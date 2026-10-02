@@ -54,11 +54,23 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val currentIndex = audioPlayer.currentIndex
     val playbackError = audioPlayer.playbackError
 
-    // Estado de ecualizador
+    // Estado de ecualizador y efectos
     val eqBands = effectManager.bands
     val bassBoostLevel = effectManager.bassBoostLevel
     val currentPreset = effectManager.currentPreset
     val isEqEnabled = effectManager.isEnabled
+    val spatial8DConfig = effectManager.spatial8DConfig
+
+    // Estados de velocidad, tono, crossfade y gapless
+    val playbackSpeed = audioPlayer.playbackSpeed
+    val playbackPitch = audioPlayer.playbackPitch
+    val crossfadeSeconds = audioPlayer.crossfadeSeconds
+    val isGaplessEnabled = audioPlayer.isGaplessEnabled
+
+    // Estado del Temporizador de Apagado (Sleep Timer)
+    private var sleepTimerJob: kotlinx.coroutines.Job? = null
+    private val _sleepTimerState = MutableStateFlow(com.example.model.SleepTimerState())
+    val sleepTimerState: StateFlow<com.example.model.SleepTimerState> = _sleepTimerState.asStateFlow()
 
     // Estados de navegación y UI
     private val _currentScreen = MutableStateFlow<NavScreen>(NavScreen.Home)
@@ -318,8 +330,93 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun applyPreset(preset: EqualizerPreset) = effectManager.applyPreset(preset)
 
+    // Acciones de Audio Espacial 8D C++20
+    fun set8DEnabled(enabled: Boolean) = effectManager.set8DEnabled(enabled)
+
+    fun set8DOrbitSpeed(speedSeconds: Float) = effectManager.set8DOrbitSpeed(speedSeconds)
+
+    fun set8DSpatialIntensity(intensity: Float) = effectManager.set8DSpatialIntensity(intensity)
+
+    fun set8DRoomDepth(depth: Float) = effectManager.set8DRoomDepth(depth)
+
+    // Acciones de Velocidad y Tono (Playback Parameters)
+    fun setPlaybackSpeed(speed: Float) = audioPlayer.setPlaybackSpeed(speed)
+
+    fun setPlaybackPitch(pitch: Float) = audioPlayer.setPlaybackPitch(pitch)
+
+    fun resetSpeedAndPitch() = audioPlayer.resetSpeedAndPitch()
+
+    // Acciones de Transición de Pistas (Crossfade y Gapless)
+    fun setCrossfadeSeconds(seconds: Int) = audioPlayer.setCrossfadeSeconds(seconds)
+
+    fun setGaplessEnabled(enabled: Boolean) = audioPlayer.setGaplessEnabled(enabled)
+
+    // Acciones del Temporizador de Apagado (Sleep Timer con Fade-Out de 10s)
+    fun startSleepTimer(minutes: Int) {
+        if (minutes <= 0) return
+        sleepTimerJob?.cancel()
+        val totalSec = minutes * 60
+        _sleepTimerState.value = com.example.model.SleepTimerState(
+            isActive = true,
+            totalSeconds = totalSec,
+            remainingSeconds = totalSec,
+            isFadingOut = false
+        )
+        audioPlayer.setVolume(1.0f)
+
+        sleepTimerJob = viewModelScope.launch(Dispatchers.Default) {
+            var currentRemaining = totalSec
+            while (currentRemaining > 0) {
+                kotlinx.coroutines.delay(1000)
+                currentRemaining--
+                val isFading = currentRemaining in 1..10
+                _sleepTimerState.value = _sleepTimerState.value.copy(
+                    remainingSeconds = currentRemaining,
+                    isFadingOut = isFading
+                )
+
+                if (isFading) {
+                    val fadeFactor = (currentRemaining / 10.0f).coerceIn(0.0f, 1.0f)
+                    audioPlayer.setVolume(fadeFactor)
+                }
+            }
+
+            // Al cumplirse el tiempo, pausar reproducción y restaurar volumen para futuras reproducciones
+            if (audioPlayer.isPlaying.value) {
+                audioPlayer.togglePlayPause()
+            }
+            audioPlayer.setVolume(1.0f)
+            _sleepTimerState.value = com.example.model.SleepTimerState()
+        }
+    }
+
+    fun cancelSleepTimer() {
+        sleepTimerJob?.cancel()
+        sleepTimerJob = null
+        audioPlayer.setVolume(1.0f)
+        _sleepTimerState.value = com.example.model.SleepTimerState()
+    }
+
+    fun addSleepTimerMinutes(extraMinutes: Int = 5) {
+        val current = _sleepTimerState.value
+        if (!current.isActive) {
+            startSleepTimer(extraMinutes)
+            return
+        }
+        val addedSec = extraMinutes * 60
+        val newRemaining = current.remainingSeconds + addedSec
+        val newTotal = current.totalSeconds + addedSec
+        _sleepTimerState.value = current.copy(
+            totalSeconds = newTotal,
+            remainingSeconds = newRemaining,
+            isFadingOut = false
+        )
+        audioPlayer.setVolume(1.0f)
+    }
+
     override fun onCleared() {
         super.onCleared()
+        cancelSleepTimer()
         audioPlayer.release()
     }
 }

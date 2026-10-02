@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       enable_cache:
-        description: 'Habilitar caché de dependencias Gradle y NDK'
+        description: 'Habilitar caché de dependencias Gradle'
         required: false
         type: boolean
         default: true
@@ -33,18 +33,40 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: 🤖 3. Configurar Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: 🛠️ 4. Instalar NDK y CMake para C++20
+      - name: 🤖 3. Configurar Android SDK y Aceptar Licencias
         run: |
-          echo "=== Instalando NDK y CMake 3.22.1 ==="
-          yes | sdkmanager --licenses > /dev/null 2>&1 || true
-          sdkmanager --install "cmake;3.22.1" "ndk;25.1.8937393"
-          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/25.1.8937393" >> $GITHUB_ENV
-          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.1.8937393" >> $GITHUB_ENV
+          echo "=== Configurando entorno Android SDK ==="
+          # En runners de GitHub Actions, el Android SDK ya reside en /usr/local/lib/android/sdk
+          export ANDROID_HOME="/usr/local/lib/android/sdk"
+          export ANDROID_SDK_ROOT="/usr/local/lib/android/sdk"
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
 
-      - name: 💾 5. Caché de dependencias Gradle (Opcional)
+          # Añadir binarios de cmdline-tools y platform-tools al PATH
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
+          echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
+
+          # Aceptar todas las licencias de Android SDK de forma automática
+          echo "Aceptando licencias del SDK..."
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+
+      - name: 🛠️ 4. Instalar CMake y NDK para compilar C++20
+        run: |
+          echo "=== Instalando componentes nativos CMake 3.22.1 y NDK ==="
+          # Instalar CMake 3.22.1 requerido por el proyecto
+          sdkmanager --install "cmake;3.22.1" || true
+
+          # AGP seleccionará automáticamente la versión de NDK compatible o se instala ndk;25.1.8937393
+          sdkmanager --install "ndk;25.1.8937393" || true
+
+          # Confirmar instalación
+          if [ -d "$ANDROID_HOME/ndk/25.1.8937393" ]; then
+            echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/25.1.8937393" >> $GITHUB_ENV
+            echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.1.8937393" >> $GITHUB_ENV
+          fi
+
+      - name: 💾 5. Configurar Caché de Gradle (Opcional)
         if: ${{ inputs.enable_cache }}
         uses: actions/cache@v4
         with:
@@ -57,7 +79,7 @@ jobs:
 
       - name: 🔑 6. Generar firma de depuración desde cero
         run: |
-          echo "=== Verificando / Generando firma debug.keystore ==="
+          echo "=== Verificando / Generando firma debug.keystore limpia ==="
           if [ "${{ inputs.force_new_keystore }}" = "true" ] || [ ! -f "debug.keystore" ]; then
             echo "Eliminando cualquier keystore anterior y generando firma fresca desde cero..."
             rm -f debug.keystore
@@ -83,7 +105,7 @@ jobs:
           fi
           chmod +x ./gradlew
 
-      - name: 🚀 8. Compilar APK Debug con librerías nativas C++20
+      - name: 🚀 8. Compilar APK Debug con motor DSP C++20
         run: |
           echo "Iniciando compilación de Aura Music Debug APK..."
           ./gradlew :app:assembleDebug --no-daemon --stacktrace

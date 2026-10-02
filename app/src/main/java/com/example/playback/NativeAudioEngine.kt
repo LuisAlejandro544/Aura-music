@@ -25,10 +25,10 @@ object NativeAudioEngine {
         try {
             System.loadLibrary("auramusic_dsp")
             isLoaded = true
-            Log.i(TAG, "Motor nativo C++20 de Aura Music cargado exitosamente.")
+            try { Log.i(TAG, "Motor nativo C++20 de Aura Music cargado exitosamente.") } catch (ignored: Throwable) {}
         } catch (e: Throwable) {
             isLoaded = false
-            Log.d(TAG, "Motor C++20 preparado con respaldo de procesamiento digital de alta fidelidad.")
+            try { Log.d(TAG, "Motor C++20 preparado con respaldo de procesamiento digital de alta fidelidad.") } catch (ignored: Throwable) {}
         }
     }
 
@@ -86,6 +86,46 @@ object NativeAudioEngine {
         fallbackEnabled = enabled
     }
 
+    fun setEightDEnabled(enabled: Boolean) {
+        if (isLoaded) {
+            try {
+                nativeSetEightDEnabled(enabled)
+                return
+            } catch (ignored: Throwable) {}
+        }
+        fallback8DEnabled = enabled
+    }
+
+    fun setEightDOrbitSpeed(speedSeconds: Float) {
+        if (isLoaded) {
+            try {
+                nativeSetEightDOrbitSpeed(speedSeconds)
+                return
+            } catch (ignored: Throwable) {}
+        }
+        fallback8DOrbitSpeed = speedSeconds.coerceIn(3f, 45f)
+    }
+
+    fun setEightDSpatialIntensity(intensity: Float) {
+        if (isLoaded) {
+            try {
+                nativeSetEightDSpatialIntensity(intensity)
+                return
+            } catch (ignored: Throwable) {}
+        }
+        fallback8DIntensity = intensity.coerceIn(0f, 1f)
+    }
+
+    fun setEightDRoomDepth(depth: Float) {
+        if (isLoaded) {
+            try {
+                nativeSetEightDRoomDepth(depth)
+                return
+            } catch (ignored: Throwable) {}
+        }
+        fallback8DRoomDepth = depth.coerceIn(0f, 1f)
+    }
+
     fun processPcmBuffer(byteBuffer: ByteBuffer, offset: Int, length: Int) {
         if (isLoaded) {
             try {
@@ -104,13 +144,22 @@ object NativeAudioEngine {
     private external fun nativeSetBassBoost(strength: Float)
     private external fun nativeSetDspEnabled(enabled: Boolean)
     private external fun nativeProcessPcmBuffer(byteBuffer: ByteBuffer, offset: Int, length: Int)
+    private external fun nativeSetEightDEnabled(enabled: Boolean)
+    private external fun nativeSetEightDOrbitSpeed(speedSeconds: Float)
+    private external fun nativeSetEightDSpatialIntensity(intensity: Float)
+    private external fun nativeSetEightDRoomDepth(depth: Float)
 
-    // --- Implementación de Respaldo Matemático Idéntico (Filtros Bi-cuadráticos 64-bit) ---
+    // --- Implementación de Respaldo Matemático Idéntico (Filtros Bi-cuadráticos 64-bit y 8D) ---
     private var fallbackSampleRate = 44100
     private var fallbackChannels = 2
     private var fallbackEnabled = true
     private var fallbackBassBoost = 0f
     private val fallbackGains = DoubleArray(10) { 0.0 }
+    private var fallback8DEnabled = false
+    private var fallback8DOrbitSpeed = 10f
+    private var fallback8DIntensity = 0.85f
+    private var fallback8DRoomDepth = 0.35f
+    private var fallback8DAngle = 0.0
 
     private class BiquadCoeffs {
         var b0 = 1.0; var b1 = 0.0; var b2 = 0.0
@@ -184,26 +233,51 @@ object NativeAudioEngine {
     }
 
     private fun processFallback(byteBuffer: ByteBuffer, offset: Int, length: Int) {
-        if (!fallbackEnabled || length <= 0) return
+        if ((!fallbackEnabled && !fallback8DEnabled) || length <= 0) return
         try {
             val shortBuffer = byteBuffer.duplicate().order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
             val startShort = offset / 2
             val shortCount = length / 2
+            val deltaAngle = (2.0 * Math.PI) / (fallbackSampleRate * fallback8DOrbitSpeed.toDouble())
+
             for (i in startShort until (startShort + shortCount) step fallbackChannels) {
                 var sL = shortBuffer.get(i) / 32768.0
-                if (fallbackBassBoost > 0.001f) sL = bassFilterL.process(sL)
-                for (b in 0 until 10) {
-                    if (abs(fallbackGains[b]) > 0.01) sL = filtersL[b].process(sL)
+                var sR = if (fallbackChannels > 1 && (i + 1) < (startShort + shortCount)) {
+                    shortBuffer.get(i + 1) / 32768.0
+                } else sL
+
+                if (fallbackEnabled) {
+                    if (fallbackBassBoost > 0.001f) {
+                        sL = bassFilterL.process(sL)
+                        sR = bassFilterR.process(sR)
+                    }
+                    for (b in 0 until 10) {
+                        if (abs(fallbackGains[b]) > 0.01) {
+                            sL = filtersL[b].process(sL)
+                            sR = filtersR[b].process(sR)
+                        }
+                    }
                 }
+
+                if (fallback8DEnabled && fallbackChannels > 1) {
+                    fallback8DAngle += deltaAngle
+                    if (fallback8DAngle >= 2.0 * Math.PI) fallback8DAngle -= 2.0 * Math.PI
+
+                    val sinA = sin(fallback8DAngle)
+                    val pan = (sinA * fallback8DIntensity).coerceIn(-1.0, 1.0)
+                    val gL = sqrt((0.5 * (1.0 - pan)).coerceIn(0.0, 1.0)) * 1.414
+                    val gR = sqrt((0.5 * (1.0 + pan)).coerceIn(0.0, 1.0)) * 1.414
+
+                    val oL = (sL * 0.75 + sR * 0.25) * gL
+                    val oR = (sR * 0.75 + sL * 0.25) * gR
+                    sL = oL
+                    sR = oR
+                }
+
                 sL = (sL.coerceIn(-1.2, 1.2)).let { it - (it * it * it) / 6.0 }
                 shortBuffer.put(i, (sL * 32767.0).coerceIn(-32768.0, 32767.0).toInt().toShort())
 
                 if (fallbackChannels > 1 && (i + 1) < (startShort + shortCount)) {
-                    var sR = shortBuffer.get(i + 1) / 32768.0
-                    if (fallbackBassBoost > 0.001f) sR = bassFilterR.process(sR)
-                    for (b in 0 until 10) {
-                        if (abs(fallbackGains[b]) > 0.01) sR = filtersR[b].process(sR)
-                    }
                     sR = (sR.coerceIn(-1.2, 1.2)).let { it - (it * it * it) / 6.0 }
                     shortBuffer.put(i + 1, (sR * 32767.0).coerceIn(-32768.0, 32767.0).toInt().toShort())
                 }

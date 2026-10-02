@@ -63,6 +63,21 @@ class AuraAudioPlayer(
     private val _playbackError = MutableStateFlow<String?>(null)
     val playbackError: StateFlow<String?> = _playbackError.asStateFlow()
 
+    private val _playbackSpeed = MutableStateFlow(1.0f)
+    val playbackSpeed: StateFlow<Float> = _playbackSpeed.asStateFlow()
+
+    private val _playbackPitch = MutableStateFlow(1.0f)
+    val playbackPitch: StateFlow<Float> = _playbackPitch.asStateFlow()
+
+    private val _crossfadeSeconds = MutableStateFlow(0)
+    val crossfadeSeconds: StateFlow<Int> = _crossfadeSeconds.asStateFlow()
+
+    private val _isGaplessEnabled = MutableStateFlow(true)
+    val isGaplessEnabled: StateFlow<Boolean> = _isGaplessEnabled.asStateFlow()
+
+    private var baseVolume = 1.0f
+    private var fadeInJob: Job? = null
+
     private val nativeAudioProcessor = NativeAudioProcessor()
 
     init {
@@ -149,11 +164,66 @@ class AuraAudioPlayer(
                 .build()
 
             player.setMediaItem(mediaItem)
+            player.playbackParameters = androidx.media3.common.PlaybackParameters(_playbackSpeed.value, _playbackPitch.value)
             player.prepare()
             player.play()
+
+            // Manejar fundido de entrada si el crossfade está configurado
+            fadeInJob?.cancel()
+            if (_crossfadeSeconds.value > 0) {
+                player.volume = 0.05f * baseVolume
+                fadeInJob = playerScope.launch {
+                    val steps = 15
+                    val stepDelay = (_crossfadeSeconds.value * 1000L) / steps
+                    for (i in 1..steps) {
+                        delay(stepDelay.coerceAtLeast(40L))
+                        if (!isActive) break
+                        val factor = i.toFloat() / steps.toFloat()
+                        player.volume = baseVolume * factor
+                    }
+                    player.volume = baseVolume
+                }
+            } else {
+                player.volume = baseVolume
+            }
         } catch (e: Exception) {
             _playbackError.value = "No se pudo cargar la pista: ${e.message}"
         }
+    }
+
+    fun setPlaybackSpeed(speed: Float) {
+        val clamped = speed.coerceIn(0.25f, 3.0f)
+        _playbackSpeed.value = clamped
+        applyPlaybackParameters()
+    }
+
+    fun setPlaybackPitch(pitch: Float) {
+        val clamped = pitch.coerceIn(0.25f, 3.0f)
+        _playbackPitch.value = clamped
+        applyPlaybackParameters()
+    }
+
+    fun resetSpeedAndPitch() {
+        _playbackSpeed.value = 1.0f
+        _playbackPitch.value = 1.0f
+        applyPlaybackParameters()
+    }
+
+    private fun applyPlaybackParameters() {
+        exoPlayer?.playbackParameters = androidx.media3.common.PlaybackParameters(_playbackSpeed.value, _playbackPitch.value)
+    }
+
+    fun setVolume(volume: Float) {
+        baseVolume = volume.coerceIn(0.0f, 1.0f)
+        exoPlayer?.volume = baseVolume
+    }
+
+    fun setCrossfadeSeconds(seconds: Int) {
+        _crossfadeSeconds.value = seconds.coerceIn(0, 12)
+    }
+
+    fun setGaplessEnabled(enabled: Boolean) {
+        _isGaplessEnabled.value = enabled
     }
 
     fun togglePlayPause() {
@@ -292,6 +362,16 @@ class AuraAudioPlayer(
                     if (player.duration > 0) {
                         _duration.value = player.duration
                     }
+
+                    // Atenuación progresiva al acercarse al final si el crossfade está habilitado
+                    if (_crossfadeSeconds.value > 0 && player.duration > 0 && player.isPlaying && fadeInJob?.isActive != true) {
+                        val remainingMs = player.duration - player.currentPosition
+                        val crossfadeMs = _crossfadeSeconds.value * 1000L
+                        if (remainingMs in 0..crossfadeMs) {
+                            val factor = (remainingMs.toFloat() / crossfadeMs.toFloat()).coerceIn(0.05f, 1.0f)
+                            player.volume = baseVolume * factor
+                        }
+                    }
                 }
                 delay(250)
             }
@@ -301,6 +381,8 @@ class AuraAudioPlayer(
     private fun stopProgressTracking() {
         progressJob?.cancel()
         progressJob = null
+        fadeInJob?.cancel()
+        fadeInJob = null
     }
 
     fun release() {

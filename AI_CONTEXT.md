@@ -36,7 +36,9 @@ Este archivo define el contexto de diseño, directrices técnicas y restriccione
 6. **Motor de Audio y C++20**:
    - Se debe utilizar **Jetpack Media3 (ExoPlayer)** (`androidx.media3:media3-*`).
    - El ecualizador paramétrico cuenta con **10 bandas ISO** y limitador anti-clipping en **ISO C++20** con filtros biquad de doble precisión.
-   - La entrada al ecualizador se realiza desde el **Mini Reproductor** y la pantalla **Now Playing**, manteniendo despejada la barra inferior de navegación.
+   - El motor de **Audio 8D Espacial** está integrado en **ISO C++20** mediante paneo orbital continuo de potencia constante, filtro de sombra de cabeza y reverberación binaural para auriculares.
+   - La reproducción incluye soporte para velocidad/tono en tiempo real, transiciones suaves (Crossfade ajustable de 0 a 12s con desvanecimiento de volumen), reproducción Gapless y un Temporizador de Apagado personalizable con atenuación de 10s.
+   - La entrada a estos efectos se realiza desde la pantalla **Now Playing** (`AudioEffectsBottomSheet`) y el **Mini Reproductor**, manteniendo despejada la barra inferior de navegación.
 
 7. **Diseño de Interfaz (Jetpack Compose & M3)**:
    - Fondos 100% opacos OLED: evitar transparencias que permitan que las listas o cabeceras se filtren por detrás del reproductor o mini reproductor.

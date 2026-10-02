@@ -30,6 +30,9 @@ class AudioEffectManager {
     private val _currentPreset = MutableStateFlow(EqualizerPreset.PRESETS.first())
     val currentPreset: StateFlow<EqualizerPreset> = _currentPreset.asStateFlow()
 
+    private val _spatial8DConfig = MutableStateFlow(com.example.model.Spatial8DConfig())
+    val spatial8DConfig: StateFlow<com.example.model.Spatial8DConfig> = _spatial8DConfig.asStateFlow()
+
     init {
         // Inicializar motor DSP nativo C++20 con valores iniciales
         NativeAudioEngine.setDspEnabled(true)
@@ -110,12 +113,39 @@ class AudioEffectManager {
         setBassBoost(preset.bassBoost)
     }
 
+    fun set8DEnabled(enabled: Boolean) {
+        _spatial8DConfig.value = _spatial8DConfig.value.copy(enabled = enabled)
+        NativeAudioEngine.setEightDEnabled(enabled)
+    }
+
+    fun set8DOrbitSpeed(speedSeconds: Float) {
+        val clamped = speedSeconds.coerceIn(3f, 45f)
+        _spatial8DConfig.value = _spatial8DConfig.value.copy(orbitSpeedSeconds = clamped)
+        NativeAudioEngine.setEightDOrbitSpeed(clamped)
+    }
+
+    fun set8DSpatialIntensity(intensity: Float) {
+        val clamped = intensity.coerceIn(0f, 1f)
+        _spatial8DConfig.value = _spatial8DConfig.value.copy(spatialIntensity = clamped)
+        NativeAudioEngine.setEightDSpatialIntensity(clamped)
+    }
+
+    fun set8DRoomDepth(depth: Float) {
+        val clamped = depth.coerceIn(0f, 1f)
+        _spatial8DConfig.value = _spatial8DConfig.value.copy(roomDepth = clamped)
+        NativeAudioEngine.setEightDRoomDepth(clamped)
+    }
+
     private fun syncWithNativeEngine() {
         NativeAudioEngine.setDspEnabled(_isEnabled.value)
         _bands.value.forEach { band ->
             NativeAudioEngine.setBandGain(band.index, band.levelMb / 100.0f)
         }
         NativeAudioEngine.setBassBoost(_bassBoostLevel.value / 1000.0f)
+        NativeAudioEngine.setEightDEnabled(_spatial8DConfig.value.enabled)
+        NativeAudioEngine.setEightDOrbitSpeed(_spatial8DConfig.value.orbitSpeedSeconds)
+        NativeAudioEngine.setEightDSpatialIntensity(_spatial8DConfig.value.spatialIntensity)
+        NativeAudioEngine.setEightDRoomDepth(_spatial8DConfig.value.roomDepth)
     }
 
     private fun releaseHardwareEffects() {

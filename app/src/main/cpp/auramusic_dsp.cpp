@@ -56,4 +56,26 @@ Java_com_example_playback_NativeAudioEngine_nativeProcessPcmBuffer(JNIEnv* env, 
     }
 }
 
+JNIEXPORT void JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeSetEightDEnabled(JNIEnv* /* env */, jobject /* thiz */, jboolean enabled) {
+    LOGI("Aura Music Audio 8D: %s", enabled ? "ACTIVADO" : "DESACTIVADO");
+    sDspEngine.setEightDEnabled(enabled == JNI_TRUE);
 }
+
+JNIEXPORT void JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeSetEightDOrbitSpeed(JNIEnv* /* env */, jobject /* thiz */, jfloat speedSeconds) {
+    sDspEngine.setEightDOrbitSpeed(static_cast<double>(speedSeconds));
+}
+
+JNIEXPORT void JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeSetEightDSpatialIntensity(JNIEnv* /* env */, jobject /* thiz */, jfloat intensity) {
+    sDspEngine.setEightDSpatialIntensity(static_cast<double>(intensity));
+}
+
+JNIEXPORT void JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeSetEightDRoomDepth(JNIEnv* /* env */, jobject /* thiz */, jfloat depth) {
+    sDspEngine.setEightDRoomDepth(static_cast<double>(depth));
+}
+
+}
+

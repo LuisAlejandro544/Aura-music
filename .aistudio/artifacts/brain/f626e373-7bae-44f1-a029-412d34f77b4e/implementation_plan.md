@@ -1,138 +1,123 @@
-# Plan de Integración C++20, Carátulas Personalizadas, Playlists Reactivas, Animaciones y GitHub Actions
+# Temporizador, Crossfade/Gapless, Pitch/Speed y Audio 8D en C++20 🎧⏱️
 
-Plan de ingeniería para completar la integración nativa del motor DSP C++20 en el APK final, incorporar el selector de carátulas personalizadas desde galería con eliminación física del arte previo, habilitar la gestión de playlists sincronizadas con persistencia Room en la Biblioteca (incluyendo lista automática de canciones favoritas), perfeccionar las animaciones de interfaz y configurar un flujo de integración continua en GitHub Actions de ejecución manual con firma autónoma y script shell.
+Implementación integral de cuatro capacidades avanzadas de reproducción y audio en **Aura Music**: un Temporizador de Apagado personalizable con cuenta regresiva y desvanecimiento suave de 10 segundos, Transición Suave entre Canciones (Crossfade configurable) con Reproducción Gapless, Control en tiempo real de Velocidad (0.5x - 2.0x) y Tono (Pitch), y un motor nativo de **Audio 8D Espacial Binaural en C++20** configurable sin modelos 3D invasivos, accesible desde un Bottom Sheet en la pantalla Now Playing.
 
 ---
 
-## Decisiones Críticas y Resumen de Alcance
+## Decisiones Críticas y Preferencias Confirmadas
 
 > [!IMPORTANT]
-> Este plan consolida las 5 áreas solicitadas respetando estrictamente el manual de operaciones `AGENTS.md`, la versión mínima `minSdk = 26`, la autonomía total sin archivos `.env` y el diseño con fondos OLED 100% opacos:
->
-> 1. **C++20 NDK Integrado en el APK**: Se añade la configuración `externalNativeBuild` con `cmake` y filtros ABI (`arm64-v8a`, `armeabi-v7a`, `x86_64`, `x86`) en `app/build.gradle.kts` para empaquetar la librería `libauramusic_dsp.so` real en el APK, manteniendo intacto el respaldo matemático en Kotlin en caso de fallos de entorno.
-> 2. **Carátulas Personalizadas desde Galería**: Implementación del selector moderno Android Photo Picker (`ActivityResultContracts.PickVisualMedia`). Al elegir una nueva imagen, se convierte a WebP sin pérdida en `Dispatchers.IO`, se elimina físicamente el archivo de carátula WebP anterior en `images/` para evitar acumulación de basura y se actualiza la base de datos Room.
-> 3. **Gestión Completa de Playlists en la Biblioteca**:
->    - Pestaña "Playlists" completamente operativa en `LibraryScreen`.
->    - Playlist fija "Tus Me Gusta" / Favoritos que sincroniza dinámicamente las canciones marcadas con corazón.
->    - Creación y edición de nombres de playlists personalizadas con diálogo estilizado.
->    - Modal contextual para añadir/quitar canciones a playlists desde cualquier canción o desde la vista de detalle.
-> 4. **Pulido de Animaciones del Sistema**:
->    - Transiciones de pantalla suaves con interpolación `tween` / `spring` en Compose.
->    - Expansión/colapso continuo del mini reproductor hacia Now Playing.
->    - Animación fluida de la barra de progreso y barras del ecualizador.
-> 5. **GitHub Actions y Script Shell Autónomo**:
->    - Archivo `.github/workflows/build-debug-apk.yml` con trigger manual (`workflow_dispatch`), configuración de NDK/CMake, caché Gradle opcional, generación dinámica de `debug.keystore` en el runner y empaquetado del APK Debug.
->    - Script `scripts/generate_keystore_and_build.sh` 100% ejecutable que crea la firma desde cero con `keytool` y ejecuta la compilación sin requerir credenciales externas.
+> Se han incorporado las preferencias confirmadas por el usuario durante la fase de clarificación:
+
+- **Punto de Acceso UI**: Acceso directo mediante una hoja inferior deslizable (*Modal BottomSheet*) integrada en la pantalla **Now Playing**, manteniendo la interfaz limpia y accesible durante la escucha.
+- **Control de Audio 8D**: Efecto espacial binaural que se activa/desactiva con interruptor, sin gráficos 3D sobrecargados, con deslizadores intuitivos para velocidad de órbita, intensidad binaural y profundidad acústica de sala.
+- **Comportamiento del Temporizador**: Cuenta regresiva en vivo con atenuación progresiva de volumen (*fade-out* suave de 10 segundos) antes de pausar la reproducción para una transición natural al dormir.
 
 ---
 
-## 1. Experiencia de Usuario y Flujos
+## 1. Visión General del Concepto
 
-### Flujo de Selección de Carátula Personalizada
-1. El usuario abre el menú de opciones (tres puntos) de cualquier canción o el botón de edición en `NowPlayingScreen`.
-2. En el diálogo `EditTrackDialog`, se visualiza la carátula actual (WebP o procedural) y un botón destacado "Cambiar Carátula".
-3. Al pulsarlo, se lanza el Photo Picker nativo del sistema. Al seleccionar una imagen, se muestra una previsualización inmediata.
-4. Al presionar "Guardar", un corrutina en `Dispatchers.IO` comprime la imagen a WebP en `Android/data/.../files/images/`, elimina el archivo `.webp` anterior de dicha pista, actualiza el campo `artworkUri` en Room y refresca instantáneamente la interfaz.
-
-### Flujo de Playlists en la Biblioteca
-1. En `LibraryScreen`, el usuario selecciona la pestaña "Playlists".
-2. Se muestra en primer lugar la tarjeta especial "Tus Me Gusta" con gradiente neón distintivo y contador de canciones favoritas.
-3. Se incluye el botón "+ Nueva Playlist" para crear listas con nombre personalizado.
-4. Cada canción cuenta con la opción "Añadir a playlist" en su menú desplegable.
-5. Al hacer clic en cualquier playlist, se navega a `PlaylistDetailScreen` con reproducción de la lista, edición del título, opción de añadir pistas y reordenación.
-
-### Micro-interacciones y Animaciones Fluidas
-* **Transiciones de vista**: Animaciones de desvanecimiento con deslizamiento sutil (`slideInVertically` / `fadeIn`) entre pantallas secundarias y el reproductor principal.
-* **Now Playing Expandible**: Apertura fluida desde el mini reproductor con amortiguación natural.
-* **Pulsación de Controles**: Feedback táctil con escala elástica en los botones Play/Pause, Shuffle y Like.
+Aura Music evoluciona su motor de audio para proporcionar herramientas de control de escucha profesional y experiencias inmersivas:
+1. **Temporizador de Apagado Personalizable**: Permite introducir cualquier número de minutos deseado (además de presets rápidos de 15, 30, 45, 60 min), mostrando el tiempo restante en vivo y aplicando un *fade-out* lineal de 10 segundos para no interrumpir abruptamente el sueño del usuario.
+2. **Crossfade y Reproducción Gapless**: Eliminación de silencios entre pistas consecutivas (Gapless) y fundido cruzado ajustable de 0 a 12 segundos para enlazar el final y principio de canciones como en una sesión de DJ.
+3. **Control de Velocidad y Tono (Pitch & Speed)**: Ajuste independiente del tempo (0.5x a 2.0x) y la frecuencia tonal del audio mediante los parámetros nativos de Media3, con botones rápidos de restablecimiento (1.0x).
+4. **Motor Nativo de Audio 8D en C++20**: Algoritmo de rotación espacial binaural desarrollado en C++20 con cálculo trigonométrico orbital en tiempo real, modulación de retardo interaural (ITD), filtrado espectral de atenuación posterior y reverberación acústica ambiental en coma flotante de 64 bits.
 
 ---
 
-## 2. Decisiones Técnicas y Arquitectura
+## 2. Experiencia de Usuario y Diseño Visual
+
+### Flujos Principales de Usuario
+- **Apertura de la Hoja de Efectos**: El usuario toca el nuevo icono de "Efectos & Temporizador" (mezclador / temporizador) en la barra superior de Now Playing.
+- **Configuración del Temporizador**:
+  - Toca un chip rápido (15m, 30m, 45m, 60m) o pulsa "Personalizado" para escribir exactamente los minutos deseados (por ejemplo, 23 o 90 minutos).
+  - Al iniciar, se muestra un indicador visual animado con la cuenta regresiva en formato `mm:ss` y un botón para cancelar o añadir 5 minutos más.
+  - Al llegar a los últimos 10 segundos, el volumen disminuye fluidamente de 1.0 a 0.0 y se pausa la reproducción.
+- **Ajuste de Velocidad y Tono**:
+  - Deslizador de velocidad de reproducción (0.50x a 2.00x) con incrementos de 0.05x y presets (0.8x, 1.0x, 1.25x, 1.5x).
+  - Deslizador de afinación/tono musical con opción de bloqueo a tono estándar o modificación creativa.
+- **Experiencia de Audio 8D**:
+  - Interruptor maestro de activación 8D.
+  - Slider de **Velocidad de Órbita**: Ajusta los segundos por vuelta completa (de 4 a 30 segundos por rotación alrededor de la cabeza).
+  - Slider de **Ancho e Intensidad Espacial**: Regula la amplitud del efecto binaural (0% a 100%).
+  - Slider de **Profundidad de Sala**: Aplica una leve cola de reflexión espacial para sensación de escucha en sala abierta con audífonos.
+
+### Estilo Visual y Paleta M3 Dark Luxury
+- Hoja inferior opaca 100% OLED en superficie `Color(0xFF0F0F16)` con esquinas redondeadas (28.dp).
+- Acentos brillantes correspondientes al tema activo (Nebula Violet, Cyber Mint, Sunset Ember u Ocean Abyss).
+- Sliders M3 con retroalimentación visual del valor actual y botones táctiles con un área mínima de 48.dp.
+
+---
+
+## 3. Decisiones Clave de Producto y Arquitectura
+
+### Decisión 1: Implementación de Audio 8D en C++20 Nativo
+- **Enfoque**: Extender la clase `NativeDspEngine` en `auramusic_dsp.h` y `auramusic_dsp.cpp` agregando un módulo `EightDProcessor`.
+- **Por qué**: El cálculo de fase angular, retardo de muestras (fracción de milisegundos para ITD - Interaural Time Difference) y paneo de potencia constante $L = \cos(\theta), R = \sin(\theta)$ se ejecuta de forma óptima a 44.1/48 kHz en C++ con `std::span` sin provocar pausas de recolección de basura (*Garbage Collector*) en Android.
+- **Alternativas descartadas**: No hacerlo en Java/Kotlin porque procesar 176,400 bytes por segundo en la JVM genera latencia y consumo excesivo de batería.
+
+### Decisión 2: Control de Velocidad y Tono mediante Media3 PlaybackParameters
+- **Enfoque**: Utilizar la API oficial de `androidx.media3.common.PlaybackParameters(speed, pitch)` integrada en `ExoPlayer`.
+- **Por qué**: Media3 incluye algoritmos Sonic optimizados por hardware para estiramiento temporal de audio de alta calidad sin artefactos robóticos.
+
+### Decisión 3: Manejo del Temporizador con Corrutinas y Fade-Out Gradual
+- **Enfoque**: Un `Job` dedicado en `MusicViewModel` que actualiza el estado reactivo `timerRemainingSeconds: StateFlow<Long?>`. En los últimos 10 segundos, interpola linealmente el volumen de `AuraAudioPlayer` cada 250ms hasta cero antes de ejecutar `pause()`.
+
+---
+
+## 4. Arquitectura Técnica y Estrategia de Datos
+
+### Diagrama del Sistema
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                       Aura Music Compose UI                     │
-│  HomeScreen  │  LibraryScreen (Playlists)  │  NowPlayingScreen  │
-└────────────────────────────────┬────────────────────────────────┘
-                                 │
-                     ┌───────────▼───────────┐
-                     │     MusicViewModel    │
-                     └─────┬───────────┬─────┘
-                           │           │
-            ┌──────────────▼─────┐  ┌──▼─────────────────────────┐
-            │  MusicRepository   │  │   AuraAudioPlayer (Media3) │
-            └──────┬───────┬─────┘  └──┬─────────────────────────┘
-                   │       │           │
-     ┌─────────────▼─┐  ┌──▼─────────┐ │
-     │  Room Database│  │ AppStorage │ │
-     │ (Tracks &     │  │ Manager    │ │
-     │  Playlists)   │  │ (WebP/Loss)│ │
-     └───────────────┘  └────────────┘ │
-                                       │ PCM Audio Buffer
-                        ┌──────────────▼─────────────┐
-                        │ NativeAudioProcessor (JNI) │
-                        └──────────────┬─────────────┘
-                                       │ std::span
-                        ┌──────────────▼─────────────┐
-                        │   auramusic_dsp.cpp C++20  │
-                        │ (10-Band Biquads + Limiter)│
-                        └────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│                   NowPlayingScreen / UI (Compose M3)                   │
+│  ┌───────────────────────┐  ┌───────────────────────────────────────┐  │
+│  │ NowPlayingTopBar      │  │ AudioEffectsBottomSheet               │  │
+│  │ [Icono Efectos/Timer] ├─►│ ├─ Sleep Timer (Personalizado/Fade10s)│  │
+│  └───────────────────────┘  │ ├─ Crossfade & Gapless Controls       │  │
+│                             │ ├─ Speed & Pitch Sliders              │  │
+│                             │ └─ 8D Audio Switch & Orbit Controls   │  │
+│                             └──────────────────┬────────────────────┘  │
+└────────────────────────────────────────────────┼───────────────────────┘
+                                                 │
+                                                 ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                   MusicViewModel (Gestión de Estado)                   │
+│  - sleepTimerJob: Job?               - timerSecondsRemaining: Flow     │
+│  - crossfadeDurationSeconds: Flow    - isGaplessEnabled: Flow          │
+│  - playbackSpeed: Flow               - playbackPitch: Flow             │
+│  - is8DEnabled: Flow                 - orbitSpeedSeconds: Flow         │
+│  - spatialIntensity: Flow            - roomDepth: Flow                 │
+└───────────────────────┬───────────────────────────────┬────────────────┘
+                        │                               │
+                        ▼                               ▼
+       ┌────────────────────────────────┐  ┌─────────────────────────────┐
+       │       AuraAudioPlayer          │  │     NativeAudioEngine       │
+       │  (Media3 ExoPlayer Wrapper)    │  │        (Puente JNI)         │
+       │  - setPlaybackParameters()     │  └──────────────┬──────────────┘
+       │  - setVolumeWithFade()         │                 │ JNI Call
+       │  - crossfadeTransitionHandler  │                 ▼
+       └────────────────┬───────────────┘  ┌─────────────────────────────┐
+                        │ PCM Audio Sink   │    auramusic_dsp.cpp/h      │
+                        │                  │       (Motor C++20)         │
+                        └─────────────────►│  - Biquad 10-Band Filters   │
+                                           │  - Soft Limiter             │
+                                           │  - 8D Binaural Orbit Engine │
+                                           └─────────────────────────────┘
 ```
 
-### Integración NDK en `app/build.gradle.kts`
-Se declara el enlace nativo para asegurar que CMake compile el módulo `auramusic_dsp` para las arquitecturas de 32 y 64 bits:
-```kotlin
-android {
-    defaultConfig {
-        ndk {
-            abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86"))
-        }
-    }
-    externalNativeBuild {
-        cmake {
-            path = file("src/main/cpp/CMakeLists.txt")
-            version = "3.22.1"
-        }
-    }
-}
-```
+### Entidades y Modelos
+- `AudioPlaybackConfig`: Estado que agrupa `speed: Float`, `pitch: Float`, `crossfadeSeconds: Int`, `gapless: Boolean`.
+- `SpatialAudio8DConfig`: Estado que agrupa `enabled: Boolean`, `orbitSpeedSeconds: Float`, `spatialIntensity: Float`, `roomDepth: Float`.
+- `SleepTimerState`: Estado reactivo con `isActive: Boolean`, `totalSeconds: Int`, `remainingSeconds: Int`, `inFadeOut: Boolean`.
 
-### Gestión de Carátulas en `AppStorageManager`
-* Función `saveCustomArtwork(trackId: Long, sourceUri: Uri): String?`: decodifica la imagen de la galería, la comprime a WebP sin pérdida en `images/track_{id}_{timestamp}.webp` y elimina el archivo anterior si existía.
-
-### Modelo de Playlists en Room
-* `PlaylistEntity`: `id`, `name`, `createdAt`, `isFavorites`.
-* `PlaylistTrackCrossRef`: asociación muchos a muchos entre pistas y listas.
-* Sincronización continua de la playlist de "Me Gusta" con la propiedad `isFavorite` de `TrackEntity`.
-
----
-
-## 3. GitHub Actions & Automatización de Compilación
-
-### Workflow: `.github/workflows/build-debug-apk.yml`
-* **Activación**: Únicamente manual (`workflow_dispatch`).
-* **Etapas**:
-  1. *Checkout* del repositorio completo.
-  2. Configuración de JDK 17.
-  3. Instalación de Android NDK y CMake para compilar las bibliotecas C++20.
-  4. Caché de dependencias Gradle para acelerar ejecuciones posteriores.
-  5. Generación autónoma de un `debug.keystore` si no existe en el repositorio mediante `keytool`.
-  6. Compilación de `gradle :app:assembleDebug`.
-  7. Publicación del artefacto APK Debug generado para descarga directa.
-
-### Script Shell: `scripts/generate_keystore_and_build.sh`
-* Script en Bash que regenera de forma limpia una clave debug RSA de 2048 bits con validez de 10.000 días y ejecuta la compilación nativa completa localmente o dentro del CI.
-
----
-
-## 4. Plan de Ejecución Paso a Paso
-
-1. **Paso 1: Configuración Gradle C++20**: Modificar `app/build.gradle.kts` para incluir el bloque `externalNativeBuild` con CMake y las ABI filters correspondientes.
-2. **Paso 2: Almacenamiento y Carátulas Personalizadas**: Implementar la lógica de reemplazo WebP y borrado seguro de la carátula previa en `AppStorageManager` y conectar el Photo Picker en `EditTrackDialog`.
-3. **Paso 3: Sincronización de Playlists en Room y ViewModel**: Extender `PlaylistDao`, `MusicRepository` y `MusicViewModel` con flujos reactivos para crear playlists, añadir pistas y mantener la lista fija de "Tus Me Gusta".
-4. **Paso 4: Pantallas de Biblioteca y Detalle de Playlist**: Actualizar `LibraryScreen` para listar las playlists con diseño de tarjetas neón y afinar `PlaylistDetailScreen`.
-5. **Paso 5: Pulido de Animaciones**: Incorporar transiciones animadas consistentes en la navegación, el mini reproductor y los botones de control.
-6. **Paso 6: Workflow de GitHub Actions y Script Shell**: Crear `.github/workflows/build-debug-apk.yml` y `scripts/generate_keystore_and_build.sh`.
-7. **Paso 7: Actualización de Documentación**: Reflejar los cambios en `README.md`, `ROADMAP.md` y `STRUCTURE.md`.
-8. **Paso 8: Verificación**: Compilar el proyecto con `compile_applet` para asegurar cero errores de compilación.
+### Mapeo de Componentes Interactivos y Manejadores
+1. **Sleep Timer**:
+   - `startSleepTimer(minutes: Int)`: Cancela temporizador previo si existe, inicia cuenta atrás de 1s con `delay(1000)`. Al restar ≤ 10s, modula `player.setVolume()`. Al llegar a 0s, invoca `pause()`, restaura volumen y finaliza.
+   - `cancelSleepTimer()`: Detiene la corrutina y restaura el volumen a 1.0f inmediatamente.
+2. **Speed & Pitch**:
+   - `setPlaybackSpeed(speed: Float)` y `setPlaybackPitch(pitch: Float)`: Actualizan `exoPlayer.playbackParameters`.
+3. **8D Audio en C++20**:
+   - Funciones JNI añadidas: `setEightDEnabled(boolean)`, `setEightDOrbitSpeed(float)`, `setEightDSpatialIntensity(float)`, `setEightDRoomDepth(float)`.
+   - `EightDProcessor` en C++ calcula para cada muestra estéreo la posición orbital $\theta += \Delta\theta$, atenuación por potencia constante, y mezcla de reflexión con retardo circular.

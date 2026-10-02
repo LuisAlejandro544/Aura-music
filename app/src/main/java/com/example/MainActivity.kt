@@ -90,6 +90,13 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
     val currentPreset by viewModel.currentPreset.collectAsStateWithLifecycle()
     val isEqEnabled by viewModel.isEqEnabled.collectAsStateWithLifecycle()
 
+    val sleepTimerState by viewModel.sleepTimerState.collectAsStateWithLifecycle()
+    val spatial8DConfig by viewModel.spatial8DConfig.collectAsStateWithLifecycle()
+    val playbackSpeed by viewModel.playbackSpeed.collectAsStateWithLifecycle()
+    val playbackPitch by viewModel.playbackPitch.collectAsStateWithLifecycle()
+    val crossfadeSeconds by viewModel.crossfadeSeconds.collectAsStateWithLifecycle()
+    val isGaplessEnabled by viewModel.isGaplessEnabled.collectAsStateWithLifecycle()
+
     // Manejo de botón Atrás
     val canGoBack = isNowPlayingExpanded || (currentScreen !is NavScreen.Home)
     BackHandler(enabled = canGoBack) {
@@ -305,7 +312,25 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                 onEditTrack = { id, t, a, al -> viewModel.updateTrackInfo(id, t, a, al) },
                 onEditTrackDetails = { id, t, a, al, art, removeArt ->
                     viewModel.updateTrackDetails(id, t, a, al, art, removeArt)
-                }
+                },
+                sleepTimerState = sleepTimerState,
+                onStartSleepTimer = { viewModel.startSleepTimer(it) },
+                onCancelSleepTimer = { viewModel.cancelSleepTimer() },
+                onAddSleepTimerMinutes = { viewModel.addSleepTimerMinutes(it) },
+                spatial8DConfig = spatial8DConfig,
+                onSet8DEnabled = { viewModel.set8DEnabled(it) },
+                onSet8DOrbitSpeed = { viewModel.set8DOrbitSpeed(it) },
+                onSet8DSpatialIntensity = { viewModel.set8DSpatialIntensity(it) },
+                onSet8DRoomDepth = { viewModel.set8DRoomDepth(it) },
+                playbackSpeed = playbackSpeed,
+                onSetPlaybackSpeed = { viewModel.setPlaybackSpeed(it) },
+                playbackPitch = playbackPitch,
+                onSetPlaybackPitch = { viewModel.setPlaybackPitch(it) },
+                onResetSpeedAndPitch = { viewModel.resetSpeedAndPitch() },
+                crossfadeSeconds = crossfadeSeconds,
+                onSetCrossfadeSeconds = { viewModel.setCrossfadeSeconds(it) },
+                isGaplessEnabled = isGaplessEnabled,
+                onSetGaplessEnabled = { viewModel.setGaplessEnabled(it) }
             )
         }
     }
