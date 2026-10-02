@@ -17,33 +17,33 @@ Este documento traza las fases de evolución técnica y funcional para convertir
 
 ---
 
-## ⚡ Fase 2: Motor DSP Nativo en C++20 y Almacenamiento Organizado (Completada ✅)
+## ⚡ Fase 2: Motor DSP Nativo en C++20, Carátulas y Playlists (Completada ✅)
 
-- [x] **Ecualizador Paramétrico de 10 Bandas en C++20**:
-  - Implementación de filtros IIR bi-cuadráticos (*Peaking Biquads*) de coma flotante de 64 bits (`double`).
-  - Frecuencias ISO estándar: `31Hz, 62Hz, 125Hz, 250Hz, 500Hz, 1kHz, 2kHz, 4kHz, 8kHz, 16kHz`.
-  - Ganancia de -15 dB a +15 dB.
-- [x] **Limitador / Saturador Suave en C++**:
-  - Algoritmo anti-clipping para evitar distorsión armónica indeseada.
-- [x] **Procesador de Audio Media3 (`NativeAudioProcessor`)**:
-  - Canalización de buffers PCM hacia el motor DSP.
-- [x] **Almacenamiento Estructurado en `Android/data/com.nuestraapp/files/`**:
-  - `images/`: Carátulas en formato WebP con compresión sin pérdida (Lossless).
-  - `songs/`: Archivos de audio locales.
-  - `lyrics/`: Letras de canciones sincronizadas (.lrc).
-  - `metadata/`: Información de canciones en formato JSON (autor, artista, álbum, etc.).
-- [x] **Generador de Carátulas Procedurales**:
-  - Creación matemática de obras geométricas y gradientes vectoriales para canciones sin portada.
-- [x] **Edición de Metadatos**:
-  - Modificación de título, artista y álbum con persistencia en Room y almacenamiento JSON.
-- [x] **Acceso Directo al Ecualizador**:
-  - Integrado de forma lógica y directa en el Mini Reproductor y Now Playing, liberando la barra de navegación principal.
-- [x] **Eliminación del Sangrado Visual**:
-  - Fondos 100% opacos OLED en el reproductor completo y mini-reproductor.
+- [x] **Integración de C++20 con CMake en el APK Final**:
+  - Enlace con `externalNativeBuild` y filtros ABI (`arm64-v8a`, `armeabi-v7a`, `x86_64`, `x86`).
+  - Filtros IIR Bi-cuadráticos (*Peaking Biquads*) en C++20 con `std::span` y limitador anti-clipping.
+  - Sincronización completa de llamadas JNI con `NativeAudioEngine`.
+- [x] **Carátulas Personalizadas desde Galería**:
+  - Integración del Android Photo Picker (`ActivityResultContracts.PickVisualMedia`).
+  - Conversión a WebP sin pérdida en segundo plano (`Dispatchers.IO`).
+  - Eliminación física de la carátula anterior para evitar basura en almacenamiento.
+  - Opción de restaurar a arte procedural en cualquier momento.
+- [x] **Sistema Completo de Playlists en la Biblioteca**:
+  - Pestaña de Playlists completamente funcional.
+  - Tarjeta especial sincronizada "Tus Me Gusta" / Favoritos.
+  - Creación, nombrado y renombrado libre de playlists.
+  - Diálogo modal para añadir canciones rápidamente desde la biblioteca.
+- [x] **Pulido de Animaciones del Sistema**:
+  - Transiciones de pantalla fluidas con `AnimatedContent` (desvanecimiento y deslizamiento).
+  - Expansión y repliegue elástico de la pantalla completa Now Playing.
+  - Micro-interacciones y feedback táctil enriquecido.
+- [x] **Pipeline de CI/CD GitHub Actions y Script Shell**:
+  - Workflow manual (`workflow_dispatch`) con generación forzada de firma `debug.keystore` RSA 2048-bit.
+  - Script autónomo `scripts/generate_keystore_and_build.sh`.
 
 ---
 
-## 🌈 Fase 3: Visualizador FFT en Tiempo Real y Letras Sincronizadas (En Progreso 🔄)
+## 🌈 Fase 3: Visualizador FFT en Tiempo Real y Letras Sincronizadas (Siguiente Paso 🔄)
 
 - [ ] **Transformada Rápida de Fourier (FFT)**:
   - Cálculo espectral de 512 / 1024 puntos en C++ a 60/120 FPS sin consumo de Garbage Collector en la JVM.

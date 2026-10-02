@@ -235,13 +235,32 @@ class AuraAudioPlayer(
         }
     }
 
-    fun updateTrackMetadata(trackId: Long, title: String, artist: String, album: String) {
+    fun updateTrackMetadata(
+        trackId: Long,
+        title: String,
+        artist: String,
+        album: String,
+        albumArtPath: String? = null,
+        updateArt: Boolean = false
+    ) {
         val current = _currentTrack.value
         if (current != null && current.id == trackId) {
-            _currentTrack.value = current.copy(title = title, artist = artist, album = album)
+            _currentTrack.value = current.copy(
+                title = title,
+                artist = artist,
+                album = album,
+                albumArtPath = if (updateArt) albumArtPath else current.albumArtPath
+            )
         }
         _queue.value = _queue.value.map {
-            if (it.id == trackId) it.copy(title = title, artist = artist, album = album) else it
+            if (it.id == trackId) {
+                it.copy(
+                    title = title,
+                    artist = artist,
+                    album = album,
+                    albumArtPath = if (updateArt) albumArtPath else it.albumArtPath
+                )
+            } else it
         }
     }
 

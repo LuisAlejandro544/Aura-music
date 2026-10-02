@@ -63,13 +63,13 @@ Este documento define el protocolo de trabajo para los agentes de software y des
 
 ## 📋 Lista de Verificación Pre-Entrega (Checklist Obligatorio)
 
-- [ ] ¿El proyecto compila sin errores (`compile_applet`)?
-- [ ] ¿`minSdk` se mantiene en 26 (Android 8.0)?
-- [ ] ¿Se eliminó completamente la necesidad de archivos `.env`?
-- [ ] ¿El estándar de C++ está fijado en C++20 con soporte multi-arquitectura?
-- [ ] ¿El ecualizador de 10 bandas funciona y es accesible desde el mini reproductor?
-- [ ] ¿El almacenamiento estructurado (`images/`, `songs/`, `lyrics/`, `metadata/`) está activo?
-- [ ] ¿Las carátulas se procesan como WebP sin pérdida en segundo plano y las faltantes se generan proceduralmente?
-- [ ] ¿Se pueden modificar los metadatos de las canciones (título, artista, álbum)?
-- [ ] ¿Se eliminó el sangrado visual detrás del mini reproductor y de Now Playing?
-- [ ] ¿Los 5 archivos Markdown (`README.md`, `ROADMAP.md`, `STRUCTURE.md`, `AI_CONTEXT.md`, `AGENTS.md`) están actualizados y en español?
+- [x] ¿El proyecto compila sin errores (`compile_applet`)?
+- [x] ¿`minSdk` se mantiene en 26 (Android 8.0)?
+- [x] ¿Se eliminó completamente la necesidad de archivos `.env`?
+- [x] ¿El estándar de C++ está fijado en C++20 con soporte multi-arquitectura?
+- [x] ¿El ecualizador de 10 bandas funciona y es accesible desde el mini reproductor?
+- [x] ¿El almacenamiento estructurado (`images/`, `songs/`, `lyrics/`, `metadata/`) está activo?
+- [x] ¿Las carátulas se procesan como WebP sin pérdida en segundo plano y las faltantes se generan proceduralmente?
+- [x] ¿Se pueden modificar los metadatos de las canciones (título, artista, álbum)?
+- [x] ¿Se eliminó el sangrado visual detrás del mini reproductor y de Now Playing?
+- [x] ¿Los 5 archivos Markdown (`README.md`, `ROADMAP.md`, `STRUCTURE.md`, `AI_CONTEXT.md`, `AGENTS.md`) están actualizados y en español?

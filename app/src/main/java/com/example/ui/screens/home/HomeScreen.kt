@@ -57,6 +57,7 @@ fun HomeScreen(
     onNavigate: (NavScreen) -> Unit,
     onSelectLibraryTab: (LibraryTab) -> Unit,
     onEditTrack: (Long, String, String, String) -> Unit = { _, _, _, _ -> },
+    onEditTrackDetails: (Long, String, String, String, android.net.Uri?, Boolean) -> Unit = { _, _, _, _, _, _ -> },
     modifier: Modifier = Modifier
 ) {
     val greeting = remember {
@@ -300,6 +301,7 @@ fun HomeScreen(
                         playlists = playlists,
                         onAddToPlaylist = { playlistId -> onAddToPlaylist(playlistId, track.id) },
                         onEditTrack = { id, t, a, al -> onEditTrack(id, t, a, al) },
+                        onEditTrackDetails = onEditTrackDetails,
                         modifier = Modifier.padding(vertical = 4.dp)
                     )
                 }

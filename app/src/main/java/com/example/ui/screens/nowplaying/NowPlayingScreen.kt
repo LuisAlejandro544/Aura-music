@@ -63,6 +63,7 @@ fun NowPlayingScreen(
     onOpenEqualizer: () -> Unit,
     onCollapse: () -> Unit,
     onEditTrack: ((trackId: Long, newTitle: String, newArtist: String, newAlbum: String) -> Unit)? = null,
+    onEditTrackDetails: ((trackId: Long, newTitle: String, newArtist: String, newAlbum: String, customArtUri: android.net.Uri?, removeArtwork: Boolean) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     BackHandler {
@@ -534,12 +535,16 @@ fun NowPlayingScreen(
             )
         }
 
-        if (showEditDialog && onEditTrack != null) {
+        if (showEditDialog && (onEditTrack != null || onEditTrackDetails != null)) {
             com.example.ui.components.EditTrackDialog(
                 track = currentTrack,
                 onDismiss = { showEditDialog = false },
-                onConfirm = { trackId, title, artist, album ->
-                    onEditTrack(trackId, title, artist, album)
+                onConfirm = { trackId, title, artist, album, customArtUri, removeArtwork ->
+                    if (onEditTrackDetails != null) {
+                        onEditTrackDetails(trackId, title, artist, album, customArtUri, removeArtwork)
+                    } else if (onEditTrack != null) {
+                        onEditTrack(trackId, title, artist, album)
+                    }
                 }
             )
         }

@@ -1,0 +1,97 @@
+name: Compilar APK Debug (Aura Music)
+
+# Este flujo de trabajo se activa EXCLUSIVAMENTE de forma manual (workflow_dispatch)
+# cumpliendo la directiva de no ejecutarse en cada commit automático.
+on:
+  workflow_dispatch:
+    inputs:
+      enable_cache:
+        description: 'Habilitar caché de dependencias Gradle y NDK'
+        required: false
+        type: boolean
+        default: true
+      force_new_keystore:
+        description: 'Obligar a generar firma debug desde cero sin esperar ninguna'
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  build-debug-apk:
+    name: Compilación APK Debug con Motor C++20 y Firma Autónoma
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 1. Descargar todo el código del proyecto
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: ☕ 2. Configurar Java JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: 🤖 3. Configurar Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: 🛠️ 4. Instalar NDK y CMake para C++20
+        run: |
+          echo "=== Instalando NDK y CMake 3.22.1 ==="
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager --install "cmake;3.22.1" "ndk;25.1.8937393"
+          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/25.1.8937393" >> $GITHUB_ENV
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.1.8937393" >> $GITHUB_ENV
+
+      - name: 💾 5. Caché de dependencias Gradle (Opcional)
+        if: ${{ inputs.enable_cache }}
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', 'gradle/libs.versions.toml') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      - name: 🔑 6. Generar firma de depuración desde cero
+        run: |
+          echo "=== Verificando / Generando firma debug.keystore ==="
+          if [ "${{ inputs.force_new_keystore }}" = "true" ] || [ ! -f "debug.keystore" ]; then
+            echo "Eliminando cualquier keystore anterior y generando firma fresca desde cero..."
+            rm -f debug.keystore
+            keytool -genkeypair -v \
+              -keystore debug.keystore \
+              -alias androiddebugkey \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -storepass android \
+              -keypass android \
+              -dname "CN=AuraMusicDebug, OU=Engineering, O=AuraSound, L=Local, ST=State, C=US"
+            echo "✅ Firma debug.keystore creada exitosamente (RSA 2048 bits, validez 10.000 días)."
+          else
+            echo "Reutilizando firma debug.keystore existente."
+          fi
+
+      - name: 🔧 7. Preparar Gradle Wrapper
+        run: |
+          if [ ! -f "./gradlew" ]; then
+            echo "Generando gradle wrapper..."
+            gradle wrapper
+          fi
+          chmod +x ./gradlew
+
+      - name: 🚀 8. Compilar APK Debug con librerías nativas C++20
+        run: |
+          echo "Iniciando compilación de Aura Music Debug APK..."
+          ./gradlew :app:assembleDebug --no-daemon --stacktrace
+
+      - name: 📦 9. Publicar APK Debug como Artefacto descargable
+        uses: actions/upload-artifact@v4
+        with:
+          name: AuraMusic-Debug-APK
+          path: app/build/outputs/apk/debug/*.apk
+          retention-days: 14
+          if-no-files-found: error
