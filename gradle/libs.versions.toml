@@ -42,9 +42,11 @@ credentials = "1.5.0"
 googleid = "1.1.1"
 media3 = "1.5.1"
 documentfile = "1.0.1"
+leakcanary = "2.14"
 
 
 [libraries]
+leakcanary-android = { group = "com.squareup.leakcanary", name = "leakcanary-android", version.ref = "leakcanary" }
 androidx-documentfile = { group = "androidx.documentfile", name = "documentfile", version.ref = "documentfile" }
 media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "media3" }
 media3-session = { group = "androidx.media3", name = "media3-session", version.ref = "media3" }

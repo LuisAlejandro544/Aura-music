@@ -64,7 +64,27 @@ Este documento traza las fases de evolución técnica y funcional para convertir
 
 ---
 
-## 🌈 Fase 4: Visualizador FFT en Tiempo Real y Letras Sincronizadas (Siguiente Paso 🔄)
+## 🛠️ Fase 4: Estabilidad Crítica, Diagnóstico Autónomo y UX Fluida (Completada ✅)
+
+- [x] **Suite de Diagnóstico en Caliente "Aura Monitor"**:
+  - Aplicación de depuración conectada pero con icono propio en el cajón de apps del teléfono móvil.
+  - Captura y persistencia de excepciones fatales no controladas (`UncaughtExceptionHandler` -> CRASH).
+  - Registro de incidentes clasificados por severidad (`CRASH`, `CRÍTICO`, `ERROR`, `WARNING`, `INFO`).
+  - Telemetría técnica del teléfono: Fabricante, Modelo, Versión de Android / SDK API, CPU ABI, RAM y almacenamiento libre.
+  - Visualizador de Stack Trace en crudo y exportación de informe completo al portapapeles.
+- [x] **Integración de LeakCanary**:
+  - Detección automática en tiempo real de fugas de memoria en builds de depuración.
+- [x] **Ecualizador C++20 Integrado en Modal (Cero Apartados Aislados)**:
+  - Eliminación de la pantalla completa separada para el ecualizador; integración nativa en pestaña modal accesible instantáneamente desde el Mini Reproductor y Now Playing.
+- [x] **Estabilidad de Velocidad y Tono (Anti-Pausa Accidental)**:
+  - Implementación de *throttling* y *debouncing* en `AuraAudioPlayer` para evitar saturación de `SonicAudioProcessor` en ExoPlayer.
+  - Mecanismo de recuperación automática que reanuda la reproducción si el procesador de audio sufre una perturbación transitoria.
+- [x] **Transición Fluida de Salida en Now Playing**:
+  - Eliminación de capas negras residuales y parpadeos al cerrar o deslizar hacia abajo el reproductor mediante deslizamiento suave instantáneo.
+
+---
+
+## 🌈 Fase 5: Visualizador FFT en Tiempo Real y Letras Sincronizadas (Siguiente Paso 🔄)
 
 - [ ] **Transformada Rápida de Fourier (FFT)**:
   - Cálculo espectral de 512 / 1024 puntos en C++ a 60/120 FPS sin consumo de Garbage Collector en la JVM.
@@ -76,19 +96,12 @@ Este documento traza las fases de evolución técnica y funcional para convertir
 
 ---
 
-## 🔊 Fase 5: Modo Bit-Perfect y Salida de Ultra-Baja Latencia
+## 🔊 Fase 6: Modo Bit-Perfect y Salida de Ultra-Baja Latencia
 
 - [ ] **Integración con Google Oboe / AAudio**:
   - Modo exclusivo para saltarse el mezclador del sistema Android (*AudioFlinger*).
   - Reproducción directa hacia DACs USB externos en 24-bit/32-bit a 96 kHz o 192 kHz.
 - [ ] **Decodificación Nativa de Formatos Especiales**:
   - Soporte de archivos DSD (.dsf / .dff), Monkey's Audio (.ape) y módulos chiptune (.mod, .xm).
-
----
-
-## 📑 Fase 5: Experiencia de Usuario Avanzada
-
-- [ ] **Temporizador de Apagado (*Sleep Timer*)**:
-  - Atenuación progresiva del volumen al cumplirse el tiempo seleccionado.
 - [ ] **Widgets de Pantalla de Inicio**:
   - Widgets interactivos con Material You y controles de reproducción directa.

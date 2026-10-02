@@ -19,7 +19,14 @@ AuraMusic/
 │   │   │   │   ├── auramusic_dsp.h             # Ecualizador 10 bandas biquad, limiter y buffers
 │   │   │   │   └── auramusic_dsp.cpp           # Implementación JNI del motor nativo
 │   │   │   ├── java/com/example/
+│   │   │   │   ├── AuraApplication.kt         # Clase Application con inicio de AuraDebugManager
 │   │   │   │   ├── MainActivity.kt             # Actividad principal, insets, animaciones y navegación
+│   │   │   │   ├── debug/                      # Suite Autónoma de Diagnóstico y Telemetría
+│   │   │   │   │   ├── DebugSeverity.kt        # Enum de severidades (CRASH, CRÍTICO, ERROR, WARNING, INFO)
+│   │   │   │   │   ├── DeviceDiagnosticInfo.kt # Ficha técnica de hardware del teléfono
+│   │   │   │   │   ├── DebugLogEntry.kt        # Modelo de eventos con stacktrace en crudo y hora
+│   │   │   │   │   ├── AuraDebugManager.kt     # Gestor central de logs, persistencia JSON y UncaughtHandler
+│   │   │   │   │   └── DebugMonitorActivity.kt # Actividad accesible desde el cajón de apps (Aura Monitor)
 │   │   │   │   ├── data/
 │   │   │   │   │   ├── importer/               # Módulos de importación y análisis
 │   │   │   │   │   │   ├── AudioMetadataParser.kt # Extractor ID3 y conversor a WebP
@@ -46,18 +53,18 @@ AuraMusic/
 │   │   │   │   │   ├── AudioEffectsConfig.kt   # Modelos para Audio 8D, Temporizador y Gapless/Crossfade
 │   │   │   │   │   └── ThemePalette.kt         # Enum de temas de color vibrantes
 │   │   │   │   ├── playback/                   # Capa de reproducción de audio
-│   │   │   │   │   ├── AuraAudioPlayer.kt      # Motor Media3 ExoPlayer, cola, volumen y crossfade
+│   │   │   │   │   ├── AuraAudioPlayer.kt      # Motor Media3 ExoPlayer, cola, throttling y recuperación
 │   │   │   │   │   ├── AudioEffectManager.kt   # Gestor de EQ 10 bandas, BassBoost y Audio 8D
 │   │   │   │   │   ├── NativeAudioEngine.kt    # Puente JNI hacia C++20 (EQ 10 bandas y Audio 8D)
 │   │   │   │   │   └── NativeAudioProcessor.kt # Procesador Media3 para buffers PCM
 │   │   │   │   ├── ui/
 │   │   │   │   │   ├── components/             # Componentes visuales reutilizables
 │   │   │   │   │   │   ├── ArtworkImage.kt     # Renderizador de carátulas (WebP + Procedural)
-│   │   │   │   │   │   ├── AudioEffectsBottomSheet.kt # Hoja modal de Temporizador, 8D, Speed/Pitch y Crossfade
+│   │   │   │   │   │   ├── AudioEffectsBottomSheet.kt # Modal unificado de EQ 10 bandas, Temporizador, 8D y Speed
 │   │   │   │   │   │   ├── AudioVisualizer.kt  # Visualizador de ondas en tiempo real
 │   │   │   │   │   │   ├── BottomNavBar.kt     # Barra de navegación limpia (4 pestañas)
 │   │   │   │   │   │   ├── EditTrackDialog.kt  # Modal con Photo Picker y edición de carátula
-│   │   │   │   │   │   ├── MiniPlayer.kt       # Mini reproductor opaco con acceso a EQ
+│   │   │   │   │   │   ├── MiniPlayer.kt       # Mini reproductor opaco con acceso directo a EQ modal
 │   │   │   │   │   │   ├── ProceduralArtwork.kt # Arte vectorial dinámico en tiempo real
 │   │   │   │   │   │   └── TrackListItem.kt    # Fila de canción con menú contextual
 │   │   │   │   │   ├── navigation/
@@ -66,8 +73,8 @@ AuraMusic/
 │   │   │   │   │   │   ├── home/HomeScreen.kt  # Pantalla de inicio con saludo y accesos
 │   │   │   │   │   │   ├── library/LibraryScreen.kt # Biblioteca, Playlists y Tus Me Gusta
 │   │   │   │   │   │   ├── importmusic/ImportMusicScreen.kt # Importación selectiva SAF
-│   │   │   │   │   │   ├── nowplaying/NowPlayingScreen.kt # Vista completa de reproducción opaca
-│   │   │   │   │   │   ├── equalizer/EqualizerScreen.kt # Control de ecualizador 10 bandas C++20
+│   │   │   │   │   │   ├── nowplaying/NowPlayingScreen.kt # Vista completa de reproducción con cierre fluido
+│   │   │   │   │   │   ├── equalizer/EqualizerScreen.kt # Referencia de ecualizador (integrado en modal)
 │   │   │   │   │   │   ├── settings/SettingsScreen.kt # Selector de temas y privacidad
 │   │   │   │   │   │   └── playlist/PlaylistDetailScreen.kt # Detalle de lista sincronizada
 │   │   │   │   │   └── theme/
@@ -78,11 +85,11 @@ AuraMusic/
 │   │   │   │       └── MusicViewModel.kt       # ViewModel central reactivo
 │   │   │   └── res/                            # Recursos gráficos, iconos y strings
 │   │   └── test/                               # Pruebas unitarias y Robolectric
-│   └── build.gradle.kts                        # Configuración Gradle con CMake y NDK
+│   └── build.gradle.kts                        # Configuración Gradle con CMake, NDK y LeakCanary
 ├── scripts/
 │   └── generate_keystore_and_build.sh          # Script ejecutable de generación de firma y build
 ├── gradle/
-│   └── libs.versions.toml                      # Catálogo de versiones centralizado
+│   └── libs.versions.toml                      # Catálogo de versiones centralizado (incluye LeakCanary)
 ├── README.md                                   # Descripción general e instalación
 ├── ROADMAP.md                                  # Fases de desarrollo y avances
 ├── STRUCTURE.md                                # Arquitectura y mapa de archivos
@@ -99,3 +106,4 @@ El almacenamiento estructurado en `Android/data/com.aistudio.musicplayer.aurasou
 - `songs/`: Archivos de audio locales generados o importados.
 - `lyrics/`: Letras de canciones en formato `.lrc`.
 - `metadata/`: Archivos `.json` individuales con metadatos descriptivos de cada canción.
+- Directorio de aplicación interno (`filesDir`): Almacena `aura_debug_logs.json` con el historial persistente de incidencias capturadas por **Aura Monitor**.

@@ -10,7 +10,7 @@ Este documento define el protocolo de trabajo para los agentes de software y des
 * **Objetivo**: Antes de escribir una sola línea de código, definir la estructura, entidades y flujo técnico.
 * **Protocolo en Aura Music**:
   - Verificar que las nuevas funciones encajen en el flujo MVVM (Model - Room Database - Repository - Storage - ViewModel - Compose UI).
-  - Diseñar pantallas separadas y modulares en `ui/screens/` en lugar de saturar una única pantalla.
+  - Diseñar pantallas modulares en `ui/screens/` evitando saturar interfaces.
   - El almacenamiento de datos de usuario se organiza exclusivamente en `Android/data/com.aistudio.musicplayer.aurasound/files/` en subcarpetas (`images/`, `songs/`, `lyrics/`, `metadata/`).
   - Asegurar compatibilidad arquitectónica con arquitecturas de 64 bits (`arm64-v8a`, `x86_64`) y 32 bits (`armeabi-v7a`, `x86`).
 
@@ -18,7 +18,7 @@ Este documento define el protocolo de trabajo para los agentes de software y des
 * **Objetivo**: Escribir código limpio, tipado, modular y con manejo exhaustivo de excepciones.
 * **Protocolo en Aura Music**:
   - Utilizar Kotlin con Jetpack Compose y C++20 para código nativo DSP de 10 bandas.
-  - El ecualizador paramétrico debe ser accesible desde el Mini Reproductor y Now Playing, sin ocupar espacio innecesario en la barra inferior.
+  - El ecualizador paramétrico debe integrarse en la hoja modal unificada de efectos de audio accesible tanto desde el Mini Reproductor como desde Now Playing, **sin ocupar un apartado de pantalla completa aparte** que interrumpa la navegación del usuario.
   - La compresión de carátulas a WebP debe realizarse en un hilo secundario sin pérdida de calidad.
   - Toda canción sin carátula debe generarse proceduralmente mediante Canvas/matemáticas, evitando imágenes fijas genéricas.
   - Comentar cada archivo explicando la lógica que contiene y su rol arquitectónico.
@@ -28,9 +28,9 @@ Este documento define el protocolo de trabajo para los agentes de software y des
 * **Objetivo**: Diagnosticar y resolver errores de forma metódica con razonamiento paso a paso (*Chain of Thought*).
 * **Protocolo en Aura Music**:
   - Formular 3 hipótesis antes de tocar código.
-  - Evitar fondos translúcidos que provoquen filtraciones visuales o sangrado de elementos de fondo en los reproductores.
-  - Revisar registros de Gradle y trazas de excepciones de Media3, Room o JNI.
-  - Comprobar que no haya llamadas a `@Composable` dentro de bloques `try-catch` o dentro de bloques directos de `LazyListScope`.
+  - Evitar fondos translúcidos o contenedores de `AnimatedVisibility` con fondos negros residuales que provoquen parpadeos o capas negras al cerrar el reproductor.
+  - En la modulación rápida de parámetros de reproducción (velocidad y tono/voz), aplicar *throttling* con corrutinas y mecanismos de recuperación en `onPlayerError` para que ExoPlayer nunca detenga la reproducción de forma imprevista.
+  - Apoyarse en la suite **Aura Monitor** (`DebugMonitorActivity`) y **LeakCanary** para rastrear en caliente excepciones no controladas, warnings de memoria y fugas en la JVM.
 
 ### 4. El Crítico (Code Review)
 * **Objetivo**: Inspeccionar seguridad, rendimiento y buenas prácticas como si fuera un Pull Request profesional.
@@ -51,7 +51,7 @@ Este documento define el protocolo de trabajo para los agentes de software y des
 * **Objetivo**: Garantizar estabilidad mediante pruebas unitarias y de integración.
 * **Protocolo en Aura Music**:
   - Probar flujos locales con Robolectric (`gradle :app:testDebugUnitTest`).
-  - Cubrir casos límite: archivos de audio corruptos, URIs no disponibles, listas vacías y edición de metadatos.
+  - Cubrir casos límite: archivos de audio corruptos, URIs no disponibles, listas vacías y manipulación rápida de parámetros de audio.
 
 ### 7. El Narrador (Documentación)
 * **Objetivo**: Documentar claramente cada cambio y módulo técnico.
@@ -67,12 +67,14 @@ Este documento define el protocolo de trabajo para los agentes de software y des
 - [x] ¿`minSdk` se mantiene en 26 (Android 8.0)?
 - [x] ¿Se eliminó completamente la necesidad de archivos `.env`?
 - [x] ¿El estándar de C++ está fijado en C++20 con soporte multi-arquitectura?
-- [x] ¿El ecualizador de 10 bandas funciona y es accesible desde el mini reproductor?
+- [x] ¿El ecualizador de 10 bandas funciona y está integrado en modal sin un apartado de pantalla completa separado?
 - [x] ¿El motor de Audio 8D Espacial en C++20 está implementado y configurable desde Now Playing?
 - [x] ¿El temporizador de apagado personalizable con atenuación de 10s (fade-out) funciona correctamente?
-- [x] ¿El control de velocidad (0.5x-2.0x), tono musical y crossfade/gapless están activos?
+- [x] ¿La modulación de velocidad (0.5x-2.0x) y tono musical cuenta con protección contra pausas accidentales?
+- [x] ¿Se eliminó el fondo negro residual y el parpadeo al cerrar o minimizar la pantalla de reproducción?
+- [x] ¿Aura Monitor está integrado y accesible con su propio icono en el cajón de aplicaciones del teléfono?
+- [x] ¿LeakCanary está añadido y funcional en dependencias de depuración?
 - [x] ¿El almacenamiento estructurado (`images/`, `songs/`, `lyrics/`, `metadata/`) está activo?
 - [x] ¿Las carátulas se procesan como WebP sin pérdida en segundo plano y las faltantes se generan proceduralmente?
 - [x] ¿Se pueden modificar los metadatos de las canciones (título, artista, álbum)?
-- [x] ¿Se eliminó el sangrado visual detrás del mini reproductor y de Now Playing?
 - [x] ¿Los 5 archivos Markdown (`README.md`, `ROADMAP.md`, `STRUCTURE.md`, `AI_CONTEXT.md`, `AGENTS.md`) están actualizados y en español?
