@@ -24,6 +24,9 @@ interface PlaylistDao {
     @Query("DELETE FROM playlists WHERE id = :id")
     suspend fun deletePlaylist(id: Long)
 
+    @Query("UPDATE playlists SET name = :name, description = :description WHERE id = :id")
+    suspend fun updatePlaylist(id: Long, name: String, description: String)
+
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertCrossRef(crossRef: PlaylistTrackCrossRef)
 

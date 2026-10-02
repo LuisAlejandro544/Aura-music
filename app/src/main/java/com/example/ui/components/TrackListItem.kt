@@ -40,6 +40,7 @@ fun TrackListItem(
     playlists: List<Playlist>,
     onAddToPlaylist: (Long) -> Unit,
     onEditTrack: ((trackId: Long, newTitle: String, newArtist: String, newAlbum: String) -> Unit)? = null,
+    onEditTrackDetails: ((trackId: Long, newTitle: String, newArtist: String, newAlbum: String, customArtUri: android.net.Uri?, removeArtwork: Boolean) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -176,12 +177,16 @@ fun TrackListItem(
         }
     }
 
-    if (showEditDialog && onEditTrack != null) {
+    if (showEditDialog && (onEditTrack != null || onEditTrackDetails != null)) {
         EditTrackDialog(
             track = track,
             onDismiss = { showEditDialog = false },
-            onConfirm = { trackId, title, artist, album ->
-                onEditTrack(trackId, title, artist, album)
+            onConfirm = { trackId, title, artist, album, customArtUri, removeArtwork ->
+                if (onEditTrackDetails != null) {
+                    onEditTrackDetails(trackId, title, artist, album, customArtUri, removeArtwork)
+                } else if (onEditTrack != null) {
+                    onEditTrack(trackId, title, artist, album)
+                }
             }
         )
     }

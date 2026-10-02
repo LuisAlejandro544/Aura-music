@@ -69,6 +69,39 @@ class MusicRepository(private val database: AppDatabase) {
         }
     }
 
+    suspend fun updateTrackDetails(
+        context: Context,
+        trackId: Long,
+        title: String,
+        artist: String,
+        album: String,
+        customArtUri: Uri? = null,
+        shouldRemoveArt: Boolean = false
+    ): Track? = withContext(Dispatchers.IO) {
+        val current = trackDao.getTrackById(trackId) ?: return@withContext null
+        val storageManager = com.example.data.storage.AppStorageManager(context)
+
+        val finalArtPath = when {
+            customArtUri != null -> {
+                storageManager.saveCustomArtworkFromUri(trackId, customArtUri, current.albumArtPath)
+            }
+            shouldRemoveArt -> {
+                storageManager.deleteArtworkFile(current.albumArtPath)
+                null
+            }
+            else -> {
+                current.albumArtPath
+            }
+        }
+
+        trackDao.updateTrackDetails(trackId, title.trim(), artist.trim(), album.trim(), finalArtPath)
+        val updated = trackDao.getTrackById(trackId)?.toDomain()
+        if (updated != null) {
+            storageManager.saveMetadataJson(updated)
+        }
+        updated
+    }
+
     suspend fun deleteTrack(context: Context, trackId: Long) = withContext(Dispatchers.IO) {
         val track = trackDao.getTrackById(trackId)
         trackDao.deleteTrackById(trackId)
@@ -88,6 +121,10 @@ class MusicRepository(private val database: AppDatabase) {
                 description = description.trim()
             )
         )
+    }
+
+    suspend fun updatePlaylist(playlistId: Long, name: String, description: String = "") = withContext(Dispatchers.IO) {
+        playlistDao.updatePlaylist(playlistId, name.trim(), description.trim())
     }
 
     suspend fun deletePlaylist(playlistId: Long) = withContext(Dispatchers.IO) {

@@ -119,8 +119,14 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     fun openPlaylist(playlist: Playlist) {
         _selectedPlaylist.value = playlist
         viewModelScope.launch {
-            repository.getTracksForPlaylist(playlist.id).collect { tracks ->
-                _selectedPlaylistTracks.value = tracks
+            if (playlist.id == -1L) {
+                repository.favoriteTracks.collect { tracks ->
+                    _selectedPlaylistTracks.value = tracks
+                }
+            } else {
+                repository.getTracksForPlaylist(playlist.id).collect { tracks ->
+                    _selectedPlaylistTracks.value = tracks
+                }
             }
         }
         navigateTo(NavScreen.PlaylistDetail)
@@ -180,9 +186,46 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun updateTrackInfo(trackId: Long, newTitle: String, newArtist: String, newAlbum: String) {
+        updateTrackDetails(trackId, newTitle, newArtist, newAlbum, null, false)
+    }
+
+    fun updateTrackDetails(
+        trackId: Long,
+        newTitle: String,
+        newArtist: String,
+        newAlbum: String,
+        customArtUri: Uri? = null,
+        removeArtwork: Boolean = false
+    ) {
         viewModelScope.launch {
-            repository.updateTrackInfo(getApplication(), trackId, newTitle, newArtist, newAlbum)
-            audioPlayer.updateTrackMetadata(trackId, newTitle, newArtist, newAlbum)
+            val updated = repository.updateTrackDetails(
+                getApplication(),
+                trackId,
+                newTitle,
+                newArtist,
+                newAlbum,
+                customArtUri,
+                removeArtwork
+            )
+            audioPlayer.updateTrackMetadata(
+                trackId,
+                newTitle,
+                newArtist,
+                newAlbum,
+                updated?.albumArtPath,
+                updateArt = (customArtUri != null || removeArtwork)
+            )
+        }
+    }
+
+    fun updatePlaylist(playlistId: Long, newName: String, newDescription: String = "") {
+        if (newName.isBlank()) return
+        viewModelScope.launch {
+            repository.updatePlaylist(playlistId, newName, newDescription)
+            val current = _selectedPlaylist.value
+            if (current != null && current.id == playlistId) {
+                _selectedPlaylist.value = current.copy(name = newName, description = newDescription)
+            }
         }
     }
 

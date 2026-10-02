@@ -20,28 +20,28 @@ Java_com_example_playback_NativeAudioEngine_isDspActive(JNIEnv* /* env */, jobje
 }
 
 JNIEXPORT void JNICALL
-Java_com_example_playback_NativeAudioEngine_initDsp(JNIEnv* /* env */, jobject /* thiz */, jint sampleRate, jint channels) {
+Java_com_example_playback_NativeAudioEngine_nativeInitDsp(JNIEnv* /* env */, jobject /* thiz */, jint sampleRate, jint channels) {
     LOGI("Aura Music DSP Inicializado: Fs=%d, Canales=%d", sampleRate, channels);
     sDspEngine.init(sampleRate, channels);
 }
 
 JNIEXPORT void JNICALL
-Java_com_example_playback_NativeAudioEngine_setBandGain(JNIEnv* /* env */, jobject /* thiz */, jint bandIndex, jfloat gainDb) {
+Java_com_example_playback_NativeAudioEngine_nativeSetBandGain(JNIEnv* /* env */, jobject /* thiz */, jint bandIndex, jfloat gainDb) {
     sDspEngine.setBandGain(bandIndex, static_cast<double>(gainDb));
 }
 
 JNIEXPORT void JNICALL
-Java_com_example_playback_NativeAudioEngine_setBassBoost(JNIEnv* /* env */, jobject /* thiz */, jfloat strength) {
+Java_com_example_playback_NativeAudioEngine_nativeSetBassBoost(JNIEnv* /* env */, jobject /* thiz */, jfloat strength) {
     sDspEngine.setBassBoost(static_cast<double>(strength));
 }
 
 JNIEXPORT void JNICALL
-Java_com_example_playback_NativeAudioEngine_setDspEnabled(JNIEnv* /* env */, jobject /* thiz */, jboolean enabled) {
+Java_com_example_playback_NativeAudioEngine_nativeSetDspEnabled(JNIEnv* /* env */, jobject /* thiz */, jboolean enabled) {
     sDspEngine.setEnabled(enabled == JNI_TRUE);
 }
 
 JNIEXPORT void JNICALL
-Java_com_example_playback_NativeAudioEngine_processPcmBuffer(JNIEnv* env, jobject /* thiz */, jobject byteBuffer, jint offset, jint length) {
+Java_com_example_playback_NativeAudioEngine_nativeProcessPcmBuffer(JNIEnv* env, jobject /* thiz */, jobject byteBuffer, jint offset, jint length) {
     if (!byteBuffer || length <= 0) return;
 
     void* directBuffer = env->GetDirectBufferAddress(byteBuffer);

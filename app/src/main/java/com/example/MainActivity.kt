@@ -5,9 +5,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.*
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Scaffold
@@ -32,8 +33,9 @@ import com.example.viewmodel.MusicViewModel
 
 /**
  * Actividad Principal de Aura Music.
- * Configura Edge-to-Edge, vincula el ViewModel central, la barra de navegación,
- * el mini reproductor persistente y la vista expandida Now Playing.
+ * Configura Edge-to-Edge, vincula el ViewModel central reactivo,
+ * navegación con transiciones animadas fluidas, mini reproductor persistente
+ * y vista completa Now Playing con fondo 100% opaco OLED.
  */
 class MainActivity : ComponentActivity() {
 
@@ -57,7 +59,7 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
     val currentScreen by viewModel.currentScreen.collectAsStateWithLifecycle()
     val isNowPlayingExpanded by viewModel.isNowPlayingExpanded.collectAsStateWithLifecycle()
 
-    // Estados de reproducción
+    // Estados de reproducción Media3
     val currentTrack by viewModel.currentTrack.collectAsStateWithLifecycle()
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
     val currentPosition by viewModel.currentPosition.collectAsStateWithLifecycle()
@@ -67,7 +69,7 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
     val queue by viewModel.queue.collectAsStateWithLifecycle()
     val currentIndex by viewModel.currentIndex.collectAsStateWithLifecycle()
 
-    // Estados de datos
+    // Estados de datos de Room
     val allTracks by viewModel.allTracks.collectAsStateWithLifecycle()
     val favoriteTracks by viewModel.favoriteTracks.collectAsStateWithLifecycle()
     val recentlyAddedTracks by viewModel.recentlyAddedTracks.collectAsStateWithLifecycle()
@@ -109,8 +111,18 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                         .fillMaxWidth()
                         .background(BackgroundDark)
                 ) {
-                    // Mini reproductor flotante
-                    if (currentTrack != null && !isNowPlayingExpanded) {
+                    // Mini reproductor flotante con transición suave
+                    AnimatedVisibility(
+                        visible = currentTrack != null && !isNowPlayingExpanded,
+                        enter = fadeIn(animationSpec = tween(220)) + slideInVertically(
+                            initialOffsetY = { it / 2 },
+                            animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+                        ),
+                        exit = fadeOut(animationSpec = tween(150)) + slideOutVertically(
+                            targetOffsetY = { it / 2 },
+                            animationSpec = tween(180)
+                        )
+                    ) {
                         MiniPlayer(
                             currentTrack = currentTrack,
                             isPlaying = isPlaying,
@@ -136,95 +148,132 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                     .fillMaxSize()
                     .padding(innerPadding)
             ) {
-                when (currentScreen) {
-                    is NavScreen.Home -> HomeScreen(
-                        allTracks = allTracks,
-                        favoriteTracks = favoriteTracks,
-                        recentlyAddedTracks = recentlyAddedTracks,
-                        topPlayedTracks = topPlayedTracks,
-                        playlists = playlists,
-                        currentTrack = currentTrack,
-                        isPlaying = isPlaying,
-                        onTrackClick = { track, list -> viewModel.playTrack(track, list) },
-                        onFavoriteToggle = { viewModel.toggleFavorite(it) },
-                        onDeleteTrack = { viewModel.deleteTrack(it) },
-                        onAddToPlaylist = { playlistId, trackId -> viewModel.addTrackToPlaylist(playlistId, trackId) },
-                        onNavigate = { viewModel.navigateTo(it) },
-                        onSelectLibraryTab = { viewModel.setLibraryTab(it) },
-                        onEditTrack = { id, t, a, al -> viewModel.updateTrackInfo(id, t, a, al) }
-                    )
+                // Transición animada fluida entre pantallas del sistema
+                AnimatedContent(
+                    targetState = currentScreen,
+                    transitionSpec = {
+                        (fadeIn(animationSpec = tween(240)) + slideInHorizontally(
+                            animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+                        ) { it / 8 })
+                            .togetherWith(
+                                fadeOut(animationSpec = tween(180)) + slideOutHorizontally(
+                                    animationSpec = tween(180)
+                                ) { -it / 8 }
+                            )
+                    },
+                    label = "ScreenTransition"
+                ) { targetScreen ->
+                    when (targetScreen) {
+                        is NavScreen.Home -> HomeScreen(
+                            allTracks = allTracks,
+                            favoriteTracks = favoriteTracks,
+                            recentlyAddedTracks = recentlyAddedTracks,
+                            topPlayedTracks = topPlayedTracks,
+                            playlists = playlists,
+                            currentTrack = currentTrack,
+                            isPlaying = isPlaying,
+                            onTrackClick = { track, list -> viewModel.playTrack(track, list) },
+                            onFavoriteToggle = { viewModel.toggleFavorite(it) },
+                            onDeleteTrack = { viewModel.deleteTrack(it) },
+                            onAddToPlaylist = { playlistId, trackId -> viewModel.addTrackToPlaylist(playlistId, trackId) },
+                            onNavigate = { viewModel.navigateTo(it) },
+                            onSelectLibraryTab = { viewModel.setLibraryTab(it) },
+                            onEditTrack = { id, t, a, al -> viewModel.updateTrackInfo(id, t, a, al) },
+                            onEditTrackDetails = { id, t, a, al, art, removeArt ->
+                                viewModel.updateTrackDetails(id, t, a, al, art, removeArt)
+                            }
+                        )
 
-                    is NavScreen.Library -> LibraryScreen(
-                        allTracks = allTracks,
-                        favoriteTracks = favoriteTracks,
-                        playlists = playlists,
-                        selectedTab = selectedLibraryTab,
-                        onTabSelected = { viewModel.setLibraryTab(it) },
-                        searchQuery = searchQuery,
-                        onSearchQueryChange = { viewModel.setSearchQuery(it) },
-                        currentTrack = currentTrack,
-                        isPlaying = isPlaying,
-                        onTrackClick = { track, list -> viewModel.playTrack(track, list) },
-                        onFavoriteToggle = { viewModel.toggleFavorite(it) },
-                        onDeleteTrack = { viewModel.deleteTrack(it) },
-                        onOpenPlaylist = { viewModel.openPlaylist(it) },
-                        onCreatePlaylist = { name, desc -> viewModel.createPlaylist(name, desc) },
-                        onDeletePlaylist = { viewModel.deletePlaylist(it) },
-                        onAddToPlaylist = { playlistId, trackId -> viewModel.addTrackToPlaylist(playlistId, trackId) },
-                        onNavigate = { viewModel.navigateTo(it) },
-                        onEditTrack = { id, t, a, al -> viewModel.updateTrackInfo(id, t, a, al) }
-                    )
+                        is NavScreen.Library -> LibraryScreen(
+                            allTracks = allTracks,
+                            favoriteTracks = favoriteTracks,
+                            playlists = playlists,
+                            selectedTab = selectedLibraryTab,
+                            onTabSelected = { viewModel.setLibraryTab(it) },
+                            searchQuery = searchQuery,
+                            onSearchQueryChange = { viewModel.setSearchQuery(it) },
+                            currentTrack = currentTrack,
+                            isPlaying = isPlaying,
+                            onTrackClick = { track, list -> viewModel.playTrack(track, list) },
+                            onFavoriteToggle = { viewModel.toggleFavorite(it) },
+                            onDeleteTrack = { viewModel.deleteTrack(it) },
+                            onOpenPlaylist = { viewModel.openPlaylist(it) },
+                            onCreatePlaylist = { name, desc -> viewModel.createPlaylist(name, desc) },
+                            onRenamePlaylist = { pId, name, desc -> viewModel.updatePlaylist(pId, name, desc) },
+                            onDeletePlaylist = { viewModel.deletePlaylist(it) },
+                            onAddToPlaylist = { playlistId, trackId -> viewModel.addTrackToPlaylist(playlistId, trackId) },
+                            onNavigate = { viewModel.navigateTo(it) },
+                            onEditTrack = { id, t, a, al -> viewModel.updateTrackInfo(id, t, a, al) },
+                            onEditTrackDetails = { id, t, a, al, art, removeArt ->
+                                viewModel.updateTrackDetails(id, t, a, al, art, removeArt)
+                            }
+                        )
 
-                    is NavScreen.Import -> ImportMusicScreen(
-                        allTracks = allTracks,
-                        isImporting = isImporting,
-                        importStatusMessage = importStatusMessage,
-                        onImportUris = { viewModel.importUris(it) },
-                        onImportFolder = { viewModel.importFolder(it) },
-                        onSeedDemoTracks = { viewModel.seedDemoTracks() },
-                        onClearLibrary = { viewModel.clearAllTracks() },
-                        onDismissStatusMessage = { viewModel.dismissImportStatus() }
-                    )
+                        is NavScreen.Import -> ImportMusicScreen(
+                            allTracks = allTracks,
+                            isImporting = isImporting,
+                            importStatusMessage = importStatusMessage,
+                            onImportUris = { viewModel.importUris(it) },
+                            onImportFolder = { viewModel.importFolder(it) },
+                            onSeedDemoTracks = { viewModel.seedDemoTracks() },
+                            onClearLibrary = { viewModel.clearAllTracks() },
+                            onDismissStatusMessage = { viewModel.dismissImportStatus() }
+                        )
 
-                    is NavScreen.Equalizer -> EqualizerScreen(
-                        isEnabled = isEqEnabled,
-                        bands = eqBands,
-                        bassBoostLevel = bassBoostLevel,
-                        currentPreset = currentPreset,
-                        onToggleEnabled = { viewModel.setEqEnabled(it) },
-                        onBandLevelChange = { index, level -> viewModel.setBandLevel(index, level) },
-                        onBassBoostChange = { viewModel.setBassBoost(it) },
-                        onPresetSelect = { viewModel.applyPreset(it) },
-                        onBack = { viewModel.handleBackPress() }
-                    )
+                        is NavScreen.Equalizer -> EqualizerScreen(
+                            isEnabled = isEqEnabled,
+                            bands = eqBands,
+                            bassBoostLevel = bassBoostLevel,
+                            currentPreset = currentPreset,
+                            onToggleEnabled = { viewModel.setEqEnabled(it) },
+                            onBandLevelChange = { index, level -> viewModel.setBandLevel(index, level) },
+                            onBassBoostChange = { viewModel.setBassBoost(it) },
+                            onPresetSelect = { viewModel.applyPreset(it) },
+                            onBack = { viewModel.handleBackPress() }
+                        )
 
-                    is NavScreen.PlaylistDetail -> PlaylistDetailScreen(
-                        playlist = selectedPlaylist,
-                        tracks = selectedPlaylistTracks,
-                        allPlaylists = playlists,
-                        currentTrack = currentTrack,
-                        isPlaying = isPlaying,
-                        onBack = { viewModel.handleBackPress() },
-                        onTrackClick = { track, list -> viewModel.playTrack(track, list) },
-                        onFavoriteToggle = { viewModel.toggleFavorite(it) },
-                        onRemoveFromPlaylist = { pId, tId -> viewModel.removeTrackFromPlaylist(pId, tId) },
-                        onAddToPlaylist = { pId, tId -> viewModel.addTrackToPlaylist(pId, tId) },
-                        onEditTrack = { id, t, a, al -> viewModel.updateTrackInfo(id, t, a, al) }
-                    )
+                        is NavScreen.PlaylistDetail -> PlaylistDetailScreen(
+                            playlist = selectedPlaylist,
+                            tracks = selectedPlaylistTracks,
+                            allTracks = allTracks,
+                            allPlaylists = playlists,
+                            currentTrack = currentTrack,
+                            isPlaying = isPlaying,
+                            onBack = { viewModel.handleBackPress() },
+                            onTrackClick = { track, list -> viewModel.playTrack(track, list) },
+                            onFavoriteToggle = { viewModel.toggleFavorite(it) },
+                            onRemoveFromPlaylist = { pId, tId -> viewModel.removeTrackFromPlaylist(pId, tId) },
+                            onAddToPlaylist = { pId, tId -> viewModel.addTrackToPlaylist(pId, tId) },
+                            onRenamePlaylist = { pId, name, desc -> viewModel.updatePlaylist(pId, name, desc) },
+                            onEditTrack = { id, t, a, al -> viewModel.updateTrackInfo(id, t, a, al) },
+                            onEditTrackDetails = { id, t, a, al, art, removeArt ->
+                                viewModel.updateTrackDetails(id, t, a, al, art, removeArt)
+                            }
+                        )
 
-                    is NavScreen.Settings -> SettingsScreen(
-                        currentTheme = currentTheme,
-                        onSelectTheme = { viewModel.setTheme(it) }
-                    )
+                        is NavScreen.Settings -> SettingsScreen(
+                            currentTheme = currentTheme,
+                            onSelectTheme = { viewModel.setTheme(it) }
+                        )
+                    }
                 }
             }
         }
 
-        // Pantalla Now Playing en modal animado deslizable con fondo 100% opaco
+        // Pantalla Now Playing con transición elástica optimizada y fondo 100% opaco
         AnimatedVisibility(
             visible = isNowPlayingExpanded && currentTrack != null,
-            enter = slideInVertically(initialOffsetY = { it }),
-            exit = slideOutVertically(targetOffsetY = { it }),
+            enter = slideInVertically(
+                initialOffsetY = { it },
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioLowBouncy,
+                    stiffness = Spring.StiffnessMediumLow
+                )
+            ) + fadeIn(animationSpec = tween(220)),
+            exit = slideOutVertically(
+                targetOffsetY = { it },
+                animationSpec = tween(240)
+            ) + fadeOut(animationSpec = tween(180)),
             modifier = Modifier
                 .fillMaxSize()
                 .background(BackgroundDark)
@@ -253,7 +302,10 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                     viewModel.navigateTo(NavScreen.Equalizer)
                 },
                 onCollapse = { viewModel.setNowPlayingExpanded(false) },
-                onEditTrack = { id, t, a, al -> viewModel.updateTrackInfo(id, t, a, al) }
+                onEditTrack = { id, t, a, al -> viewModel.updateTrackInfo(id, t, a, al) },
+                onEditTrackDetails = { id, t, a, al, art, removeArt ->
+                    viewModel.updateTrackDetails(id, t, a, al, art, removeArt)
+                }
             )
         }
     }

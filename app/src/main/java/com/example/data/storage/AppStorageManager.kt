@@ -3,6 +3,7 @@ package com.example.data.storage
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.os.Build
 import com.example.model.Track
 import kotlinx.coroutines.Dispatchers
@@ -123,6 +124,68 @@ class AppStorageManager(private val context: Context) {
         val file = File(metadataDir, "track_$trackId.json")
         if (file.exists()) file.readText() else null
     }
+
+    /**
+     * Guarda una carátula personalizada seleccionada por el usuario desde la galería (SAF/Photo Picker),
+     * comprimiéndola a WebP sin pérdida en images/ y eliminando físicamente la carátula anterior
+     * asociada a la canción para evitar acumulación de archivos huérfanos.
+     */
+     suspend fun saveCustomArtworkFromUri(
+         trackId: Long,
+         sourceUri: Uri,
+         oldArtworkPath: String?
+     ): String? = withContext(Dispatchers.IO) {
+         try {
+             // 1. Decodificar la imagen desde el Uri
+             val inputStream = context.contentResolver.openInputStream(sourceUri) ?: return@withContext null
+             val bitmap = BitmapFactory.decodeStream(inputStream)
+             inputStream.close()
+             if (bitmap == null) return@withContext null
+
+             // 2. Eliminar la carátula previa si existía en images/
+             if (!oldArtworkPath.isNullOrEmpty()) {
+                 try {
+                     val oldFile = File(oldArtworkPath)
+                     if (oldFile.exists() && oldFile.canonicalPath.startsWith(imagesDir.canonicalPath)) {
+                         oldFile.delete()
+                     }
+                 } catch (ignored: Exception) {}
+             }
+
+             // 3. Guardar el nuevo archivo WebP
+             val newFile = File(imagesDir, "cover_custom_${trackId}_${System.currentTimeMillis()}.webp")
+             FileOutputStream(newFile).use { outStream ->
+                 val format = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                     Bitmap.CompressFormat.WEBP_LOSSLESS
+                 } else {
+                     @Suppress("DEPRECATION")
+                     Bitmap.CompressFormat.WEBP
+                 }
+                 bitmap.compress(format, 100, outStream)
+             }
+             bitmap.recycle()
+             newFile.absolutePath
+         } catch (e: Exception) {
+             null
+         }
+     }
+
+    /**
+     * Elimina físicamente un archivo de carátula si existe en el directorio de imágenes.
+     */
+     suspend fun deleteArtworkFile(artworkPath: String?): Boolean = withContext(Dispatchers.IO) {
+         if (artworkPath.isNullOrEmpty()) return@withContext false
+         try {
+             val file = File(artworkPath)
+             if (file.exists() && file.canonicalPath.startsWith(imagesDir.canonicalPath)) {
+                 file.delete()
+             } else {
+                 false
+             }
+         } catch (e: Exception) {
+             false
+         }
+     }
 
     /**
      * Elimina los archivos asociados a una pista (carátula WebP, letra y metadatos JSON).

@@ -58,9 +58,15 @@ fun LibraryScreen(
     onAddToPlaylist: (Long, Long) -> Unit,
     onNavigate: (NavScreen) -> Unit,
     onEditTrack: (Long, String, String, String) -> Unit = { _, _, _, _ -> },
+    onEditTrackDetails: (Long, String, String, String, android.net.Uri?, Boolean) -> Unit = { _, _, _, _, _, _ -> },
+    onRenamePlaylist: (Long, String, String) -> Unit = { _, _, _ -> },
     modifier: Modifier = Modifier
 ) {
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
+    var showRenamePlaylistDialog by remember { mutableStateOf(false) }
+    var playlistToRename by remember { mutableStateOf<Playlist?>(null) }
+    var renamePlaylistName by remember { mutableStateOf("") }
+    var renamePlaylistDesc by remember { mutableStateOf("") }
     var newPlaylistName by remember { mutableStateOf("") }
     var newPlaylistDesc by remember { mutableStateOf("") }
 
@@ -253,6 +259,7 @@ fun LibraryScreen(
                             playlists = playlists,
                             onAddToPlaylist = { playlistId -> onAddToPlaylist(playlistId, track.id) },
                             onEditTrack = { id, t, a, al -> onEditTrack(id, t, a, al) },
+                            onEditTrackDetails = onEditTrackDetails,
                             modifier = Modifier.padding(vertical = 3.dp)
                         )
                     }
@@ -280,6 +287,7 @@ fun LibraryScreen(
                             playlists = playlists,
                             onAddToPlaylist = { playlistId -> onAddToPlaylist(playlistId, track.id) },
                             onEditTrack = { id, t, a, al -> onEditTrack(id, t, a, al) },
+                            onEditTrackDetails = onEditTrackDetails,
                             modifier = Modifier.padding(vertical = 3.dp)
                         )
                     }
@@ -287,11 +295,30 @@ fun LibraryScreen(
             }
 
             LibraryTab.PLAYLISTS -> {
+                // 1. Tarjeta Especial Destacada "Tus Me Gusta"
+                item {
+                    FavoritesPlaylistBannerCard(
+                        trackCount = favoriteTracks.size,
+                        onClick = {
+                            onOpenPlaylist(
+                                Playlist(
+                                    id = -1L,
+                                    name = "Tus Me Gusta",
+                                    description = "Canciones favoritas guardadas",
+                                    trackCount = favoriteTracks.size
+                                )
+                            )
+                        }
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                }
+
+                // 2. Playlists del usuario
                 if (playlists.isEmpty()) {
                     item {
                         EmptyPlaceholder(
                             icon = Icons.Default.QueueMusic,
-                            title = "No hay listas de reproducción",
+                            title = "No hay listas personalizadas",
                             subtitle = "Crea tu primera lista pulsando 'Nueva Lista' arriba."
                         )
                     }
@@ -300,6 +327,12 @@ fun LibraryScreen(
                         PlaylistRowItem(
                             playlist = playlist,
                             onClick = { onOpenPlaylist(playlist) },
+                            onRename = {
+                                playlistToRename = playlist
+                                renamePlaylistName = playlist.name
+                                renamePlaylistDesc = playlist.description
+                                showRenamePlaylistDialog = true
+                            },
                             onDelete = { onDeletePlaylist(playlist.id) }
                         )
                     }
@@ -388,14 +421,129 @@ fun LibraryScreen(
             }
         )
     }
+
+    // Cuadro de Diálogo para Renombrar Lista
+    if (showRenamePlaylistDialog && playlistToRename != null) {
+        AlertDialog(
+            onDismissRequest = { showRenamePlaylistDialog = false },
+            title = { Text("Renombrar Lista de Reproducción", fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = renamePlaylistName,
+                        onValueChange = { renamePlaylistName = it },
+                        label = { Text("Nombre de la lista") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = renamePlaylistDesc,
+                        onValueChange = { renamePlaylistDesc = it },
+                        label = { Text("Descripción (opcional)") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (renamePlaylistName.isNotBlank()) {
+                            onRenamePlaylist(playlistToRename!!.id, renamePlaylistName, renamePlaylistDesc)
+                            showRenamePlaylistDialog = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                ) {
+                    Text("Guardar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRenamePlaylistDialog = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun FavoritesPlaylistBannerCard(
+    trackCount: Int,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick),
+        color = SurfaceCard,
+        border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    androidx.compose.ui.graphics.Brush.horizontalGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.30f),
+                            MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f),
+                            SurfaceCard
+                        )
+                    )
+                )
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(54.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.Favorite,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Tus Me Gusta",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "$trackCount canciones favoritas sincronizadas",
+                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                )
+            }
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = "Abrir Tus Me Gusta",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(26.dp)
+            )
+        }
+    }
 }
 
 @Composable
 private fun PlaylistRowItem(
     playlist: Playlist,
     onClick: () -> Unit,
+    onRename: () -> Unit,
     onDelete: () -> Unit
 ) {
+    var showMenu by remember { mutableStateOf(false) }
+
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -442,12 +590,43 @@ private fun PlaylistRowItem(
                     )
                 }
             }
-            IconButton(onClick = onDelete) {
-                Icon(
-                    imageVector = Icons.Default.DeleteOutline,
-                    contentDescription = "Eliminar lista",
-                    tint = TextMuted
-                )
+            Box {
+                IconButton(onClick = { showMenu = true }) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = "Opciones de lista",
+                        tint = TextMuted
+                    )
+                }
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { showMenu = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Abrir lista") },
+                        leadingIcon = { Icon(Icons.Default.PlayArrow, contentDescription = null) },
+                        onClick = {
+                            showMenu = false
+                            onClick()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Renombrar lista") },
+                        leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                        onClick = {
+                            showMenu = false
+                            onRename()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Eliminar lista", color = MaterialTheme.colorScheme.error) },
+                        leadingIcon = { Icon(Icons.Default.DeleteOutline, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                        onClick = {
+                            showMenu = false
+                            onDelete()
+                        }
+                    )
+                }
             }
         }
     }
