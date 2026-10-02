@@ -64,6 +64,24 @@ fun NowPlayingScreen(
     onCollapse: () -> Unit,
     onEditTrack: ((trackId: Long, newTitle: String, newArtist: String, newAlbum: String) -> Unit)? = null,
     onEditTrackDetails: ((trackId: Long, newTitle: String, newArtist: String, newAlbum: String, customArtUri: android.net.Uri?, removeArtwork: Boolean) -> Unit)? = null,
+    sleepTimerState: com.example.model.SleepTimerState = com.example.model.SleepTimerState(),
+    onStartSleepTimer: (Int) -> Unit = {},
+    onCancelSleepTimer: () -> Unit = {},
+    onAddSleepTimerMinutes: (Int) -> Unit = {},
+    spatial8DConfig: com.example.model.Spatial8DConfig = com.example.model.Spatial8DConfig(),
+    onSet8DEnabled: (Boolean) -> Unit = {},
+    onSet8DOrbitSpeed: (Float) -> Unit = {},
+    onSet8DSpatialIntensity: (Float) -> Unit = {},
+    onSet8DRoomDepth: (Float) -> Unit = {},
+    playbackSpeed: Float = 1.0f,
+    onSetPlaybackSpeed: (Float) -> Unit = {},
+    playbackPitch: Float = 1.0f,
+    onSetPlaybackPitch: (Float) -> Unit = {},
+    onResetSpeedAndPitch: () -> Unit = {},
+    crossfadeSeconds: Int = 0,
+    onSetCrossfadeSeconds: (Int) -> Unit = {},
+    isGaplessEnabled: Boolean = true,
+    onSetGaplessEnabled: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     BackHandler {
@@ -73,6 +91,7 @@ fun NowPlayingScreen(
     if (currentTrack == null) return
 
     var showQueueSheet by remember { mutableStateOf(false) }
+    var showEffectsSheet by remember { mutableStateOf(false) }
     var showDetailsDialog by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
     var isDraggingSlider by remember { mutableStateOf(false) }
@@ -157,15 +176,39 @@ fun NowPlayingScreen(
                     )
                 }
 
-                IconButton(
-                    onClick = { showDetailsDialog = true },
-                    modifier = Modifier.testTag("now_playing_details_btn")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Info,
-                        contentDescription = "Detalles técnicos de audio",
-                        tint = TextSecondary
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = { showEffectsSheet = true },
+                        modifier = Modifier.testTag("now_playing_effects_btn")
+                    ) {
+                        BadgedBox(
+                            badge = {
+                                if (sleepTimerState.isActive || spatial8DConfig.enabled) {
+                                    Badge(
+                                        containerColor = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(8.dp)
+                                    )
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Tune,
+                                contentDescription = "Efectos de Audio y Temporizador",
+                                tint = if (sleepTimerState.isActive || spatial8DConfig.enabled) MaterialTheme.colorScheme.primary else TextSecondary
+                            )
+                        }
+                    }
+
+                    IconButton(
+                        onClick = { showDetailsDialog = true },
+                        modifier = Modifier.testTag("now_playing_details_btn")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = "Detalles técnicos de audio",
+                            tint = TextSecondary
+                        )
+                    }
                 }
             }
 
@@ -546,6 +589,30 @@ fun NowPlayingScreen(
                         onEditTrack(trackId, title, artist, album)
                     }
                 }
+            )
+        }
+
+        if (showEffectsSheet) {
+            com.example.ui.components.AudioEffectsBottomSheet(
+                onDismissRequest = { showEffectsSheet = false },
+                sleepTimerState = sleepTimerState,
+                onStartSleepTimer = onStartSleepTimer,
+                onCancelSleepTimer = onCancelSleepTimer,
+                onAddSleepTimerMinutes = onAddSleepTimerMinutes,
+                spatial8DConfig = spatial8DConfig,
+                onSet8DEnabled = onSet8DEnabled,
+                onSet8DOrbitSpeed = onSet8DOrbitSpeed,
+                onSet8DSpatialIntensity = onSet8DSpatialIntensity,
+                onSet8DRoomDepth = onSet8DRoomDepth,
+                playbackSpeed = playbackSpeed,
+                onSetPlaybackSpeed = onSetPlaybackSpeed,
+                playbackPitch = playbackPitch,
+                onSetPlaybackPitch = onSetPlaybackPitch,
+                onResetSpeedAndPitch = onResetSpeedAndPitch,
+                crossfadeSeconds = crossfadeSeconds,
+                onSetCrossfadeSeconds = onSetCrossfadeSeconds,
+                isGaplessEnabled = isGaplessEnabled,
+                onSetGaplessEnabled = onSetGaplessEnabled
             )
         }
     }

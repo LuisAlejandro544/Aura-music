@@ -72,7 +72,103 @@ public:
     }
 };
 
-// Motor Principal DSP de 10 Bandas en C++20
+// Procesador de Audio Espacial 8D Binaural para Auriculares
+class EightDProcessor {
+public:
+    void init(int sampleRate) {
+        mSampleRate = (sampleRate > 0) ? sampleRate : 44100;
+        mAngle = 0.0;
+        const size_t maxDelaySamples = static_cast<size_t>(mSampleRate * 0.1);
+        mDelayBufferL.assign(maxDelaySamples, 0.0);
+        mDelayBufferR.assign(maxDelaySamples, 0.0);
+        mDelayIndex = 0;
+        mBackFilterL.reset();
+        mBackFilterR.reset();
+        mBackFilterL.configurePeaking(mSampleRate, 4000.0, -4.5, 0.7);
+        mBackFilterR.configurePeaking(mSampleRate, 4000.0, -4.5, 0.7);
+    }
+
+    void setEnabled(bool enabled) { mEnabled = enabled; }
+    [[nodiscard]] bool isEnabled() const { return mEnabled; }
+
+    void setOrbitSpeed(double secondsPerRevolution) {
+        mOrbitSpeedSeconds = std::clamp(secondsPerRevolution, 3.0, 45.0);
+    }
+
+    void setSpatialIntensity(double intensity) {
+        mIntensity = std::clamp(intensity, 0.0, 1.0);
+    }
+
+    void setRoomDepth(double depth) {
+        mRoomDepth = std::clamp(depth, 0.0, 1.0);
+    }
+
+    // Procesa un par de muestras estéreo en coma flotante aplicando paneo binaural orbital
+    inline void processSample(double& sampleL, double& sampleR) {
+        if (!mEnabled) return;
+
+        double deltaTheta = (2.0 * std::numbers::pi) / (static_cast<double>(mSampleRate) * mOrbitSpeedSeconds);
+        mAngle += deltaTheta;
+        if (mAngle >= 2.0 * std::numbers::pi) {
+            mAngle -= 2.0 * std::numbers::pi;
+        }
+
+        double sinAngle = std::sin(mAngle);
+        double cosAngle = std::cos(mAngle);
+
+        double pan = sinAngle * mIntensity;
+        double gainL = std::sqrt(std::clamp(0.5 * (1.0 - pan), 0.0, 1.0));
+        double gainR = std::sqrt(std::clamp(0.5 * (1.0 + pan), 0.0, 1.0));
+
+        double outL = (sampleL * 0.75 + sampleR * 0.25) * (gainL * 1.414);
+        double outR = (sampleR * 0.75 + sampleL * 0.25) * (gainR * 1.414);
+
+        if (cosAngle < -0.1) {
+            double backFactor = std::abs(cosAngle) * mIntensity;
+            double filteredL = mBackFilterL.process(outL);
+            double filteredR = mBackFilterR.process(outR);
+            outL = (outL * (1.0 - backFactor)) + (filteredL * backFactor);
+            outR = (outR * (1.0 - backFactor)) + (filteredR * backFactor);
+        }
+
+        if (mRoomDepth > 0.02 && !mDelayBufferL.empty()) {
+            size_t delaySamples = static_cast<size_t>(mSampleRate * (0.025 + 0.020 * mRoomDepth));
+            if (delaySamples >= mDelayBufferL.size()) delaySamples = mDelayBufferL.size() - 1;
+
+            size_t readIndex = (mDelayIndex + mDelayBufferL.size() - delaySamples) % mDelayBufferL.size();
+            double delayedL = mDelayBufferL[readIndex];
+            double delayedR = mDelayBufferR[readIndex];
+
+            double feedback = 0.26 * mRoomDepth;
+            mDelayBufferL[mDelayIndex] = outL + delayedR * feedback;
+            mDelayBufferR[mDelayIndex] = outR + delayedL * feedback;
+            mDelayIndex = (mDelayIndex + 1) % mDelayBufferL.size();
+
+            outL = outL * (1.0 - mRoomDepth * 0.22) + delayedL * (mRoomDepth * 0.32);
+            outR = outR * (1.0 - mRoomDepth * 0.22) + delayedR * (mRoomDepth * 0.32);
+        }
+
+        sampleL = outL;
+        sampleR = outR;
+    }
+
+private:
+    int mSampleRate{44100};
+    bool mEnabled{false};
+    double mOrbitSpeedSeconds{10.0};
+    double mIntensity{0.85};
+    double mRoomDepth{0.35};
+    double mAngle{0.0};
+
+    std::vector<double> mDelayBufferL{};
+    std::vector<double> mDelayBufferR{};
+    size_t mDelayIndex{0};
+
+    BiquadPeakingFilter mBackFilterL{};
+    BiquadPeakingFilter mBackFilterR{};
+};
+
+// Motor Principal DSP de 10 Bandas en C++20 con soporte de Audio 8D
 class NativeDspEngine {
 public:
     NativeDspEngine() {
@@ -93,6 +189,8 @@ public:
         mBassBoostStrength = 0.0;
         mBassBoostFilterL.configurePeaking(mSampleRate, 60.0, 0.0, 1.2);
         mBassBoostFilterR.configurePeaking(mSampleRate, 60.0, 0.0, 1.2);
+
+        mEightDProcessor.init(mSampleRate);
     }
 
     void setEnabled(bool enabled) {
@@ -113,46 +211,64 @@ public:
     }
 
     void setBassBoost(double strength) {
-        // strength: 0.0 a 1.0 (equivale a 0 dB a +12 dB en frecuencias graves de 60 Hz)
         mBassBoostStrength = std::clamp(strength, 0.0, 1.0);
         double boostDb = mBassBoostStrength * 12.0;
         mBassBoostFilterL.configurePeaking(mSampleRate, 60.0, boostDb, 1.2);
         mBassBoostFilterR.configurePeaking(mSampleRate, 60.0, boostDb, 1.2);
     }
 
+    void setEightDEnabled(bool enabled) {
+        mEightDProcessor.setEnabled(enabled);
+    }
+
+    [[nodiscard]] bool isEightDEnabled() const {
+        return mEightDProcessor.isEnabled();
+    }
+
+    void setEightDOrbitSpeed(double speedSeconds) {
+        mEightDProcessor.setOrbitSpeed(speedSeconds);
+    }
+
+    void setEightDSpatialIntensity(double intensity) {
+        mEightDProcessor.setSpatialIntensity(intensity);
+    }
+
+    void setEightDRoomDepth(double depth) {
+        mEightDProcessor.setRoomDepth(depth);
+    }
+
     // Procesa un buffer de audio PCM de 16 bits estéreo entrelazado (L, R, L, R)
     void processPcm16(std::span<int16_t> samples) {
-        if (!mEnabled) return;
+        if (!mEnabled && !mEightDProcessor.isEnabled()) return;
 
         const size_t totalSamples = samples.size();
         for (size_t i = 0; i < totalSamples; i += mChannels) {
-            // Canal Izquierdo
             double sampleL = samples[i] / 32768.0;
-            // Refuerzo de bajos
-            if (mBassBoostStrength > 0.001) {
-                sampleL = mBassBoostFilterL.process(sampleL);
-            }
-            // 10 bandas en serie
-            for (int b = 0; b < 10; ++b) {
-                if (std::abs(mBandGainsDb[b]) > 0.01) {
-                    sampleL = mFiltersL[b].process(sampleL);
-                }
-            }
-            // Limitador suave anti-clipping
-            sampleL = softClip(sampleL);
-            samples[i] = static_cast<int16_t>(std::clamp(sampleL * 32767.0, -32768.0, 32767.0));
+            double sampleR = (mChannels > 1 && (i + 1) < totalSamples) ? (samples[i + 1] / 32768.0) : sampleL;
 
-            // Canal Derecho (si es estéreo)
-            if (mChannels > 1 && (i + 1) < totalSamples) {
-                double sampleR = samples[i + 1] / 32768.0;
+            if (mEnabled) {
                 if (mBassBoostStrength > 0.001) {
+                    sampleL = mBassBoostFilterL.process(sampleL);
                     sampleR = mBassBoostFilterR.process(sampleR);
                 }
                 for (int b = 0; b < 10; ++b) {
                     if (std::abs(mBandGainsDb[b]) > 0.01) {
+                        sampleL = mFiltersL[b].process(sampleL);
                         sampleR = mFiltersR[b].process(sampleR);
                     }
                 }
+            }
+
+            // Procesamiento de Audio 8D Espacial
+            if (mEightDProcessor.isEnabled() && mChannels > 1) {
+                mEightDProcessor.processSample(sampleL, sampleR);
+            }
+
+            // Limitador suave anti-clipping
+            sampleL = softClip(sampleL);
+            samples[i] = static_cast<int16_t>(std::clamp(sampleL * 32767.0, -32768.0, 32767.0));
+
+            if (mChannels > 1 && (i + 1) < totalSamples) {
                 sampleR = softClip(sampleR);
                 samples[i + 1] = static_cast<int16_t>(std::clamp(sampleR * 32767.0, -32768.0, 32767.0));
             }
@@ -160,7 +276,7 @@ public:
     }
 
     [[nodiscard]] std::string getEngineInfo() const {
-        return "Aura Music C++20 10-Band Biquad DSP Core [Active]";
+        return "Aura Music C++20 10-Band Biquad & 8D Spatial DSP Core [Active]";
     }
 
 private:
@@ -175,7 +291,8 @@ private:
     BiquadPeakingFilter mBassBoostFilterL{};
     BiquadPeakingFilter mBassBoostFilterR{};
 
-    // Limitador suave analógico (soft clipping cúbico)
+    EightDProcessor mEightDProcessor{};
+
     static inline double softClip(double x) {
         if (x > 1.2) return 1.0;
         if (x < -1.2) return -1.0;
@@ -196,19 +313,31 @@ JNIEXPORT jboolean JNICALL
 Java_com_example_playback_NativeAudioEngine_isDspActive(JNIEnv* env, jobject thiz);
 
 JNIEXPORT void JNICALL
-Java_com_example_playback_NativeAudioEngine_initDsp(JNIEnv* env, jobject thiz, jint sampleRate, jint channels);
+Java_com_example_playback_NativeAudioEngine_nativeInitDsp(JNIEnv* env, jobject thiz, jint sampleRate, jint channels);
 
 JNIEXPORT void JNICALL
-Java_com_example_playback_NativeAudioEngine_setBandGain(JNIEnv* env, jobject thiz, jint bandIndex, jfloat gainDb);
+Java_com_example_playback_NativeAudioEngine_nativeSetBandGain(JNIEnv* env, jobject thiz, jint bandIndex, jfloat gainDb);
 
 JNIEXPORT void JNICALL
-Java_com_example_playback_NativeAudioEngine_setBassBoost(JNIEnv* env, jobject thiz, jfloat strength);
+Java_com_example_playback_NativeAudioEngine_nativeSetBassBoost(JNIEnv* env, jobject thiz, jfloat strength);
 
 JNIEXPORT void JNICALL
-Java_com_example_playback_NativeAudioEngine_setDspEnabled(JNIEnv* env, jobject thiz, jboolean enabled);
+Java_com_example_playback_NativeAudioEngine_nativeSetDspEnabled(JNIEnv* env, jobject thiz, jboolean enabled);
 
 JNIEXPORT void JNICALL
-Java_com_example_playback_NativeAudioEngine_processPcmBuffer(JNIEnv* env, jobject thiz, jobject byteBuffer, jint offset, jint length);
+Java_com_example_playback_NativeAudioEngine_nativeProcessPcmBuffer(JNIEnv* env, jobject thiz, jobject byteBuffer, jint offset, jint length);
+
+JNIEXPORT void JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeSetEightDEnabled(JNIEnv* env, jobject thiz, jboolean enabled);
+
+JNIEXPORT void JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeSetEightDOrbitSpeed(JNIEnv* env, jobject thiz, jfloat speedSeconds);
+
+JNIEXPORT void JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeSetEightDSpatialIntensity(JNIEnv* env, jobject thiz, jfloat intensity);
+
+JNIEXPORT void JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeSetEightDRoomDepth(JNIEnv* env, jobject thiz, jfloat depth);
 
 #ifdef __cplusplus
 }

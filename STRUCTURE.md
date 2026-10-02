@@ -43,15 +43,17 @@ AuraMusic/
 │   │   │   │   │   ├── Playlist.kt             # Modelo de datos de lista
 │   │   │   │   │   ├── RepeatMode.kt           # Enum de modos de repetición
 │   │   │   │   │   ├── EqualizerConfig.kt      # Modelo de 10 bandas y presets de EQ
+│   │   │   │   │   ├── AudioEffectsConfig.kt   # Modelos para Audio 8D, Temporizador y Gapless/Crossfade
 │   │   │   │   │   └── ThemePalette.kt         # Enum de temas de color vibrantes
 │   │   │   │   ├── playback/                   # Capa de reproducción de audio
-│   │   │   │   │   ├── AuraAudioPlayer.kt      # Motor Media3 ExoPlayer y cola
-│   │   │   │   │   ├── AudioEffectManager.kt   # Gestor de Equalizer 10 bandas y BassBoost
-│   │   │   │   │   ├── NativeAudioEngine.kt    # Puente JNI hacia C++20 con respaldo biquad
+│   │   │   │   │   ├── AuraAudioPlayer.kt      # Motor Media3 ExoPlayer, cola, volumen y crossfade
+│   │   │   │   │   ├── AudioEffectManager.kt   # Gestor de EQ 10 bandas, BassBoost y Audio 8D
+│   │   │   │   │   ├── NativeAudioEngine.kt    # Puente JNI hacia C++20 (EQ 10 bandas y Audio 8D)
 │   │   │   │   │   └── NativeAudioProcessor.kt # Procesador Media3 para buffers PCM
 │   │   │   │   ├── ui/
 │   │   │   │   │   ├── components/             # Componentes visuales reutilizables
 │   │   │   │   │   │   ├── ArtworkImage.kt     # Renderizador de carátulas (WebP + Procedural)
+│   │   │   │   │   │   ├── AudioEffectsBottomSheet.kt # Hoja modal de Temporizador, 8D, Speed/Pitch y Crossfade
 │   │   │   │   │   │   ├── AudioVisualizer.kt  # Visualizador de ondas en tiempo real
 │   │   │   │   │   │   ├── BottomNavBar.kt     # Barra de navegación limpia (4 pestañas)
 │   │   │   │   │   │   ├── EditTrackDialog.kt  # Modal con Photo Picker y edición de carátula

@@ -47,18 +47,32 @@ Ubicado en el almacenamiento privado del paquete `Android/data/com.aistudio.musi
 - 📁 **`lyrics/`**: Archivos de letras sincronizadas (`.lrc`) y texto.
 - 📁 **`metadata/`**: Ficheros JSON estructurados con información técnica de cada pista.
 
-### 5. Motor de Audio DSP Nativo en C++20 (10 Bandas ISO)
+### 5. Motor de Audio DSP Nativo en C++20 (10 Bandas ISO & Audio 8D Espacial)
 - **Compilado nativamente con CMake**: Integrado en el APK final para arquitecturas de 64 bits (`arm64-v8a`, `x86_64`) y 32 bits (`armeabi-v7a`, `x86`).
 - **Ecualizador Paramétrico de 10 Bandas**:
   - Frecuencias centrales ISO: `31 Hz, 62 Hz, 125 Hz, 250 Hz, 500 Hz, 1 kHz, 2 kHz, 4 kHz, 8 kHz, 16 kHz`.
   - Filtros IIR Bi-cuadráticos (*Peaking Biquads*) en coma flotante de 64 bits.
   - Rango de ganancia de `-15 dB` a `+15 dB`.
+- **Audio Espacial 8D Binaural para Auriculares**:
+  - Paneo orbital tridimensional continuo en tiempo real (4s a 30s por rotación completa).
+  - Simulación acústica de sombra de cabeza (*Head Shadow Filtering*) y reverberación espacial ambiental de sala sin modelos 3D intrusivos.
 - **Refuerzo de Bajos C++ (Bass Boost)**:
   - Curva de ganancia calibrada a 60 Hz con control de 0% a 100%.
 - **Limitador Suave Anti-Clipping**:
   - Algoritmo de saturación cúbica que evita distorsiones digitales cuando las bandas están elevadas.
 
-### 6. Privacidad Total (Storage Access Framework)
+### 6. Controles Avanzados de Reproducción y Escucha
+- **Temporizador de Apagado Personalizable**:
+  - Configuración libre de minutos numéricos o presets (15m, 30m, 45m, 60m).
+  - Contador regresivo en tiempo real con opción de añadir +5 minutos.
+  - **Atenuación suave de volumen de 10 segundos** (*fade-out*) antes de pausar para no despertar al usuario.
+- **Transición Suave (Crossfade) y Reproducción Gapless**:
+  - Fundido cruzado de 0 a 12 segundos con desvanecimiento de volumen progresivo.
+  - Modo Gapless para reproducción continua sin silencios entre canciones consecutivas.
+- **Control de Velocidad y Tono (Pitch & Speed)**:
+  - Ajuste independiente de velocidad (0.50x a 2.00x) y tono musical en tiempo real con restablecimiento a 1.0x.
+
+### 7. Privacidad Total (Storage Access Framework)
 - **Cero Escaneo Ciego**: No rastrea el disco del teléfono sin autorización.
 - Importación selectiva de canciones (`OpenMultipleDocuments`) y carpetas (`OpenDocumentTree`).
 - Generador de canciones demostrativas Synthwave listo para usar.

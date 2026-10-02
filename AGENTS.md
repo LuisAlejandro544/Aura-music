@@ -68,6 +68,9 @@ Este documento define el protocolo de trabajo para los agentes de software y des
 - [x] ¿Se eliminó completamente la necesidad de archivos `.env`?
 - [x] ¿El estándar de C++ está fijado en C++20 con soporte multi-arquitectura?
 - [x] ¿El ecualizador de 10 bandas funciona y es accesible desde el mini reproductor?
+- [x] ¿El motor de Audio 8D Espacial en C++20 está implementado y configurable desde Now Playing?
+- [x] ¿El temporizador de apagado personalizable con atenuación de 10s (fade-out) funciona correctamente?
+- [x] ¿El control de velocidad (0.5x-2.0x), tono musical y crossfade/gapless están activos?
 - [x] ¿El almacenamiento estructurado (`images/`, `songs/`, `lyrics/`, `metadata/`) está activo?
 - [x] ¿Las carátulas se procesan como WebP sin pérdida en segundo plano y las faltantes se generan proceduralmente?
 - [x] ¿Se pueden modificar los metadatos de las canciones (título, artista, álbum)?

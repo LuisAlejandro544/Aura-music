@@ -43,7 +43,28 @@ Este documento traza las fases de evolución técnica y funcional para convertir
 
 ---
 
-## 🌈 Fase 3: Visualizador FFT en Tiempo Real y Letras Sincronizadas (Siguiente Paso 🔄)
+## 🎧 Fase 3: Audio 8D Espacial en C++20, Temporizador y Control de Reproducción (Completada ✅)
+
+- [x] **Motor Nativo de Audio 8D Binaural para Auriculares (ISO C++20)**:
+  - Algoritmo de rotación orbital continua de potencia constante con control de velocidad (4s a 30s por vuelta).
+  - Simulación de sombra acústica de la cabeza (*Head Shadow Effect*) al transitar el sonido detrás del oyente.
+  - Reverberación acústica binaural y ajuste de profundidad de sala sin modelos 3D invasivos.
+- [x] **Temporizador de Apagado (Sleep Timer) con Fade-Out Suave**:
+  - Configuración libre de minutos personalizados y chips rápidos (15m, 30m, 45m, 60m).
+  - Contador regresivo en tiempo real (`mm:ss`) con opción de añadir +5 minutos.
+  - Atenuación progresiva lineal del volumen en los últimos 10 segundos antes de pausar la reproducción.
+- [x] **Control de Velocidad y Tono (Playback Parameters)**:
+  - Modulación en tiempo real de velocidad (0.50x a 2.00x) y tono musical (Pitch Shift).
+  - Botón de restablecimiento rápido a 1.0x.
+- [x] **Transiciones Suaves (Crossfade) y Reproducción Gapless**:
+  - Fundido cruzado ajustable de 0 a 12 segundos con desvanecimiento de entrada y salida entre pistas.
+  - Conmutador de reproducción Gapless continua sin silencios intermedios.
+- [x] **Hoja Modal de Efectos en Now Playing (`AudioEffectsBottomSheet`)**:
+  - Componente accesible desde la barra superior de Now Playing con indicador de insignia activa.
+
+---
+
+## 🌈 Fase 4: Visualizador FFT en Tiempo Real y Letras Sincronizadas (Siguiente Paso 🔄)
 
 - [ ] **Transformada Rápida de Fourier (FFT)**:
   - Cálculo espectral de 512 / 1024 puntos en C++ a 60/120 FPS sin consumo de Garbage Collector en la JVM.
@@ -55,7 +76,7 @@ Este documento traza las fases de evolución técnica y funcional para convertir
 
 ---
 
-## 🔊 Fase 4: Modo Bit-Perfect y Salida de Ultra-Baja Latencia
+## 🔊 Fase 5: Modo Bit-Perfect y Salida de Ultra-Baja Latencia
 
 - [ ] **Integración con Google Oboe / AAudio**:
   - Modo exclusivo para saltarse el mezclador del sistema Android (*AudioFlinger*).
