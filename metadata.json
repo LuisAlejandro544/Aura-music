@@ -1,0 +1,6 @@
+{
+  "name": "Aura Music",
+  "description": "Reproductor de música local moderno con diseño elegante inspirado en Spotify, gestión de biblioteca por importación personalizada y motor de reproducción Media3",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

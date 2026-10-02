@@ -1,0 +1,42 @@
+# CMakeLists.txt para Aura Music - Motor Nativo de Audio DSP
+# Estándar configurado: C++20 (Última versión recomendada para Android NDK con soporte de std::span y matemáticas modernas)
+cmake_minimum_required(VERSION 3.22.1)
+
+project("auramusic_dsp" LANGUAGES CXX)
+
+# Forzar C++20 como estándar del compilador
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# Opciones de optimización para procesamiento de señal de audio
+add_compile_options(
+    -O3
+    -ffast-math
+    -Wall
+    -Wextra
+)
+
+# Definir la librería compartida nativa de audio
+add_library(
+    auramusic_dsp
+    SHARED
+    auramusic_dsp.cpp
+)
+
+# Enlazar con bibliotecas del sistema de Android (Log y OpenSLES / AAudio si se requieren a futuro)
+find_library(log-lib log)
+find_library(aaudio-lib aaudio)
+
+target_link_libraries(
+    auramusic_dsp
+    PRIVATE
+    ${log-lib}
+    ${aaudio-lib}
+)
+
+target_include_directories(
+    auramusic_dsp
+    PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)

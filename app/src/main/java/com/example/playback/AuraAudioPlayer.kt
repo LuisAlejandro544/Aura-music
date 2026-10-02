@@ -1,0 +1,293 @@
+package com.example.playback
+
+import android.content.Context
+import android.net.Uri
+import androidx.annotation.OptIn
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.ExoPlayer
+import com.example.model.RepeatMode
+import com.example.model.Track
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+
+/**
+ * Motor central de reproducción de audio local usando Jetpack Media3 ExoPlayer.
+ * Gestiona el ciclo de vida del reproductor, cola de reproducción, aleatorio, repetición
+ * y exposición de estados reactivos en StateFlows para la interfaz de Compose.
+ */
+class AuraAudioPlayer(
+    private val context: Context,
+    val effectManager: AudioEffectManager
+) {
+
+    private val playerScope = CoroutineScope(Dispatchers.Main + Job())
+    private var progressJob: Job? = null
+
+    private var exoPlayer: ExoPlayer? = null
+
+    private val _isPlaying = MutableStateFlow(false)
+    val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
+
+    private val _currentTrack = MutableStateFlow<Track?>(null)
+    val currentTrack: StateFlow<Track?> = _currentTrack.asStateFlow()
+
+    private val _currentPosition = MutableStateFlow(0L)
+    val currentPosition: StateFlow<Long> = _currentPosition.asStateFlow()
+
+    private val _duration = MutableStateFlow(0L)
+    val duration: StateFlow<Long> = _duration.asStateFlow()
+
+    private val _shuffleEnabled = MutableStateFlow(false)
+    val shuffleEnabled: StateFlow<Boolean> = _shuffleEnabled.asStateFlow()
+
+    private val _repeatMode = MutableStateFlow(RepeatMode.OFF)
+    val repeatMode: StateFlow<RepeatMode> = _repeatMode.asStateFlow()
+
+    private val _queue = MutableStateFlow<List<Track>>(emptyList())
+    val queue: StateFlow<List<Track>> = _queue.asStateFlow()
+
+    private val _currentIndex = MutableStateFlow(0)
+    val currentIndex: StateFlow<Int> = _currentIndex.asStateFlow()
+
+    private val _playbackError = MutableStateFlow<String?>(null)
+    val playbackError: StateFlow<String?> = _playbackError.asStateFlow()
+
+    private val nativeAudioProcessor = NativeAudioProcessor()
+
+    init {
+        initPlayer()
+    }
+
+    @OptIn(UnstableApi::class)
+    private fun initPlayer() {
+        val audioSink = androidx.media3.exoplayer.audio.DefaultAudioSink.Builder(context)
+            .setAudioProcessors(arrayOf(nativeAudioProcessor))
+            .build()
+
+        val renderersFactory = object : androidx.media3.exoplayer.DefaultRenderersFactory(context) {
+            override fun buildAudioSink(
+                context: Context,
+                enableFloatOutput: Boolean,
+                enableAudioTrackPlaybackParams: Boolean
+            ): androidx.media3.exoplayer.audio.AudioSink {
+                return audioSink
+            }
+        }
+
+        val player = ExoPlayer.Builder(context, renderersFactory).build()
+        exoPlayer = player
+
+        player.addListener(object : Player.Listener {
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                _isPlaying.value = isPlaying
+                if (isPlaying) {
+                    startProgressTracking()
+                } else {
+                    stopProgressTracking()
+                }
+            }
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                when (playbackState) {
+                    Player.STATE_READY -> {
+                        _duration.value = player.duration.coerceAtLeast(0L)
+                        _playbackError.value = null
+                        // Conectar ecualizador y bass boost al sessionId
+                        effectManager.attachToSession(player.audioSessionId)
+                    }
+                    Player.STATE_ENDED -> {
+                        handleTrackEnded()
+                    }
+                    Player.STATE_IDLE -> {}
+                    Player.STATE_BUFFERING -> {}
+                }
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                _playbackError.value = "Error al reproducir pista: ${error.message}"
+                // Pasar a la siguiente automáticamente si hay error en el archivo
+                playNext()
+            }
+        })
+    }
+
+    fun playTrackList(tracks: List<Track>, startIndex: Int = 0) {
+        if (tracks.isEmpty()) return
+        _queue.value = tracks
+        val safeIndex = startIndex.coerceIn(0, tracks.size - 1)
+        _currentIndex.value = safeIndex
+        playTrack(tracks[safeIndex])
+    }
+
+    fun playTrack(track: Track) {
+        _currentTrack.value = track
+        _currentPosition.value = 0L
+        _duration.value = track.durationMs
+
+        val player = exoPlayer ?: return
+        try {
+            val mediaMetadata = MediaMetadata.Builder()
+                .setTitle(track.title)
+                .setArtist(track.artist)
+                .setAlbumTitle(track.album)
+                .build()
+
+            val mediaItem = MediaItem.Builder()
+                .setUri(Uri.parse(track.uriString))
+                .setMediaMetadata(mediaMetadata)
+                .build()
+
+            player.setMediaItem(mediaItem)
+            player.prepare()
+            player.play()
+        } catch (e: Exception) {
+            _playbackError.value = "No se pudo cargar la pista: ${e.message}"
+        }
+    }
+
+    fun togglePlayPause() {
+        val player = exoPlayer ?: return
+        if (player.isPlaying) {
+            player.pause()
+        } else {
+            if (_currentTrack.value == null && _queue.value.isNotEmpty()) {
+                playTrackList(_queue.value, 0)
+            } else {
+                player.play()
+            }
+        }
+    }
+
+    fun seekTo(positionMs: Long) {
+        val player = exoPlayer ?: return
+        val clamped = positionMs.coerceIn(0L, _duration.value)
+        player.seekTo(clamped)
+        _currentPosition.value = clamped
+    }
+
+    fun playNext() {
+        val q = _queue.value
+        if (q.isEmpty()) return
+
+        if (_repeatMode.value == RepeatMode.ONE) {
+            _currentTrack.value?.let { playTrack(it) }
+            return
+        }
+
+        val nextIndex = if (_shuffleEnabled.value) {
+            (q.indices - _currentIndex.value).randomOrNull() ?: 0
+        } else {
+            (_currentIndex.value + 1) % q.size
+        }
+
+        if (nextIndex == 0 && _repeatMode.value == RepeatMode.OFF && _currentIndex.value == q.size - 1) {
+            // Llegó al final y la repetición está apagada
+            exoPlayer?.pause()
+            _isPlaying.value = false
+            return
+        }
+
+        _currentIndex.value = nextIndex
+        playTrack(q[nextIndex])
+    }
+
+    fun playPrevious() {
+        val player = exoPlayer ?: return
+        // Si ya lleva más de 3 segundos, retroceder al inicio de la canción
+        if (player.currentPosition > 3000L) {
+            seekTo(0L)
+            return
+        }
+
+        val q = _queue.value
+        if (q.isEmpty()) return
+
+        val prevIndex = if (_currentIndex.value > 0) {
+            _currentIndex.value - 1
+        } else {
+            q.size - 1
+        }
+
+        _currentIndex.value = prevIndex
+        playTrack(q[prevIndex])
+    }
+
+    fun toggleShuffle() {
+        _shuffleEnabled.value = !_shuffleEnabled.value
+    }
+
+    fun cycleRepeatMode() {
+        _repeatMode.value = when (_repeatMode.value) {
+            RepeatMode.OFF -> RepeatMode.ALL
+            RepeatMode.ALL -> RepeatMode.ONE
+            RepeatMode.ONE -> RepeatMode.OFF
+        }
+    }
+
+    fun updateTrackMetadata(trackId: Long, title: String, artist: String, album: String) {
+        val current = _currentTrack.value
+        if (current != null && current.id == trackId) {
+            _currentTrack.value = current.copy(title = title, artist = artist, album = album)
+        }
+        _queue.value = _queue.value.map {
+            if (it.id == trackId) it.copy(title = title, artist = artist, album = album) else it
+        }
+    }
+
+    private fun handleTrackEnded() {
+        when (_repeatMode.value) {
+            RepeatMode.ONE -> {
+                seekTo(0L)
+                exoPlayer?.play()
+            }
+            RepeatMode.ALL -> {
+                playNext()
+            }
+            RepeatMode.OFF -> {
+                if (_currentIndex.value < _queue.value.size - 1) {
+                    playNext()
+                } else {
+                    _isPlaying.value = false
+                }
+            }
+        }
+    }
+
+    private fun startProgressTracking() {
+        stopProgressTracking()
+        progressJob = playerScope.launch {
+            while (isActive) {
+                exoPlayer?.let { player ->
+                    _currentPosition.value = player.currentPosition.coerceAtLeast(0L)
+                    if (player.duration > 0) {
+                        _duration.value = player.duration
+                    }
+                }
+                delay(250)
+            }
+        }
+    }
+
+    private fun stopProgressTracking() {
+        progressJob?.cancel()
+        progressJob = null
+    }
+
+    fun release() {
+        stopProgressTracking()
+        effectManager.release()
+        exoPlayer?.release()
+        exoPlayer = null
+    }
+}
