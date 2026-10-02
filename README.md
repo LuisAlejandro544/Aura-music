@@ -2,7 +2,7 @@
 
 **Aura Music** es un reproductor de música local de alta fidelidad para Android, diseñado con una estética moderna e inmersiva inspirada en Spotify, pero enriquecida con colores vibrantes, gradientes de neón, fondos oscuros OLED 100% opacos y procesamiento de audio avanzado.
 
-Está construido con las tecnologías más modernas del ecosistema Android: **Jetpack Compose (Material 3)**, **Jetpack Media3 (ExoPlayer)**, **Room Persistence**, **Coroutines / StateFlow**, un **motor DSP nativo compilado en ISO C++20 con CMake** y almacenamiento estructurado de datos.
+Está construido con las tecnologías más modernas del ecosistema Android: **Jetpack Compose (Material 3)**, **Jetpack Media3 (ExoPlayer)**, **Room Persistence**, **Coroutines / StateFlow**, un **motor DSP nativo compilado en ISO C++20 con CMake**, almacenamiento estructurado de datos y una suite de diagnóstico autónoma (**Aura Monitor**).
 
 ---
 
@@ -12,7 +12,7 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
 - **Estética Dark Luxury OLED**: Superficies 100% opacas de alto contraste sin transparencias indeseadas ni filtraciones de fondo.
 - **Transiciones y Animaciones del Sistema**:
   - Cambio entre pantallas con animación combinada de desvanecimiento y deslizamiento suave (`AnimatedContent`).
-  - Despliegue elástico amortiguado de la pantalla completa Now Playing desde el mini reproductor.
+  - Despliegue elástico de la pantalla completa Now Playing desde el mini reproductor y **cierre suave con deslizamiento vertical instantáneo sin capas negras residuales**.
   - Indicadores y micro-interacciones táctiles con retroalimentación inmediata.
 - **4 Paletas de Acentos Vibrantes**:
   - 🌌 **Nebula Violet**: Violeta eléctrico y cyan neón futurista.
@@ -21,61 +21,56 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
   - 🌊 **Ocean Abyss**: Azul zafiro profundo y agua bioluminiscente.
 - **Mini Reproductor Flotante**:
   - Barra persistente con barra de progreso y controles táctiles.
-  - **Acceso Directo al Ecualizador C++20** con un solo toque.
+  - **Acceso Directo al Ecualizador C++20 integrado** mediante hoja modal inferior sin abandonar la vista actual.
 - **Pantalla Completa Now Playing**:
   - Visualizador de ondas animado en tiempo real.
   - Deslizador de búsqueda interactivo con formato de tiempo `mm:ss`.
   - Hoja de especificaciones de audio y modal para **editar metadatos y carátula**.
 
-### 2. Carátulas Personalizadas de Galería & Arte Procedural
-- **Selección de Carátula desde Galería**: Mediante el Android Photo Picker nativo del sistema, el usuario puede asignar cualquier imagen personal a una pista.
-- **Compresión WebP y Borrado Inteligente**: La nueva carátula se comprime automáticamente a formato **WebP sin pérdida (Lossless)** en hilos secundarios (`Dispatchers.IO`), y la carátula previa se elimina físicamente del disco para evitar archivos residuales.
-- **Generador de Arte Procedural**: Si una canción no tiene carátula o el usuario desea restaurarla, se genera una ilustración vectorial matemática única basada en los metadatos de la pista.
-
-### 3. Sistema Completo de Playlists en la Biblioteca
-- **Pestaña "Playlists" en Tu Biblioteca**:
-  - **Tarjeta Especial "Tus Me Gusta"**: Sincronización automática de todas las canciones marcadas con corazón en tiempo real.
-  - **Listas Personalizadas**: Creación de nuevas playlists con nombre y descripción libre.
-  - **Renombrado y Edición**: Opción para cambiar el nombre de cualquier playlist en cualquier momento.
-  - **Añadir Canciones Rápidamente**: Diálogo modal con buscador dentro de la playlist para agregar múltiples canciones de la biblioteca con un toque.
-  - **Menú Contextual**: Posibilidad de añadir o quitar pistas de playlists desde el menú de 3 puntos de cada canción.
-
-### 4. Estructura Organizada de Almacenamiento
-Ubicado en el almacenamiento privado del paquete `Android/data/com.aistudio.musicplayer.aurasound/files/`:
-- 📁 **`images/`**: Carátulas de álbumes y personalizadas en WebP Lossless.
-- 📁 **`songs/`**: Canciones locales y pistas sintetizadas de demostración.
-- 📁 **`lyrics/`**: Archivos de letras sincronizadas (`.lrc`) y texto.
-- 📁 **`metadata/`**: Ficheros JSON estructurados con información técnica de cada pista.
-
-### 5. Motor de Audio DSP Nativo en C++20 (10 Bandas ISO & Audio 8D Espacial)
-- **Compilado nativamente con CMake**: Integrado en el APK final para arquitecturas de 64 bits (`arm64-v8a`, `x86_64`) y 32 bits (`armeabi-v7a`, `x86`).
-- **Ecualizador Paramétrico de 10 Bandas**:
-  - Frecuencias centrales ISO: `31 Hz, 62 Hz, 125 Hz, 250 Hz, 500 Hz, 1 kHz, 2 kHz, 4 kHz, 8 kHz, 16 kHz`.
-  - Filtros IIR Bi-cuadráticos (*Peaking Biquads*) en coma flotante de 64 bits.
+### 2. Ecualizador C++20 Integrado en Modal (Sin Apartados Aislados)
+- **10 Bandas Paramétricas ISO**:
+  - Frecuencias centrales: `31 Hz, 62 Hz, 125 Hz, 250 Hz, 500 Hz, 1 kHz, 2 kHz, 4 kHz, 8 kHz, 16 kHz`.
+  - Filtros IIR Bi-cuadráticos (*Peaking Biquads*) en coma flotante de 64 bits con limitador suave anti-clipping.
   - Rango de ganancia de `-15 dB` a `+15 dB`.
+- **Integración Total en Hoja Modal**: Ya no existe una pantalla separada que interrumpa la navegación; se abre como una pestaña directa en la hoja de efectos desde el Mini Reproductor o Now Playing.
+- **Perfiles Acústicos (Presets)**: Rock, Pop, Electrónica, Jazz, Acústico, Bass Boost y Plano.
+- **Refuerzo de Bajos C++ (Bass Boost)** calibrado a 60 Hz con modulación precisa.
+
+### 3. Audio 8D Espacial y Controles Avanzados de Escucha
 - **Audio Espacial 8D Binaural para Auriculares**:
   - Paneo orbital tridimensional continuo en tiempo real (4s a 30s por rotación completa).
-  - Simulación acústica de sombra de cabeza (*Head Shadow Filtering*) y reverberación espacial ambiental de sala sin modelos 3D intrusivos.
-- **Refuerzo de Bajos C++ (Bass Boost)**:
-  - Curva de ganancia calibrada a 60 Hz con control de 0% a 100%.
-- **Limitador Suave Anti-Clipping**:
-  - Algoritmo de saturación cúbica que evita distorsiones digitales cuando las bandas están elevadas.
-
-### 6. Controles Avanzados de Reproducción y Escucha
-- **Temporizador de Apagado Personalizable**:
-  - Configuración libre de minutos numéricos o presets (15m, 30m, 45m, 60m).
+  - Simulación acústica de sombra de cabeza (*Head Shadow Filtering*) y reverberación espacial ambiental.
+- **Control Estable de Velocidad y Tono (Pitch & Speed)**:
+  - Modulación fluida de 0.50x a 2.00x protegida con *throttling* y amortiguación de llamadas a ExoPlayer.
+  - Recuperación automática ante anomalías de audio para evitar que la canción se pause accidentalmente.
+- **Temporizador de Apagado (Sleep Timer)**:
+  - Minutos personalizados o chips rápidos (15m, 30m, 45m, 60m).
   - Contador regresivo en tiempo real con opción de añadir +5 minutos.
-  - **Atenuación suave de volumen de 10 segundos** (*fade-out*) antes de pausar para no despertar al usuario.
+  - **Atenuación suave de volumen de 10 segundos** (*fade-out*) antes de pausar.
 - **Transición Suave (Crossfade) y Reproducción Gapless**:
   - Fundido cruzado de 0 a 12 segundos con desvanecimiento de volumen progresivo.
-  - Modo Gapless para reproducción continua sin silencios entre canciones consecutivas.
-- **Control de Velocidad y Tono (Pitch & Speed)**:
-  - Ajuste independiente de velocidad (0.50x a 2.00x) y tono musical en tiempo real con restablecimiento a 1.0x.
+  - Modo Gapless para reproducción continua sin silencios entre pistas.
 
-### 7. Privacidad Total (Storage Access Framework)
-- **Cero Escaneo Ciego**: No rastrea el disco del teléfono sin autorización.
-- Importación selectiva de canciones (`OpenMultipleDocuments`) y carpetas (`OpenDocumentTree`).
-- Generador de canciones demostrativas Synthwave listo para usar.
+### 4. Carátulas Personalizadas de Galería & Arte Procedural
+- **Selección de Carátula desde Galería**: Mediante el Android Photo Picker nativo del sistema.
+- **Compresión WebP y Borrado Inteligente**: Conversión en segundo plano (`Dispatchers.IO`) a WebP sin pérdida y eliminación de carátulas residuales del disco.
+- **Generador de Arte Procedural**: Ilustración matemática vectorial única para canciones sin portada.
+
+### 5. Playlists y Almacenamiento Estructurado
+- **Pestaña "Playlists" en Tu Biblioteca**: Tarjeta "Tus Me Gusta" sincronizada, creación, renombrado y adición rápida de canciones.
+- **Almacenamiento Organizado** en `Android/data/com.aistudio.musicplayer.aurasound/files/`:
+  - 📁 `images/`: Carátulas en WebP Lossless.
+  - 📁 `songs/`: Canciones locales y demos.
+  - 📁 `lyrics/`: Archivos de letras sincronizadas (`.lrc`).
+  - 📁 `metadata/`: Ficheros JSON estructurados con información técnica.
+
+### 6. Suite de Diagnóstico Autónoma: Aura Monitor 🛠️ & LeakCanary
+- **Aura Monitor (App Debug Propia en el Cajón de Aplicaciones)**:
+  - Cuenta con su propio icono de acceso directo en el cajón de apps del teléfono móvil.
+  - Atrapa y registra automáticamente **Crashes** no controlados mediante `UncaughtExceptionHandler`, **Errores Críticos**, **Warnings de Memoria** y eventos de Media3 / JNI.
+  - Registra datos técnicos del teléfono móvil: Modelo, Fabricante, Versión de Android / SDK API, CPU ABI (64-bit / 32-bit), memoria RAM libre/total y espacio de disco disponible.
+  - Visualizador de **Stack Trace en crudo** completo con copia rápida al portapapeles y generación de informe diagnóstico integral para compartir sin necesidad de PC.
+- **LeakCanary**: Integrado en el entorno de desarrollo para auditoría y detección en tiempo real de fugas de memoria en la JVM.
 
 ---
 

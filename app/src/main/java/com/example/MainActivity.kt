@@ -13,7 +13,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -97,6 +102,9 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
     val crossfadeSeconds by viewModel.crossfadeSeconds.collectAsStateWithLifecycle()
     val isGaplessEnabled by viewModel.isGaplessEnabled.collectAsStateWithLifecycle()
 
+    var showGlobalAudioEffectsSheet by remember { mutableStateOf(false) }
+    var initialAudioEffectsTab by remember { mutableIntStateOf(0) }
+
     // Manejo de botón Atrás
     val canGoBack = isNowPlayingExpanded || (currentScreen !is NavScreen.Home)
     BackHandler(enabled = canGoBack) {
@@ -137,7 +145,10 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                             durationMs = duration,
                             onTogglePlayPause = { viewModel.togglePlayPause() },
                             onSkipNext = { viewModel.playNext() },
-                            onOpenEqualizer = { viewModel.navigateTo(NavScreen.Equalizer) },
+                            onOpenEqualizer = {
+                                initialAudioEffectsTab = 0
+                                showGlobalAudioEffectsSheet = true
+                            },
                             onClick = { viewModel.setNowPlayingExpanded(true) }
                         )
                     }
@@ -227,17 +238,32 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                             onDismissStatusMessage = { viewModel.dismissImportStatus() }
                         )
 
-                        is NavScreen.Equalizer -> EqualizerScreen(
-                            isEnabled = isEqEnabled,
-                            bands = eqBands,
-                            bassBoostLevel = bassBoostLevel,
-                            currentPreset = currentPreset,
-                            onToggleEnabled = { viewModel.setEqEnabled(it) },
-                            onBandLevelChange = { index, level -> viewModel.setBandLevel(index, level) },
-                            onBassBoostChange = { viewModel.setBassBoost(it) },
-                            onPresetSelect = { viewModel.applyPreset(it) },
-                            onBack = { viewModel.handleBackPress() }
-                        )
+                        is NavScreen.Equalizer -> {
+                            LaunchedEffect(Unit) {
+                                initialAudioEffectsTab = 0
+                                showGlobalAudioEffectsSheet = true
+                                viewModel.handleBackPress()
+                            }
+                            HomeScreen(
+                                allTracks = allTracks,
+                                favoriteTracks = favoriteTracks,
+                                recentlyAddedTracks = recentlyAddedTracks,
+                                topPlayedTracks = topPlayedTracks,
+                                playlists = playlists,
+                                currentTrack = currentTrack,
+                                isPlaying = isPlaying,
+                                onTrackClick = { track, list -> viewModel.playTrack(track, list) },
+                                onFavoriteToggle = { viewModel.toggleFavorite(it) },
+                                onDeleteTrack = { viewModel.deleteTrack(it) },
+                                onAddToPlaylist = { playlistId, trackId -> viewModel.addTrackToPlaylist(playlistId, trackId) },
+                                onNavigate = { viewModel.navigateTo(it) },
+                                onSelectLibraryTab = { viewModel.setLibraryTab(it) },
+                                onEditTrack = { id, t, a, al -> viewModel.updateTrackInfo(id, t, a, al) },
+                                onEditTrackDetails = { id, t, a, al, art, removeArt ->
+                                    viewModel.updateTrackDetails(id, t, a, al, art, removeArt)
+                                }
+                            )
+                        }
 
                         is NavScreen.PlaylistDetail -> PlaylistDetailScreen(
                             playlist = selectedPlaylist,
@@ -267,23 +293,21 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
             }
         }
 
-        // Pantalla Now Playing con transición elástica optimizada y fondo 100% opaco
+        // Pantalla Now Playing con deslizamiento suave sin fondo negro residual
         AnimatedVisibility(
             visible = isNowPlayingExpanded && currentTrack != null,
             enter = slideInVertically(
                 initialOffsetY = { it },
                 animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioLowBouncy,
-                    stiffness = Spring.StiffnessMediumLow
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = Spring.StiffnessMedium
                 )
-            ) + fadeIn(animationSpec = tween(220)),
+            ),
             exit = slideOutVertically(
                 targetOffsetY = { it },
-                animationSpec = tween(240)
-            ) + fadeOut(animationSpec = tween(180)),
-            modifier = Modifier
-                .fillMaxSize()
-                .background(BackgroundDark)
+                animationSpec = tween(durationMillis = 220)
+            ),
+            modifier = Modifier.fillMaxSize()
         ) {
             NowPlayingScreen(
                 currentTrack = currentTrack,
@@ -305,8 +329,8 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                     queue.getOrNull(index)?.let { viewModel.playTrack(it, queue) }
                 },
                 onOpenEqualizer = {
-                    viewModel.setNowPlayingExpanded(false)
-                    viewModel.navigateTo(NavScreen.Equalizer)
+                    initialAudioEffectsTab = 0
+                    showGlobalAudioEffectsSheet = true
                 },
                 onCollapse = { viewModel.setNowPlayingExpanded(false) },
                 onEditTrack = { id, t, a, al -> viewModel.updateTrackInfo(id, t, a, al) },
@@ -330,7 +354,49 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                 crossfadeSeconds = crossfadeSeconds,
                 onSetCrossfadeSeconds = { viewModel.setCrossfadeSeconds(it) },
                 isGaplessEnabled = isGaplessEnabled,
-                onSetGaplessEnabled = { viewModel.setGaplessEnabled(it) }
+                onSetGaplessEnabled = { viewModel.setGaplessEnabled(it) },
+                isEqEnabled = isEqEnabled,
+                eqBands = eqBands,
+                bassBoostLevel = bassBoostLevel,
+                currentPreset = currentPreset,
+                onToggleEqEnabled = { viewModel.setEqEnabled(it) },
+                onBandLevelChange = { index, level -> viewModel.setBandLevel(index, level) },
+                onBassBoostChange = { viewModel.setBassBoost(it) },
+                onPresetSelect = { viewModel.applyPreset(it) }
+            )
+        }
+
+        // Hoja modal unificada de Efectos de Audio y Ecualizador accesible globalmente
+        if (showGlobalAudioEffectsSheet) {
+            com.example.ui.components.AudioEffectsBottomSheet(
+                onDismissRequest = { showGlobalAudioEffectsSheet = false },
+                isEqEnabled = isEqEnabled,
+                eqBands = eqBands,
+                bassBoostLevel = bassBoostLevel,
+                currentPreset = currentPreset,
+                onToggleEqEnabled = { viewModel.setEqEnabled(it) },
+                onBandLevelChange = { index, level -> viewModel.setBandLevel(index, level) },
+                onBassBoostChange = { viewModel.setBassBoost(it) },
+                onPresetSelect = { viewModel.applyPreset(it) },
+                sleepTimerState = sleepTimerState,
+                onStartSleepTimer = { viewModel.startSleepTimer(it) },
+                onCancelSleepTimer = { viewModel.cancelSleepTimer() },
+                onAddSleepTimerMinutes = { viewModel.addSleepTimerMinutes(it) },
+                spatial8DConfig = spatial8DConfig,
+                onSet8DEnabled = { viewModel.set8DEnabled(it) },
+                onSet8DOrbitSpeed = { viewModel.set8DOrbitSpeed(it) },
+                onSet8DSpatialIntensity = { viewModel.set8DSpatialIntensity(it) },
+                onSet8DRoomDepth = { viewModel.set8DRoomDepth(it) },
+                playbackSpeed = playbackSpeed,
+                onSetPlaybackSpeed = { viewModel.setPlaybackSpeed(it) },
+                playbackPitch = playbackPitch,
+                onSetPlaybackPitch = { viewModel.setPlaybackPitch(it) },
+                onResetSpeedAndPitch = { viewModel.resetSpeedAndPitch() },
+                crossfadeSeconds = crossfadeSeconds,
+                onSetCrossfadeSeconds = { viewModel.setCrossfadeSeconds(it) },
+                isGaplessEnabled = isGaplessEnabled,
+                onSetGaplessEnabled = { viewModel.setGaplessEnabled(it) },
+                initialTab = initialAudioEffectsTab
             )
         }
     }

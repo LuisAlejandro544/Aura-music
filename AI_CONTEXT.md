@@ -5,7 +5,7 @@ Este archivo define el contexto de diseño, directrices técnicas y restriccione
 ---
 
 ## 🎯 Propósito del Proyecto
-**Aura Music** es un reproductor de audio local fuera de línea para Android con una experiencia estética inspirada en Spotify, pero con diseño moderno, colores vibrantes de neón, fondos 100% opacos, ecualización paramétrica de **10 bandas impulsada por C++20**, compresión WebP sin pérdida y almacenamiento de datos organizado.
+**Aura Music** es un reproductor de audio local fuera de línea para Android con una experiencia estética inspirada en Spotify, pero con diseño moderno, colores vibrantes de neón, fondos 100% opacos, ecualización paramétrica de **10 bandas impulsada por C++20**, compresión WebP sin pérdida, almacenamiento de datos organizado y una suite de diagnóstico propia (**Aura Monitor**).
 
 ---
 
@@ -28,6 +28,7 @@ Este archivo define el contexto de diseño, directrices técnicas y restriccione
      - `songs/`: Canciones locales y demos.
      - `lyrics/`: Letras de canciones sincronizadas (.lrc).
      - `metadata/`: Archivos JSON con información técnica y descriptiva de las pistas.
+   - Los registros de diagnóstico del monitor se guardan de forma atómica en `filesDir/aura_debug_logs.json`.
 
 5. **Carátulas Procedurales & WebP**:
    - Las canciones sin carátula deben usar el generador procedural vectorial, no imágenes genéricas estáticas o de IA fijas.
@@ -37,13 +38,19 @@ Este archivo define el contexto de diseño, directrices técnicas y restriccione
    - Se debe utilizar **Jetpack Media3 (ExoPlayer)** (`androidx.media3:media3-*`).
    - El ecualizador paramétrico cuenta con **10 bandas ISO** y limitador anti-clipping en **ISO C++20** con filtros biquad de doble precisión.
    - El motor de **Audio 8D Espacial** está integrado en **ISO C++20** mediante paneo orbital continuo de potencia constante, filtro de sombra de cabeza y reverberación binaural para auriculares.
-   - La reproducción incluye soporte para velocidad/tono en tiempo real, transiciones suaves (Crossfade ajustable de 0 a 12s con desvanecimiento de volumen), reproducción Gapless y un Temporizador de Apagado personalizable con atenuación de 10s.
-   - La entrada a estos efectos se realiza desde la pantalla **Now Playing** (`AudioEffectsBottomSheet`) y el **Mini Reproductor**, manteniendo despejada la barra inferior de navegación.
+   - El ecualizador **NO DEBE TENER UN APARTADO APARTE DE PANTALLA COMPLETA**. Se integra y despliega como una hoja modal unificada (`AudioEffectsBottomSheet`) accesible desde el Mini Reproductor y Now Playing con un solo toque.
+   - Los cambios de velocidad y tono (*playback parameters*) deben contar con amortiguación (*throttling* con corrutinas) para no saturar ExoPlayer ni pausar la canción accidentalmente.
 
 7. **Diseño de Interfaz (Jetpack Compose & M3)**:
    - Fondos 100% opacos OLED: evitar transparencias que permitan que las listas o cabeceras se filtren por detrás del reproductor o mini reproductor.
+   - La animación de salida de Now Playing hacia abajo debe realizarse sin superposiciones de capas negras residuales (`slideOutVertically` limpio sobre fondo nativo).
    - Todos los elementos interactivos deben cumplir con un tamaño mínimo de toque de **48.dp**.
-   - Modularidad en pantallas: `Home`, `Library`, `Import`, `Equalizer`, `NowPlaying`, `Settings`, `PlaylistDetail`.
+   - Modularidad en pantallas: `Home`, `Library`, `Import`, `NowPlaying`, `Settings`, `PlaylistDetail`.
 
-8. **Idioma de Comunicación**:
+8. **Suite de Diagnóstico Propia & LeakCanary**:
+   - La actividad `DebugMonitorActivity` ("Aura Monitor") debe mantenerse accesible desde el cajón de aplicaciones con su propio icono independiente.
+   - Debe interceptar excepciones no controladas a nivel de proceso (`Thread.setDefaultUncaughtExceptionHandler`) y registrar datos del teléfono (modelo, CPU ABI, RAM, almacenamiento, versión de Android) junto con el stacktrace en crudo.
+   - LeakCanary debe estar configurado en `debugImplementation` para auditar fugas de memoria en la JVM.
+
+9. **Idioma de Comunicación**:
    - La documentación, comentarios en código, cadenas de usuario (`strings.xml`) y mensajes de commit deben redactarse en **español**.

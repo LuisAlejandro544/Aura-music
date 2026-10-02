@@ -77,6 +77,7 @@ class AuraAudioPlayer(
 
     private var baseVolume = 1.0f
     private var fadeInJob: Job? = null
+    private var playbackParamsJob: Job? = null
 
     private val nativeAudioProcessor = NativeAudioProcessor()
 
@@ -131,7 +132,25 @@ class AuraAudioPlayer(
 
             override fun onPlayerError(error: PlaybackException) {
                 _playbackError.value = "Error al reproducir pista: ${error.message}"
-                // Pasar a la siguiente automáticamente si hay error en el archivo
+                com.example.debug.AuraDebugManager.logError("ExoPlayer", "Error durante la reproducción: ${error.errorCodeName} - ${error.message}", error)
+
+                // Si el error ocurrió por saturación del procesador de audio (Sonic / AudioSink), intentar recuperarse
+                val player = exoPlayer
+                if (player != null && _currentTrack.value != null) {
+                    try {
+                        _playbackSpeed.value = 1.0f
+                        _playbackPitch.value = 1.0f
+                        player.playbackParameters = androidx.media3.common.PlaybackParameters.DEFAULT
+                        player.prepare()
+                        player.play()
+                        com.example.debug.AuraDebugManager.logWarning("ExoPlayer", "Recuperación automática de reproducción tras error de procesador de audio.")
+                        return
+                    } catch (e: Throwable) {
+                        com.example.debug.AuraDebugManager.logCritical("ExoPlayer", "Fallo al recuperar reproducción local: ${e.message}", e)
+                    }
+                }
+
+                // Pasar a la siguiente automáticamente si hay error irrecuperable en el archivo
                 playNext()
             }
         })
@@ -192,25 +211,49 @@ class AuraAudioPlayer(
     }
 
     fun setPlaybackSpeed(speed: Float) {
-        val clamped = speed.coerceIn(0.25f, 3.0f)
+        val clamped = speed.coerceIn(0.5f, 2.0f)
         _playbackSpeed.value = clamped
-        applyPlaybackParameters()
+        schedulePlaybackParameters()
     }
 
     fun setPlaybackPitch(pitch: Float) {
-        val clamped = pitch.coerceIn(0.25f, 3.0f)
+        val clamped = pitch.coerceIn(0.5f, 2.0f)
         _playbackPitch.value = clamped
-        applyPlaybackParameters()
+        schedulePlaybackParameters()
     }
 
     fun resetSpeedAndPitch() {
+        playbackParamsJob?.cancel()
         _playbackSpeed.value = 1.0f
         _playbackPitch.value = 1.0f
-        applyPlaybackParameters()
+        applyPlaybackParametersDirect(1.0f, 1.0f)
     }
 
-    private fun applyPlaybackParameters() {
-        exoPlayer?.playbackParameters = androidx.media3.common.PlaybackParameters(_playbackSpeed.value, _playbackPitch.value)
+    private fun schedulePlaybackParameters() {
+        playbackParamsJob?.cancel()
+        playbackParamsJob = playerScope.launch(Dispatchers.Main) {
+            delay(40L) // Coalescing / Throttling seguro contra movimientos rápidos del slider
+            val speedTarget = _playbackSpeed.value
+            val pitchTarget = _playbackPitch.value
+            applyPlaybackParametersDirect(speedTarget, pitchTarget)
+        }
+    }
+
+    private fun applyPlaybackParametersDirect(speed: Float, pitch: Float) {
+        val player = exoPlayer ?: return
+        val current = player.playbackParameters
+        if (kotlin.math.abs(current.speed - speed) > 0.01f || kotlin.math.abs(current.pitch - pitch) > 0.01f) {
+            val wasPlaying = player.isPlaying || player.playWhenReady
+            try {
+                player.playbackParameters = androidx.media3.common.PlaybackParameters(speed, pitch)
+                // Si estaba reproduciendo, asegurar que no se quede pausado
+                if (wasPlaying && !player.isPlaying && player.playbackState != Player.STATE_ENDED) {
+                    player.play()
+                }
+            } catch (t: Throwable) {
+                com.example.debug.AuraDebugManager.logWarning("ExoPlayer", "Fallo al aplicar velocidad/tono: ${t.message}", t)
+            }
+        }
     }
 
     fun setVolume(volume: Float) {
@@ -383,6 +426,8 @@ class AuraAudioPlayer(
         progressJob = null
         fadeInJob?.cancel()
         fadeInJob = null
+        playbackParamsJob?.cancel()
+        playbackParamsJob = null
     }
 
     fun release() {

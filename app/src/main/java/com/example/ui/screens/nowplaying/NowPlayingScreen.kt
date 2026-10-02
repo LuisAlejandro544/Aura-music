@@ -82,6 +82,15 @@ fun NowPlayingScreen(
     onSetCrossfadeSeconds: (Int) -> Unit = {},
     isGaplessEnabled: Boolean = true,
     onSetGaplessEnabled: (Boolean) -> Unit = {},
+    // Parámetros de Ecualizador C++20 integrados
+    isEqEnabled: Boolean = true,
+    eqBands: List<com.example.model.EqualizerBand> = emptyList(),
+    bassBoostLevel: Int = 0,
+    currentPreset: com.example.model.EqualizerPreset = com.example.model.EqualizerPreset.PRESETS.first(),
+    onToggleEqEnabled: (Boolean) -> Unit = {},
+    onBandLevelChange: (Int, Int) -> Unit = { _, _ -> },
+    onBassBoostChange: (Int) -> Unit = {},
+    onPresetSelect: (com.example.model.EqualizerPreset) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     BackHandler {
@@ -92,6 +101,7 @@ fun NowPlayingScreen(
 
     var showQueueSheet by remember { mutableStateOf(false) }
     var showEffectsSheet by remember { mutableStateOf(false) }
+    var effectsInitialTab by remember { mutableIntStateOf(0) }
     var showDetailsDialog by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
     var isDraggingSlider by remember { mutableStateOf(false) }
@@ -178,7 +188,10 @@ fun NowPlayingScreen(
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(
-                        onClick = { showEffectsSheet = true },
+                        onClick = {
+                            effectsInitialTab = 1
+                            showEffectsSheet = true
+                        },
                         modifier = Modifier.testTag("now_playing_effects_btn")
                     ) {
                         BadgedBox(
@@ -443,7 +456,10 @@ fun NowPlayingScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 TextButton(
-                    onClick = onOpenEqualizer,
+                    onClick = {
+                        effectsInitialTab = 0
+                        showEffectsSheet = true
+                    },
                     modifier = Modifier.testTag("now_playing_eq_shortcut")
                 ) {
                     Icon(Icons.Default.Tune, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
@@ -595,6 +611,14 @@ fun NowPlayingScreen(
         if (showEffectsSheet) {
             com.example.ui.components.AudioEffectsBottomSheet(
                 onDismissRequest = { showEffectsSheet = false },
+                isEqEnabled = isEqEnabled,
+                eqBands = eqBands,
+                bassBoostLevel = bassBoostLevel,
+                currentPreset = currentPreset,
+                onToggleEqEnabled = onToggleEqEnabled,
+                onBandLevelChange = onBandLevelChange,
+                onBassBoostChange = onBassBoostChange,
+                onPresetSelect = onPresetSelect,
                 sleepTimerState = sleepTimerState,
                 onStartSleepTimer = onStartSleepTimer,
                 onCancelSleepTimer = onCancelSleepTimer,
@@ -612,7 +636,8 @@ fun NowPlayingScreen(
                 crossfadeSeconds = crossfadeSeconds,
                 onSetCrossfadeSeconds = onSetCrossfadeSeconds,
                 isGaplessEnabled = isGaplessEnabled,
-                onSetGaplessEnabled = onSetGaplessEnabled
+                onSetGaplessEnabled = onSetGaplessEnabled,
+                initialTab = effectsInitialTab
             )
         }
     }
