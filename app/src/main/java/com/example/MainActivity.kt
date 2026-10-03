@@ -1,6 +1,7 @@
 package com.example
 
 import android.os.Bundle
+import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -39,10 +40,12 @@ import com.example.viewmodel.MusicViewModel
 /**
  * Actividad Principal de Aura Music.
  * Configura Edge-to-Edge, vincula el ViewModel central reactivo,
- * navegación con transiciones animadas fluidas, mini reproductor persistente
- * y vista completa Now Playing con fondo 100% opaco OLED.
+ * navegación con transiciones animadas fluidas, mini reproductor persistente,
+ * control de botones físicos de auriculares y vista completa Now Playing.
  */
 class MainActivity : ComponentActivity() {
+
+    private var musicViewModel: MusicViewModel? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -50,12 +53,22 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val viewModel: MusicViewModel = viewModel()
+            musicViewModel = viewModel
             val currentTheme by viewModel.currentTheme.collectAsStateWithLifecycle()
 
             AuraMusicTheme(auraTheme = currentTheme) {
                 AuraMusicApp(viewModel = viewModel)
             }
         }
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        musicViewModel?.let { vm ->
+            if (vm.headphoneController.onKeyEvent(event.keyCode, event)) {
+                return true
+            }
+        }
+        return super.dispatchKeyEvent(event)
     }
 }
 
@@ -104,6 +117,7 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
     val videoDisplayMode by viewModel.videoDisplayMode.collectAsStateWithLifecycle()
     val isVideoCanvasActive by viewModel.isVideoCanvasActive.collectAsStateWithLifecycle()
     val isDynamicArtworkColorEnabled by viewModel.isDynamicArtworkColorEnabled.collectAsStateWithLifecycle()
+    val headphoneConfig by viewModel.headphoneConfig.collectAsStateWithLifecycle()
 
     var showGlobalAudioEffectsSheet by remember { mutableStateOf(false) }
     var initialAudioEffectsTab by remember { mutableIntStateOf(0) }
@@ -297,7 +311,18 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                             currentTheme = currentTheme,
                             onSelectTheme = { viewModel.setTheme(it) },
                             isDynamicArtworkColorEnabled = isDynamicArtworkColorEnabled,
-                            onToggleDynamicArtworkColor = { viewModel.toggleDynamicArtworkColor(it) }
+                            onToggleDynamicArtworkColor = { viewModel.toggleDynamicArtworkColor(it) },
+                            headphoneConfig = headphoneConfig,
+                            onUpdateHeadphoneConfig = { viewModel.updateHeadphoneConfig(it) },
+                            onSetCrossfeedEnabled = { viewModel.setCrossfeedEnabled(it) },
+                            onSetCrossfeedStrength = { viewModel.setCrossfeedStrength(it) },
+                            onSetBalanceControlEnabled = { viewModel.setBalanceControlEnabled(it) },
+                            onSetStereoBalance = { viewModel.setStereoBalance(it) },
+                            onSetBecomingNoisyGuardEnabled = { viewModel.setBecomingNoisyGuardEnabled(it) },
+                            onSetFadeInOnResumeEnabled = { viewModel.setFadeInOnResumeEnabled(it) },
+                            onSetDedicatedVolumeMemoryEnabled = { viewModel.setDedicatedVolumeMemoryEnabled(it) },
+                            onSetHeadsetControlsEnabled = { viewModel.setHeadsetControlsEnabled(it) },
+                            onSetHeadsetAction = { type, action -> viewModel.setHeadsetAction(type, action) }
                         )
                     }
                 }
@@ -382,7 +407,12 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                 onToggleEqEnabled = { viewModel.setEqEnabled(it) },
                 onBandLevelChange = { index, level -> viewModel.setBandLevel(index, level) },
                 onBassBoostChange = { viewModel.setBassBoost(it) },
-                onPresetSelect = { viewModel.applyPreset(it) }
+                onPresetSelect = { viewModel.applyPreset(it) },
+                headphoneConfig = headphoneConfig,
+                onSetCrossfeedEnabled = { viewModel.setCrossfeedEnabled(it) },
+                onSetCrossfeedStrength = { viewModel.setCrossfeedStrength(it) },
+                onSetBalanceControlEnabled = { viewModel.setBalanceControlEnabled(it) },
+                onSetStereoBalance = { viewModel.setStereoBalance(it) }
             )
         }
 
@@ -416,6 +446,11 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                 onSetCrossfadeSeconds = { viewModel.setCrossfadeSeconds(it) },
                 isGaplessEnabled = isGaplessEnabled,
                 onSetGaplessEnabled = { viewModel.setGaplessEnabled(it) },
+                headphoneConfig = headphoneConfig,
+                onSetCrossfeedEnabled = { viewModel.setCrossfeedEnabled(it) },
+                onSetCrossfeedStrength = { viewModel.setCrossfeedStrength(it) },
+                onSetBalanceControlEnabled = { viewModel.setBalanceControlEnabled(it) },
+                onSetStereoBalance = { viewModel.setStereoBalance(it) },
                 initialTab = initialAudioEffectsTab
             )
         }

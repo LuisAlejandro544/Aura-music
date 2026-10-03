@@ -52,12 +52,14 @@ AuraMusic/
 │   │   │   │   │   ├── RepeatMode.kt           # Enum de modos de repetición
 │   │   │   │   │   ├── EqualizerConfig.kt      # Modelo de 10 bandas y presets de EQ
 │   │   │   │   │   ├── AudioEffectsConfig.kt   # Modelos para Audio 8D, Temporizador y Gapless/Crossfade
+│   │   │   │   │   ├── HeadphoneConfig.kt      # Configuración de Crossfeed C++20, Balance L/R y gestos
 │   │   │   │   │   ├── VideoDisplayMode.kt     # Enum de modos de visualización de video (Fondo Completo, Carátula, Off)
 │   │   │   │   │   └── ThemePalette.kt         # Enum de temas de color vibrantes
 │   │   │   │   ├── playback/                   # Capa de reproducción de audio
 │   │   │   │   │   ├── AuraAudioPlayer.kt      # Motor Media3 ExoPlayer, cola, throttling y recuperación
 │   │   │   │   │   ├── AudioEffectManager.kt   # Gestor de EQ 10 bandas, BassBoost y Audio 8D
-│   │   │   │   │   ├── NativeAudioEngine.kt    # Puente JNI hacia C++20 (EQ 10 bandas y Audio 8D)
+│   │   │   │   │   ├── HeadphoneController.kt  # Gestor de auriculares, Becoming Noisy y botones físicos
+│   │   │   │   │   ├── NativeAudioEngine.kt    # Puente JNI hacia C++20 (EQ 10 bandas, 8D, Crossfeed y Balance)
 │   │   │   │   │   └── NativeAudioProcessor.kt # Procesador Media3 para buffers PCM
 │   │   │   │   ├── ui/
 │   │   │   │   │   ├── components/             # Componentes visuales reutilizables

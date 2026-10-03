@@ -27,6 +27,32 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val effectManager = AudioEffectManager()
     val audioPlayer = AuraAudioPlayer(application, effectManager)
 
+    // Controlador y gestor de hardware para Auriculares / Audífonos
+    val headphoneController = com.example.playback.HeadphoneController(
+        context = application,
+        onPauseRequested = { audioPlayer.pause() },
+        onPlayRequested = { audioPlayer.play() },
+        onTogglePlayPauseRequested = { audioPlayer.togglePlayPause() },
+        onNextRequested = { audioPlayer.playNext() },
+        onPrevRequested = { audioPlayer.playPrevious() },
+        onToggleFavoriteRequested = {
+            audioPlayer.currentTrack.value?.let { track ->
+                toggleFavorite(track)
+            }
+        },
+        onSeekByOffset = { offsetMs ->
+            val cur = audioPlayer.currentPosition.value
+            val target = (cur + offsetMs).coerceAtLeast(0L)
+            audioPlayer.seekTo(target)
+        },
+        onVolumeChangeRequested = { vol ->
+            audioPlayer.setVolume(vol)
+        },
+        getCurrentVolume = { audioPlayer.getVolume() }
+    )
+
+    val headphoneConfig: StateFlow<HeadphoneConfig> = headphoneController.config
+
     // Datos reactivos de Room
     val allTracks: StateFlow<List<Track>> = repository.allTracks
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -523,9 +549,75 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         audioPlayer.setVolume(1.0f)
     }
 
+    // --- Métodos de Control para Auriculares / Audífonos ---
+
+    fun updateHeadphoneConfig(newConfig: HeadphoneConfig) {
+        headphoneController.updateConfig(newConfig)
+        audioPlayer.setFadeInOnResumeEnabled(newConfig.isFadeInOnResumeEnabled)
+    }
+
+    fun setCrossfeedEnabled(enabled: Boolean) {
+        headphoneController.setCrossfeedEnabled(enabled)
+    }
+
+    fun setCrossfeedStrength(strengthMode: Int) {
+        headphoneController.setCrossfeedStrength(strengthMode)
+    }
+
+    fun setBalanceControlEnabled(enabled: Boolean) {
+        headphoneController.setBalanceControlEnabled(enabled)
+    }
+
+    fun setStereoBalance(balance: Float) {
+        headphoneController.setStereoBalance(balance)
+    }
+
+    fun setBecomingNoisyGuardEnabled(enabled: Boolean) {
+        headphoneController.setBecomingNoisyGuardEnabled(enabled)
+    }
+
+    fun setFadeInOnResumeEnabled(enabled: Boolean) {
+        headphoneController.setFadeInOnResumeEnabled(enabled)
+        audioPlayer.setFadeInOnResumeEnabled(enabled)
+    }
+
+    fun setDedicatedVolumeMemoryEnabled(enabled: Boolean) {
+        headphoneController.setDedicatedVolumeMemoryEnabled(enabled)
+    }
+
+    fun setHeadsetControlsEnabled(enabled: Boolean) {
+        headphoneController.setHeadsetControlsEnabled(enabled)
+    }
+
+    fun setHeadsetSingleClickAction(action: HeadsetButtonAction) {
+        headphoneController.setSingleClickAction(action)
+    }
+
+    fun setHeadsetDoubleClickAction(action: HeadsetButtonAction) {
+        headphoneController.setDoubleClickAction(action)
+    }
+
+    fun setHeadsetTripleClickAction(action: HeadsetButtonAction) {
+        headphoneController.setTripleClickAction(action)
+    }
+
+    fun setHeadsetLongClickAction(action: HeadsetButtonAction) {
+        headphoneController.setLongClickAction(action)
+    }
+
+    fun setHeadsetAction(type: Int, action: HeadsetButtonAction) {
+        when (type) {
+            1 -> headphoneController.setSingleClickAction(action)
+            2 -> headphoneController.setDoubleClickAction(action)
+            3 -> headphoneController.setTripleClickAction(action)
+            4 -> headphoneController.setLongClickAction(action)
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
         cancelSleepTimer()
+        headphoneController.release()
         audioPlayer.release()
     }
 }
