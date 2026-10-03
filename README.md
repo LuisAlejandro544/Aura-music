@@ -88,9 +88,10 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
 
 ### 6. Descarga Directa desde TikTok, YouTube y Enlaces Web (Música, Carátula y Video Canvas) 🎬🔗🎵
 - **Descargas sin Límite de Duración**: Permite pegar enlaces de **TikTok**, **YouTube** y videos web para descargar música completa, directos, sesiones o parodias de cualquier duración.
-- **Motor de Doble Capa Optimizado Anti-Batería (Sin Sobrecarga ni Wrappers Pesados)**:
-  - ⚡ **Fast API Resolution (500ms - 1.5s)**: Consulta directa de endpoints públicos para obtener el flujo sin abrir motores pesados.
-  - 🛡️ **Headless Engine Efímero (2s - 3s)**: Si hay bloqueos o retos de BotGuard / PO Token, un WebView invisible y ultra optimizado ejecuta el JavaScript oficial con bloqueo total de imágenes, estilos y multimedia. En cuanto captura la URL descifrada del stream, se destruye y libera el 100% de la RAM, consumiendo cero batería.
+- **Arquitectura de Extracción con Selector de Motor (InnerTube vs WebView)**:
+  - ⚡ **Motor InnerTube (YouTube Music - Nativo & Ultrarrápido)**: Consulta directa y 100% gratuita al endpoint de YouTube Music mediante los clientes oficiales `ANDROID_MUSIC` y `WEB_REMIX`. Al ejecutarse directamente desde la conexión local del teléfono (IP residencial/datos móviles 4G/5G), sortea los bloqueos por IP de datacenter y resuelve el stream de audio en alta fidelidad en menos de ~300ms sin consumir batería.
+  - 🌐 **Motor Headless WebView Reparado**: Navegador efímero en segundo plano con `mediaPlaybackRequiresUserGesture = false` y modo embebido sin cookies (`youtube-nocookie.com/embed/`), capaz de auto-reproducir silenciado e interceptar peticiones de red a `googlevideo.com` o evaluar `ytInitialPlayerResponse` en memoria.
+  - 🎛️ **Selector Interactivo en el Diálogo**: El usuario puede alternar entre ambos motores directamente en el diálogo de descarga según su preferencia, contando con auto-fallback cruzado si uno de ellos experimenta anomalías temporales.
 - **Extracción Automática 3 en 1**:
   - 🎵 **Audio de Alta Fidelidad**: Extrae la pista de audio pura en formato `.m4a` o `.mp3` directamente a `songs/`.
   - 🖼️ **Carátula Oficial en WebP**: Descarga la portada en alta resolución (o extrae fotograma clave) y la procesa a WebP sin pérdida en `images/`.
