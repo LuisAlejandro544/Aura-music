@@ -81,12 +81,17 @@ Este documento traza las fases de evolución técnica y funcional para convertir
   - Mecanismo de recuperación automática que reanuda la reproducción si el procesador de audio sufre una perturbación transitoria.
 - [x] **Transición Fluida de Salida en Now Playing**:
   - Eliminación de capas negras residuales y parpadeos al cerrar o deslizar hacia abajo el reproductor mediante deslizamiento suave instantáneo.
-- [x] **Video Canvas de Fondo (Loops Cortos o Videos Largos Sincronizados)**:
+- [x] **Video Canvas de Fondo (Loops Cortos de 10-20s o Videos Largos Sincronizados)**:
   - Soporte para asociar videos desde la galería a canciones individuales con Photo/Media Picker.
-  - Loops automáticos de Canvas (≤ 10s) en bucle infinito continuo.
-  - Sincronización temporal reactiva con la música (`currentPositionMs` y `seekTo`) para videos largos (> 10s).
+  - Loops automáticos de Canvas (≤ 10s - 20s) en bucle infinito continuo y videos sincronizados (> 20s) con selector de modo en edición.
+  - **Armonización Cromática Reactiva**: Extracción dinámica de color desde fotogramas clave de video en tiempo real, evitando que el color de la carátula estática interfiera con el video.
+  - Sincronización temporal reactiva con la música (`currentPositionMs` y `seekTo`) para videos largos.
   - Conmutador directo entre modo Carátula y modo Video Canvas en Now Playing.
   - Almacenamiento organizado en subcarpeta `videos/` con eliminación de archivos obsoletos.
+- [x] **Conversor Nativo "Video a Música" (Extracción 3 en 1)**:
+  - Extracción directa de audio (`.m4a`) desde videos de la galería mediante demuxing sin recodificación en Android.
+  - Captura y compresión automática de fotograma clave en WebP sin pérdida como carátula oficial.
+  - Vinculación automática opcional como Video Canvas sincronizado o loop con inicio inmediato de reproducción.
 
 ---
 

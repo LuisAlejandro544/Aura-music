@@ -102,6 +102,7 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
     val crossfadeSeconds by viewModel.crossfadeSeconds.collectAsStateWithLifecycle()
     val isGaplessEnabled by viewModel.isGaplessEnabled.collectAsStateWithLifecycle()
     val isVideoCanvasActive by viewModel.isVideoCanvasActive.collectAsStateWithLifecycle()
+    val isDynamicArtworkColorEnabled by viewModel.isDynamicArtworkColorEnabled.collectAsStateWithLifecycle()
 
     var showGlobalAudioEffectsSheet by remember { mutableStateOf(false) }
     var initialAudioEffectsTab by remember { mutableIntStateOf(0) }
@@ -236,7 +237,13 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                             onImportFolder = { viewModel.importFolder(it) },
                             onSeedDemoTracks = { viewModel.seedDemoTracks() },
                             onClearLibrary = { viewModel.clearAllTracks() },
-                            onDismissStatusMessage = { viewModel.dismissImportStatus() }
+                            onDismissStatusMessage = { viewModel.dismissImportStatus() },
+                            onImportVideoAsMusic = { videoUri, title, artist, album, attachCanvas, forceLoop ->
+                                viewModel.importVideoAsTrack(videoUri, title, artist, album, attachCanvas, forceLoop) { createdTrack ->
+                                    viewModel.playTrack(createdTrack, listOf(createdTrack))
+                                    viewModel.setNowPlayingExpanded(true)
+                                }
+                            }
                         )
 
                         is NavScreen.Equalizer -> {
@@ -287,7 +294,9 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
 
                         is NavScreen.Settings -> SettingsScreen(
                             currentTheme = currentTheme,
-                            onSelectTheme = { viewModel.setTheme(it) }
+                            onSelectTheme = { viewModel.setTheme(it) },
+                            isDynamicArtworkColorEnabled = isDynamicArtworkColorEnabled,
+                            onToggleDynamicArtworkColor = { viewModel.toggleDynamicArtworkColor(it) }
                         )
                     }
                 }
@@ -338,10 +347,11 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                 onEditTrackDetails = { id, t, a, al, art, removeArt ->
                     viewModel.updateTrackDetails(id, t, a, al, art, removeArt)
                 },
-                onEditTrackDetailsWithVideo = { id, t, a, al, art, removeArt, video, removeVideo ->
-                    viewModel.updateTrackDetails(id, t, a, al, art, removeArt, video, removeVideo)
+                onEditTrackDetailsWithVideo = { id, t, a, al, art, removeArt, video, removeVideo, forceLoop ->
+                    viewModel.updateTrackDetails(id, t, a, al, art, removeArt, video, removeVideo, forceLoop)
                 },
                 isVideoCanvasActive = isVideoCanvasActive,
+                isDynamicArtworkColorEnabled = isDynamicArtworkColorEnabled,
                 onToggleVideoCanvas = { viewModel.toggleVideoCanvas() },
                 sleepTimerState = sleepTimerState,
                 onStartSleepTimer = { viewModel.startSleepTimer(it) },

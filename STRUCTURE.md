@@ -31,7 +31,8 @@ AuraMusic/
 │   │   │   │   │   ├── importer/               # Módulos de importación y análisis
 │   │   │   │   │   │   ├── AudioMetadataParser.kt # Extractor ID3 y conversor a WebP
 │   │   │   │   │   │   ├── ProceduralArtworkGenerator.kt # Generador procedural de carátulas
-│   │   │   │   │   │   └── SampleMusicGenerator.kt # Sintetizador de audio WAV para demos
+│   │   │   │   │   │   ├── SampleMusicGenerator.kt # Sintetizador de audio WAV para demos
+│   │   │   │   │   │   └── VideoAudioExtractor.kt  # Extractor de audio nativo y generador 3 en 1 de Video a Música
 │   │   │   │   │   ├── local/                  # Capa de persistencia local Room SQLite
 │   │   │   │   │   │   ├── AppDatabase.kt      # Base de datos Room
 │   │   │   │   │   │   ├── dao/
@@ -67,7 +68,8 @@ AuraMusic/
 │   │   │   │   │   │   ├── EditTrackDialog.kt  # Modal con Photo Picker y edición de carátula/video
 │   │   │   │   │   │   ├── MiniPlayer.kt       # Mini reproductor opaco con acceso directo a EQ modal
 │   │   │   │   │   │   ├── ProceduralArtwork.kt # Arte vectorial dinámico en tiempo real
-│   │   │   │   │   │   └── TrackListItem.kt    # Fila de canción con menú contextual
+│   │   │   │   │   │   ├── TrackListItem.kt    # Fila de canción con menú contextual
+│   │   │   │   │   │   └── VideoToMusicDialog.kt # Diálogo de conversión y previsualización de Video a Música
 │   │   │   │   │   ├── navigation/
 │   │   │   │   │   │   └── NavScreen.kt        # Destinos de navegación y pestañas
 │   │   │   │   │   ├── screens/                # Pantallas principales modulares
@@ -79,6 +81,7 @@ AuraMusic/
 │   │   │   │   │   │   ├── settings/SettingsScreen.kt # Selector de temas y privacidad
 │   │   │   │   │   │   └── playlist/PlaylistDetailScreen.kt # Detalle de lista sincronizada
 │   │   │   │   │   └── theme/
+│   │   │   │   │       ├── ArtworkColorExtractor.kt # Extractor reactivo de paleta para carátulas y fotogramas de video
 │   │   │   │   │       ├── Color.kt            # Paleta de colores Dark Luxury y Neón
 │   │   │   │   │       ├── Theme.kt            # Configuración de MaterialTheme M3
 │   │   │   │   │       └── Type.kt             # Tipografía M3
