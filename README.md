@@ -95,7 +95,17 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
 - **Mapeo Avanzado de Botones y Gestos Físicos de Auriculares (Headset Controls)**:
   - Totalmente configurable por el usuario mediante diálogo modal para 1 pulsación, 2 pulsaciones, 3 pulsaciones y pulsación prolongada (Play/Pausa, Siguiente, Anterior, Me Gusta ❤️, Avanzar 15s, Retroceder 15s).
 
-### 8. Playlists y Almacenamiento Estructurado
+### 8. Notificación Nativa del Reproductor de Android & Segundo Plano 🔔
+- **Controlador Multimedia Nativo de Android (System Media Controls)**:
+  - Integración completa con **Jetpack Media3 `MediaSessionService`** y `MediaSession`.
+  - **Android 13, 14, 15+**: Tarjeta multimedia nativa en la cortina de notificaciones con arte de tapa en alta resolución, colores adaptativos dinámicos y **línea ondulada interactiva (*squiggled seekbar*)** para avanzar o retroceder sin abrir la app.
+  - **Android 11 y 12**: Controles multimedia integrados en el panel de Ajustes Rápidos (*Quick Settings*).
+  - **Android 8.0 Oreo, 9 Pie y 10**: Notificación de estilo multimedia retrocompatible (`MediaStyle`) con botones de reproducción y carátula.
+- **Canal de Notificación Silencioso**: Configurado con `IMPORTANCE_LOW` para cambiar de pista sin emitir timbres o alertas intrusivas.
+- **Reproducción Continua en Segundo Plano (*Foreground Service*)**: Mantiene la música sonando ininterrumpidamente cuando la pantalla está apagada o la aplicación se minimiza.
+- **Soporte Extendido**: Detección automática en **relojes inteligentes (Wear OS)**, **Android Auto** y mandos remotos Bluetooth.
+
+### 9. Playlists y Almacenamiento Estructurado
 - **Pestaña "Playlists" en Tu Biblioteca**: Tarjeta "Tus Me Gusta" sincronizada, creación, renombrado y adición rápida de canciones.
 - **Almacenamiento Organizado** en `Android/data/com.aistudio.musicplayer.aurasound/files/`:
   - 📁 `images/`: Carátulas en WebP Lossless.
@@ -104,7 +114,7 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
   - 📁 `metadata/`: Ficheros JSON estructurados con información técnica.
   - 📁 `videos/`: Videos de fondo y loops de Canvas (.mp4/.webm).
 
-### 9. Suite de Diagnóstico Autónoma: Aura Monitor 🛠️ & LeakCanary
+### 10. Suite de Diagnóstico Autónoma: Aura Monitor 🛠️ & LeakCanary
 - **Aura Monitor (App Debug Propia en el Cajón de Aplicaciones)**:
   - Cuenta con su propio icono de acceso directo en el cajón de apps del teléfono móvil.
   - Atrapa y registra automáticamente **Crashes** no controlados mediante `UncaughtExceptionHandler`, **Errores Críticos**, **Warnings de Memoria** y eventos de Media3 / JNI.

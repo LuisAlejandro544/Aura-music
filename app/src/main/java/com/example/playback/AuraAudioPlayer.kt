@@ -1,7 +1,10 @@
 package com.example.playback
 
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
@@ -9,8 +12,10 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.session.MediaSession
 import com.example.model.RepeatMode
 import com.example.model.Track
+import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -80,6 +85,14 @@ class AuraAudioPlayer(
     private var playbackParamsJob: Job? = null
 
     private val nativeAudioProcessor = NativeAudioProcessor()
+
+    private var mediaSession: MediaSession? = null
+
+    companion object {
+        @Volatile
+        var activeMediaSession: MediaSession? = null
+            private set
+    }
 
     init {
         initPlayer()
@@ -154,6 +167,46 @@ class AuraAudioPlayer(
                 playNext()
             }
         })
+
+        // Inicializar MediaSession vinculada a ExoPlayer para System Media Controls y compatibilidad retroactiva
+        try {
+            val sessionActivityIntent = Intent(context, com.example.MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            val sessionActivityPendingIntent = PendingIntent.getActivity(
+                context,
+                0,
+                sessionActivityIntent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
+
+            val session = MediaSession.Builder(context, player)
+                .setSessionActivity(sessionActivityPendingIntent)
+                .build()
+            mediaSession = session
+            activeMediaSession = session
+        } catch (e: Throwable) {
+            com.example.debug.AuraDebugManager.logWarning(
+                "AuraAudioPlayer",
+                "No se pudo inicializar MediaSession: ${e.message}"
+            )
+        }
+    }
+
+    private fun ensurePlaybackServiceStarted() {
+        try {
+            val serviceIntent = Intent(context, AuraMediaPlaybackService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(serviceIntent)
+            } else {
+                context.startService(serviceIntent)
+            }
+        } catch (e: Throwable) {
+            com.example.debug.AuraDebugManager.logWarning(
+                "AuraAudioPlayer",
+                "No se pudo iniciar AuraMediaPlaybackService: ${e.message}"
+            )
+        }
     }
 
     fun playTrackList(tracks: List<Track>, startIndex: Int = 0) {
@@ -171,10 +224,20 @@ class AuraAudioPlayer(
 
         val player = exoPlayer ?: return
         try {
+            val artworkUri = if (!track.albumArtPath.isNullOrBlank()) {
+                val artFile = File(track.albumArtPath)
+                if (artFile.exists()) Uri.fromFile(artFile) else null
+            } else null
+
             val mediaMetadata = MediaMetadata.Builder()
                 .setTitle(track.title)
                 .setArtist(track.artist)
                 .setAlbumTitle(track.album)
+                .apply {
+                    if (artworkUri != null) {
+                        setArtworkUri(artworkUri)
+                    }
+                }
                 .build()
 
             val mediaItem = MediaItem.Builder()
@@ -185,6 +248,7 @@ class AuraAudioPlayer(
             player.setMediaItem(mediaItem)
             player.playbackParameters = androidx.media3.common.PlaybackParameters(_playbackSpeed.value, _playbackPitch.value)
             player.prepare()
+            ensurePlaybackServiceStarted()
             player.play()
 
             // Manejar fundido de entrada si el crossfade está configurado
@@ -296,6 +360,7 @@ class AuraAudioPlayer(
             playTrackList(_queue.value, 0)
             return
         }
+        ensurePlaybackServiceStarted()
         player.play()
         if (isFadeInOnResume) {
             triggerSmoothFadeIn()
@@ -318,6 +383,7 @@ class AuraAudioPlayer(
             if (_currentTrack.value == null && _queue.value.isNotEmpty()) {
                 playTrackList(_queue.value, 0)
             } else {
+                ensurePlaybackServiceStarted()
                 player.play()
                 if (isFadeInOnResume) {
                     triggerSmoothFadeIn()
@@ -493,6 +559,13 @@ class AuraAudioPlayer(
 
     fun release() {
         stopProgressTracking()
+        try {
+            mediaSession?.run {
+                release()
+            }
+        } catch (ignored: Throwable) {}
+        mediaSession = null
+        activeMediaSession = null
         effectManager.release()
         exoPlayer?.release()
         exoPlayer = null

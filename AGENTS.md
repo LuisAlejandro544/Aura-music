@@ -88,4 +88,5 @@ Este documento define el protocolo de trabajo para los agentes de software y des
 - [x] ¿El Balance Estéreo Fino (L/R) se puede ajustar en tiempo real en Now Playing y hoja modal?
 - [x] ¿La protección contra desconexiones ("Becoming Noisy" Guard) y Fade-In suave están activos?
 - [x] ¿La memoria de volumen dedicada y el control avanzado por botones de audífonos son configurables?
+- [x] ¿La notificación nativa del reproductor de Android (System Media Controls con MediaSessionService y MediaStyle retrocompatible) está integrada y funcional?
 - [x] ¿Los 5 archivos Markdown (`README.md`, `ROADMAP.md`, `STRUCTURE.md`, `AI_CONTEXT.md`, `AGENTS.md`) están actualizados y en español?

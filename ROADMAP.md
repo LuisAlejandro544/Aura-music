@@ -118,6 +118,11 @@ Este documento traza las fases de evolución técnica y funcional para convertir
   - Detección de 1 pulsación, 2 pulsaciones, 3 pulsaciones y pulsación prolongada (hold) con mapeo libre personalizable.
 - [x] **Pestaña Dedicada de "Auriculares" en Configuración**:
   - Navegación segmentada en 3 apartados: 1. Acústica & DSP, 2. Seguridad & Conexión, 3. Botones y Gestos.
+- [x] **Notificación Nativa de Android y Servicio en Primer Plano (Media3 MediaSessionService)**:
+  - Controlador multimedia nativo del sistema (System Media Controls) en Android 13, 14, 15+ con arte de carátula en alta definición y seekbar interactiva.
+  - Compatibilidad retroactiva completa para Android 11/12 (Quick Settings) y Android 8/9/10 (`MediaStyle`).
+  - Canal de notificación silencioso (`IMPORTANCE_LOW`) para transiciones limpias y libres de interrupciones sonoras.
+  - Reproducción continua e indestructible en segundo plano con pantalla apagada.
 
 ---
 

@@ -75,5 +75,11 @@ Este archivo define el contexto de diseño, directrices técnicas y restriccione
     - **Protección Becoming Noisy y Fade-In**: Pausa inmediata ante desconexión de audífonos (cable o Bluetooth) y aumento progresivo de volumen en reanudación (~1s) para cuidar la salud auditiva.
     - **Controles de Auriculares Personalizables**: Manejo configurable de 1 clic, 2 clics, 3 clics y pulsación prolongada (hold) con mapeo flexible.
 
-12. **Idioma de Comunicación**:
+12. **Notificación Nativa del Sistema y MediaSessionService (Media3)**:
+    - La reproducción en segundo plano debe apoyarse en `AuraMediaPlaybackService` extendiendo `MediaSessionService`.
+    - Proporciona el controlador multimedia del sistema (System Media Controls) en Android 13, 14, 15+ (con carátula HD y barra ondulada de progreso) y compatibilidad retroactiva limpia en Android 8.0 a 12 (`MediaStyle`).
+    - El canal de notificación debe ser silencioso (`IMPORTANCE_LOW`) para evitar pitidos en cada cambio de canción.
+    - En Android 13+ (API 33+) se debe solicitar el permiso en tiempo de ejecución `POST_NOTIFICATIONS`.
+
+13. **Idioma de Comunicación**:
    - La documentación, comentarios en código, cadenas de usuario (`strings.xml`) y mensajes de commit deben redactarse en **español**.
