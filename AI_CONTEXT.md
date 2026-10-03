@@ -73,9 +73,10 @@ Este archivo define el contexto de diseño, directrices técnicas y restriccione
 
 11. **Descarga Directa desde TikTok, YouTube y Enlaces Web**:
     - Permite a los usuarios descargar cualquier canción completa, parodia o audio de cualquier duración pegando un enlace de TikTok, YouTube o URL web.
-    - **Motor de Doble Capa Optimizado Anti-Batería**:
-      - *Fast API*: Resolución rápida en <1s mediante endpoints de streaming público.
-      - *Headless Engine Efímero*: WebView invisible de solo 2-3s con bloqueo total de imágenes y multimedia que descifra firmas n-sig y supera PO Tokens/BotGuard en local, destruyéndose de inmediato para liberar el 100% de la memoria.
+    - **Arquitectura de Extracción con Selector de Motor (InnerTube vs WebView)**:
+      - *Motor InnerTube*: API nativa directa de YouTube Music (`ANDROID_MUSIC` y `WEB_REMIX`). 100% gratuita, ultrarrápida (<300ms) y ejecutada directamente desde la IP móvil/residencial del usuario, evitando bloqueos por IP de centro de datos.
+      - *Motor WebView Reparado*: Navegador efímero en segundo plano configurado con `mediaPlaybackRequiresUserGesture = false` y modo embebido nocookie para evitar muros de consentimiento, interceptando el stream de red de `googlevideo.com` y evaluando `ytInitialPlayerResponse`.
+      - *Selector Interactivo*: Permite al usuario escoger entre InnerTube y WebView directamente en el diálogo con auto-fallback cruzado.
     - Almacenamiento organizado: audio `.m4a`/`.mp3` en `songs/`, carátula oficial en WebP sin pérdida en `images/`, y video vinculado en `videos/` para reproducir el Video Canvas de fondo.
     - Interfaz adaptativa: Degradados visuales reactivos (Cyan/Magenta para TikTok, Rojo Carmesí/Naranja para YouTube/Web) y reproducción inmediata en Now Playing tras descargar.
 

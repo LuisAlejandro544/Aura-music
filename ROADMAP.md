@@ -132,8 +132,10 @@ Este documento traza las fases de evolución técnica y funcional para convertir
   - Compatibilidad retroactiva completa para Android 11/12 (Quick Settings) y Android 8/9/10 (`MediaStyle`).
   - Canal de notificación silencioso (`IMPORTANCE_LOW`) para transiciones limpias y libres de interrupciones sonoras.
   - Reproducción continua e indestructible en segundo plano con pantalla apagada.
-- [x] **Descarga Directa desde YouTube y Video Web con Motor Optimizado**:
-  - Arquitectura de Doble Capa: Fast API Resolution + Headless Engine efímero con bloqueo de imágenes y multimedia para nulo impacto en batería.
+- [x] **Descarga Directa desde YouTube y Video Web con Motor Dual (InnerTube + WebView Reparado)**:
+  - **Motor Nativo InnerTube (YouTube Music)**: Clientes `ANDROID_MUSIC` y `WEB_REMIX` para extracción directa, gratuita y sin bloqueo por IP de centro de datos en <300ms.
+  - **Motor Headless WebView Reparado**: Solución del bloqueo de gestos (`mediaPlaybackRequiresUserGesture = false`), bypass de muros de cookies con modo Embed nocookie, e intercepción de red / evaluación de `ytInitialPlayerResponse`.
+  - **Selector Interactivo de Motor**: Permite al usuario alternar entre InnerTube y WebView en el diálogo de descarga con auto-fallback cruzado.
   - Adaptación visual dinámica al enlace pegado (Cyan/Magenta para TikTok y Rojo/Naranja para YouTube/Web).
   - Extracción automática de audio `.m4a`/`.mp3`, carátula WebP y Video Canvas sincronizado para Now Playing.
 

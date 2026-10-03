@@ -22,6 +22,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import com.example.data.importer.OnlineVideoAudioImporter
+import com.example.data.importer.WebStreamExtractor
+import com.example.data.importer.YoutubeExtractionEngine
 import com.example.ui.theme.CardBorder
 import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.TextPrimary
@@ -59,6 +61,7 @@ fun DownloadFromLinkDialog(
     val context = androidx.compose.ui.platform.LocalContext.current
 
     var selectedMode by remember { mutableStateOf(initialMode) }
+    var selectedEngine by remember { mutableStateOf(YoutubeExtractionEngine.INNERTUBE) }
     var linkUrl by remember { mutableStateOf("") }
     var isResolving by remember { mutableStateOf(false) }
     var resolveError by remember { mutableStateOf<String?>(null) }
@@ -169,6 +172,48 @@ fun DownloadFromLinkDialog(
                     )
                 }
 
+                // Selector de motor para YouTube / Web
+                if (selectedMode == DownloadSourceMode.YOUTUBE_WEB) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "Motor de extracción:",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            color = TextSecondary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(
+                            selected = selectedEngine == YoutubeExtractionEngine.INNERTUBE,
+                            onClick = {
+                                selectedEngine = YoutubeExtractionEngine.INNERTUBE
+                                resolveError = null
+                            },
+                            label = { Text("⚡ InnerTube (Rápido)", fontSize = 11.sp) }
+                        )
+                        FilterChip(
+                            selected = selectedEngine == YoutubeExtractionEngine.WEBVIEW,
+                            onClick = {
+                                selectedEngine = YoutubeExtractionEngine.WEBVIEW
+                                resolveError = null
+                            },
+                            label = { Text("🌐 Motor WebView", fontSize = 11.sp) }
+                        )
+                    }
+                    Text(
+                        text = if (selectedEngine == YoutubeExtractionEngine.INNERTUBE)
+                            "API nativa directa de YouTube Music. Rápida, gratis y sin consumo de batería."
+                        else
+                            "Navegador efímero en segundo plano que ejecuta el reproductor en memoria.",
+                        style = MaterialTheme.typography.labelSmall.copy(color = TextSecondary),
+                        modifier = Modifier.padding(top = 2.dp, start = 2.dp)
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // Campo para ingresar la URL con botón de pegar
@@ -232,7 +277,7 @@ fun DownloadFromLinkDialog(
                             isResolving = true
                             resolveError = null
                             coroutineScope.launch {
-                                val result = OnlineVideoAudioImporter.resolveMediaLink(linkUrl, context)
+                                val result = OnlineVideoAudioImporter.resolveMediaLink(linkUrl, context, selectedEngine)
                                 isResolving = false
                                 result.onSuccess { info ->
                                     resolvedInfo = info

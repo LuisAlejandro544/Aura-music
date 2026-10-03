@@ -51,7 +51,11 @@ object OnlineVideoAudioImporter {
     /**
      * Resuelve el enlace de video para obtener los metadatos y las URLs directas de descarga.
      */
-    suspend fun resolveMediaLink(linkUrl: String, context: Context? = null): Result<ResolvedMediaInfo> = withContext(Dispatchers.IO) {
+    suspend fun resolveMediaLink(
+        linkUrl: String,
+        context: Context? = null,
+        engine: YoutubeExtractionEngine = YoutubeExtractionEngine.INNERTUBE
+    ): Result<ResolvedMediaInfo> = withContext(Dispatchers.IO) {
         val cleanUrl = linkUrl.trim()
         if (cleanUrl.isBlank()) {
             return@withContext Result.failure(IllegalArgumentException("El enlace no puede estar vacío"))
@@ -61,7 +65,7 @@ object OnlineVideoAudioImporter {
             // Caso 1: Enlace de YouTube o video web compatible
             if (WebStreamExtractor.isWebVideoUrl(cleanUrl)) {
                 if (context != null) {
-                    return@withContext WebStreamExtractor.resolveStream(context, cleanUrl)
+                    return@withContext WebStreamExtractor.resolveStream(context, cleanUrl, engine)
                 }
             }
 
@@ -92,7 +96,7 @@ object OnlineVideoAudioImporter {
 
             // Caso 4: Intentar con WebStreamExtractor si hay contexto disponible
             if (context != null && (cleanUrl.startsWith("http://") || cleanUrl.startsWith("https://"))) {
-                val streamRes = WebStreamExtractor.resolveStream(context, cleanUrl)
+                val streamRes = WebStreamExtractor.resolveStream(context, cleanUrl, engine)
                 if (streamRes.isSuccess) {
                     return@withContext streamRes
                 }
@@ -197,65 +201,68 @@ object OnlineVideoAudioImporter {
         val finalArtist = customArtist?.trim()?.ifBlank { resolvedInfo.suggestedArtist } ?: resolvedInfo.suggestedArtist
 
         try {
-            onProgressUpdate("Descargando video en alta definición...")
-            val tempVideoFile = File(storageManager.videosDir, "tiktok_video_${timestamp}.mp4")
-            val downloadVideoSuccess = downloadUrlToFile(resolvedInfo.videoUrl, tempVideoFile)
-            if (!downloadVideoSuccess || !tempVideoFile.exists() || tempVideoFile.length() == 0L) {
-                return@withContext Result.failure(IllegalStateException("Error al descargar el archivo de video."))
+            val audioFile = File(storageManager.songsDir, "track_online_${timestamp}.m4a")
+            val tempVideoFile = File(storageManager.videosDir, "media_video_${timestamp}.mp4")
+            var audioReady = false
+            var durationMs = resolvedInfo.durationSeconds * 1000L
+
+            // 1. Descarga prioritaria del audio de alta fidelidad si está disponible por separado (p. ej. InnerTube)
+            if (!resolvedInfo.audioUrl.isNullOrBlank()) {
+                onProgressUpdate("Descargando audio de alta fidelidad...")
+                val downloadedAudio = downloadUrlToFile(resolvedInfo.audioUrl, audioFile)
+                if (downloadedAudio && audioFile.exists() && audioFile.length() > 0L) {
+                    audioReady = true
+                }
             }
 
-            // Extraer duración real del video descargado
-            var durationMs = resolvedInfo.durationSeconds * 1000L
+            // 2. Si no había audio directo o falló, descargar flujo de video y demuxear
+            if (!audioReady) {
+                onProgressUpdate("Descargando flujo multimedia...")
+                val downloadVideoSuccess = downloadUrlToFile(resolvedInfo.videoUrl, tempVideoFile)
+                if (downloadVideoSuccess && tempVideoFile.exists() && tempVideoFile.length() > 0L) {
+                    // Intentar demuxing sin recodificación a través de VideoAudioExtractor
+                    try {
+                        val videoUri = Uri.fromFile(tempVideoFile)
+                        val isYoutube = resolvedInfo.originalUrl.contains("youtu", ignoreCase = true)
+                        val dummyTrack = VideoAudioExtractor.convertVideoToTrack(
+                            context = context,
+                            storageManager = storageManager,
+                            videoUri = videoUri,
+                            title = finalTitle,
+                            artist = finalArtist,
+                            album = if (isYoutube) "YouTube Music" else "TikTok Music",
+                            attachAsCanvas = false,
+                            forceLoop = forceLoop
+                        )
+                        if (dummyTrack != null) {
+                            val extractedFile = File(Uri.parse(dummyTrack.uriString).path ?: "")
+                            if (extractedFile.exists() && extractedFile.length() > 0L) {
+                                audioReady = true
+                                extractedFile.copyTo(audioFile, overwrite = true)
+                            }
+                        }
+                    } catch (_: Throwable) {}
+
+                    if (!audioReady) {
+                        tempVideoFile.copyTo(audioFile, overwrite = true)
+                        audioReady = true
+                    }
+                }
+            }
+
+            if (!audioReady || !audioFile.exists() || audioFile.length() == 0L) {
+                return@withContext Result.failure(IllegalStateException("Error al descargar el archivo de audio. Verifica tu conexión."))
+            }
+
+            // Extraer duración real del archivo
             val retriever = MediaMetadataRetriever()
             try {
-                retriever.setDataSource(tempVideoFile.absolutePath)
+                retriever.setDataSource(audioFile.absolutePath)
                 val durStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
                 durationMs = durStr?.toLongOrNull()?.takeIf { it > 0 } ?: durationMs
             } catch (_: Throwable) {
             } finally {
                 try { retriever.release() } catch (_: Throwable) {}
-            }
-
-            onProgressUpdate("Procesando audio de alta fidelidad...")
-            val audioFile = File(storageManager.songsDir, "track_online_${timestamp}.m4a")
-            var audioReady = false
-
-            // Intentar demuxing sin recodificación a través de VideoAudioExtractor
-            try {
-                val videoUri = Uri.fromFile(tempVideoFile)
-                val dummyTrack = VideoAudioExtractor.convertVideoToTrack(
-                    context = context,
-                    storageManager = storageManager,
-                    videoUri = videoUri,
-                    title = finalTitle,
-                    artist = finalArtist,
-                    album = "TikTok Music & Videos",
-                    attachAsCanvas = false,
-                    forceLoop = forceLoop
-                )
-                if (dummyTrack != null) {
-                    val extractedFile = File(Uri.parse(dummyTrack.uriString).path ?: "")
-                    if (extractedFile.exists() && extractedFile.length() > 0L) {
-                        audioReady = true
-                        extractedFile.copyTo(audioFile, overwrite = true)
-                    }
-                }
-            } catch (_: Throwable) {}
-
-            // Si el demuxing falló, descargar el audio directo si está disponible o usar el archivo de video como fuente de audio
-            if (!audioReady) {
-                if (!resolvedInfo.audioUrl.isNullOrBlank()) {
-                    val directAudioFile = File(storageManager.songsDir, "track_online_${timestamp}.mp3")
-                    if (downloadUrlToFile(resolvedInfo.audioUrl, directAudioFile)) {
-                        directAudioFile.copyTo(audioFile, overwrite = true)
-                        directAudioFile.delete()
-                        audioReady = true
-                    }
-                }
-                if (!audioReady) {
-                    // Fallback directo: el contenedor mp4 se reproduce nativamente en ExoPlayer
-                    tempVideoFile.copyTo(audioFile, overwrite = true)
-                }
             }
 
             onProgressUpdate("Generando carátula en WebP sin pérdida...")
@@ -290,8 +297,8 @@ object OnlineVideoAudioImporter {
                 }
             }
 
-            // 2. Si no hubo portada o falló, extraer fotograma clave del video descargado
-            if (artworkPath == null) {
+            // 2. Si no hubo portada o falló y tenemos video, extraer fotograma clave del video descargado
+            if (artworkPath == null && tempVideoFile.exists() && tempVideoFile.length() > 0L) {
                 val frameRetriever = MediaMetadataRetriever()
                 try {
                     frameRetriever.setDataSource(tempVideoFile.absolutePath)
@@ -322,7 +329,17 @@ object OnlineVideoAudioImporter {
             val isLoop = forceLoop ?: (durationMs in 1..20500L)
 
             if (attachAsCanvas) {
-                videoCanvasPath = tempVideoFile.absolutePath
+                // Si attachAsCanvas está marcado pero aún no descargamos el video porque el audio vino directo
+                if ((!tempVideoFile.exists() || tempVideoFile.length() == 0L) &&
+                    !resolvedInfo.videoUrl.isNullOrBlank() &&
+                    resolvedInfo.videoUrl != resolvedInfo.audioUrl
+                ) {
+                    onProgressUpdate("Descargando Video Canvas...")
+                    downloadUrlToFile(resolvedInfo.videoUrl, tempVideoFile)
+                }
+                if (tempVideoFile.exists() && tempVideoFile.length() > 0L) {
+                    videoCanvasPath = tempVideoFile.absolutePath
+                }
             } else {
                 // Si el usuario no quería video de fondo, eliminamos el archivo de video para no gastar espacio
                 if (tempVideoFile.exists() && audioFile.absolutePath != tempVideoFile.absolutePath) {
@@ -330,13 +347,16 @@ object OnlineVideoAudioImporter {
                 }
             }
 
+            val isYoutubeSource = resolvedInfo.originalUrl.contains("youtu", ignoreCase = true)
+            val finalAlbum = if (isYoutubeSource) "YouTube Music & Canvas" else "TikTok Music & Canvas"
+            val finalFolder = if (isYoutubeSource) "YouTube & Web" else "TikTok & Web"
             val fileSizeFormatted = formatFileSize(audioFile.length())
 
             val createdTrack = Track(
                 id = 0L,
                 title = finalTitle,
                 artist = finalArtist,
-                album = "TikTok Music & Canvas",
+                album = finalAlbum,
                 durationMs = durationMs,
                 uriString = Uri.fromFile(audioFile).toString(),
                 albumArtPath = artworkPath,
@@ -346,7 +366,7 @@ object OnlineVideoAudioImporter {
                 dateAdded = System.currentTimeMillis(),
                 isFavorite = false,
                 playCount = 0,
-                folderName = "TikTok & Web",
+                folderName = finalFolder,
                 fileSizeFormatted = fileSizeFormatted
             )
 

@@ -93,7 +93,7 @@ Este documento define el protocolo de trabajo para los agentes de software y des
 - [x] ¿El botón de modo de video en Now Playing tiene formato de cápsula elevada visible y ergonómica de alto contraste?
 - [x] ¿El temporizador de apagado ejecuta su atenuación suave y pausa en el hilo principal (Main Thread) previniendo excepciones de ExoPlayer?
 - [x] ¿La función de descarga desde TikTok y enlaces web extrae la música de cualquier duración, genera carátula en WebP y vincula el Video Canvas de fondo automáticamente?
-- [x] ¿La descarga desde YouTube / Video Web con resolución optimizada de doble capa (Fast API + Headless Engine efímero anti-batería) y tema visual adaptativo está integrada y operativa?
+- [x] ¿La descarga desde YouTube / Video Web con arquitectura dual (Motor nativo InnerTube + Headless WebView reparado con bypass de gestos) y selector interactivo está integrada y operativa?
 - [x] ¿La opción de paleta dinámica 'Material You' está disponible y operativa en ajustes para Android 12+?
 - [x] ¿La escala tipográfica está fijada a un valor cómodo (fontScale = 1.0f) para evitar que los ajustes de texto del sistema desborden la interfaz?
 - [x] ¿Los 5 archivos Markdown (`README.md`, `ROADMAP.md`, `STRUCTURE.md`, `AI_CONTEXT.md`, `AGENTS.md`) están actualizados y en español?
