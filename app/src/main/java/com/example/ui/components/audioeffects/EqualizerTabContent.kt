@@ -210,17 +210,28 @@ fun EqualizerTabContent(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 4.dp),
+                            .padding(vertical = 5.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "${band.displayFreq()}Hz",
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontWeight = FontWeight.SemiBold,
-                                color = TextPrimary
-                            ),
-                            modifier = Modifier.width(64.dp)
-                        )
+                        Column(
+                            modifier = Modifier.width(84.dp)
+                        ) {
+                            Text(
+                                text = getBandAcousticLabel(band.centerFreqHz),
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isEnabled && band.levelMb != 0) MaterialTheme.colorScheme.primary else TextPrimary
+                                ),
+                                maxLines = 1
+                            )
+                            Text(
+                                text = "${band.displayFreq()}Hz",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    color = TextSecondary,
+                                    fontSize = 11.sp
+                                )
+                            )
+                        }
 
                         Slider(
                             value = band.levelMb / 100f,
@@ -238,12 +249,30 @@ fun EqualizerTabContent(
                                 fontWeight = FontWeight.Bold,
                                 color = if (band.levelMb != 0) MaterialTheme.colorScheme.primary else TextMuted
                             ),
-                            modifier = Modifier.width(58.dp),
+                            modifier = Modifier.width(52.dp),
                             textAlign = androidx.compose.ui.text.style.TextAlign.End
                         )
                     }
                 }
             }
         }
+    }
+}
+
+/**
+ * Traduce frecuencias en hercios a descriptores acústicos comprensibles para cualquier usuario.
+ */
+private fun getBandAcousticLabel(freqHz: Int): String {
+    return when {
+        freqHz <= 35 -> "Subgraves"
+        freqHz <= 70 -> "Bajos"
+        freqHz <= 140 -> "Graves"
+        freqHz <= 280 -> "Cuerpo"
+        freqHz <= 600 -> "Medios Bajos"
+        freqHz <= 1200 -> "Voces"
+        freqHz <= 2500 -> "Claridad"
+        freqHz <= 5000 -> "Presencia"
+        freqHz <= 10000 -> "Brillo"
+        else -> "Aire / Agudos"
     }
 }

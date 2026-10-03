@@ -115,19 +115,46 @@ fun NowPlayingTopBar(
             }
 
             if (hasVideo) {
-                IconButton(
+                Spacer(modifier = Modifier.width(4.dp))
+                Surface(
                     onClick = onOpenVideoMode,
-                    modifier = Modifier.testTag("now_playing_toggle_video_canvas_btn")
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                    color = Color.Black.copy(alpha = 0.70f),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.5.dp,
+                        if (videoDisplayMode != VideoDisplayMode.OFF) animatedPrimary else Color.White.copy(alpha = 0.40f)
+                    ),
+                    modifier = Modifier
+                        .height(38.dp)
+                        .testTag("now_playing_toggle_video_canvas_btn")
                 ) {
-                    Icon(
-                        imageVector = when (videoDisplayMode) {
-                            VideoDisplayMode.FULLSCREEN_BACKGROUND -> Icons.Default.Wallpaper
-                            VideoDisplayMode.CARD_CANVAS -> Icons.Default.CropSquare
-                            VideoDisplayMode.OFF -> Icons.Default.VideocamOff
-                        },
-                        contentDescription = "Modo de Video: ${videoDisplayMode.label}",
-                        tint = if (videoDisplayMode != VideoDisplayMode.OFF) animatedPrimary else TextSecondary
-                    )
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = when (videoDisplayMode) {
+                                VideoDisplayMode.FULLSCREEN_BACKGROUND -> Icons.Default.Fullscreen
+                                VideoDisplayMode.CARD_CANVAS -> Icons.Default.CropSquare
+                                VideoDisplayMode.OFF -> Icons.Default.VideocamOff
+                            },
+                            contentDescription = "Modo de Video: ${videoDisplayMode.label}",
+                            tint = if (videoDisplayMode != VideoDisplayMode.OFF) animatedPrimary else Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = when (videoDisplayMode) {
+                                VideoDisplayMode.FULLSCREEN_BACKGROUND -> "Fondo"
+                                VideoDisplayMode.CARD_CANVAS -> "Lienzo"
+                                VideoDisplayMode.OFF -> "Off"
+                            },
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = if (videoDisplayMode != VideoDisplayMode.OFF) animatedPrimary else Color.White
+                            )
+                        )
+                    }
                 }
             }
         }

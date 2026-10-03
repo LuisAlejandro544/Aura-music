@@ -51,19 +51,26 @@ object OnlineVideoAudioImporter {
     /**
      * Resuelve el enlace de video para obtener los metadatos y las URLs directas de descarga.
      */
-    suspend fun resolveMediaLink(linkUrl: String): Result<ResolvedMediaInfo> = withContext(Dispatchers.IO) {
+    suspend fun resolveMediaLink(linkUrl: String, context: Context? = null): Result<ResolvedMediaInfo> = withContext(Dispatchers.IO) {
         val cleanUrl = linkUrl.trim()
         if (cleanUrl.isBlank()) {
             return@withContext Result.failure(IllegalArgumentException("El enlace no puede estar vacío"))
         }
 
         try {
-            // Caso 1: Enlace de TikTok (tiktok.com, vt.tiktok.com, vm.tiktok.com)
+            // Caso 1: Enlace de YouTube o video web compatible
+            if (WebStreamExtractor.isWebVideoUrl(cleanUrl)) {
+                if (context != null) {
+                    return@withContext WebStreamExtractor.resolveStream(context, cleanUrl)
+                }
+            }
+
+            // Caso 2: Enlace de TikTok (tiktok.com, vt.tiktok.com, vm.tiktok.com)
             if (cleanUrl.contains("tiktok.com", ignoreCase = true)) {
                 return@withContext resolveTikTokMedia(cleanUrl)
             }
 
-            // Caso 2: Enlace directo a archivo multimedia (.mp4, .m4a, .mp3, .webm)
+            // Caso 3: Enlace directo a archivo multimedia (.mp4, .m4a, .mp3, .webm)
             if (cleanUrl.endsWith(".mp4", ignoreCase = true) ||
                 cleanUrl.endsWith(".m4a", ignoreCase = true) ||
                 cleanUrl.endsWith(".mp3", ignoreCase = true) ||
@@ -83,7 +90,15 @@ object OnlineVideoAudioImporter {
                 )
             }
 
-            // Intento por defecto con el resolver
+            // Caso 4: Intentar con WebStreamExtractor si hay contexto disponible
+            if (context != null && (cleanUrl.startsWith("http://") || cleanUrl.startsWith("https://"))) {
+                val streamRes = WebStreamExtractor.resolveStream(context, cleanUrl)
+                if (streamRes.isSuccess) {
+                    return@withContext streamRes
+                }
+            }
+
+            // Intento por defecto con el resolver de TikTok
             return@withContext resolveTikTokMedia(cleanUrl)
         } catch (e: Exception) {
             Result.failure(e)

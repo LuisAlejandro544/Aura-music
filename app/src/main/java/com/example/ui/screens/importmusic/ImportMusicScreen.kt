@@ -52,6 +52,7 @@ fun ImportMusicScreen(
     var showClearConfirmation by remember { mutableStateOf(false) }
     var selectedVideoForConversion by remember { mutableStateOf<Uri?>(null) }
     var showDownloadFromLinkDialog by remember { mutableStateOf(false) }
+    var downloadDialogMode by remember { mutableStateOf(com.example.ui.components.DownloadSourceMode.TIKTOK) }
 
     // Lanzador Photo/Media Picker para seleccionar un video y convertirlo a música
     val videoPickerLauncher = rememberLauncherForActivityResult(
@@ -229,18 +230,40 @@ fun ImportMusicScreen(
             Spacer(modifier = Modifier.height(8.dp))
         }
 
-        // Opción 1: Descargar desde TikTok / Enlace Web (Música, Carátula y Video Canvas)
+        // Opción 1: Descargar desde TikTok (Música, Carátula y Video Canvas)
         item {
             ImportActionCard(
-                title = "Descargar desde TikTok / Web",
-                description = "Pega un enlace de video de TikTok o web: descarga la música en alta fidelidad de cualquier duración, con carátula oficial y Video Canvas de fondo.",
-                buttonText = "Pegar Enlace y Descargar",
-                icon = Icons.Default.CloudDownload,
+                title = "Descargar desde TikTok",
+                description = "Pega un enlace de video de TikTok: descarga la música en alta fidelidad de cualquier duración, con carátula oficial y Video Canvas de fondo.",
+                buttonText = "Pegar Enlace de TikTok",
+                icon = Icons.Default.MusicNote,
                 accentGradient = Brush.horizontalGradient(
                     listOf(Color(0xFF00F2FE), Color(0xFF4FACFE), Color(0xFFFF007F))
                 ),
-                onClick = { showDownloadFromLinkDialog = true },
+                onClick = {
+                    downloadDialogMode = com.example.ui.components.DownloadSourceMode.TIKTOK
+                    showDownloadFromLinkDialog = true
+                },
                 testTag = "import_tiktok_link_btn"
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+
+        // Opción 2: Descargar desde YouTube / Enlace Web
+        item {
+            ImportActionCard(
+                title = "Descargar desde YouTube / Web",
+                description = "Pega un enlace de YouTube o video web: extrae el audio de alta fidelidad con resolución rápida y optimizada, carátula en WebP y Video Canvas sincronizado.",
+                buttonText = "Pegar Enlace de Video",
+                icon = Icons.Default.SmartDisplay,
+                accentGradient = Brush.horizontalGradient(
+                    listOf(Color(0xFFFF0033), Color(0xFFFF3366), Color(0xFFFF8800))
+                ),
+                onClick = {
+                    downloadDialogMode = com.example.ui.components.DownloadSourceMode.YOUTUBE_WEB
+                    showDownloadFromLinkDialog = true
+                },
+                testTag = "import_youtube_link_btn"
             )
             Spacer(modifier = Modifier.height(12.dp))
         }
@@ -413,6 +436,7 @@ fun ImportMusicScreen(
 
     if (showDownloadFromLinkDialog) {
         com.example.ui.components.DownloadFromLinkDialog(
+            initialMode = downloadDialogMode,
             onDismiss = { showDownloadFromLinkDialog = false },
             onConfirmDownload = { info, title, artist, attachCanvas ->
                 showDownloadFromLinkDialog = false
