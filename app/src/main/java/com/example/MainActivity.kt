@@ -101,6 +101,7 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
     val playbackPitch by viewModel.playbackPitch.collectAsStateWithLifecycle()
     val crossfadeSeconds by viewModel.crossfadeSeconds.collectAsStateWithLifecycle()
     val isGaplessEnabled by viewModel.isGaplessEnabled.collectAsStateWithLifecycle()
+    val isVideoCanvasActive by viewModel.isVideoCanvasActive.collectAsStateWithLifecycle()
 
     var showGlobalAudioEffectsSheet by remember { mutableStateOf(false) }
     var initialAudioEffectsTab by remember { mutableIntStateOf(0) }
@@ -337,6 +338,11 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                 onEditTrackDetails = { id, t, a, al, art, removeArt ->
                     viewModel.updateTrackDetails(id, t, a, al, art, removeArt)
                 },
+                onEditTrackDetailsWithVideo = { id, t, a, al, art, removeArt, video, removeVideo ->
+                    viewModel.updateTrackDetails(id, t, a, al, art, removeArt, video, removeVideo)
+                },
+                isVideoCanvasActive = isVideoCanvasActive,
+                onToggleVideoCanvas = { viewModel.toggleVideoCanvas() },
                 sleepTimerState = sleepTimerState,
                 onStartSleepTimer = { viewModel.startSleepTimer(it) },
                 onCancelSleepTimer = { viewModel.cancelSleepTimer() },

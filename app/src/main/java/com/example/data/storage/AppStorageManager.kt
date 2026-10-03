@@ -17,11 +17,12 @@ import java.io.InputStream
  * Gestor centralizado del almacenamiento estructurado de la aplicación en:
  * Android/data/com.aistudio.musicplayer.aurasound/files/
  *
- * Mantiene 4 carpetas dedicadas:
+ * Mantiene 5 carpetas dedicadas:
  * - images/   -> Carátulas de álbumes convertidas a WebP con máxima compresión sin pérdida
  * - songs/    -> Canciones y pistas de audio locales
  * - lyrics/   -> Archivos de letras sincronizadas (.lrc) o texto plano
  * - metadata/ -> Archivos JSON con información técnica y descriptiva de las pistas
+ * - videos/   -> Videos de fondo y loops de Canvas sincronizados o continuos
  */
 class AppStorageManager(private val context: Context) {
 
@@ -32,6 +33,7 @@ class AppStorageManager(private val context: Context) {
     val songsDir: File = File(baseDir, "songs").apply { if (!exists()) mkdirs() }
     val lyricsDir: File = File(baseDir, "lyrics").apply { if (!exists()) mkdirs() }
     val metadataDir: File = File(baseDir, "metadata").apply { if (!exists()) mkdirs() }
+    val videosDir: File = File(baseDir, "videos").apply { if (!exists()) mkdirs() }
 
     /**
      * Guarda una carátula comprimiéndola a formato WebP sin pérdida de calidad (Lossless)
@@ -106,6 +108,8 @@ class AppStorageManager(private val context: Context) {
             put("durationMs", track.durationMs)
             put("uriString", track.uriString)
             put("albumArtPath", track.albumArtPath ?: "")
+            put("videoUri", track.videoUri ?: "")
+            put("isVideoLoop", track.isVideoLoop)
             put("mimeType", track.mimeType)
             put("dateAdded", track.dateAdded)
             put("isFavorite", track.isFavorite)
@@ -187,15 +191,87 @@ class AppStorageManager(private val context: Context) {
          }
      }
 
+     /**
+      * Guarda un video personalizado o Canvas seleccionado por el usuario desde la galería (SAF/Photo Picker).
+      * Analiza la duración del video con MediaMetadataRetriever para determinar si es un loop corto (<= 12s)
+      * o un video largo sincronizado con la canción, y elimina el video previo si existía.
+      */
+     suspend fun saveCustomVideoFromUri(
+         trackId: Long,
+         sourceUri: Uri,
+         oldVideoPath: String?
+     ): Pair<String, Boolean>? = withContext(Dispatchers.IO) {
+         try {
+             // 1. Determinar duración con MediaMetadataRetriever
+             var isLoop = false
+             try {
+                 val retriever = android.media.MediaMetadataRetriever()
+                 retriever.setDataSource(context, sourceUri)
+                 val durStr = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)
+                 val durationMs = durStr?.toLongOrNull() ?: 0L
+                 // Si dura 12 segundos o menos, se cataloga automáticamente como bucle continuo de Canvas
+                 isLoop = durationMs in 1..12500L
+                 retriever.release()
+             } catch (e: Exception) {
+                 isLoop = false
+             }
+
+             // 2. Eliminar video previo si existía en videosDir
+             if (!oldVideoPath.isNullOrEmpty()) {
+                 try {
+                     val oldFile = File(oldVideoPath)
+                     if (oldFile.exists() && oldFile.canonicalPath.startsWith(videosDir.canonicalPath)) {
+                         oldFile.delete()
+                     }
+                 } catch (ignored: Exception) {}
+             }
+
+             // 3. Copiar archivo al directorio videos/
+             val newFile = File(videosDir, "canvas_${trackId}_${System.currentTimeMillis()}.mp4")
+             context.contentResolver.openInputStream(sourceUri)?.use { input ->
+                 FileOutputStream(newFile).use { output ->
+                     input.copyTo(output)
+                 }
+             } ?: return@withContext null
+
+             Pair(newFile.absolutePath, isLoop)
+         } catch (e: Exception) {
+             null
+         }
+     }
+
+     /**
+      * Elimina físicamente un archivo de video si existe en el directorio de videos.
+      */
+     suspend fun deleteVideoFile(videoPath: String?): Boolean = withContext(Dispatchers.IO) {
+         if (videoPath.isNullOrEmpty()) return@withContext false
+         try {
+             val file = File(videoPath)
+             if (file.exists() && file.canonicalPath.startsWith(videosDir.canonicalPath)) {
+                 file.delete()
+             } else {
+                 false
+             }
+         } catch (e: Exception) {
+             false
+         }
+     }
+
     /**
-     * Elimina los archivos asociados a una pista (carátula WebP, letra y metadatos JSON).
+     * Elimina los archivos asociados a una pista (carátula WebP, video de fondo, letra y metadatos JSON).
      */
-    suspend fun deleteTrackFiles(trackId: Long, albumArtPath: String?) = withContext(Dispatchers.IO) {
+    suspend fun deleteTrackFiles(trackId: Long, albumArtPath: String?, videoPath: String? = null) = withContext(Dispatchers.IO) {
         try {
             if (!albumArtPath.isNullOrEmpty()) {
                 val artFile = File(albumArtPath)
                 if (artFile.exists() && artFile.startsWith(imagesDir)) {
                     artFile.delete()
+                }
+            }
+            if (!videoPath.isNullOrEmpty()) {
+                val vidFile = File(videoPath)
+                if (vidFile.exists() && vidFile.startsWith(videosDir)) {
+                    vidFile.delete()
                 }
             }
             File(lyricsDir, "track_$trackId.lrc").takeIf { it.exists() }?.delete()

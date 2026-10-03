@@ -11,7 +11,7 @@ Este documento define el protocolo de trabajo para los agentes de software y des
 * **Protocolo en Aura Music**:
   - Verificar que las nuevas funciones encajen en el flujo MVVM (Model - Room Database - Repository - Storage - ViewModel - Compose UI).
   - Diseñar pantallas modulares en `ui/screens/` evitando saturar interfaces.
-  - El almacenamiento de datos de usuario se organiza exclusivamente en `Android/data/com.aistudio.musicplayer.aurasound/files/` en subcarpetas (`images/`, `songs/`, `lyrics/`, `metadata/`).
+  - El almacenamiento de datos de usuario se organiza exclusivamente en `Android/data/com.aistudio.musicplayer.aurasound/files/` en subcarpetas (`images/`, `songs/`, `lyrics/`, `metadata/`, `videos/`).
   - Asegurar compatibilidad arquitectónica con arquitecturas de 64 bits (`arm64-v8a`, `x86_64`) y 32 bits (`armeabi-v7a`, `x86`).
 
 ### 2. El Constructor (Generación de Código)
@@ -76,5 +76,6 @@ Este documento define el protocolo de trabajo para los agentes de software y des
 - [x] ¿LeakCanary está añadido y funcional en dependencias de depuración?
 - [x] ¿El almacenamiento estructurado (`images/`, `songs/`, `lyrics/`, `metadata/`) está activo?
 - [x] ¿Las carátulas se procesan como WebP sin pérdida en segundo plano y las faltantes se generan proceduralmente?
+- [x] ¿El Video Canvas de fondo soporta loops cortos (≤10s) y videos largos sincronizados con el audio?
 - [x] ¿Se pueden modificar los metadatos de las canciones (título, artista, álbum)?
 - [x] ¿Los 5 archivos Markdown (`README.md`, `ROADMAP.md`, `STRUCTURE.md`, `AI_CONTEXT.md`, `AGENTS.md`) están actualizados y en español?

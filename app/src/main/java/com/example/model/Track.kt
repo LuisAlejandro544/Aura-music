@@ -13,6 +13,8 @@ data class Track(
     val durationMs: Long = 0L,
     val uriString: String,
     val albumArtPath: String? = null,
+    val videoUri: String? = null,
+    val isVideoLoop: Boolean = false,
     val mimeType: String = "audio/mpeg",
     val dateAdded: Long = System.currentTimeMillis(),
     val isFavorite: Boolean = false,

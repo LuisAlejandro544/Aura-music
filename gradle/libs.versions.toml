@@ -43,9 +43,11 @@ googleid = "1.1.1"
 media3 = "1.5.1"
 documentfile = "1.0.1"
 leakcanary = "2.14"
+palette = "1.0.0"
 
 
 [libraries]
+androidx-palette = { group = "androidx.palette", name = "palette-ktx", version.ref = "palette" }
 leakcanary-android = { group = "com.squareup.leakcanary", name = "leakcanary-android", version.ref = "leakcanary" }
 androidx-documentfile = { group = "androidx.documentfile", name = "documentfile", version.ref = "documentfile" }
 media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "media3" }

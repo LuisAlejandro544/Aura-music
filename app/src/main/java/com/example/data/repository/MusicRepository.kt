@@ -76,7 +76,9 @@ class MusicRepository(private val database: AppDatabase) {
         artist: String,
         album: String,
         customArtUri: Uri? = null,
-        shouldRemoveArt: Boolean = false
+        shouldRemoveArt: Boolean = false,
+        customVideoUri: Uri? = null,
+        shouldRemoveVideo: Boolean = false
     ): Track? = withContext(Dispatchers.IO) {
         val current = trackDao.getTrackById(trackId) ?: return@withContext null
         val storageManager = com.example.data.storage.AppStorageManager(context)
@@ -94,7 +96,29 @@ class MusicRepository(private val database: AppDatabase) {
             }
         }
 
-        trackDao.updateTrackDetails(trackId, title.trim(), artist.trim(), album.trim(), finalArtPath)
+        val (finalVideoPath, finalIsLoop) = when {
+            customVideoUri != null -> {
+                val result = storageManager.saveCustomVideoFromUri(trackId, customVideoUri, current.videoUri)
+                if (result != null) result.first to result.second else null to false
+            }
+            shouldRemoveVideo -> {
+                storageManager.deleteVideoFile(current.videoUri)
+                null to false
+            }
+            else -> {
+                current.videoUri to current.isVideoLoop
+            }
+        }
+
+        trackDao.updateTrackDetailsWithVideo(
+            trackId,
+            title.trim(),
+            artist.trim(),
+            album.trim(),
+            finalArtPath,
+            finalVideoPath,
+            finalIsLoop
+        )
         val updated = trackDao.getTrackById(trackId)?.toDomain()
         if (updated != null) {
             storageManager.saveMetadataJson(updated)
@@ -106,7 +130,7 @@ class MusicRepository(private val database: AppDatabase) {
         val track = trackDao.getTrackById(trackId)
         trackDao.deleteTrackById(trackId)
         if (track != null) {
-            com.example.data.storage.AppStorageManager(context).deleteTrackFiles(trackId, track.albumArtPath)
+            com.example.data.storage.AppStorageManager(context).deleteTrackFiles(trackId, track.albumArtPath, track.videoUri)
         }
     }
 

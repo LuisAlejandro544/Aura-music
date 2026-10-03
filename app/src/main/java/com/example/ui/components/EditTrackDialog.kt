@@ -47,7 +47,16 @@ import java.io.File
 fun EditTrackDialog(
     track: Track,
     onDismiss: () -> Unit,
-    onConfirm: (trackId: Long, newTitle: String, newArtist: String, newAlbum: String, customArtUri: Uri?, removeArtwork: Boolean) -> Unit
+    onConfirm: (
+        trackId: Long,
+        newTitle: String,
+        newArtist: String,
+        newAlbum: String,
+        customArtUri: Uri?,
+        removeArtwork: Boolean,
+        customVideoUri: Uri?,
+        removeVideo: Boolean
+    ) -> Unit
 ) {
     var title by remember { mutableStateOf(track.title) }
     var artist by remember { mutableStateOf(track.artist) }
@@ -56,13 +65,26 @@ fun EditTrackDialog(
     var selectedCustomArtUri by remember { mutableStateOf<Uri?>(null) }
     var shouldRemoveArtwork by remember { mutableStateOf(false) }
 
-    // Launcher del Android Photo Picker (cero permisos invasivos, moderno y seguro)
+    var selectedCustomVideoUri by remember { mutableStateOf<Uri?>(null) }
+    var shouldRemoveVideo by remember { mutableStateOf(false) }
+
+    // Launcher del Android Photo Picker para imágenes (carátula)
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         if (uri != null) {
             selectedCustomArtUri = uri
             shouldRemoveArtwork = false
+        }
+    }
+
+    // Launcher del Android Photo/Media Picker para videos de fondo (Canvas o Video Sincronizado)
+    val videoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            selectedCustomVideoUri = uri
+            shouldRemoveVideo = false
         }
     }
 
@@ -79,7 +101,7 @@ fun EditTrackDialog(
                 )
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(
-                    text = "Editar Canción",
+                    text = "Editar Canción y Canvas",
                     style = MaterialTheme.typography.titleLarge.copy(
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary
@@ -99,7 +121,7 @@ fun EditTrackDialog(
                 // Sección de Carátula (Previsualización y controles de galería)
                 Box(
                     modifier = Modifier
-                        .size(130.dp)
+                        .size(120.dp)
                         .clip(RoundedCornerShape(16.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant)
                         .border(1.dp, CardBorder, RoundedCornerShape(16.dp))
@@ -152,7 +174,7 @@ fun EditTrackDialog(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
                             .padding(6.dp)
-                            .size(36.dp)
+                            .size(32.dp)
                             .clip(RoundedCornerShape(10.dp))
                             .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)),
                         contentAlignment = Alignment.Center
@@ -161,7 +183,7 @@ fun EditTrackDialog(
                             imageVector = Icons.Default.AddPhotoAlternate,
                             contentDescription = "Seleccionar de galería",
                             tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }
@@ -185,7 +207,7 @@ fun EditTrackDialog(
                     ) {
                         Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Galería", style = MaterialTheme.typography.labelMedium)
+                        Text("Carátula", style = MaterialTheme.typography.labelMedium)
                     }
 
                     val hasArtwork = (!track.albumArtPath.isNullOrEmpty() || selectedCustomArtUri != null) && !shouldRemoveArtwork
@@ -206,17 +228,82 @@ fun EditTrackDialog(
                     }
                 }
 
-                Text(
-                    text = if (selectedCustomArtUri != null) {
-                        "✨ Nueva imagen seleccionada. Al guardar, se convertirá a WebP y se reemplazará la anterior."
-                    } else if (shouldRemoveArtwork) {
-                        "🎨 Se eliminará la carátula personalizada y se generará arte procedural dinámico."
-                    } else {
-                        "Toca la carátula para elegir una foto personalizada desde tu galería."
-                    },
-                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                )
+                // Sección de Video Canvas / Video de Fondo
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                    shape = RoundedCornerShape(14.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Videocam,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                text = "Video Canvas de Fondo",
+                                style = MaterialTheme.typography.titleSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextPrimary
+                                )
+                            )
+                        }
+
+                        val hasVideoAttached = (track.videoUri != null || selectedCustomVideoUri != null) && !shouldRemoveVideo
+                        val videoStatusText = when {
+                            selectedCustomVideoUri != null -> "🎬 Nuevo video seleccionado (se analizará duración al guardar)"
+                            shouldRemoveVideo -> "❌ Se eliminará el video de fondo"
+                            track.videoUri != null -> if (track.isVideoLoop) "🔁 Loop Canvas activo (≤ 10s)" else "⏱️ Video largo sincronizado activo"
+                            else -> "Sin video de fondo. Los videos cortos (≤10s) se repiten en loop y los largos se sincronizan con la música."
+                        }
+
+                        Text(
+                            text = videoStatusText,
+                            style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = {
+                                    videoPickerLauncher.launch(
+                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)
+                                    )
+                                },
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Default.MovieFilter, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(if (hasVideoAttached) "Cambiar Video" else "Elegir Video")
+                            }
+
+                            if (hasVideoAttached) {
+                                OutlinedButton(
+                                    onClick = {
+                                        selectedCustomVideoUri = null
+                                        shouldRemoveVideo = true
+                                    },
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
+                                }
+                            }
+                        }
+                    }
+                }
 
                 Divider(color = CardBorder.copy(alpha = 0.5f), thickness = 0.8.dp)
 
@@ -264,7 +351,9 @@ fun EditTrackDialog(
                             artist,
                             album,
                             selectedCustomArtUri,
-                            shouldRemoveArtwork
+                            shouldRemoveArtwork,
+                            selectedCustomVideoUri,
+                            shouldRemoveVideo
                         )
                         onDismiss()
                     }
@@ -293,8 +382,23 @@ fun EditTrackDialog(
 }
 
 /**
- * Sobrecarga de compatibilidad para llamadas previas con 4 argumentos.
+ * Sobrecargas de compatibilidad para llamadas previas.
  */
+@Composable
+fun EditTrackDialog(
+    track: Track,
+    onDismiss: () -> Unit,
+    onConfirm: (trackId: Long, newTitle: String, newArtist: String, newAlbum: String, customArtUri: Uri?, removeArtwork: Boolean) -> Unit
+) {
+    EditTrackDialog(
+        track = track,
+        onDismiss = onDismiss,
+        onConfirm = { id, title, artist, album, artUri, remArt, _, _ ->
+            onConfirm(id, title, artist, album, artUri, remArt)
+        }
+    )
+}
+
 @Composable
 fun EditTrackDialog(
     track: Track,
@@ -304,7 +408,7 @@ fun EditTrackDialog(
     EditTrackDialog(
         track = track,
         onDismiss = onDismiss,
-        onConfirm = { id, title, artist, album, _, _ ->
+        onConfirm = { id, title, artist, album, _, _, _, _ ->
             onConfirm(id, title, artist, album)
         }
     )

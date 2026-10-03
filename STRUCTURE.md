@@ -62,8 +62,9 @@ AuraMusic/
 │   │   │   │   │   │   ├── ArtworkImage.kt     # Renderizador de carátulas (WebP + Procedural)
 │   │   │   │   │   │   ├── AudioEffectsBottomSheet.kt # Modal unificado de EQ 10 bandas, Temporizador, 8D y Speed
 │   │   │   │   │   │   ├── AudioVisualizer.kt  # Visualizador de ondas en tiempo real
+│   │   │   │   │   │   ├── BackgroundVideoPlayer.kt # Renderizador de video de fondo (Loops Canvas y Video Sync)
 │   │   │   │   │   │   ├── BottomNavBar.kt     # Barra de navegación limpia (4 pestañas)
-│   │   │   │   │   │   ├── EditTrackDialog.kt  # Modal con Photo Picker y edición de carátula
+│   │   │   │   │   │   ├── EditTrackDialog.kt  # Modal con Photo Picker y edición de carátula/video
 │   │   │   │   │   │   ├── MiniPlayer.kt       # Mini reproductor opaco con acceso directo a EQ modal
 │   │   │   │   │   │   ├── ProceduralArtwork.kt # Arte vectorial dinámico en tiempo real
 │   │   │   │   │   │   └── TrackListItem.kt    # Fila de canción con menú contextual
@@ -106,4 +107,5 @@ El almacenamiento estructurado en `Android/data/com.aistudio.musicplayer.aurasou
 - `songs/`: Archivos de audio locales generados o importados.
 - `lyrics/`: Letras de canciones en formato `.lrc`.
 - `metadata/`: Archivos `.json` individuales con metadatos descriptivos de cada canción.
+- `videos/`: Videos de fondo vinculados y loops de Canvas (.mp4 / .webm).
 - Directorio de aplicación interno (`filesDir`): Almacena `aura_debug_logs.json` con el historial persistente de incidencias capturadas por **Aura Monitor**.

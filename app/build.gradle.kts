@@ -90,6 +90,7 @@ dependencies {
   implementation(libs.androidx.room.ktx)
   implementation(libs.androidx.room.runtime)
   implementation(libs.androidx.documentfile)
+  implementation(libs.androidx.palette)
   implementation(libs.coil.compose)
   implementation(libs.media3.exoplayer)
   implementation(libs.media3.session)

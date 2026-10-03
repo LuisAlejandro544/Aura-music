@@ -28,6 +28,7 @@ Este archivo define el contexto de diseño, directrices técnicas y restriccione
      - `songs/`: Canciones locales y demos.
      - `lyrics/`: Letras de canciones sincronizadas (.lrc).
      - `metadata/`: Archivos JSON con información técnica y descriptiva de las pistas.
+     - `videos/`: Videos de fondo (.mp4/.webm) y loops de Canvas vinculados.
    - Los registros de diagnóstico del monitor se guardan de forma atómica en `filesDir/aura_debug_logs.json`.
 
 5. **Carátulas Procedurales & WebP**:
@@ -52,5 +53,10 @@ Este archivo define el contexto de diseño, directrices técnicas y restriccione
    - Debe interceptar excepciones no controladas a nivel de proceso (`Thread.setDefaultUncaughtExceptionHandler`) y registrar datos del teléfono (modelo, CPU ABI, RAM, almacenamiento, versión de Android) junto con el stacktrace en crudo.
    - LeakCanary debe estar configurado en `debugImplementation` para auditar fugas de memoria en la JVM.
 
-9. **Idioma de Comunicación**:
+9. **Video Canvas de Fondo**:
+   - Soporte para asociar videos a pistas individuales. Los videos cortos (≤ 10s - 12s) se reproducen en bucle continuo (*Canvas Loop*); los videos largos se sincronizan temporalmente con el audio y los saltos de búsqueda (*Video Sync*).
+   - El reproductor de video de fondo opera con `volume = 0.0f` para no contaminar el procesador PCM ni el motor DSP C++20 de audio principal.
+   - En `NowPlayingScreen`, el usuario puede alternar rápidamente entre ver la carátula o el Video Canvas mediante el botón dedicado en la barra superior.
+
+10. **Idioma de Comunicación**:
    - La documentación, comentarios en código, cadenas de usuario (`strings.xml`) y mensajes de commit deben redactarse en **español**.
