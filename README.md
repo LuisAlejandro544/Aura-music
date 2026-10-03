@@ -51,19 +51,19 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
   - Fundido cruzado de 0 a 12 segundos con desvanecimiento de volumen progresivo.
   - Modo Gapless para reproducción continua sin silencios entre pistas.
 
-### 4. Video Canvas de Fondo (Loops Cortos de 10-20s o Videos Largos Sincronizados)
-- **Lienzo Dinámico de Video**: Capacidad de vincular videos desde la galería del teléfono móvil a cualquier canción.
+### 4. Video de Fondo Multifuncional (Fondo Completo, Lienzo en Carátula o Desactivado)
+- **3 Modos de Visualización Seleccionables por el Usuario**:
+  - 🌌 **Fondo Completo (Full Background)**: El video se reproduce ocupando todo el fondo de pantalla de Now Playing detrás de la interfaz gráfica con un velo oscuro/gradiente para máxima legibilidad, mientras la carátula flota al frente con su aura lumínica, elevación y sombra.
+  - 🔲 **Lienzo en Carátula (Card Canvas)**: El video se reproduce dentro del marco central de la carátula (relación de aspecto 1:1 estilo Spotify Canvas).
+  - 🖼️ **Solo Carátula**: Muestra únicamente la carátula estática o procedural sin video.
+- **Selector Modal Interactivo**: El usuario puede abrir un cuadro de diálogo modal desde el icono de video en la barra superior o alternar con un solo toque desde la etiqueta en la carátula.
 - **Detección Automática y Forzado Manual**:
-  - **Loop Canvas (≤ 10s - 20s)**: Se repite en bucle infinito suave y continuo de fondo como en Spotify Canvas.
-  - **Video Largo Sincronizado (> 20s)**: El video avanza sincronizado con la reproducción de la canción y los saltos de búsqueda (`seekTo`).
-  - **Selector de Modo en Edición**: El usuario puede elegir entre detección automática (`≤ 20s`), forzar como Bucle (Loop) o forzar como Video Sincronizado.
-- **Armonización Cromática Inteligente (Cero Interferencia con Carátulas)**:
-  - Cuando el Video Canvas está en pantalla, el halo ambiental superior, el visualizador y la barra de progreso extraen su paleta cromática en tiempo real **directamente de un fotograma clave del video**.
-  - De esta forma, el color de la carátula estática nunca interfiere ni desentona con el video.
-  - Al alternar de vuelta a la carátula estática, la iluminación se adapta suavemente a los tonos de la portada.
-- **Reproducción Silenciada de Alto Rendimiento**: El video se renderiza mediante una instancia secundaria de ExoPlayer optimizada con `volume = 0.0f` y liberación estricta de códecs, preservando íntegramente la señal de audio que alimenta el motor DSP C++20 de 10 bandas.
-- **Conmutador Rápido en Now Playing**: Botón interactivo en la barra superior para alternar al instante entre la carátula clásica y el Video Canvas.
-- **Gestión Limpia en Almacenamiento**: Los videos se copian de forma segura a la subcarpeta privada `videos/` y los videos anteriores se eliminan automáticamente para evitar acumulación de archivos huérfanos.
+  - **Loop Canvas (≤ 10s - 20s)**: Bucle infinito continuo silenciado.
+  - **Video Largo Sincronizado (> 20s)**: Sincronizado con la reproducción y los saltos temporales (`seekTo`).
+  - **Selector en Edición**: Opción de forzar bucle o sincronización desde `EditTrackDialog`.
+- **Armonización Cromática Inteligente**: Extracción en tiempo real del halo de luz y visualizador a partir de fotogramas del video para armonizar la interfaz.
+- **Sincronización Instantánea de Favoritos**: El botón de corazón en Now Playing y en la Biblioteca refleja reactivamente el estado en tiempo real (icono relleno en rojo `Color(0xFFEF4444)` al marcar favorito).
+- **Lista de Inicio Estable**: La sección "Populares en tu biblioteca" permanece fija y nunca elimina otras canciones al marcar un favorito.
 
 ### 5. Video a Música (Extracción 3 en 1 Directa en el Teléfono) 🎬➡️🎵
 - **Solución Nativa para Usuarios Móviles sin PC**: Permite seleccionar cualquier video de la galería (conciertos, clips de redes, TikToks, descargas) y transformarlo instantáneamente en una pista de música completa.

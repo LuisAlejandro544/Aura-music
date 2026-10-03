@@ -28,11 +28,25 @@ class AuraApplication : Application() {
 
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
-        if (level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) {
-            AuraDebugManager.logWarning(
-                "Memory",
-                "Memoria del sistema bajo presión alta (TRIM_MEMORY level: $level)."
-            )
+        when {
+            level >= ComponentCallbacks2.TRIM_MEMORY_COMPLETE -> {
+                AuraDebugManager.logWarning(
+                    "Memory",
+                    "Memoria del sistema bajo presión crítica (TRIM_MEMORY level: $level)."
+                )
+            }
+            level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL -> {
+                AuraDebugManager.logWarning(
+                    "Memory",
+                    "Memoria del sistema bajo presión alta (TRIM_MEMORY level: $level)."
+                )
+            }
+            level == ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN -> {
+                AuraDebugManager.logInfo(
+                    "Memory",
+                    "Interfaz oculta en segundo plano (TRIM_MEMORY_UI_HIDDEN level: 20). Transición normal a reposo."
+                )
+            }
         }
     }
 }

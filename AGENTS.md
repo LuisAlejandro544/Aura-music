@@ -66,7 +66,7 @@ Este documento define el protocolo de trabajo para los agentes de software y des
 - [x] ¿El proyecto compila sin errores (`compile_applet`)?
 - [x] ¿`minSdk` se mantiene en 26 (Android 8.0)?
 - [x] ¿Se eliminó completamente la necesidad de archivos `.env`?
-- [x] ¿El estándar de C++ está fijado en C++20 con soporte multi-arquitectura?
+- [x] ¿El estándar de C++ está fijado en C++20 con soporte multi-arquitectura y empaquetado del .so en el APK final?
 - [x] ¿El ecualizador de 10 bandas funciona y está integrado en modal sin un apartado de pantalla completa separado?
 - [x] ¿El motor de Audio 8D Espacial en C++20 está implementado y configurable desde Now Playing?
 - [x] ¿El temporizador de apagado personalizable con atenuación de 10s (fade-out) funciona correctamente?
@@ -77,6 +77,10 @@ Este documento define el protocolo de trabajo para los agentes de software y des
 - [x] ¿El almacenamiento estructurado (`images/`, `songs/`, `lyrics/`, `metadata/`) está activo?
 - [x] ¿Las carátulas se procesan como WebP sin pérdida en segundo plano y las faltantes se generan proceduralmente?
 - [x] ¿El Video Canvas de fondo soporta loops cortos (≤20s), videos largos sincronizados con el audio y armonización cromática sin interferencias de carátula?
+- [x] ¿El video de fondo soporta los 3 modos (Fondo Completo con carátula al frente, Lienzo en carátula y Solo Carátula) seleccionables por el usuario mediante diálogo modal?
+- [x] ¿El corazón en Now Playing se refleja inmediatamente en rojo y se sincroniza reactivamente con Room y ExoPlayer?
+- [x] ¿La sección 'Populares en tu biblioteca' de la pantalla de inicio permanece fija sin renombrarse a 'Tus favoritos' ni ocultar canciones al marcar favoritos?
+- [x] ¿El evento TRIM_MEMORY_UI_HIDDEN (nivel 20) está clasificado como información normal en lugar de advertencia para evitar falsas alarmas de memoria?
 - [x] ¿La función 'Video a Música' extrae el audio a .m4a, genera carátula en WebP y vincula el Video Canvas automáticamente?
 - [x] ¿Se pueden modificar los metadatos de las canciones (título, artista, álbum)?
 - [x] ¿Los 5 archivos Markdown (`README.md`, `ROADMAP.md`, `STRUCTURE.md`, `AI_CONTEXT.md`, `AGENTS.md`) están actualizados y en español?

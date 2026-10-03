@@ -52,6 +52,7 @@ AuraMusic/
 │   │   │   │   │   ├── RepeatMode.kt           # Enum de modos de repetición
 │   │   │   │   │   ├── EqualizerConfig.kt      # Modelo de 10 bandas y presets de EQ
 │   │   │   │   │   ├── AudioEffectsConfig.kt   # Modelos para Audio 8D, Temporizador y Gapless/Crossfade
+│   │   │   │   │   ├── VideoDisplayMode.kt     # Enum de modos de visualización de video (Fondo Completo, Carátula, Off)
 │   │   │   │   │   └── ThemePalette.kt         # Enum de temas de color vibrantes
 │   │   │   │   ├── playback/                   # Capa de reproducción de audio
 │   │   │   │   │   ├── AuraAudioPlayer.kt      # Motor Media3 ExoPlayer, cola, throttling y recuperación
