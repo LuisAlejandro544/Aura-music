@@ -126,6 +126,57 @@ object NativeAudioEngine {
         fallback8DRoomDepth = depth.coerceIn(0f, 1f)
     }
 
+    fun setCrossfeedEnabled(enabled: Boolean) {
+        if (isLoaded) {
+            try {
+                nativeSetCrossfeedEnabled(enabled)
+                return
+            } catch (ignored: Throwable) {}
+        }
+        fallbackCrossfeedEnabled = enabled
+    }
+
+    fun setCrossfeedHeadphonesConnected(connected: Boolean) {
+        if (isLoaded) {
+            try {
+                nativeSetCrossfeedHeadphonesConnected(connected)
+                return
+            } catch (ignored: Throwable) {}
+        }
+        fallbackCrossfeedHeadphonesConnected = connected
+    }
+
+    fun setCrossfeedStrength(strengthMode: Int) {
+        if (isLoaded) {
+            try {
+                nativeSetCrossfeedStrength(strengthMode)
+                return
+            } catch (ignored: Throwable) {}
+        }
+        fallbackCrossfeedStrength = strengthMode.coerceIn(0, 2)
+    }
+
+    fun setBalanceEnabled(enabled: Boolean) {
+        if (isLoaded) {
+            try {
+                nativeSetBalanceEnabled(enabled)
+                return
+            } catch (ignored: Throwable) {}
+        }
+        fallbackBalanceEnabled = enabled
+    }
+
+    fun setStereoBalance(balance: Float) {
+        val clamped = balance.coerceIn(-1.0f, 1.0f)
+        if (isLoaded) {
+            try {
+                nativeSetStereoBalance(clamped)
+                return
+            } catch (ignored: Throwable) {}
+        }
+        fallbackStereoBalance = clamped
+    }
+
     fun processPcmBuffer(byteBuffer: ByteBuffer, offset: Int, length: Int) {
         if (isLoaded) {
             try {
@@ -148,6 +199,11 @@ object NativeAudioEngine {
     private external fun nativeSetEightDOrbitSpeed(speedSeconds: Float)
     private external fun nativeSetEightDSpatialIntensity(intensity: Float)
     private external fun nativeSetEightDRoomDepth(depth: Float)
+    private external fun nativeSetCrossfeedEnabled(enabled: Boolean)
+    private external fun nativeSetCrossfeedHeadphonesConnected(connected: Boolean)
+    private external fun nativeSetCrossfeedStrength(strengthMode: Int)
+    private external fun nativeSetBalanceEnabled(enabled: Boolean)
+    private external fun nativeSetStereoBalance(balance: Float)
 
     // --- Implementación de Respaldo Matemático Idéntico (Filtros Bi-cuadráticos 64-bit y 8D) ---
     private var fallbackSampleRate = 44100
@@ -160,6 +216,11 @@ object NativeAudioEngine {
     private var fallback8DIntensity = 0.85f
     private var fallback8DRoomDepth = 0.35f
     private var fallback8DAngle = 0.0
+    private var fallbackCrossfeedEnabled = false
+    private var fallbackCrossfeedHeadphonesConnected = false
+    private var fallbackCrossfeedStrength = 1
+    private var fallbackBalanceEnabled = false
+    private var fallbackStereoBalance = 0.0f
 
     private class BiquadCoeffs {
         var b0 = 1.0; var b1 = 0.0; var b2 = 0.0
@@ -233,12 +294,15 @@ object NativeAudioEngine {
     }
 
     private fun processFallback(byteBuffer: ByteBuffer, offset: Int, length: Int) {
-        if ((!fallbackEnabled && !fallback8DEnabled) || length <= 0) return
+        if ((!fallbackEnabled && !fallback8DEnabled && !fallbackCrossfeedEnabled && !fallbackBalanceEnabled) || length <= 0) return
         try {
             val shortBuffer = byteBuffer.duplicate().order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
             val startShort = offset / 2
             val shortCount = length / 2
             val deltaAngle = (2.0 * Math.PI) / (fallbackSampleRate * fallback8DOrbitSpeed.toDouble())
+
+            val gainL = if (fallbackBalanceEnabled && fallbackStereoBalance > 0.0f) (1.0f - fallbackStereoBalance).toDouble() else 1.0
+            val gainR = if (fallbackBalanceEnabled && fallbackStereoBalance < 0.0f) (1.0f + fallbackStereoBalance).toDouble() else 1.0
 
             for (i in startShort until (startShort + shortCount) step fallbackChannels) {
                 var sL = shortBuffer.get(i) / 32768.0
@@ -272,6 +336,12 @@ object NativeAudioEngine {
                     val oR = (sR * 0.75 + sL * 0.25) * gR
                     sL = oL
                     sR = oR
+                }
+
+                // Balance Estéreo en Fallback
+                if (fallbackBalanceEnabled && fallbackChannels > 1) {
+                    sL *= gainL
+                    sR *= gainR
                 }
 
                 sL = (sL.coerceIn(-1.2, 1.2)).let { it - (it * it * it) / 6.0 }

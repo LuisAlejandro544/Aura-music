@@ -136,6 +136,26 @@ class AudioEffectManager {
         NativeAudioEngine.setEightDRoomDepth(clamped)
     }
 
+    fun setCrossfeedEnabled(enabled: Boolean) {
+        NativeAudioEngine.setCrossfeedEnabled(enabled)
+    }
+
+    fun setCrossfeedStrength(strengthMode: Int) {
+        NativeAudioEngine.setCrossfeedStrength(strengthMode)
+    }
+
+    fun setCrossfeedHeadphonesConnected(connected: Boolean) {
+        NativeAudioEngine.setCrossfeedHeadphonesConnected(connected)
+    }
+
+    fun setBalanceEnabled(enabled: Boolean) {
+        NativeAudioEngine.setBalanceEnabled(enabled)
+    }
+
+    fun setStereoBalance(balance: Float) {
+        NativeAudioEngine.setStereoBalance(balance)
+    }
+
     private fun syncWithNativeEngine() {
         NativeAudioEngine.setDspEnabled(_isEnabled.value)
         _bands.value.forEach { band ->

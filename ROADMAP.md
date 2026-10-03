@@ -99,19 +99,39 @@ Este documento traza las fases de evolución técnica y funcional para convertir
 
 ---
 
-## 🌈 Fase 5: Visualizador FFT en Tiempo Real y Letras Sincronizadas (Siguiente Paso 🔄)
+## 🎧 Fase 5: Suite Acústica de Auriculares, Crossfeed C++20 y Ergonomía (Completada ✅)
+
+- [x] **Filtro Crossfeed Acústico Nativo (ISO C++20)**:
+  - Algoritmo acústico Bauer / Chu Moy para auriculares con filtro paso-bajos (~700 Hz) y retardo interaural (ITD).
+  - Activación exclusiva cuando se detecta un auricular conectado (`isHeadphoneConnected`), en reposo para altavoces.
+  - 3 niveles acústicos: Sutil (Bauer 4.5 dB), Moderado (Chu Moy Classic) e Intenso (Monitores de Estudio).
+- [x] **Balance Estéreo Fino (Control Izquierda / Derecha L/R en Tiempo Real)**:
+  - Compensación milimétrica de balance L/R con paneo suave y limitador suave anti-clipping en C++20.
+  - Barra de ajuste en tiempo real en la pantalla completa Now Playing y en la hoja modal de efectos con botón de centrado.
+- [x] **Protección contra Desconexiones ("Becoming Noisy" Guard)**:
+  - Intercepción inmediata de `ACTION_AUDIO_BECOMING_NOISY` para pausar la música al desenchufar audífonos.
+- [x] **Reanudación con Fade-In Suave (Volumen Progresivo)**:
+  - Rampa suave de volumen de ~1 segundo al reanudar la reproducción con audífonos puestos para proteger los oídos.
+- [x] **Memoria de Volumen Dedicada para Audífonos**:
+  - Almacenamiento independiente de nivel de volumen para auriculares vs altavoz del dispositivo.
+- [x] **Control Avanzado de Botones y Gestos de Auriculares (Headset Controls)**:
+  - Detección de 1 pulsación, 2 pulsaciones, 3 pulsaciones y pulsación prolongada (hold) con mapeo libre personalizable.
+- [x] **Pestaña Dedicada de "Auriculares" en Configuración**:
+  - Navegación segmentada en 3 apartados: 1. Acústica & DSP, 2. Seguridad & Conexión, 3. Botones y Gestos.
+
+---
+
+## 🌈 Fase 6: Visualizador FFT en Tiempo Real y Letras Sincronizadas (Siguiente Paso 🔄)
 
 - [ ] **Transformada Rápida de Fourier (FFT)**:
   - Cálculo espectral de 512 / 1024 puntos en C++ a 60/120 FPS sin consumo de Garbage Collector en la JVM.
   - Visualizadores de barras, medidores VU analógicos y espectrograma circular.
 - [ ] **Visor de Letras Sincronizadas (.LRC)**:
   - Desplazamiento automático interactivo estilo karaoke leyendo desde `lyrics/`.
-- [ ] **Efecto Crossfeed (Bauer / Chu Moy)**:
-  - Reducción de fatiga auditiva con auriculares emulando la escucha en monitores de campo cercano.
 
 ---
 
-## 🔊 Fase 6: Modo Bit-Perfect y Salida de Ultra-Baja Latencia
+## 🔊 Fase 7: Modo Bit-Perfect y Salida de Ultra-Baja Latencia
 
 - [ ] **Integración con Google Oboe / AAudio**:
   - Modo exclusivo para saltarse el mezclador del sistema Android (*AudioFlinger*).

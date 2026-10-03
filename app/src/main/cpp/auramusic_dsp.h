@@ -61,6 +61,24 @@ public:
         a2 = (1.0 - alpha / A) / a0;
     }
 
+    // Filtro Paso-Bajos Bi-cuadrático (Biquad Low-Pass)
+    void configureLowPass(double sampleRate, double cutoffHz, double q = 0.707) {
+        if (sampleRate <= 0.0 || cutoffHz <= 0.0) return;
+        double maxFreq = sampleRate * 0.49;
+        double f0 = std::clamp(cutoffHz, 20.0, maxFreq);
+        double omega = 2.0 * std::numbers::pi * f0 / sampleRate;
+        double sinOmega = std::sin(omega);
+        double cosOmega = std::cos(omega);
+        double alpha = sinOmega / (2.0 * q);
+
+        double a0 = 1.0 + alpha;
+        b0 = ((1.0 - cosOmega) / 2.0) / a0;
+        b1 = (1.0 - cosOmega) / a0;
+        b2 = ((1.0 - cosOmega) / 2.0) / a0;
+        a1 = (-2.0 * cosOmega) / a0;
+        a2 = (1.0 - alpha) / a0;
+    }
+
     // Procesa una muestra de audio flotante
     inline double process(double in) {
         double out = (b0 * in) + (b1 * x1) + (b2 * x2) - (a1 * y1) - (a2 * y2);
@@ -168,7 +186,126 @@ private:
     BiquadPeakingFilter mBackFilterR{};
 };
 
-// Motor Principal DSP de 10 Bandas en C++20 con soporte de Audio 8D
+// Procesador de Filtro Crossfeed Acústico (Algoritmo Bauer / Chu Moy para Auriculares)
+// Proyecta el sonido frontalmente y elimina la fatiga auditiva mezclando sutilmente
+// una señal paso-bajos con retardo temporal interaural (ITD) al canal opuesto.
+// EXCLUSIVAMENTE ACTIVO cuando hay auriculares conectados.
+class CrossfeedProcessor {
+public:
+    void init(int sampleRate) {
+        mSampleRate = (sampleRate > 0) ? sampleRate : 44100;
+        configureParameters();
+        reset();
+    }
+
+    void reset() {
+        size_t bufferSize = static_cast<size_t>(mSampleRate * 0.002) + 64; // ~2ms de buffer
+        mDelayBufferL.assign(bufferSize, 0.0);
+        mDelayBufferR.assign(bufferSize, 0.0);
+        mDelayIdx = 0;
+        mLowPassFilterL.reset();
+        mLowPassFilterR.reset();
+    }
+
+    void setEnabled(bool enabled) {
+        mEnabled = enabled;
+    }
+
+    [[nodiscard]] bool isEnabled() const {
+        return mEnabled;
+    }
+
+    void setHeadphonesConnected(bool connected) {
+        mHeadphonesConnected = connected;
+    }
+
+    [[nodiscard]] bool isHeadphonesConnected() const {
+        return mHeadphonesConnected;
+    }
+
+    // 0 = Sutil (Bauer 4.5dB / 700Hz), 1 = Moderado (Chu Moy Classic), 2 = Intenso (Monitores de Estudio)
+    void setStrength(int strengthMode) {
+        mStrengthMode = std::clamp(strengthMode, 0, 2);
+        configureParameters();
+    }
+
+    [[nodiscard]] int getStrength() const {
+        return mStrengthMode;
+    }
+
+    // Procesa un par de muestras estéreo. Se ejecuta únicamente si el usuario lo activó Y hay audífonos conectados.
+    inline void processSample(double& sampleL, double& sampleR) {
+        if (!mEnabled || !mHeadphonesConnected) return;
+
+        // Filtrado paso-bajos de la señal cruzada (alrededor de 700 Hz)
+        double feedL = mLowPassFilterL.process(sampleR) * mCrossFeedGain;
+        double feedR = mLowPassFilterR.process(sampleL) * mCrossFeedGain;
+
+        // Retardo interaural (ITD: ~250 a 330 microsegundos)
+        if (mDelaySamples > 0 && !mDelayBufferL.empty()) {
+            size_t readIdx = (mDelayIdx + mDelayBufferL.size() - mDelaySamples) % mDelayBufferL.size();
+            double delayedFeedL = mDelayBufferL[readIdx];
+            double delayedFeedR = mDelayBufferR[readIdx];
+
+            mDelayBufferL[mDelayIdx] = feedL;
+            mDelayBufferR[mDelayIdx] = feedR;
+            mDelayIdx = (mDelayIdx + 1) % mDelayBufferL.size();
+
+            feedL = delayedFeedL;
+            feedR = delayedFeedR;
+        }
+
+        // Fusión de señal directa con señal cruzada compensada
+        sampleL = (sampleL * mDirectGain) + feedL;
+        sampleR = (sampleR * mDirectGain) + feedR;
+    }
+
+private:
+    int mSampleRate{44100};
+    bool mEnabled{false};
+    bool mHeadphonesConnected{false};
+    int mStrengthMode{1}; // Moderado por defecto
+
+    double mCrossFeedGain{0.36};
+    double mDirectGain{0.82};
+    size_t mDelaySamples{13};
+
+    std::vector<double> mDelayBufferL{};
+    std::vector<double> mDelayBufferR{};
+    size_t mDelayIdx{0};
+
+    BiquadPeakingFilter mLowPassFilterL{};
+    BiquadPeakingFilter mLowPassFilterR{};
+
+    void configureParameters() {
+        // Frecuencia de corte natural de sombra de cabeza (~700 Hz)
+        const double cutoffHz = 700.0;
+        mLowPassFilterL.configureLowPass(mSampleRate, cutoffHz, 0.707);
+        mLowPassFilterR.configureLowPass(mSampleRate, cutoffHz, 0.707);
+
+        switch (mStrengthMode) {
+            case 0: // Sutil (Bauer 4.5 dB)
+                mCrossFeedGain = 0.26;
+                mDirectGain = 0.88;
+                mDelaySamples = static_cast<size_t>(mSampleRate * 0.00025); // 250 us
+                break;
+            case 1: // Moderado (Chu Moy Estándar)
+            default:
+                mCrossFeedGain = 0.36;
+                mDirectGain = 0.82;
+                mDelaySamples = static_cast<size_t>(mSampleRate * 0.00029); // 290 us
+                break;
+            case 2: // Intenso (Monitores de Estudio)
+                mCrossFeedGain = 0.46;
+                mDirectGain = 0.76;
+                mDelaySamples = static_cast<size_t>(mSampleRate * 0.00034); // 340 us
+                break;
+        }
+        if (mDelaySamples < 1) mDelaySamples = 1;
+    }
+};
+
+// Motor Principal DSP de 10 Bandas en C++20 con soporte de Audio 8D, Crossfeed y Balance Estéreo
 class NativeDspEngine {
 public:
     NativeDspEngine() {
@@ -191,6 +328,7 @@ public:
         mBassBoostFilterR.configurePeaking(mSampleRate, 60.0, 0.0, 1.2);
 
         mEightDProcessor.init(mSampleRate);
+        mCrossfeedProcessor.init(mSampleRate);
     }
 
     void setEnabled(bool enabled) {
@@ -237,9 +375,55 @@ public:
         mEightDProcessor.setRoomDepth(depth);
     }
 
+    // Configuración de Crossfeed Bauer / Chu Moy
+    void setCrossfeedEnabled(bool enabled) {
+        mCrossfeedProcessor.setEnabled(enabled);
+    }
+
+    [[nodiscard]] bool isCrossfeedEnabled() const {
+        return mCrossfeedProcessor.isEnabled();
+    }
+
+    void setCrossfeedHeadphonesConnected(bool connected) {
+        mCrossfeedProcessor.setHeadphonesConnected(connected);
+    }
+
+    void setCrossfeedStrength(int strengthMode) {
+        mCrossfeedProcessor.setStrength(strengthMode);
+    }
+
+    // Balance Estéreo Fino (-1.0 = 100% Izquierda, 0.0 = Centro, +1.0 = 100% Derecha)
+    void setBalanceEnabled(bool enabled) {
+        mBalanceEnabled = enabled;
+    }
+
+    [[nodiscard]] bool isBalanceEnabled() const {
+        return mBalanceEnabled;
+    }
+
+    void setStereoBalance(double balance) {
+        mStereoBalance = std::clamp(balance, -1.0, 1.0);
+        if (std::abs(mStereoBalance) < 0.001) {
+            mGainL = 1.0;
+            mGainR = 1.0;
+        } else if (mStereoBalance < 0.0) {
+            // Hacia la izquierda: canal izquierdo al 100%, derecho atenuado
+            mGainL = 1.0;
+            mGainR = 1.0 + mStereoBalance; // Si balance es -0.4 -> 0.6
+        } else {
+            // Hacia la derecha: canal derecho al 100%, izquierdo atenuado
+            mGainL = 1.0 - mStereoBalance; // Si balance es 0.4 -> 0.6
+            mGainR = 1.0;
+        }
+    }
+
+    [[nodiscard]] double getStereoBalance() const {
+        return mStereoBalance;
+    }
+
     // Procesa un buffer de audio PCM de 16 bits estéreo entrelazado (L, R, L, R)
     void processPcm16(std::span<int16_t> samples) {
-        if (!mEnabled && !mEightDProcessor.isEnabled()) return;
+        if (!mEnabled && !mEightDProcessor.isEnabled() && !mCrossfeedProcessor.isEnabled() && !mBalanceEnabled) return;
 
         const size_t totalSamples = samples.size();
         for (size_t i = 0; i < totalSamples; i += mChannels) {
@@ -264,6 +448,17 @@ public:
                 mEightDProcessor.processSample(sampleL, sampleR);
             }
 
+            // Procesamiento de Filtro Crossfeed Acústico (exclusivo para auriculares conectados)
+            if (mCrossfeedProcessor.isEnabled() && mCrossfeedProcessor.isHeadphonesConnected() && mChannels > 1) {
+                mCrossfeedProcessor.processSample(sampleL, sampleR);
+            }
+
+            // Balance Estéreo Fino L/R
+            if (mBalanceEnabled && mChannels > 1) {
+                sampleL *= mGainL;
+                sampleR *= mGainR;
+            }
+
             // Limitador suave anti-clipping
             sampleL = softClip(sampleL);
             samples[i] = static_cast<int16_t>(std::clamp(sampleL * 32767.0, -32768.0, 32767.0));
@@ -276,7 +471,7 @@ public:
     }
 
     [[nodiscard]] std::string getEngineInfo() const {
-        return "Aura Music C++20 10-Band Biquad & 8D Spatial DSP Core [Active]";
+        return "Aura Music C++20 10-Band Biquad, 8D Spatial & Crossfeed DSP Core [Active]";
     }
 
 private:
@@ -292,6 +487,12 @@ private:
     BiquadPeakingFilter mBassBoostFilterR{};
 
     EightDProcessor mEightDProcessor{};
+    CrossfeedProcessor mCrossfeedProcessor{};
+
+    bool mBalanceEnabled{false};
+    double mStereoBalance{0.0};
+    double mGainL{1.0};
+    double mGainR{1.0};
 
     static inline double softClip(double x) {
         if (x > 1.2) return 1.0;
@@ -338,6 +539,21 @@ Java_com_example_playback_NativeAudioEngine_nativeSetEightDSpatialIntensity(JNIE
 
 JNIEXPORT void JNICALL
 Java_com_example_playback_NativeAudioEngine_nativeSetEightDRoomDepth(JNIEnv* env, jobject thiz, jfloat depth);
+
+JNIEXPORT void JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeSetCrossfeedEnabled(JNIEnv* env, jobject thiz, jboolean enabled);
+
+JNIEXPORT void JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeSetCrossfeedHeadphonesConnected(JNIEnv* env, jobject thiz, jboolean connected);
+
+JNIEXPORT void JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeSetCrossfeedStrength(JNIEnv* env, jobject thiz, jint strengthMode);
+
+JNIEXPORT void JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeSetBalanceEnabled(JNIEnv* env, jobject thiz, jboolean enabled);
+
+JNIEXPORT void JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeSetStereoBalance(JNIEnv* env, jobject thiz, jfloat balance);
 
 #ifdef __cplusplus
 }

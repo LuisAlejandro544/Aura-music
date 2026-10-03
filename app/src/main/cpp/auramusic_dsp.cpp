@@ -77,5 +77,31 @@ Java_com_example_playback_NativeAudioEngine_nativeSetEightDRoomDepth(JNIEnv* /* 
     sDspEngine.setEightDRoomDepth(static_cast<double>(depth));
 }
 
+JNIEXPORT void JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeSetCrossfeedEnabled(JNIEnv* /* env */, jobject /* thiz */, jboolean enabled) {
+    LOGI("Aura Music Crossfeed: %s", enabled ? "ACTIVADO" : "DESACTIVADO");
+    sDspEngine.setCrossfeedEnabled(enabled == JNI_TRUE);
+}
+
+JNIEXPORT void JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeSetCrossfeedHeadphonesConnected(JNIEnv* /* env */, jobject /* thiz */, jboolean connected) {
+    sDspEngine.setCrossfeedHeadphonesConnected(connected == JNI_TRUE);
+}
+
+JNIEXPORT void JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeSetCrossfeedStrength(JNIEnv* /* env */, jobject /* thiz */, jint strengthMode) {
+    sDspEngine.setCrossfeedStrength(strengthMode);
+}
+
+JNIEXPORT void JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeSetBalanceEnabled(JNIEnv* /* env */, jobject /* thiz */, jboolean enabled) {
+    sDspEngine.setBalanceEnabled(enabled == JNI_TRUE);
+}
+
+JNIEXPORT void JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeSetStereoBalance(JNIEnv* /* env */, jobject /* thiz */, jfloat balance) {
+    sDspEngine.setStereoBalance(static_cast<double>(balance));
+}
+
 }
 

@@ -261,6 +261,47 @@ class AuraAudioPlayer(
         exoPlayer?.volume = baseVolume
     }
 
+    fun getVolume(): Float = baseVolume
+
+    private var isFadeInOnResume = true
+
+    fun setFadeInOnResumeEnabled(enabled: Boolean) {
+        isFadeInOnResume = enabled
+    }
+
+    fun triggerSmoothFadeIn(durationMs: Long = 1000L) {
+        val player = exoPlayer ?: return
+        fadeInJob?.cancel()
+        player.volume = 0.08f * baseVolume
+        fadeInJob = playerScope.launch {
+            val steps = 16
+            val delayStep = durationMs / steps
+            for (i in 1..steps) {
+                delay(delayStep.coerceAtLeast(30L))
+                if (!isActive) break
+                val factor = i.toFloat() / steps.toFloat()
+                player.volume = baseVolume * factor
+            }
+            player.volume = baseVolume
+        }
+    }
+
+    fun pause() {
+        exoPlayer?.pause()
+    }
+
+    fun play() {
+        val player = exoPlayer ?: return
+        if (_currentTrack.value == null && _queue.value.isNotEmpty()) {
+            playTrackList(_queue.value, 0)
+            return
+        }
+        player.play()
+        if (isFadeInOnResume) {
+            triggerSmoothFadeIn()
+        }
+    }
+
     fun setCrossfadeSeconds(seconds: Int) {
         _crossfadeSeconds.value = seconds.coerceIn(0, 12)
     }
@@ -278,6 +319,9 @@ class AuraAudioPlayer(
                 playTrackList(_queue.value, 0)
             } else {
                 player.play()
+                if (isFadeInOnResume) {
+                    triggerSmoothFadeIn()
+                }
             }
         }
     }

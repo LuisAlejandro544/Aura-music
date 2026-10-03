@@ -69,5 +69,11 @@ Este archivo define el contexto de diseño, directrices técnicas y restriccione
     - Captura automática de fotograma de video en alta definición a WebP sin pérdida en `images/` como carátula de álbum.
     - Vinculación automática del Video Canvas sincronizado y reproducción inmediata tras la conversión.
 
-11. **Idioma de Comunicación**:
+11. **Suite de Auriculares y Ajustes Acústicos**:
+    - **Filtro Crossfeed en C++20**: Algoritmo Bauer / Chu Moy que se activa **exclusivamente** cuando hay auriculares conectados (`isHeadphoneConnected`). Debe permanecer en reposo cuando se reproduzca por los altavoces del teléfono.
+    - **Balance Estéreo Fino L/R**: Ajustable en tiempo real tanto en la pantalla de *Ajustes* como directamente en la pantalla completa *Now Playing* y en la hoja modal de efectos con botón de centrado.
+    - **Protección Becoming Noisy y Fade-In**: Pausa inmediata ante desconexión de audífonos (cable o Bluetooth) y aumento progresivo de volumen en reanudación (~1s) para cuidar la salud auditiva.
+    - **Controles de Auriculares Personalizables**: Manejo configurable de 1 clic, 2 clics, 3 clics y pulsación prolongada (hold) con mapeo flexible.
+
+12. **Idioma de Comunicación**:
    - La documentación, comentarios en código, cadenas de usuario (`strings.xml`) y mensajes de commit deben redactarse en **español**.

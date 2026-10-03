@@ -107,6 +107,12 @@ fun NowPlayingScreen(
     onBandLevelChange: (Int, Int) -> Unit = { _, _ -> },
     onBassBoostChange: (Int) -> Unit = {},
     onPresetSelect: (com.example.model.EqualizerPreset) -> Unit = {},
+    // Auriculares & Balance Estéreo Fino
+    headphoneConfig: com.example.model.HeadphoneConfig = com.example.model.HeadphoneConfig(),
+    onSetCrossfeedEnabled: (Boolean) -> Unit = {},
+    onSetCrossfeedStrength: (Int) -> Unit = {},
+    onSetBalanceControlEnabled: (Boolean) -> Unit = {},
+    onSetStereoBalance: (Float) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     BackHandler {
@@ -609,7 +615,82 @@ fun NowPlayingScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            // Barra de Balance Estéreo Fino L/R en Tiempo Real (si el usuario activó la opción)
+            if (headphoneConfig.isBalanceControlEnabled) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = SurfaceCard.copy(alpha = 0.92f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 6.dp)
+                        .testTag("now_playing_balance_control_bar")
+                ) {
+                    Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Tune,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.secondary,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Balance Estéreo L/R:",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = TextPrimary
+                                    )
+                                )
+                            }
+                            Text(
+                                text = headphoneConfig.formattedBalance,
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.secondary
+                                )
+                            )
+                            if (kotlin.math.abs(headphoneConfig.stereoBalance) > 0.02f) {
+                                TextButton(
+                                    onClick = { onSetStereoBalance(0.0f) },
+                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                                    modifier = Modifier.height(24.dp)
+                                ) {
+                                    Text(
+                                        text = "Centrar",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.secondary
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                        Slider(
+                            value = headphoneConfig.stereoBalance,
+                            onValueChange = onSetStereoBalance,
+                            valueRange = -1.0f..1.0f,
+                            colors = SliderDefaults.colors(
+                                thumbColor = MaterialTheme.colorScheme.secondary,
+                                activeTrackColor = MaterialTheme.colorScheme.secondary,
+                                inactiveTrackColor = Color(0xFF232736)
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(26.dp)
+                                .testTag("now_playing_live_balance_slider")
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
 
             // Atajos Inferiores: Ecualizador y Cola de Reproducción
             Row(
@@ -915,6 +996,11 @@ fun NowPlayingScreen(
                 onSetCrossfadeSeconds = onSetCrossfadeSeconds,
                 isGaplessEnabled = isGaplessEnabled,
                 onSetGaplessEnabled = onSetGaplessEnabled,
+                headphoneConfig = headphoneConfig,
+                onSetCrossfeedEnabled = onSetCrossfeedEnabled,
+                onSetCrossfeedStrength = onSetCrossfeedStrength,
+                onSetBalanceControlEnabled = onSetBalanceControlEnabled,
+                onSetStereoBalance = onSetStereoBalance,
                 initialTab = effectsInitialTab
             )
         }

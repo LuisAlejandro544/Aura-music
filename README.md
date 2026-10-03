@@ -78,7 +78,24 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
 - **Compresión WebP y Borrado Inteligente**: Conversión en segundo plano (`Dispatchers.IO`) a WebP sin pérdida y eliminación de carátulas residuales del disco.
 - **Generador de Arte Procedural**: Ilustración matemática vectorial única para canciones sin portada.
 
-### 7. Playlists y Almacenamiento Estructurado
+### 7. Suite Acústica y Ajustes para Auriculares / Audífonos 🎧
+- **Filtro Crossfeed Acústico (Algoritmo Bauer / Chu Moy en ISO C++20)**:
+  - Elimina la fatiga auditiva mezclando sutilmente una porción de audio con filtro paso-bajos (~700 Hz) y retardo temporal interaural (ITD de 250 µs a 340 µs) hacia el oído opuesto, emulando la escucha natural de monitores de estudio en sala.
+  - **Activación Exclusiva por Hardware**: Solo se aplica en la música cuando el sistema detecta que hay auriculares conectados (jack 3.5mm, USB-C DAC o Bluetooth), pausándose automáticamente en los altavoces del teléfono.
+  - 3 niveles acústicos calibrados: *Sutil (Bauer 4.5 dB)*, *Moderado (Chu Moy Classic)* e *Intenso (Monitores de Estudio)*.
+- **Balance Estéreo Fino (Control Izquierda / Derecha L/R en Tiempo Real)**:
+  - Ajuste de ganancia L/R de precisión con cálculo de paneo suave en C++20 y limitador anti-clipping.
+  - **Ajuste en Tiempo Real en Pantalla Completa**: Barra de balance accesible directamente en *Now Playing* bajo los controles de reproducción y en la hoja modal de efectos, con porcentaje en vivo y botón para centrar (`0%`).
+- **Protección contra Desconexiones ("Becoming Noisy" Guard)**:
+  - Pausa instantáneamente la música al desconectar los audífonos por cable o si se apaga la batería de auriculares Bluetooth, evitando que la música suene a todo volumen en altavoz en público.
+- **Reanudación con Fade-In Suave (Volumen Progresivo)**:
+  - Rampa suave de volumen de ~1 segundo al reanudar la reproducción con audífonos puestos para proteger los tímpanos de picos repentinos.
+- **Memoria de Volumen Dedicada para Audífonos**:
+  - Recuerda de forma independiente el volumen de audífonos y el volumen del altavoz del teléfono al conectar y desconectar.
+- **Mapeo Avanzado de Botones y Gestos Físicos de Auriculares (Headset Controls)**:
+  - Totalmente configurable por el usuario mediante diálogo modal para 1 pulsación, 2 pulsaciones, 3 pulsaciones y pulsación prolongada (Play/Pausa, Siguiente, Anterior, Me Gusta ❤️, Avanzar 15s, Retroceder 15s).
+
+### 8. Playlists y Almacenamiento Estructurado
 - **Pestaña "Playlists" en Tu Biblioteca**: Tarjeta "Tus Me Gusta" sincronizada, creación, renombrado y adición rápida de canciones.
 - **Almacenamiento Organizado** en `Android/data/com.aistudio.musicplayer.aurasound/files/`:
   - 📁 `images/`: Carátulas en WebP Lossless.
@@ -87,7 +104,7 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
   - 📁 `metadata/`: Ficheros JSON estructurados con información técnica.
   - 📁 `videos/`: Videos de fondo y loops de Canvas (.mp4/.webm).
 
-### 8. Suite de Diagnóstico Autónoma: Aura Monitor 🛠️ & LeakCanary
+### 9. Suite de Diagnóstico Autónoma: Aura Monitor 🛠️ & LeakCanary
 - **Aura Monitor (App Debug Propia en el Cajón de Aplicaciones)**:
   - Cuenta con su propio icono de acceso directo en el cajón de apps del teléfono móvil.
   - Atrapa y registra automáticamente **Crashes** no controlados mediante `UncaughtExceptionHandler`, **Errores Críticos**, **Warnings de Memoria** y eventos de Media3 / JNI.

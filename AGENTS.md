@@ -83,4 +83,9 @@ Este documento define el protocolo de trabajo para los agentes de software y des
 - [x] ¿El evento TRIM_MEMORY_UI_HIDDEN (nivel 20) está clasificado como información normal en lugar de advertencia para evitar falsas alarmas de memoria?
 - [x] ¿La función 'Video a Música' extrae el audio a .m4a, genera carátula en WebP y vincula el Video Canvas automáticamente?
 - [x] ¿Se pueden modificar los metadatos de las canciones (título, artista, álbum)?
+- [x] ¿La pestaña 'Auriculares' está implementada con apartados de Acústica DSP, Seguridad y Gestos?
+- [x] ¿El filtro Crossfeed (Bauer / Chu Moy en C++20) se activa exclusivamente al detectar auriculares conectados?
+- [x] ¿El Balance Estéreo Fino (L/R) se puede ajustar en tiempo real en Now Playing y hoja modal?
+- [x] ¿La protección contra desconexiones ("Becoming Noisy" Guard) y Fade-In suave están activos?
+- [x] ¿La memoria de volumen dedicada y el control avanzado por botones de audífonos son configurables?
 - [x] ¿Los 5 archivos Markdown (`README.md`, `ROADMAP.md`, `STRUCTURE.md`, `AI_CONTEXT.md`, `AGENTS.md`) están actualizados y en español?
