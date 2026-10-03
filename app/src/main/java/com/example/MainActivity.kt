@@ -101,6 +101,7 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
     val playbackPitch by viewModel.playbackPitch.collectAsStateWithLifecycle()
     val crossfadeSeconds by viewModel.crossfadeSeconds.collectAsStateWithLifecycle()
     val isGaplessEnabled by viewModel.isGaplessEnabled.collectAsStateWithLifecycle()
+    val videoDisplayMode by viewModel.videoDisplayMode.collectAsStateWithLifecycle()
     val isVideoCanvasActive by viewModel.isVideoCanvasActive.collectAsStateWithLifecycle()
     val isDynamicArtworkColorEnabled by viewModel.isDynamicArtworkColorEnabled.collectAsStateWithLifecycle()
 
@@ -351,8 +352,11 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                     viewModel.updateTrackDetails(id, t, a, al, art, removeArt, video, removeVideo, forceLoop)
                 },
                 isVideoCanvasActive = isVideoCanvasActive,
+                videoDisplayMode = videoDisplayMode,
                 isDynamicArtworkColorEnabled = isDynamicArtworkColorEnabled,
                 onToggleVideoCanvas = { viewModel.toggleVideoCanvas() },
+                onSetVideoDisplayMode = { viewModel.setVideoDisplayMode(it) },
+                onCycleVideoDisplayMode = { viewModel.cycleVideoDisplayMode() },
                 sleepTimerState = sleepTimerState,
                 onStartSleepTimer = { viewModel.startSleepTimer(it) },
                 onCancelSleepTimer = { viewModel.cancelSleepTimer() },

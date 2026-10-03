@@ -105,6 +105,30 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     init {
         // Al iniciar por primera vez, si la biblioteca está vacía, no forzamos escaneo global,
         // pero sugerimos al usuario en la vista de importación o le permitimos generar demos
+
+        // Sincronización reactiva del reproductor con la base de datos Room (favoritos, metadatos, video)
+        viewModelScope.launch {
+            repository.allTracks.collect { tracks ->
+                val current = audioPlayer.currentTrack.value
+                if (current != null) {
+                    val updated = tracks.find { it.id == current.id }
+                    if (updated != null && (updated.isFavorite != current.isFavorite || updated.title != current.title || updated.artist != current.artist || updated.album != current.album || updated.albumArtPath != current.albumArtPath || updated.videoUri != current.videoUri || updated.isVideoLoop != current.isVideoLoop)) {
+                        audioPlayer.updateTrackFavorite(current.id, updated.isFavorite)
+                        audioPlayer.updateTrackMetadata(
+                            trackId = updated.id,
+                            title = updated.title,
+                            artist = updated.artist,
+                            album = updated.album,
+                            albumArtPath = updated.albumArtPath,
+                            updateArt = true,
+                            videoUri = updated.videoUri,
+                            isVideoLoop = updated.isVideoLoop,
+                            updateVideo = true
+                        )
+                    }
+                }
+            }
+        }
     }
 
     // Acciones de Navegación
@@ -184,7 +208,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleFavorite(track: Track) {
         viewModelScope.launch {
+            val newFav = !track.isFavorite
             repository.toggleFavorite(track.id, track.isFavorite)
+            audioPlayer.updateTrackFavorite(track.id, newFav)
         }
     }
 
@@ -197,18 +223,39 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // Modo de visualización de video de fondo:
+    // FULLSCREEN_BACKGROUND: video a pantalla completa con carátula flotando al frente
+    // CARD_CANVAS: video dentro del recuadro de la carátula
+    // OFF: solo carátula estática
+    private val _videoDisplayMode = MutableStateFlow(VideoDisplayMode.FULLSCREEN_BACKGROUND)
+    val videoDisplayMode: StateFlow<VideoDisplayMode> = _videoDisplayMode.asStateFlow()
+
     private val _isVideoCanvasActive = MutableStateFlow(true)
     val isVideoCanvasActive: StateFlow<Boolean> = _isVideoCanvasActive.asStateFlow()
 
     private val _isDynamicArtworkColorEnabled = MutableStateFlow(true)
     val isDynamicArtworkColorEnabled: StateFlow<Boolean> = _isDynamicArtworkColorEnabled.asStateFlow()
 
+    fun setVideoDisplayMode(mode: VideoDisplayMode) {
+        _videoDisplayMode.value = mode
+        _isVideoCanvasActive.value = (mode != VideoDisplayMode.OFF)
+    }
+
+    fun cycleVideoDisplayMode() {
+        val nextMode = _videoDisplayMode.value.next()
+        setVideoDisplayMode(nextMode)
+    }
+
     fun toggleVideoCanvas() {
-        _isVideoCanvasActive.value = !_isVideoCanvasActive.value
+        cycleVideoDisplayMode()
     }
 
     fun setVideoCanvasActive(active: Boolean) {
-        _isVideoCanvasActive.value = active
+        if (!active) {
+            setVideoDisplayMode(VideoDisplayMode.OFF)
+        } else if (_videoDisplayMode.value == VideoDisplayMode.OFF) {
+            setVideoDisplayMode(VideoDisplayMode.FULLSCREEN_BACKGROUND)
+        }
     }
 
     fun toggleDynamicArtworkColor(enabled: Boolean) {

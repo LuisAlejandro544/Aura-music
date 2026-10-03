@@ -53,11 +53,15 @@ Este archivo define el contexto de diseño, directrices técnicas y restriccione
    - Debe interceptar excepciones no controladas a nivel de proceso (`Thread.setDefaultUncaughtExceptionHandler`) y registrar datos del teléfono (modelo, CPU ABI, RAM, almacenamiento, versión de Android) junto con el stacktrace en crudo.
    - LeakCanary debe estar configurado en `debugImplementation` para auditar fugas de memoria en la JVM.
 
-9. **Video Canvas de Fondo**:
+9. **Video de Fondo Multifuncional (Fondo Completo, Lienzo o Desactivado)**:
    - Soporte para asociar videos a pistas individuales. Los videos cortos (≤ 10s - 20s) se reproducen en bucle continuo (*Canvas Loop*); los videos largos se sincronizan temporalmente con el audio y los saltos de búsqueda (*Video Sync*). Permite forzar el modo (Loop o Sync) en `EditTrackDialog`.
-   - **Armonización Cromática Sin Interferencia**: Cuando Video Canvas está activo, el resplandor ambiental (*ambient aura*), visualizador y acentos se extraen de un fotograma clave del video en lugar de la carátula, garantizando que el color de la carátula estática no choque con la imagen en movimiento del video.
+   - **3 Modos de Visualización Seleccionables**:
+     - `FULLSCREEN_BACKGROUND`: El video se reproduce en todo el fondo de pantalla completa con un velo oscuro/gradiente para garantizar contraste y legibilidad, con la carátula flotando al frente.
+     - `CARD_CANVAS`: El video se reproduce dentro del marco central de la carátula (1:1).
+     - `OFF`: Desactivado; solo se muestra la carátula estática.
+   - **Armonización Cromática Sin Interferencia**: Cuando el video está activo, el resplandor ambiental (*ambient aura*), visualizador y acentos se extraen de un fotograma clave del video en lugar de la carátula, garantizando que el color de la carátula estática no choque con la imagen en movimiento del video.
    - El reproductor de video de fondo opera con `volume = 0.0f` para no contaminar el procesador PCM ni el motor DSP C++20 de audio principal.
-   - En `NowPlayingScreen`, el usuario puede alternar rápidamente entre ver la carátula o el Video Canvas mediante el botón dedicado en la barra superior.
+   - **Sincronización Reactiva de Favoritos**: El corazón en Now Playing refleja instantáneamente el estado de `isFavorite` (rojo al estar marcado) sincronizándose con Room y ExoPlayer. La lista de inicio "Populares en tu biblioteca" permanece estable y nunca oculta canciones al marcar favoritos.
 
 10. **Modo Video a Música (Extracción 3 en 1)**:
     - Permite a los usuarios móviles sin PC convertir videos de su galería en canciones locales.

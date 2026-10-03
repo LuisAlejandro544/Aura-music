@@ -348,6 +348,16 @@ class AuraAudioPlayer(
         }
     }
 
+    fun updateTrackFavorite(trackId: Long, isFavorite: Boolean) {
+        val current = _currentTrack.value
+        if (current != null && current.id == trackId) {
+            _currentTrack.value = current.copy(isFavorite = isFavorite)
+        }
+        _queue.value = _queue.value.map {
+            if (it.id == trackId) it.copy(isFavorite = isFavorite) else it
+        }
+    }
+
     fun updateTrackMetadata(
         trackId: Long,
         title: String,

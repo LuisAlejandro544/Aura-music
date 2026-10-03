@@ -81,13 +81,17 @@ Este documento traza las fases de evolución técnica y funcional para convertir
   - Mecanismo de recuperación automática que reanuda la reproducción si el procesador de audio sufre una perturbación transitoria.
 - [x] **Transición Fluida de Salida en Now Playing**:
   - Eliminación de capas negras residuales y parpadeos al cerrar o deslizar hacia abajo el reproductor mediante deslizamiento suave instantáneo.
-- [x] **Video Canvas de Fondo (Loops Cortos de 10-20s o Videos Largos Sincronizados)**:
+- [x] **Video Canvas y Fondo Completo (3 Modos Seleccionables)**:
   - Soporte para asociar videos desde la galería a canciones individuales con Photo/Media Picker.
-  - Loops automáticos de Canvas (≤ 10s - 20s) en bucle infinito continuo y videos sincronizados (> 20s) con selector de modo en edición.
+  - **3 Modos de Visualización**: Fondo Completo (video detrás de toda la pantalla con velo oscuro y carátula flotando al frente), Lienzo en Carátula (recuadro central 1:1) y Solo Carátula.
+  - Selector modal interactivo accesible desde la barra superior y badge dinámico en la carátula.
+  - Loops automáticos de Canvas (≤ 10s - 20s) en bucle continuo y videos sincronizados (> 20s) con selector de modo en edición.
   - **Armonización Cromática Reactiva**: Extracción dinámica de color desde fotogramas clave de video en tiempo real, evitando que el color de la carátula estática interfiera con el video.
   - Sincronización temporal reactiva con la música (`currentPositionMs` y `seekTo`) para videos largos.
-  - Conmutador directo entre modo Carátula y modo Video Canvas en Now Playing.
   - Almacenamiento organizado en subcarpeta `videos/` con eliminación de archivos obsoletos.
+- [x] **Sincronización Reactiva de Favoritos y Estabilidad en Inicio**:
+  - Reflejo instantáneo del estado de favorito en el reproductor (corazón lleno en rojo `Color(0xFFEF4444)` al activar).
+  - Estabilidad permanente en la sección "Populares en tu biblioteca", evitando que al pulsar el corazón se cambie la lista o se oculten otras canciones.
 - [x] **Conversor Nativo "Video a Música" (Extracción 3 en 1)**:
   - Extracción directa de audio (`.m4a`) desde videos de la galería mediante demuxing sin recodificación en Android.
   - Captura y compresión automática de fotograma clave en WebP sin pérdida como carátula oficial.

@@ -265,11 +265,11 @@ fun HomeScreen(
                 }
             }
 
-            // Sección: Canciones Favoritas o Más escuchadas
-            val tracksSection = if (favoriteTracks.isNotEmpty()) favoriteTracks else topPlayedTracks
-            val sectionTitle = if (favoriteTracks.isNotEmpty()) "Tus favoritas" else "Populares en tu biblioteca"
+            // Sección principal de canciones: Populares en tu biblioteca (o todas las pistas de la biblioteca)
+            val popularTracks = if (topPlayedTracks.isNotEmpty()) topPlayedTracks else allTracks
+            val sectionTitle = "Populares en tu biblioteca"
 
-            if (tracksSection.isNotEmpty()) {
+            if (popularTracks.isNotEmpty()) {
                 item {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -290,12 +290,12 @@ fun HomeScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                 }
 
-                items(tracksSection.take(6)) { track ->
+                items(popularTracks.take(8)) { track ->
                     TrackListItem(
                         track = track,
                         isCurrentTrack = currentTrack?.id == track.id,
                         isPlaying = isPlaying,
-                        onTrackClick = { onTrackClick(track, tracksSection) },
+                        onTrackClick = { onTrackClick(track, popularTracks) },
                         onFavoriteToggle = { onFavoriteToggle(track) },
                         onDeleteTrack = { onDeleteTrack(track.id) },
                         playlists = playlists,

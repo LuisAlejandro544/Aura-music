@@ -5,6 +5,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -31,12 +32,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.RepeatMode
 import com.example.model.Track
+import com.example.model.VideoDisplayMode
 import com.example.ui.components.ArtworkImage
 import com.example.ui.components.AudioVisualizer
 import com.example.ui.theme.ArtworkColorExtractor
 import com.example.ui.theme.BackgroundDark
+import com.example.ui.theme.CardBorder
 import com.example.ui.theme.ExtractedArtworkColors
 import com.example.ui.theme.SurfaceCard
+import com.example.ui.theme.SurfaceElevatedDark
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
@@ -71,8 +75,11 @@ fun NowPlayingScreen(
     onEditTrackDetails: ((trackId: Long, newTitle: String, newArtist: String, newAlbum: String, customArtUri: android.net.Uri?, removeArtwork: Boolean) -> Unit)? = null,
     onEditTrackDetailsWithVideo: ((trackId: Long, newTitle: String, newArtist: String, newAlbum: String, customArtUri: android.net.Uri?, removeArtwork: Boolean, customVideoUri: android.net.Uri?, removeVideo: Boolean, forceLoop: Boolean?) -> Unit)? = null,
     isVideoCanvasActive: Boolean = true,
+    videoDisplayMode: VideoDisplayMode = VideoDisplayMode.FULLSCREEN_BACKGROUND,
     isDynamicArtworkColorEnabled: Boolean = true,
     onToggleVideoCanvas: () -> Unit = {},
+    onSetVideoDisplayMode: (VideoDisplayMode) -> Unit = {},
+    onCycleVideoDisplayMode: () -> Unit = {},
     sleepTimerState: com.example.model.SleepTimerState = com.example.model.SleepTimerState(),
     onStartSleepTimer: (Int) -> Unit = {},
     onCancelSleepTimer: () -> Unit = {},
@@ -123,19 +130,20 @@ fun NowPlayingScreen(
         )
     }
 
-    // Extracción dinámica de color: si Video Canvas está activo, extrae del video para no interferir
+    // Extracción dinámica de color: si Video Canvas está activo (en cualquier modo), extrae del video para no interferir
     // con el color de la carátula estática. Si el Canvas está inactivo o no hay video, extrae de la carátula.
     LaunchedEffect(
         currentTrack.id,
         currentTrack.albumArtPath,
         currentTrack.videoUri,
-        isVideoCanvasActive,
+        videoDisplayMode,
         isDynamicArtworkColorEnabled
     ) {
+        val isVideoVisual = (videoDisplayMode != VideoDisplayMode.OFF) && !currentTrack.videoUri.isNullOrEmpty()
         activeColors = ArtworkColorExtractor.extractPlaybackColors(
             context = context,
             track = currentTrack,
-            isVideoActive = isVideoCanvasActive && !currentTrack.videoUri.isNullOrEmpty(),
+            isVideoActive = isVideoVisual,
             isDynamicEnabled = isDynamicArtworkColorEnabled,
             fallbackPrimary = fallbackPrimary,
             fallbackSecondary = fallbackSecondary
@@ -163,8 +171,13 @@ fun NowPlayingScreen(
     var effectsInitialTab by remember { mutableIntStateOf(0) }
     var showDetailsDialog by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
+    var showVideoModeDialog by remember { mutableStateOf(false) }
     var isDraggingSlider by remember { mutableStateOf(false) }
     var sliderDragPosition by remember { mutableStateOf(0f) }
+
+    val hasVideo = !currentTrack.videoUri.isNullOrEmpty()
+    val isFullscreenVideo = hasVideo && (videoDisplayMode == VideoDisplayMode.FULLSCREEN_BACKGROUND)
+    val isCardVideo = hasVideo && (videoDisplayMode == VideoDisplayMode.CARD_CANVAS)
 
     val safeDuration = durationMs.coerceAtLeast(1L)
     val sliderValue = if (isDraggingSlider) {
@@ -185,7 +198,35 @@ fun NowPlayingScreen(
             .background(BackgroundDark)
             .testTag("now_playing_screen")
     ) {
-        // Halo de luz ambiental decorativo sobre fondo negro sólido sincronizado con video o carátula
+        // Modo FONDO COMPLETO: Renderiza el video de fondo detrás de toda la pantalla completa
+        if (isFullscreenVideo && currentTrack.videoUri != null) {
+            com.example.ui.components.BackgroundVideoPlayer(
+                videoUriString = currentTrack.videoUri,
+                isVideoLoop = currentTrack.isVideoLoop,
+                isPlaying = isPlaying,
+                currentPositionMs = currentPositionMs,
+                modifier = Modifier.fillMaxSize(),
+                cornerRadius = 0.dp,
+                showIndicator = false
+            )
+
+            // Velo oscuro y gradiente cinematográfico para máximo contraste y legibilidad de textos y controles
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Black.copy(alpha = 0.65f),
+                                Color.Black.copy(alpha = 0.50f),
+                                BackgroundDark.copy(alpha = 0.94f)
+                            )
+                        )
+                    )
+            )
+        }
+
+        // Halo de luz ambiental decorativo sobre fondo sincronizado con video o carátula
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -194,7 +235,7 @@ fun NowPlayingScreen(
                         colors = listOf(
                             animatedTopGlow,
                             Color.Transparent,
-                            BackgroundDark
+                            if (isFullscreenVideo) Color.Transparent else BackgroundDark
                         )
                     )
                 )
@@ -282,15 +323,19 @@ fun NowPlayingScreen(
                         )
                     }
 
-                    if (!currentTrack.videoUri.isNullOrEmpty()) {
+                    if (hasVideo) {
                         IconButton(
-                            onClick = onToggleVideoCanvas,
+                            onClick = { showVideoModeDialog = true },
                             modifier = Modifier.testTag("now_playing_toggle_video_canvas_btn")
                         ) {
                             Icon(
-                                imageVector = if (isVideoCanvasActive) Icons.Default.Videocam else Icons.Default.VideocamOff,
-                                contentDescription = if (isVideoCanvasActive) "Desactivar Video Canvas" else "Activar Video Canvas",
-                                tint = if (isVideoCanvasActive) animatedPrimary else TextSecondary
+                                imageVector = when (videoDisplayMode) {
+                                    VideoDisplayMode.FULLSCREEN_BACKGROUND -> Icons.Default.Wallpaper
+                                    VideoDisplayMode.CARD_CANVAS -> Icons.Default.CropSquare
+                                    VideoDisplayMode.OFF -> Icons.Default.VideocamOff
+                                },
+                                contentDescription = "Modo de Video: ${videoDisplayMode.label}",
+                                tint = if (videoDisplayMode != VideoDisplayMode.OFF) animatedPrimary else TextSecondary
                             )
                         }
                     }
@@ -312,7 +357,7 @@ fun NowPlayingScreen(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                if (!currentTrack.videoUri.isNullOrEmpty() && isVideoCanvasActive) {
+                if (isCardVideo && currentTrack.videoUri != null) {
                     com.example.ui.components.BackgroundVideoPlayer(
                         videoUriString = currentTrack.videoUri,
                         isVideoLoop = currentTrack.isVideoLoop,
@@ -327,6 +372,41 @@ fun NowPlayingScreen(
                         modifier = Modifier.fillMaxSize(),
                         cornerRadius = 24.dp
                     )
+
+                    // Si está en modo Fondo Completo, mostrar badge interactivo para cambiar de modo al tocar
+                    if (isFullscreenVideo) {
+                        Surface(
+                            color = Color.Black.copy(alpha = 0.65f),
+                            shape = RoundedCornerShape(8.dp),
+                            border = androidx.compose.foundation.BorderStroke(0.8.dp, animatedPrimary.copy(alpha = 0.6f)),
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(12.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { onCycleVideoDisplayMode() }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Wallpaper,
+                                    contentDescription = null,
+                                    tint = animatedPrimary,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Text(
+                                    text = if (currentTrack.isVideoLoop) "FONDO LOOP" else "FONDO SYNC",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 9.sp,
+                                        color = Color.White
+                                    )
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
@@ -701,6 +781,106 @@ fun NowPlayingScreen(
                         onEditTrackDetails(trackId, title, artist, album, customArtUri, removeArtwork)
                     } else if (onEditTrack != null) {
                         onEditTrack(trackId, title, artist, album)
+                    }
+                }
+            )
+        }
+
+        if (showVideoModeDialog && hasVideo) {
+            AlertDialog(
+                onDismissRequest = { showVideoModeDialog = false },
+                containerColor = SurfaceElevatedDark,
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Videocam,
+                            contentDescription = null,
+                            tint = animatedPrimary
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "Modo de Video",
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                        )
+                    }
+                },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            text = "Elige cómo visualizar el video asociado a esta canción:",
+                            style = MaterialTheme.typography.bodyMedium.copy(color = TextSecondary)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        VideoDisplayMode.values().forEach { mode ->
+                            val isSelected = (videoDisplayMode == mode)
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = if (isSelected) animatedPrimary.copy(alpha = 0.16f) else SurfaceCard,
+                                border = androidx.compose.foundation.BorderStroke(
+                                    1.dp,
+                                    if (isSelected) animatedPrimary else CardBorder
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .clickable {
+                                        onSetVideoDisplayMode(mode)
+                                        showVideoModeDialog = false
+                                    }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(14.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = when (mode) {
+                                            VideoDisplayMode.FULLSCREEN_BACKGROUND -> Icons.Default.Wallpaper
+                                            VideoDisplayMode.CARD_CANVAS -> Icons.Default.CropSquare
+                                            VideoDisplayMode.OFF -> Icons.Default.VideocamOff
+                                        },
+                                        contentDescription = null,
+                                        tint = if (isSelected) animatedPrimary else TextSecondary,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = mode.label,
+                                            style = MaterialTheme.typography.bodyMedium.copy(
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isSelected) animatedPrimary else TextPrimary
+                                            )
+                                        )
+                                        Text(
+                                            text = mode.description,
+                                            style = MaterialTheme.typography.bodySmall.copy(
+                                                color = TextSecondary,
+                                                fontSize = 11.sp
+                                            )
+                                        )
+                                    }
+                                    RadioButton(
+                                        selected = isSelected,
+                                        onClick = {
+                                            onSetVideoDisplayMode(mode)
+                                            showVideoModeDialog = false
+                                        },
+                                        colors = RadioButtonDefaults.colors(
+                                            selectedColor = animatedPrimary,
+                                            unselectedColor = TextSecondary
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showVideoModeDialog = false }) {
+                        Text("Listo", color = animatedPrimary, fontWeight = FontWeight.Bold)
                     }
                 }
             )
