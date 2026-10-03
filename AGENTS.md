@@ -76,6 +76,7 @@ Este documento define el protocolo de trabajo para los agentes de software y des
 - [x] ¿LeakCanary está añadido y funcional en dependencias de depuración?
 - [x] ¿El almacenamiento estructurado (`images/`, `songs/`, `lyrics/`, `metadata/`) está activo?
 - [x] ¿Las carátulas se procesan como WebP sin pérdida en segundo plano y las faltantes se generan proceduralmente?
-- [x] ¿El Video Canvas de fondo soporta loops cortos (≤10s) y videos largos sincronizados con el audio?
+- [x] ¿El Video Canvas de fondo soporta loops cortos (≤20s), videos largos sincronizados con el audio y armonización cromática sin interferencias de carátula?
+- [x] ¿La función 'Video a Música' extrae el audio a .m4a, genera carátula en WebP y vincula el Video Canvas automáticamente?
 - [x] ¿Se pueden modificar los metadatos de las canciones (título, artista, álbum)?
 - [x] ¿Los 5 archivos Markdown (`README.md`, `ROADMAP.md`, `STRUCTURE.md`, `AI_CONTEXT.md`, `AGENTS.md`) están actualizados y en español?

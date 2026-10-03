@@ -12,10 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AddPhotoAlternate
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -56,7 +53,18 @@ fun EditTrackDialog(
         removeArtwork: Boolean,
         customVideoUri: Uri?,
         removeVideo: Boolean
-    ) -> Unit
+    ) -> Unit,
+    onConfirmWithLoopOption: ((
+        trackId: Long,
+        newTitle: String,
+        newArtist: String,
+        newAlbum: String,
+        customArtUri: Uri?,
+        removeArtwork: Boolean,
+        customVideoUri: Uri?,
+        removeVideo: Boolean,
+        forceLoop: Boolean?
+    ) -> Unit)? = null
 ) {
     var title by remember { mutableStateOf(track.title) }
     var artist by remember { mutableStateOf(track.artist) }
@@ -67,6 +75,7 @@ fun EditTrackDialog(
 
     var selectedCustomVideoUri by remember { mutableStateOf<Uri?>(null) }
     var shouldRemoveVideo by remember { mutableStateOf(false) }
+    var selectedLoopMode by remember { mutableStateOf<Boolean?>(null) }
 
     // Launcher del Android Photo Picker para imágenes (carátula)
     val photoPickerLauncher = rememberLauncherForActivityResult(
@@ -262,14 +271,41 @@ fun EditTrackDialog(
                         val videoStatusText = when {
                             selectedCustomVideoUri != null -> "🎬 Nuevo video seleccionado (se analizará duración al guardar)"
                             shouldRemoveVideo -> "❌ Se eliminará el video de fondo"
-                            track.videoUri != null -> if (track.isVideoLoop) "🔁 Loop Canvas activo (≤ 10s)" else "⏱️ Video largo sincronizado activo"
-                            else -> "Sin video de fondo. Los videos cortos (≤10s) se repiten en loop y los largos se sincronizan con la música."
+                            track.videoUri != null -> if (track.isVideoLoop) "🔁 Loop Canvas activo (≤ 20s)" else "⏱️ Video largo sincronizado activo"
+                            else -> "Sin video de fondo. Los videos cortos (≤ 20s) se repiten en loop y los largos se sincronizan con la música."
                         }
 
                         Text(
                             text = videoStatusText,
                             style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
                         )
+
+                        if (hasVideoAttached) {
+                            Text(
+                                text = "Modo de reproducción de video:",
+                                style = MaterialTheme.typography.labelSmall.copy(color = TextPrimary, fontWeight = FontWeight.Bold)
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                FilterChip(
+                                    selected = selectedLoopMode == null,
+                                    onClick = { selectedLoopMode = null },
+                                    label = { Text("Auto (≤20s)", style = MaterialTheme.typography.labelSmall) }
+                                )
+                                FilterChip(
+                                    selected = selectedLoopMode == true,
+                                    onClick = { selectedLoopMode = true },
+                                    label = { Text("Loop", style = MaterialTheme.typography.labelSmall) }
+                                )
+                                FilterChip(
+                                    selected = selectedLoopMode == false,
+                                    onClick = { selectedLoopMode = false },
+                                    label = { Text("Sync", style = MaterialTheme.typography.labelSmall) }
+                                )
+                            }
+                        }
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -345,16 +381,30 @@ fun EditTrackDialog(
             Button(
                 onClick = {
                     if (title.isNotBlank()) {
-                        onConfirm(
-                            track.id,
-                            title,
-                            artist,
-                            album,
-                            selectedCustomArtUri,
-                            shouldRemoveArtwork,
-                            selectedCustomVideoUri,
-                            shouldRemoveVideo
-                        )
+                        if (onConfirmWithLoopOption != null) {
+                            onConfirmWithLoopOption(
+                                track.id,
+                                title,
+                                artist,
+                                album,
+                                selectedCustomArtUri,
+                                shouldRemoveArtwork,
+                                selectedCustomVideoUri,
+                                shouldRemoveVideo,
+                                selectedLoopMode
+                            )
+                        } else {
+                            onConfirm(
+                                track.id,
+                                title,
+                                artist,
+                                album,
+                                selectedCustomArtUri,
+                                shouldRemoveArtwork,
+                                selectedCustomVideoUri,
+                                shouldRemoveVideo
+                            )
+                        }
                         onDismiss()
                     }
                 },

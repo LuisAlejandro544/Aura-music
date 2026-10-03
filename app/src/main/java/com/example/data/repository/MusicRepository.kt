@@ -78,7 +78,8 @@ class MusicRepository(private val database: AppDatabase) {
         customArtUri: Uri? = null,
         shouldRemoveArt: Boolean = false,
         customVideoUri: Uri? = null,
-        shouldRemoveVideo: Boolean = false
+        shouldRemoveVideo: Boolean = false,
+        forceVideoLoop: Boolean? = null
     ): Track? = withContext(Dispatchers.IO) {
         val current = trackDao.getTrackById(trackId) ?: return@withContext null
         val storageManager = com.example.data.storage.AppStorageManager(context)
@@ -98,7 +99,7 @@ class MusicRepository(private val database: AppDatabase) {
 
         val (finalVideoPath, finalIsLoop) = when {
             customVideoUri != null -> {
-                val result = storageManager.saveCustomVideoFromUri(trackId, customVideoUri, current.videoUri)
+                val result = storageManager.saveCustomVideoFromUri(trackId, customVideoUri, current.videoUri, forceVideoLoop)
                 if (result != null) result.first to result.second else null to false
             }
             shouldRemoveVideo -> {
@@ -106,7 +107,8 @@ class MusicRepository(private val database: AppDatabase) {
                 null to false
             }
             else -> {
-                current.videoUri to current.isVideoLoop
+                val resolvedLoop = forceVideoLoop ?: current.isVideoLoop
+                current.videoUri to resolvedLoop
             }
         }
 
@@ -274,5 +276,39 @@ class MusicRepository(private val database: AppDatabase) {
             trackDao.getTrackById(id)?.let { storageManager.saveMetadataJson(it.toDomain()) }
         }
         ids.size
+    }
+
+    /**
+     * Importa y convierte un video de la galería a canción con audio extraído,
+     * carátula generada en WebP y Video Canvas opcional sincronizado.
+     */
+    suspend fun importVideoAsTrack(
+        context: Context,
+        videoUri: Uri,
+        title: String,
+        artist: String,
+        album: String,
+        attachAsCanvas: Boolean,
+        forceLoop: Boolean?
+    ): Track? = withContext(Dispatchers.IO) {
+        val storageManager = com.example.data.storage.AppStorageManager(context)
+        val extractedTrack = com.example.data.importer.VideoAudioExtractor.convertVideoToTrack(
+            context = context,
+            storageManager = storageManager,
+            videoUri = videoUri,
+            title = title,
+            artist = artist,
+            album = album,
+            attachAsCanvas = attachAsCanvas,
+            forceLoop = forceLoop
+        ) ?: return@withContext null
+
+        val entity = TrackEntity.fromDomain(extractedTrack)
+        val newId = trackDao.insertTrack(entity)
+        val savedTrack = trackDao.getTrackById(newId)?.toDomain()
+        if (savedTrack != null) {
+            storageManager.saveMetadataJson(savedTrack)
+        }
+        savedTrack
     }
 }

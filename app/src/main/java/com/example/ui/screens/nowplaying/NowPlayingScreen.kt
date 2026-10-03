@@ -2,6 +2,8 @@ package com.example.ui.screens.nowplaying
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -20,6 +22,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -30,7 +33,9 @@ import com.example.model.RepeatMode
 import com.example.model.Track
 import com.example.ui.components.ArtworkImage
 import com.example.ui.components.AudioVisualizer
+import com.example.ui.theme.ArtworkColorExtractor
 import com.example.ui.theme.BackgroundDark
+import com.example.ui.theme.ExtractedArtworkColors
 import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
@@ -64,8 +69,9 @@ fun NowPlayingScreen(
     onCollapse: () -> Unit,
     onEditTrack: ((trackId: Long, newTitle: String, newArtist: String, newAlbum: String) -> Unit)? = null,
     onEditTrackDetails: ((trackId: Long, newTitle: String, newArtist: String, newAlbum: String, customArtUri: android.net.Uri?, removeArtwork: Boolean) -> Unit)? = null,
-    onEditTrackDetailsWithVideo: ((trackId: Long, newTitle: String, newArtist: String, newAlbum: String, customArtUri: android.net.Uri?, removeArtwork: Boolean, customVideoUri: android.net.Uri?, removeVideo: Boolean) -> Unit)? = null,
+    onEditTrackDetailsWithVideo: ((trackId: Long, newTitle: String, newArtist: String, newAlbum: String, customArtUri: android.net.Uri?, removeArtwork: Boolean, customVideoUri: android.net.Uri?, removeVideo: Boolean, forceLoop: Boolean?) -> Unit)? = null,
     isVideoCanvasActive: Boolean = true,
+    isDynamicArtworkColorEnabled: Boolean = true,
     onToggleVideoCanvas: () -> Unit = {},
     sleepTimerState: com.example.model.SleepTimerState = com.example.model.SleepTimerState(),
     onStartSleepTimer: (Int) -> Unit = {},
@@ -102,6 +108,56 @@ fun NowPlayingScreen(
 
     if (currentTrack == null) return
 
+    val context = LocalContext.current
+    val fallbackPrimary = MaterialTheme.colorScheme.primary
+    val fallbackSecondary = MaterialTheme.colorScheme.secondary
+
+    var activeColors by remember {
+        mutableStateOf(
+            ExtractedArtworkColors(
+                primary = fallbackPrimary,
+                secondary = fallbackSecondary,
+                accent = fallbackPrimary,
+                ambientTopGlow = fallbackPrimary.copy(alpha = 0.28f)
+            )
+        )
+    }
+
+    // Extracción dinámica de color: si Video Canvas está activo, extrae del video para no interferir
+    // con el color de la carátula estática. Si el Canvas está inactivo o no hay video, extrae de la carátula.
+    LaunchedEffect(
+        currentTrack.id,
+        currentTrack.albumArtPath,
+        currentTrack.videoUri,
+        isVideoCanvasActive,
+        isDynamicArtworkColorEnabled
+    ) {
+        activeColors = ArtworkColorExtractor.extractPlaybackColors(
+            context = context,
+            track = currentTrack,
+            isVideoActive = isVideoCanvasActive && !currentTrack.videoUri.isNullOrEmpty(),
+            isDynamicEnabled = isDynamicArtworkColorEnabled,
+            fallbackPrimary = fallbackPrimary,
+            fallbackSecondary = fallbackSecondary
+        )
+    }
+
+    val animatedPrimary by animateColorAsState(
+        targetValue = activeColors.primary,
+        animationSpec = tween(400),
+        label = "PrimaryAuraColor"
+    )
+    val animatedSecondary by animateColorAsState(
+        targetValue = activeColors.secondary,
+        animationSpec = tween(400),
+        label = "SecondaryAuraColor"
+    )
+    val animatedTopGlow by animateColorAsState(
+        targetValue = activeColors.ambientTopGlow,
+        animationSpec = tween(400),
+        label = "TopAuraGlow"
+    )
+
     var showQueueSheet by remember { mutableStateOf(false) }
     var showEffectsSheet by remember { mutableStateOf(false) }
     var effectsInitialTab by remember { mutableIntStateOf(0) }
@@ -129,14 +185,14 @@ fun NowPlayingScreen(
             .background(BackgroundDark)
             .testTag("now_playing_screen")
     ) {
-        // Halo de luz ambiental decorativo sobre fondo negro sólido
+        // Halo de luz ambiental decorativo sobre fondo negro sólido sincronizado con video o carátula
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.28f),
+                            animatedTopGlow,
                             Color.Transparent,
                             BackgroundDark
                         )
@@ -234,7 +290,7 @@ fun NowPlayingScreen(
                             Icon(
                                 imageVector = if (isVideoCanvasActive) Icons.Default.Videocam else Icons.Default.VideocamOff,
                                 contentDescription = if (isVideoCanvasActive) "Desactivar Video Canvas" else "Activar Video Canvas",
-                                tint = if (isVideoCanvasActive) MaterialTheme.colorScheme.primary else TextSecondary
+                                tint = if (isVideoCanvasActive) animatedPrimary else TextSecondary
                             )
                         }
                     }
@@ -251,8 +307,8 @@ fun NowPlayingScreen(
                     .shadow(
                         elevation = 24.dp,
                         shape = RoundedCornerShape(24.dp),
-                        ambientColor = MaterialTheme.colorScheme.primary,
-                        spotColor = MaterialTheme.colorScheme.secondary
+                        ambientColor = animatedPrimary,
+                        spotColor = animatedSecondary
                     ),
                 contentAlignment = Alignment.Center
             ) {
@@ -281,7 +337,8 @@ fun NowPlayingScreen(
                 isPlaying = isPlaying,
                 modifier = Modifier.fillMaxWidth(0.9f),
                 barCount = 32,
-                barHeight = 40.dp
+                barHeight = 40.dp,
+                customColor = animatedPrimary
             )
 
             Spacer(modifier = Modifier.height(18.dp))
@@ -306,14 +363,14 @@ fun NowPlayingScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Surface(
                             shape = RoundedCornerShape(4.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer,
+                            color = animatedPrimary.copy(alpha = 0.16f),
                             modifier = Modifier.padding(end = 8.dp)
                         ) {
                             Text(
                                 text = currentTrack.formatBadge(),
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontWeight = FontWeight.ExtraBold,
-                                    color = MaterialTheme.colorScheme.primary
+                                    color = animatedPrimary
                                 ),
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
@@ -358,8 +415,8 @@ fun NowPlayingScreen(
                     },
                     colors = SliderDefaults.colors(
                         thumbColor = Color.White,
-                        activeTrackColor = MaterialTheme.colorScheme.primary,
-                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                        activeTrackColor = animatedPrimary,
+                        inactiveTrackColor = animatedPrimary.copy(alpha = 0.25f)
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -397,7 +454,7 @@ fun NowPlayingScreen(
                     Icon(
                         imageVector = Icons.Default.Shuffle,
                         contentDescription = "Modo aleatorio",
-                        tint = if (shuffleEnabled) MaterialTheme.colorScheme.primary else TextMuted
+                        tint = if (shuffleEnabled) animatedPrimary else TextMuted
                     )
                 }
 
@@ -419,7 +476,7 @@ fun NowPlayingScreen(
                 // Play / Pause (Botón Grande con Gradiente)
                 Surface(
                     shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = animatedPrimary,
                     shadowElevation = 12.dp,
                     modifier = Modifier
                         .size(68.dp)
@@ -630,7 +687,16 @@ fun NowPlayingScreen(
                 onDismiss = { showEditDialog = false },
                 onConfirm = { trackId, title, artist, album, customArtUri, removeArtwork, customVideoUri, removeVideo ->
                     if (onEditTrackDetailsWithVideo != null) {
-                        onEditTrackDetailsWithVideo(trackId, title, artist, album, customArtUri, removeArtwork, customVideoUri, removeVideo)
+                        onEditTrackDetailsWithVideo(trackId, title, artist, album, customArtUri, removeArtwork, customVideoUri, removeVideo, null)
+                    } else if (onEditTrackDetails != null) {
+                        onEditTrackDetails(trackId, title, artist, album, customArtUri, removeArtwork)
+                    } else if (onEditTrack != null) {
+                        onEditTrack(trackId, title, artist, album)
+                    }
+                },
+                onConfirmWithLoopOption = { trackId, title, artist, album, customArtUri, removeArtwork, customVideoUri, removeVideo, forceLoop ->
+                    if (onEditTrackDetailsWithVideo != null) {
+                        onEditTrackDetailsWithVideo(trackId, title, artist, album, customArtUri, removeArtwork, customVideoUri, removeVideo, forceLoop)
                     } else if (onEditTrackDetails != null) {
                         onEditTrackDetails(trackId, title, artist, album, customArtUri, removeArtwork)
                     } else if (onEditTrack != null) {

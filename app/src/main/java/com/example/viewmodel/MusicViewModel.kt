@@ -200,12 +200,19 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val _isVideoCanvasActive = MutableStateFlow(true)
     val isVideoCanvasActive: StateFlow<Boolean> = _isVideoCanvasActive.asStateFlow()
 
+    private val _isDynamicArtworkColorEnabled = MutableStateFlow(true)
+    val isDynamicArtworkColorEnabled: StateFlow<Boolean> = _isDynamicArtworkColorEnabled.asStateFlow()
+
     fun toggleVideoCanvas() {
         _isVideoCanvasActive.value = !_isVideoCanvasActive.value
     }
 
     fun setVideoCanvasActive(active: Boolean) {
         _isVideoCanvasActive.value = active
+    }
+
+    fun toggleDynamicArtworkColor(enabled: Boolean) {
+        _isDynamicArtworkColorEnabled.value = enabled
     }
 
     fun updateTrackInfo(trackId: Long, newTitle: String, newArtist: String, newAlbum: String) {
@@ -220,7 +227,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         customArtUri: Uri? = null,
         removeArtwork: Boolean = false,
         customVideoUri: Uri? = null,
-        removeVideo: Boolean = false
+        removeVideo: Boolean = false,
+        forceVideoLoop: Boolean? = null
     ) {
         viewModelScope.launch {
             val updated = repository.updateTrackDetails(
@@ -232,7 +240,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 customArtUri,
                 removeArtwork,
                 customVideoUri,
-                removeVideo
+                removeVideo,
+                forceVideoLoop
             )
             audioPlayer.updateTrackMetadata(
                 trackId,
@@ -303,6 +312,41 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             val count = repository.seedDemoTracks(getApplication())
             _isImporting.value = false
             _importStatusMessage.value = "Se crearon $count pistas de prueba Synthwave con audio real."
+        }
+    }
+
+    /**
+     * Importa y convierte un video de la galería en canción musical con carátula WebP
+     * y Video Canvas sincronizado en Now Playing.
+     */
+    fun importVideoAsTrack(
+        videoUri: Uri,
+        title: String,
+        artist: String,
+        album: String,
+        attachAsCanvas: Boolean,
+        forceLoop: Boolean?,
+        onTrackCreated: ((Track) -> Unit)? = null
+    ) {
+        viewModelScope.launch {
+            _isImporting.value = true
+            _importStatusMessage.value = "Convirtiendo video a música, extrayendo carátula y Video Canvas..."
+            val track = repository.importVideoAsTrack(
+                context = getApplication(),
+                videoUri = videoUri,
+                title = title,
+                artist = artist,
+                album = album,
+                attachAsCanvas = attachAsCanvas,
+                forceLoop = forceLoop
+            )
+            _isImporting.value = false
+            if (track != null) {
+                _importStatusMessage.value = "¡Éxito! Se añadió \"${track.title}\" con carátula y Video Canvas."
+                onTrackCreated?.invoke(track)
+            } else {
+                _importStatusMessage.value = "No se pudo procesar el video seleccionado."
+            }
         }
     }
 

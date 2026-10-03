@@ -3,6 +3,7 @@ package com.example.ui.theme
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.util.LruCache
 import androidx.compose.ui.graphics.Color
@@ -14,9 +15,9 @@ import java.io.File
 import kotlin.math.absoluteValue
 
 /**
- * Paleta de colores dinámicos extraída de la carátula de una pista.
+ * Paleta de colores dinámicos extraída de la carátula o fotograma de video de una pista.
  * Permite ambientar la interfaz (Aura luminosa, barra de progreso, visualizador)
- * con los tonos predominantes de cada álbum sin perder la estética OLED profunda.
+ * con los tonos predominantes sin perder la estética OLED profunda.
  */
 data class ExtractedArtworkColors(
     val primary: Color,
@@ -26,15 +27,22 @@ data class ExtractedArtworkColors(
 )
 
 /**
- * Extractor reactivo y optimizado de colores de carátula para Aura Music.
+ * Extractor reactivo y optimizado de colores de carátula y video para Aura Music.
  * Utiliza AndroidX Palette en hilos de fondo ([Dispatchers.Default]) con decodificación
  * de bajo peso en memoria y caché LRU para transiciones fluidas a 60/120 FPS.
+ *
+ * Si Video Canvas está activo, extrae la paleta cromática directamente de un fotograma
+ * clave del video, garantizando que el color de la carátula estática NO interfiera
+ * ni choque con la atmósfera visual del video.
  */
 object ArtworkColorExtractor {
 
-    // Caché en memoria para almacenar las paletas de las últimas 50 canciones reproducidas
+    // Caché en memoria para almacenar las paletas de carátulas y videos recientes
     private val memoryCache = LruCache<Long, ExtractedArtworkColors>(50)
 
+    /**
+     * Extrae los colores de la carátula estática o genera una paleta armónica si no existe.
+     */
     suspend fun extractColors(
         context: Context,
         track: Track?,
@@ -45,7 +53,7 @@ object ArtworkColorExtractor {
             return@withContext createFallback(fallbackPrimary, fallbackSecondary)
         }
 
-        // Consultar en caché rápida
+        // Consultar en caché rápida de carátula
         memoryCache.get(track.id)?.let { return@withContext it }
 
         var bitmap: Bitmap? = null
@@ -112,6 +120,89 @@ object ArtworkColorExtractor {
         val fallback = createFallback(fallbackPrimary, fallbackSecondary)
         memoryCache.put(track.id, fallback)
         return@withContext fallback
+    }
+
+    /**
+     * Extrae los colores armónicos para la reproducción activa en pantalla Now Playing.
+     * Si Video Canvas está activo y la pista cuenta con video, extrae la paleta cromática
+     * directamente de un fotograma clave del video en segundo plano mediante MediaMetadataRetriever,
+     * garantizando que el color de la carátula estática NO interfiera ni choque con el video.
+     * Si Video Canvas está desactivado o la pista no tiene video, extrae los colores de la carátula.
+     * Si el usuario desactivó la opción en Ajustes, retorna la paleta predeterminada del tema.
+     */
+    suspend fun extractPlaybackColors(
+        context: Context,
+        track: Track?,
+        isVideoActive: Boolean,
+        isDynamicEnabled: Boolean,
+        fallbackPrimary: Color,
+        fallbackSecondary: Color
+    ): ExtractedArtworkColors = withContext(Dispatchers.Default) {
+        if (!isDynamicEnabled || track == null) {
+            return@withContext createFallback(fallbackPrimary, fallbackSecondary)
+        }
+
+        // Si el Video Canvas está en pantalla y hay video configurado: extraer color del fotograma del video
+        val videoUri = track.videoUri
+        if (isVideoActive && !videoUri.isNullOrBlank()) {
+            val videoCacheKey = -(track.id.absoluteValue + 100_000L)
+            memoryCache.get(videoCacheKey)?.let { return@withContext it }
+
+            var frameBitmap: Bitmap? = null
+            var retriever: MediaMetadataRetriever? = null
+            try {
+                retriever = MediaMetadataRetriever()
+                if (videoUri.startsWith("content://")) {
+                    retriever.setDataSource(context, Uri.parse(videoUri))
+                } else {
+                    retriever.setDataSource(videoUri)
+                }
+                // Obtener fotograma a 1 segundo o primer fotograma disponible
+                frameBitmap = retriever.getFrameAtTime(1_000_000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                    ?: retriever.frameAtTime
+
+                if (frameBitmap != null) {
+                    val scaled = Bitmap.createScaledBitmap(frameBitmap, 96, 96, false)
+                    if (scaled != frameBitmap) {
+                        frameBitmap.recycle()
+                    }
+                    val palette = Palette.from(scaled).maximumColorCount(16).generate()
+                    scaled.recycle()
+
+                    val vibrant = palette.vibrantSwatch
+                    val dominant = palette.dominantSwatch
+                    val lightVibrant = palette.lightVibrantSwatch
+                    val darkVibrant = palette.darkVibrantSwatch
+                    val muted = palette.mutedSwatch
+
+                    val primaryInt = vibrant?.rgb ?: dominant?.rgb ?: lightVibrant?.rgb ?: fallbackPrimary.hashCode()
+                    val secondaryInt = lightVibrant?.rgb ?: muted?.rgb ?: vibrant?.rgb ?: fallbackSecondary.hashCode()
+                    val accentInt = darkVibrant?.rgb ?: dominant?.rgb ?: primaryInt
+
+                    val primaryColor = Color(primaryInt)
+                    val secondaryColor = Color(secondaryInt)
+                    val accentColor = Color(accentInt)
+
+                    val result = ExtractedArtworkColors(
+                        primary = primaryColor,
+                        secondary = secondaryColor,
+                        accent = accentColor,
+                        ambientTopGlow = primaryColor.copy(alpha = 0.35f)
+                    )
+                    memoryCache.put(videoCacheKey, result)
+                    return@withContext result
+                }
+            } catch (_: Throwable) {
+                // Si falla la lectura del fotograma de video, no colapsar la app
+            } finally {
+                try {
+                    retriever?.release()
+                } catch (_: Throwable) {}
+            }
+        }
+
+        // Si no hay video o no está activo el Canvas, extraer de la carátula
+        return@withContext extractColors(context, track, fallbackPrimary, fallbackSecondary)
     }
 
     private fun createFallback(primary: Color, secondary: Color): ExtractedArtworkColors {

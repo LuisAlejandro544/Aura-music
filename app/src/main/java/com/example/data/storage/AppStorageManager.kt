@@ -193,27 +193,32 @@ class AppStorageManager(private val context: Context) {
 
      /**
       * Guarda un video personalizado o Canvas seleccionado por el usuario desde la galería (SAF/Photo Picker).
-      * Analiza la duración del video con MediaMetadataRetriever para determinar si es un loop corto (<= 12s)
+      * Analiza la duración del video con MediaMetadataRetriever para determinar si es un loop corto (<= 20s)
       * o un video largo sincronizado con la canción, y elimina el video previo si existía.
       */
      suspend fun saveCustomVideoFromUri(
          trackId: Long,
          sourceUri: Uri,
-         oldVideoPath: String?
+         oldVideoPath: String?,
+         forceLoop: Boolean? = null
      ): Pair<String, Boolean>? = withContext(Dispatchers.IO) {
          try {
-             // 1. Determinar duración con MediaMetadataRetriever
+             // 1. Determinar duración con MediaMetadataRetriever o respetar forzado manual
              var isLoop = false
-             try {
-                 val retriever = android.media.MediaMetadataRetriever()
-                 retriever.setDataSource(context, sourceUri)
-                 val durStr = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)
-                 val durationMs = durStr?.toLongOrNull() ?: 0L
-                 // Si dura 12 segundos o menos, se cataloga automáticamente como bucle continuo de Canvas
-                 isLoop = durationMs in 1..12500L
-                 retriever.release()
-             } catch (e: Exception) {
-                 isLoop = false
+             if (forceLoop != null) {
+                 isLoop = forceLoop
+             } else {
+                 try {
+                     val retriever = android.media.MediaMetadataRetriever()
+                     retriever.setDataSource(context, sourceUri)
+                     val durStr = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)
+                     val durationMs = durStr?.toLongOrNull() ?: 0L
+                     // Si dura 20 segundos o menos, se cataloga automáticamente como bucle continuo de Canvas
+                     isLoop = durationMs in 1..20500L
+                     retriever.release()
+                 } catch (e: Exception) {
+                     isLoop = false
+                 }
              }
 
              // 2. Eliminar video previo si existía en videosDir

@@ -54,9 +54,16 @@ Este archivo define el contexto de diseño, directrices técnicas y restriccione
    - LeakCanary debe estar configurado en `debugImplementation` para auditar fugas de memoria en la JVM.
 
 9. **Video Canvas de Fondo**:
-   - Soporte para asociar videos a pistas individuales. Los videos cortos (≤ 10s - 12s) se reproducen en bucle continuo (*Canvas Loop*); los videos largos se sincronizan temporalmente con el audio y los saltos de búsqueda (*Video Sync*).
+   - Soporte para asociar videos a pistas individuales. Los videos cortos (≤ 10s - 20s) se reproducen en bucle continuo (*Canvas Loop*); los videos largos se sincronizan temporalmente con el audio y los saltos de búsqueda (*Video Sync*). Permite forzar el modo (Loop o Sync) en `EditTrackDialog`.
+   - **Armonización Cromática Sin Interferencia**: Cuando Video Canvas está activo, el resplandor ambiental (*ambient aura*), visualizador y acentos se extraen de un fotograma clave del video en lugar de la carátula, garantizando que el color de la carátula estática no choque con la imagen en movimiento del video.
    - El reproductor de video de fondo opera con `volume = 0.0f` para no contaminar el procesador PCM ni el motor DSP C++20 de audio principal.
    - En `NowPlayingScreen`, el usuario puede alternar rápidamente entre ver la carátula o el Video Canvas mediante el botón dedicado en la barra superior.
 
-10. **Idioma de Comunicación**:
+10. **Modo Video a Música (Extracción 3 en 1)**:
+    - Permite a los usuarios móviles sin PC convertir videos de su galería en canciones locales.
+    - Se realiza mediante demuxing directo de audio sin recodificación (*Direct Stream Demuxing*) con `MediaExtractor` y `MediaMuxer` a `.m4a` en `songs/`, garantizando velocidad instantánea (1-2s) y cero pérdida acústica.
+    - Captura automática de fotograma de video en alta definición a WebP sin pérdida en `images/` como carátula de álbum.
+    - Vinculación automática del Video Canvas sincronizado y reproducción inmediata tras la conversión.
+
+11. **Idioma de Comunicación**:
    - La documentación, comentarios en código, cadenas de usuario (`strings.xml`) y mensajes de commit deben redactarse en **español**.
