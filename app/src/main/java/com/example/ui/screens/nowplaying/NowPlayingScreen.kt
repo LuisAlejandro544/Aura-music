@@ -64,6 +64,9 @@ fun NowPlayingScreen(
     onCollapse: () -> Unit,
     onEditTrack: ((trackId: Long, newTitle: String, newArtist: String, newAlbum: String) -> Unit)? = null,
     onEditTrackDetails: ((trackId: Long, newTitle: String, newArtist: String, newAlbum: String, customArtUri: android.net.Uri?, removeArtwork: Boolean) -> Unit)? = null,
+    onEditTrackDetailsWithVideo: ((trackId: Long, newTitle: String, newArtist: String, newAlbum: String, customArtUri: android.net.Uri?, removeArtwork: Boolean, customVideoUri: android.net.Uri?, removeVideo: Boolean) -> Unit)? = null,
+    isVideoCanvasActive: Boolean = true,
+    onToggleVideoCanvas: () -> Unit = {},
     sleepTimerState: com.example.model.SleepTimerState = com.example.model.SleepTimerState(),
     onStartSleepTimer: (Int) -> Unit = {},
     onCancelSleepTimer: () -> Unit = {},
@@ -222,12 +225,25 @@ fun NowPlayingScreen(
                             tint = TextSecondary
                         )
                     }
+
+                    if (!currentTrack.videoUri.isNullOrEmpty()) {
+                        IconButton(
+                            onClick = onToggleVideoCanvas,
+                            modifier = Modifier.testTag("now_playing_toggle_video_canvas_btn")
+                        ) {
+                            Icon(
+                                imageVector = if (isVideoCanvasActive) Icons.Default.Videocam else Icons.Default.VideocamOff,
+                                contentDescription = if (isVideoCanvasActive) "Desactivar Video Canvas" else "Activar Video Canvas",
+                                tint = if (isVideoCanvasActive) MaterialTheme.colorScheme.primary else TextSecondary
+                            )
+                        }
+                    }
                 }
             }
 
             Spacer(modifier = Modifier.weight(0.5f))
 
-            // Carátula con aura luminosa y sombra flotante
+            // Carátula o Video Canvas con aura luminosa y sombra flotante
             Box(
                 modifier = Modifier
                     .fillMaxWidth(0.85f)
@@ -240,11 +256,22 @@ fun NowPlayingScreen(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                ArtworkImage(
-                    track = currentTrack,
-                    modifier = Modifier.fillMaxSize(),
-                    cornerRadius = 24.dp
-                )
+                if (!currentTrack.videoUri.isNullOrEmpty() && isVideoCanvasActive) {
+                    com.example.ui.components.BackgroundVideoPlayer(
+                        videoUriString = currentTrack.videoUri,
+                        isVideoLoop = currentTrack.isVideoLoop,
+                        isPlaying = isPlaying,
+                        currentPositionMs = currentPositionMs,
+                        modifier = Modifier.fillMaxSize(),
+                        cornerRadius = 24.dp
+                    )
+                } else {
+                    ArtworkImage(
+                        track = currentTrack,
+                        modifier = Modifier.fillMaxSize(),
+                        cornerRadius = 24.dp
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -572,11 +599,14 @@ fun NowPlayingScreen(
                             DetailItem("Tamaño", currentTrack.fileSizeFormatted)
                         }
                         DetailItem("Origen", if (currentTrack.folderName.isNotBlank()) currentTrack.folderName else "Almacenamiento Local")
+                        if (!currentTrack.videoUri.isNullOrEmpty()) {
+                            DetailItem("Video Canvas", if (currentTrack.isVideoLoop) "Loop Continuo (≤ 10s)" else "Sincronizado con Audio (> 10s)")
+                        }
                     }
                 },
                 confirmButton = {
                     Row {
-                        if (onEditTrack != null) {
+                        if (onEditTrack != null || onEditTrackDetails != null || onEditTrackDetailsWithVideo != null) {
                             TextButton(
                                 onClick = {
                                     showDetailsDialog = false
@@ -594,12 +624,14 @@ fun NowPlayingScreen(
             )
         }
 
-        if (showEditDialog && (onEditTrack != null || onEditTrackDetails != null)) {
+        if (showEditDialog && (onEditTrack != null || onEditTrackDetails != null || onEditTrackDetailsWithVideo != null)) {
             com.example.ui.components.EditTrackDialog(
                 track = currentTrack,
                 onDismiss = { showEditDialog = false },
-                onConfirm = { trackId, title, artist, album, customArtUri, removeArtwork ->
-                    if (onEditTrackDetails != null) {
+                onConfirm = { trackId, title, artist, album, customArtUri, removeArtwork, customVideoUri, removeVideo ->
+                    if (onEditTrackDetailsWithVideo != null) {
+                        onEditTrackDetailsWithVideo(trackId, title, artist, album, customArtUri, removeArtwork, customVideoUri, removeVideo)
+                    } else if (onEditTrackDetails != null) {
                         onEditTrackDetails(trackId, title, artist, album, customArtUri, removeArtwork)
                     } else if (onEditTrack != null) {
                         onEditTrack(trackId, title, artist, album)

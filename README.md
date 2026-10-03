@@ -51,20 +51,30 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
   - Fundido cruzado de 0 a 12 segundos con desvanecimiento de volumen progresivo.
   - Modo Gapless para reproducción continua sin silencios entre pistas.
 
-### 4. Carátulas Personalizadas de Galería & Arte Procedural
+### 4. Video Canvas de Fondo (Loops Cortos o Videos Largos Sincronizados)
+- **Lienzo Dinámico de Video**: Capacidad de vincular videos desde la galería del teléfono móvil a cualquier canción.
+- **Detección Automática de Modo**:
+  - **Loop Canvas (≤ 10s - 12s)**: Se repite en bucle infinito suave y continuo de fondo como en Spotify Canvas.
+  - **Video Largo Sincronizado (> 10s)**: El video avanza sincronizado con la reproducción de la canción y los saltos de búsqueda (`seekTo`).
+- **Reproducción Silenciada de Alto Rendimiento**: El video se renderiza mediante una instancia secundaria de ExoPlayer optimizada con `volume = 0.0f` y liberación estricta de códecs, preservando íntegramente la señal de audio que alimenta el motor DSP C++20 de 10 bandas.
+- **Conmutador Rápido en Now Playing**: Botón interactivo en la barra superior para alternar al instante entre la carátula clásica y el Video Canvas.
+- **Gestión Limpia en Almacenamiento**: Los videos se copian de forma segura a la subcarpeta privada `videos/` y los videos anteriores se eliminan automáticamente para evitar acumulación de archivos huérfanos.
+
+### 5. Carátulas Personalizadas de Galería & Arte Procedural
 - **Selección de Carátula desde Galería**: Mediante el Android Photo Picker nativo del sistema.
 - **Compresión WebP y Borrado Inteligente**: Conversión en segundo plano (`Dispatchers.IO`) a WebP sin pérdida y eliminación de carátulas residuales del disco.
 - **Generador de Arte Procedural**: Ilustración matemática vectorial única para canciones sin portada.
 
-### 5. Playlists y Almacenamiento Estructurado
+### 6. Playlists y Almacenamiento Estructurado
 - **Pestaña "Playlists" en Tu Biblioteca**: Tarjeta "Tus Me Gusta" sincronizada, creación, renombrado y adición rápida de canciones.
 - **Almacenamiento Organizado** en `Android/data/com.aistudio.musicplayer.aurasound/files/`:
   - 📁 `images/`: Carátulas en WebP Lossless.
   - 📁 `songs/`: Canciones locales y demos.
   - 📁 `lyrics/`: Archivos de letras sincronizadas (`.lrc`).
   - 📁 `metadata/`: Ficheros JSON estructurados con información técnica.
+  - 📁 `videos/`: Videos de fondo y loops de Canvas (.mp4/.webm).
 
-### 6. Suite de Diagnóstico Autónoma: Aura Monitor 🛠️ & LeakCanary
+### 7. Suite de Diagnóstico Autónoma: Aura Monitor 🛠️ & LeakCanary
 - **Aura Monitor (App Debug Propia en el Cajón de Aplicaciones)**:
   - Cuenta con su propio icono de acceso directo en el cajón de apps del teléfono móvil.
   - Atrapa y registra automáticamente **Crashes** no controlados mediante `UncaughtExceptionHandler`, **Errores Críticos**, **Warnings de Memoria** y eventos de Media3 / JNI.

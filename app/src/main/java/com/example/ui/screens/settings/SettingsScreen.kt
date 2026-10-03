@@ -38,6 +38,8 @@ import com.example.ui.theme.TextSecondary
 fun SettingsScreen(
     currentTheme: AuraTheme,
     onSelectTheme: (AuraTheme) -> Unit,
+    isDynamicArtworkColorEnabled: Boolean = true,
+    onToggleDynamicArtworkColor: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -63,23 +65,86 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(20.dp))
         }
 
+        // Opción Avanzada: Aura Dinámica de Carátula
+        item {
+            Card(
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = SurfaceCard),
+                border = CardBorder.let { androidx.compose.foundation.BorderStroke(1.dp, it) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("dynamic_artwork_color_card")
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(18.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Palette,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Aura Dinámica de Carátula",
+                                style = MaterialTheme.typography.titleSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextPrimary
+                                )
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Adapta el resplandor de neón, la barra de progreso y los acentos visuales a los tonos de cada portada.",
+                            style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    Switch(
+                        checked = isDynamicArtworkColorEnabled,
+                        onCheckedChange = onToggleDynamicArtworkColor,
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = MaterialTheme.colorScheme.primary
+                        ),
+                        modifier = Modifier.testTag("dynamic_color_switch")
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+        }
+
         // Selector de Temas Visuales
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = Icons.Default.Palette,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
+                    tint = MaterialTheme.colorScheme.secondary
                 )
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(
-                    text = "Paleta de Color y Acentos",
+                    text = "Paleta Base Predeterminada",
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary
                     )
                 )
             }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Se utiliza en la biblioteca, menús y cuando una pista no tiene colores específicos.",
+                style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+            )
             Spacer(modifier = Modifier.height(12.dp))
         }
 

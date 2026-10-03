@@ -197,8 +197,19 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private val _isVideoCanvasActive = MutableStateFlow(true)
+    val isVideoCanvasActive: StateFlow<Boolean> = _isVideoCanvasActive.asStateFlow()
+
+    fun toggleVideoCanvas() {
+        _isVideoCanvasActive.value = !_isVideoCanvasActive.value
+    }
+
+    fun setVideoCanvasActive(active: Boolean) {
+        _isVideoCanvasActive.value = active
+    }
+
     fun updateTrackInfo(trackId: Long, newTitle: String, newArtist: String, newAlbum: String) {
-        updateTrackDetails(trackId, newTitle, newArtist, newAlbum, null, false)
+        updateTrackDetails(trackId, newTitle, newArtist, newAlbum, null, false, null, false)
     }
 
     fun updateTrackDetails(
@@ -207,7 +218,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         newArtist: String,
         newAlbum: String,
         customArtUri: Uri? = null,
-        removeArtwork: Boolean = false
+        removeArtwork: Boolean = false,
+        customVideoUri: Uri? = null,
+        removeVideo: Boolean = false
     ) {
         viewModelScope.launch {
             val updated = repository.updateTrackDetails(
@@ -217,7 +230,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 newArtist,
                 newAlbum,
                 customArtUri,
-                removeArtwork
+                removeArtwork,
+                customVideoUri,
+                removeVideo
             )
             audioPlayer.updateTrackMetadata(
                 trackId,
@@ -225,7 +240,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 newArtist,
                 newAlbum,
                 updated?.albumArtPath,
-                updateArt = (customArtUri != null || removeArtwork)
+                updateArt = (customArtUri != null || removeArtwork),
+                videoUri = updated?.videoUri,
+                isVideoLoop = updated?.isVideoLoop ?: false,
+                updateVideo = (customVideoUri != null || removeVideo)
             )
         }
     }

@@ -354,7 +354,10 @@ class AuraAudioPlayer(
         artist: String,
         album: String,
         albumArtPath: String? = null,
-        updateArt: Boolean = false
+        updateArt: Boolean = false,
+        videoUri: String? = null,
+        isVideoLoop: Boolean = false,
+        updateVideo: Boolean = false
     ) {
         val current = _currentTrack.value
         if (current != null && current.id == trackId) {
@@ -362,7 +365,9 @@ class AuraAudioPlayer(
                 title = title,
                 artist = artist,
                 album = album,
-                albumArtPath = if (updateArt) albumArtPath else current.albumArtPath
+                albumArtPath = if (updateArt) albumArtPath else current.albumArtPath,
+                videoUri = if (updateVideo) videoUri else current.videoUri,
+                isVideoLoop = if (updateVideo) isVideoLoop else current.isVideoLoop
             )
         }
         _queue.value = _queue.value.map {
@@ -371,7 +376,9 @@ class AuraAudioPlayer(
                     title = title,
                     artist = artist,
                     album = album,
-                    albumArtPath = if (updateArt) albumArtPath else it.albumArtPath
+                    albumArtPath = if (updateArt) albumArtPath else it.albumArtPath,
+                    videoUri = if (updateVideo) videoUri else it.videoUri,
+                    isVideoLoop = if (updateVideo) isVideoLoop else it.isVideoLoop
                 )
             } else it
         }
