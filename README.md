@@ -14,11 +14,14 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
   - Cambio entre pantallas con animación combinada de desvanecimiento y deslizamiento suave (`AnimatedContent`).
   - Despliegue elástico de la pantalla completa Now Playing desde el mini reproductor y **cierre suave con deslizamiento vertical instantáneo sin capas negras residuales**.
   - Indicadores y micro-interacciones táctiles con retroalimentación inmediata.
-- **4 Paletas de Acentos Vibrantes**:
+- **5 Paletas de Acentos Vibrantes & Material You**:
+  - 🎨 **Material You**: Colores dinámicos sincronizados con el fondo de pantalla del sistema operativo (Android 12+ / Material 3) manteniendo el fondo oscuro OLED.
   - 🌌 **Nebula Violet**: Violeta eléctrico y cyan neón futurista.
   - 🍃 **Cyber Mint**: Esmeralda brillante y menta líquida.
   - 🔥 **Sunset Ember**: Coral cálido, naranja fuego y destellos dorados.
   - 🌊 **Ocean Abyss**: Azul zafiro profundo y agua bioluminiscente.
+- **Protección Tipográfica Fija (Cero Desbordamientos)**:
+  - Escala de densidad y fuente estabilizada (`fontScale = 1.0f`) para que las configuraciones globales de tamaño de letra en Android no rompan la maquetación ni corten textos.
 - **Mini Reproductor Flotante**:
   - Barra persistente con barra de progreso y controles táctiles.
   - **Acceso Directo al Ecualizador C++20 integrado** mediante hoja modal inferior sin abandonar la vista actual.
@@ -73,12 +76,21 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
   - 🎬 **Video Canvas Vinculado**: Vincula el video como Canvas de fondo sincronizado en `NowPlayingScreen`.
 - **Reproducción Inmediata**: Al finalizar la conversión, la pista recién creada se reproduce de inmediato con su Video Canvas y atmósfera lumínica armonizada.
 
-### 6. Carátulas Personalizadas de Galería & Arte Procedural
+### 6. Descarga Directa desde TikTok y Enlaces Web (Música, Carátula y Video Canvas) 🎬🔗🎵
+- **Descargas sin Límite de Duración**: Permite pegar cualquier enlace de video de TikTok (o URL de video web) para descargar música completa, parodias, versiones especiales o directos de cualquier duración.
+- **Extracción Automática sin Marcas de Agua**:
+  - 🎵 **Audio de Alta Fidelidad**: Extrae la pista de audio pura en formato `.m4a` o `.mp3` directamente a `songs/`.
+  - 🖼️ **Carátula Oficial en WebP**: Descarga la portada en alta resolución (o extrae fotograma clave) y la procesa a WebP sin pérdida en `images/`.
+  - 🎬 **Video Canvas Vinculado**: Almacena el video en `videos/` para reproducirlo de fondo continuo o sincronizado en *Now Playing*.
+- **Previsualización y Edición Rápida**: Muestra título, autor/creador, duración y portada antes de confirmar, permitiendo ajustar los nombres antes de guardar.
+- **Reproducción al Instante**: Una vez descargada, inicia la reproducción automáticamente abriendo Now Playing.
+
+### 7. Carátulas Personalizadas de Galería & Arte Procedural
 - **Selección de Carátula desde Galería**: Mediante el Android Photo Picker nativo del sistema.
 - **Compresión WebP y Borrado Inteligente**: Conversión en segundo plano (`Dispatchers.IO`) a WebP sin pérdida y eliminación de carátulas residuales del disco.
 - **Generador de Arte Procedural**: Ilustración matemática vectorial única para canciones sin portada.
 
-### 7. Suite Acústica y Ajustes para Auriculares / Audífonos 🎧
+### 8. Suite Acústica y Ajustes para Auriculares / Audífonos 🎧
 - **Filtro Crossfeed Acústico (Algoritmo Bauer / Chu Moy en ISO C++20)**:
   - Elimina la fatiga auditiva mezclando sutilmente una porción de audio con filtro paso-bajos (~700 Hz) y retardo temporal interaural (ITD de 250 µs a 340 µs) hacia el oído opuesto, emulando la escucha natural de monitores de estudio en sala.
   - **Activación Exclusiva por Hardware**: Solo se aplica en la música cuando el sistema detecta que hay auriculares conectados (jack 3.5mm, USB-C DAC o Bluetooth), pausándose automáticamente en los altavoces del teléfono.
@@ -95,7 +107,7 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
 - **Mapeo Avanzado de Botones y Gestos Físicos de Auriculares (Headset Controls)**:
   - Totalmente configurable por el usuario mediante diálogo modal para 1 pulsación, 2 pulsaciones, 3 pulsaciones y pulsación prolongada (Play/Pausa, Siguiente, Anterior, Me Gusta ❤️, Avanzar 15s, Retroceder 15s).
 
-### 8. Notificación Nativa del Reproductor de Android & Segundo Plano 🔔
+### 9. Notificación Nativa del Reproductor de Android & Segundo Plano 🔔
 - **Controlador Multimedia Nativo de Android (System Media Controls)**:
   - Integración completa con **Jetpack Media3 `MediaSessionService`** y `MediaSession`.
   - **Android 13, 14, 15+**: Tarjeta multimedia nativa en la cortina de notificaciones con arte de tapa en alta resolución, colores adaptativos dinámicos y **línea ondulada interactiva (*squiggled seekbar*)** para avanzar o retroceder sin abrir la app.
@@ -105,7 +117,7 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
 - **Reproducción Continua en Segundo Plano (*Foreground Service*)**: Mantiene la música sonando ininterrumpidamente cuando la pantalla está apagada o la aplicación se minimiza.
 - **Soporte Extendido**: Detección automática en **relojes inteligentes (Wear OS)**, **Android Auto** y mandos remotos Bluetooth.
 
-### 9. Playlists y Almacenamiento Estructurado
+### 10. Playlists y Almacenamiento Estructurado
 - **Pestaña "Playlists" en Tu Biblioteca**: Tarjeta "Tus Me Gusta" sincronizada, creación, renombrado y adición rápida de canciones.
 - **Almacenamiento Organizado** en `Android/data/com.aistudio.musicplayer.aurasound/files/`:
   - 📁 `images/`: Carátulas en WebP Lossless.
@@ -114,7 +126,7 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
   - 📁 `metadata/`: Ficheros JSON estructurados con información técnica.
   - 📁 `videos/`: Videos de fondo y loops de Canvas (.mp4/.webm).
 
-### 10. Suite de Diagnóstico Autónoma: Aura Monitor 🛠️ & LeakCanary
+### 11. Suite de Diagnóstico Autónoma: Aura Monitor 🛠️ & LeakCanary
 - **Aura Monitor (App Debug Propia en el Cajón de Aplicaciones)**:
   - Cuenta con su propio icono de acceso directo en el cajón de apps del teléfono móvil.
   - Atrapa y registra automáticamente **Crashes** no controlados mediante `UncaughtExceptionHandler`, **Errores Críticos**, **Warnings de Memoria** y eventos de Media3 / JNI.

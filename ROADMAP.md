@@ -96,6 +96,15 @@ Este documento traza las fases de evolución técnica y funcional para convertir
   - Extracción directa de audio (`.m4a`) desde videos de la galería mediante demuxing sin recodificación en Android.
   - Captura y compresión automática de fotograma clave en WebP sin pérdida como carátula oficial.
   - Vinculación automática opcional como Video Canvas sincronizado o loop con inicio inmediato de reproducción.
+- [x] **Descarga Directa desde TikTok y Enlaces Web (Música + Carátula + Video Canvas)**:
+  - Descarga sin límites de duración para canciones completas, parodias y audios virales pegando el enlace.
+  - Resolución inteligente sin marcas de agua con descarga de audio en alta fidelidad a `songs/`.
+  - Captura y conversión de carátula oficial en WebP sin pérdida a `images/`.
+  - Vinculación de Video Canvas continuo o sincronizado en `videos/` y reproducción instantánea en Now Playing.
+- [x] **Soporte de Colores Dinámicos Material You (Android 12+)**:
+  - Incorporación del tema Material You a las 5 opciones de personalización, adaptando los acentos primarios y secundarios a los colores del fondo de pantalla del sistema operativo.
+- [x] **Blindaje Tipográfico Fijo contra Desbordamientos**:
+  - Escala tipográfica estabilizada a valor cómodo (`fontScale = 1.0f`) garantizando que los ajustes globales de tamaño de letra de Android no desborden la interfaz.
 
 ---
 

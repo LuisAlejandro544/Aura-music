@@ -46,10 +46,12 @@ fun ImportMusicScreen(
     onClearLibrary: () -> Unit,
     onDismissStatusMessage: () -> Unit,
     onImportVideoAsMusic: (videoUri: Uri, title: String, artist: String, album: String, attachAsCanvas: Boolean, forceLoop: Boolean?) -> Unit = { _, _, _, _, _, _ -> },
+    onDownloadFromLink: (resolvedInfo: com.example.data.importer.OnlineVideoAudioImporter.ResolvedMediaInfo, customTitle: String, customArtist: String, attachAsCanvas: Boolean) -> Unit = { _, _, _, _ -> },
     modifier: Modifier = Modifier
 ) {
     var showClearConfirmation by remember { mutableStateOf(false) }
     var selectedVideoForConversion by remember { mutableStateOf<Uri?>(null) }
+    var showDownloadFromLinkDialog by remember { mutableStateOf(false) }
 
     // Lanzador Photo/Media Picker para seleccionar un video y convertirlo a música
     val videoPickerLauncher = rememberLauncherForActivityResult(
@@ -227,10 +229,26 @@ fun ImportMusicScreen(
             Spacer(modifier = Modifier.height(8.dp))
         }
 
-        // Opción 1: Video a Música (Extraer Audio, Carátula y Video Canvas)
+        // Opción 1: Descargar desde TikTok / Enlace Web (Música, Carátula y Video Canvas)
         item {
             ImportActionCard(
-                title = "Video a Música",
+                title = "Descargar desde TikTok / Web",
+                description = "Pega un enlace de video de TikTok o web: descarga la música en alta fidelidad de cualquier duración, con carátula oficial y Video Canvas de fondo.",
+                buttonText = "Pegar Enlace y Descargar",
+                icon = Icons.Default.CloudDownload,
+                accentGradient = Brush.horizontalGradient(
+                    listOf(Color(0xFF00F2FE), Color(0xFF4FACFE), Color(0xFFFF007F))
+                ),
+                onClick = { showDownloadFromLinkDialog = true },
+                testTag = "import_tiktok_link_btn"
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+
+        // Opción 2: Video a Música de Galería (Extraer Audio, Carátula y Video Canvas)
+        item {
+            ImportActionCard(
+                title = "Video a Música (Galería)",
                 description = "Elige un video de tu galería: extraerá el audio en alta fidelidad, capturará la portada en WebP y vinculará el Video Canvas automáticamente.",
                 buttonText = "Elegir Video de Galería",
                 icon = Icons.Default.MovieFilter,
@@ -389,6 +407,16 @@ fun ImportMusicScreen(
             onConfirm = { title, artist, album, attachAsCanvas, forceLoop ->
                 onImportVideoAsMusic(selectedVideoForConversion!!, title, artist, album, attachAsCanvas, forceLoop)
                 selectedVideoForConversion = null
+            }
+        )
+    }
+
+    if (showDownloadFromLinkDialog) {
+        com.example.ui.components.DownloadFromLinkDialog(
+            onDismiss = { showDownloadFromLinkDialog = false },
+            onConfirmDownload = { info, title, artist, attachCanvas ->
+                showDownloadFromLinkDialog = false
+                onDownloadFromLink(info, title, artist, attachCanvas)
             }
         )
     }

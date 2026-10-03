@@ -423,6 +423,44 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * Descarga e importa una canción desde un enlace web (TikTok u online),
+     * extrayendo el audio, carátula en WebP y vinculando el Video Canvas.
+     */
+    fun importFromWebVideoLink(
+        resolvedInfo: com.example.data.importer.OnlineVideoAudioImporter.ResolvedMediaInfo,
+        customTitle: String,
+        customArtist: String,
+        attachAsCanvas: Boolean,
+        onSuccess: (Track) -> Unit
+    ) {
+        viewModelScope.launch {
+            _isImporting.value = true
+            _importStatusMessage.value = "Iniciando descarga de video y audio..."
+            val storageManager = com.example.data.storage.AppStorageManager(getApplication())
+            val result = com.example.data.importer.OnlineVideoAudioImporter.downloadAndImport(
+                context = getApplication(),
+                storageManager = storageManager,
+                resolvedInfo = resolvedInfo,
+                customTitle = customTitle,
+                customArtist = customArtist,
+                attachAsCanvas = attachAsCanvas,
+                onProgressUpdate = { status ->
+                    _importStatusMessage.value = status
+                }
+            )
+
+            _isImporting.value = false
+            result.onSuccess { track ->
+                val saved = repository.insertCustomTrack(getApplication(), track)
+                _importStatusMessage.value = "¡Éxito! Se descargó \"${saved.title}\" con carátula y Video Canvas."
+                onSuccess(saved)
+            }.onFailure { error ->
+                _importStatusMessage.value = "Error al descargar: ${error.message ?: "Verifica tu conexión y el enlace"}"
+            }
+        }
+    }
+
     fun dismissImportStatus() {
         _importStatusMessage.value = null
     }

@@ -62,8 +62,16 @@ class MainActivity : ComponentActivity() {
             musicViewModel = viewModel
             val currentTheme by viewModel.currentTheme.collectAsStateWithLifecycle()
 
-            AuraMusicTheme(auraTheme = currentTheme) {
-                AuraMusicApp(viewModel = viewModel)
+            val currentDensity = androidx.compose.ui.platform.LocalDensity.current
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(
+                    density = currentDensity.density,
+                    fontScale = 1.0f
+                )
+            ) {
+                AuraMusicTheme(auraTheme = currentTheme) {
+                    AuraMusicApp(viewModel = viewModel)
+                }
             }
         }
     }
@@ -280,6 +288,12 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                             onDismissStatusMessage = { viewModel.dismissImportStatus() },
                             onImportVideoAsMusic = { videoUri, title, artist, album, attachCanvas, forceLoop ->
                                 viewModel.importVideoAsTrack(videoUri, title, artist, album, attachCanvas, forceLoop) { createdTrack ->
+                                    viewModel.playTrack(createdTrack, listOf(createdTrack))
+                                    viewModel.setNowPlayingExpanded(true)
+                                }
+                            },
+                            onDownloadFromLink = { info, title, artist, canvas ->
+                                viewModel.importFromWebVideoLink(info, title, artist, canvas) { createdTrack ->
                                     viewModel.playTrack(createdTrack, listOf(createdTrack))
                                     viewModel.setNowPlayingExpanded(true)
                                 }

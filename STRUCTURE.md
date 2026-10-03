@@ -26,10 +26,17 @@ AuraMusic/
 │   │   │   │   │   ├── DeviceDiagnosticInfo.kt # Ficha técnica de hardware del teléfono
 │   │   │   │   │   ├── DebugLogEntry.kt        # Modelo de eventos con stacktrace en crudo y hora
 │   │   │   │   │   ├── AuraDebugManager.kt     # Gestor central de logs, persistencia JSON y UncaughtHandler
-│   │   │   │   │   └── DebugMonitorActivity.kt # Actividad accesible desde el cajón de apps (Aura Monitor)
+│   │   │   │   │   ├── DebugMonitorActivity.kt # Actividad accesible desde el cajón de apps (Aura Monitor)
+│   │   │   │   │   └── ui/                     # Componentes modulares de Aura Monitor
+│   │   │   │   │       ├── HardwareTelemetryCard.kt   # Ficha técnica de hardware, RAM y CPU ABI
+│   │   │   │   │       ├── DebugLogEntryCard.kt       # Tarjeta individual para logs con severidad
+│   │   │   │   │       ├── DebugFilterChips.kt        # Filtros por severidad con contadores en vivo
+│   │   │   │   │       ├── DebugLogDetailDialog.kt    # Modal de visualización de Stack Trace en crudo
+│   │   │   │   │       └── DebugSyntheticTestDialog.kt# Menú para simulación sintética de incidencias
 │   │   │   │   ├── data/
 │   │   │   │   │   ├── importer/               # Módulos de importación y análisis
 │   │   │   │   │   │   ├── AudioMetadataParser.kt # Extractor ID3 y conversor a WebP
+│   │   │   │   │   │   ├── OnlineVideoAudioImporter.kt # Descargador de audio, carátula y Video Canvas desde TikTok y web
 │   │   │   │   │   │   ├── ProceduralArtworkGenerator.kt # Generador procedural de carátulas
 │   │   │   │   │   │   ├── SampleMusicGenerator.kt # Sintetizador de audio WAV para demos
 │   │   │   │   │   │   └── VideoAudioExtractor.kt  # Extractor de audio nativo y generador 3 en 1 de Video a Música
@@ -65,7 +72,14 @@ AuraMusic/
 │   │   │   │   ├── ui/
 │   │   │   │   │   ├── components/             # Componentes visuales reutilizables
 │   │   │   │   │   │   ├── ArtworkImage.kt     # Renderizador de carátulas (WebP + Procedural)
-│   │   │   │   │   │   ├── AudioEffectsBottomSheet.kt # Modal unificado de EQ 10 bandas, Temporizador, 8D y Speed
+│   │   │   │   │   │   ├── AudioEffectsBottomSheet.kt # Modal unificado orquestador de EQ 10 bandas, 8D y efectos
+│   │   │   │   │   │   ├── audioeffects/       # Pestañas modulares de efectos acústicos
+│   │   │   │   │   │   │   ├── EqualizerTabContent.kt         # Ecualizador 10 bandas ISO, presets y Bass Boost
+│   │   │   │   │   │   │   ├── Spatial8DTabContent.kt         # Motor Audio 8D Espacial y controles de órbita
+│   │   │   │   │   │   │   ├── SleepTimerTabContent.kt        # Temporizador de apagado con fade-out de 10s
+│   │   │   │   │   │   │   ├── PlaybackParametersTabContent.kt# Velocidad y Tono (Pitch Shift) con protección
+│   │   │   │   │   │   │   ├── TransitionsTabContent.kt       # Crossfade de 0-12s y conmutador Gapless
+│   │   │   │   │   │   │   └── BalanceAndHeadphonesTabContent.kt# Balance L/R y Crossfeed C++20 rápido
 │   │   │   │   │   │   ├── AudioVisualizer.kt  # Visualizador de ondas en tiempo real
 │   │   │   │   │   │   ├── BackgroundVideoPlayer.kt # Renderizador de video de fondo (Loops Canvas y Video Sync)
 │   │   │   │   │   │   ├── BottomNavBar.kt     # Barra de navegación limpia (4 pestañas)
@@ -73,16 +87,42 @@ AuraMusic/
 │   │   │   │   │   │   ├── MiniPlayer.kt       # Mini reproductor opaco con acceso directo a EQ modal
 │   │   │   │   │   │   ├── ProceduralArtwork.kt # Arte vectorial dinámico en tiempo real
 │   │   │   │   │   │   ├── TrackListItem.kt    # Fila de canción con menú contextual
-│   │   │   │   │   │   └── VideoToMusicDialog.kt # Diálogo de conversión y previsualización de Video a Música
+│   │   │   │   │   │   ├── VideoToMusicDialog.kt # Diálogo de conversión y previsualización de Video a Música
+│   │   │   │   │   │   └── DownloadFromLinkDialog.kt # Diálogo de descarga desde enlaces de TikTok y videos web
 │   │   │   │   │   ├── navigation/
 │   │   │   │   │   │   └── NavScreen.kt        # Destinos de navegación y pestañas
 │   │   │   │   │   ├── screens/                # Pantallas principales modulares
 │   │   │   │   │   │   ├── home/HomeScreen.kt  # Pantalla de inicio con saludo y accesos
-│   │   │   │   │   │   ├── library/LibraryScreen.kt # Biblioteca, Playlists y Tus Me Gusta
+│   │   │   │   │   │   ├── library/
+│   │   │   │   │   │   │   ├── LibraryScreen.kt# Biblioteca y orquestador de listas
+│   │   │   │   │   │   │   └── components/     # Componentes modulares de biblioteca
+│   │   │   │   │   │   │       ├── FavoritesPlaylistBannerCard.kt # Tarjeta destacada de "Tus Me Gusta"
+│   │   │   │   │   │   │       ├── PlaylistRowItem.kt             # Elemento de lista con menú contextual
+│   │   │   │   │   │   │       ├── AlbumAndArtistCards.kt         # Vistas agrupadas de Álbumes y Artistas
+│   │   │   │   │   │   │       ├── PlaylistDialogs.kt             # Diálogos de creación y renombrado
+│   │   │   │   │   │   │       └── LibraryEmptyViews.kt           # Estados vacíos y botón de importación SAF
 │   │   │   │   │   │   ├── importmusic/ImportMusicScreen.kt # Importación selectiva SAF
-│   │   │   │   │   │   ├── nowplaying/NowPlayingScreen.kt # Vista completa de reproducción con cierre fluido
+│   │   │   │   │   │   ├── nowplaying/
+│   │   │   │   │   │   │   ├── NowPlayingScreen.kt # Vista completa de reproducción
+│   │   │   │   │   │   │   └── components/     # Componentes modulares de reproducción
+│   │   │   │   │   │   │       ├── NowPlayingTopBar.kt            # Barra superior con botones de acción
+│   │   │   │   │   │   │       ├── NowPlayingArtworkCard.kt       # Carátula y Video Canvas con aura y elevación
+│   │   │   │   │   │   │       ├── NowPlayingPlaybackControls.kt  # Info de pista, seekbar y botonera de control
+│   │   │   │   │   │   │       ├── NowPlayingBalanceBar.kt        # Barra de balance estéreo L/R en vivo
+│   │   │   │   │   │   │       ├── NowPlayingQueueSheet.kt        # Hoja modal de cola de reproducción ("Up Next")
+│   │   │   │   │   │   │       ├── AudioSpecsDialog.kt            # Diálogo con ficha técnica del archivo
+│   │   │   │   │   │   │       └── VideoDisplayModeDialog.kt      # Diálogo selector de los 3 modos de video
 │   │   │   │   │   │   ├── equalizer/EqualizerScreen.kt # Referencia de ecualizador (integrado en modal)
-│   │   │   │   │   │   ├── settings/SettingsScreen.kt # Selector de temas y privacidad
+│   │   │   │   │   │   ├── settings/
+│   │   │   │   │   │   │   ├── SettingsScreen.kt # Pantalla de ajustes y selector de pestañas
+│   │   │   │   │   │   │   └── components/     # Componentes modulares de configuración
+│   │   │   │   │   │   │       ├── AppearanceSettingsTab.kt       # Pestaña de temas OLED, paletas y privacidad
+│   │   │   │   │   │   │       ├── HeadphoneStatusCard.kt         # Tarjeta de estado de auriculares en tiempo real
+│   │   │   │   │   │   │       ├── HeadphonesAcousticsSection.kt  # Crossfeed C++20 y balance estéreo fino
+│   │   │   │   │   │   │       ├── HeadphonesSecuritySection.kt   # Becoming Noisy, Fade-In y memoria volumen
+│   │   │   │   │   │   │       ├── HeadphonesGesturesSection.kt   # Configuración de botones físicos de audífonos
+│   │   │   │   │   │   │       ├── HeadsetButtonActionDialog.kt   # Diálogo selector de acción por pulsación
+│   │   │   │   │   │   │       └── SettingDetailRow.kt            # Fila de datos clave-valor reutilizable
 │   │   │   │   │   │   └── playlist/PlaylistDetailScreen.kt # Detalle de lista sincronizada
 │   │   │   │   │   └── theme/
 │   │   │   │   │       ├── ArtworkColorExtractor.kt # Extractor reactivo de paleta para carátulas y fotogramas de video

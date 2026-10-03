@@ -1,12 +1,10 @@
 package com.example.ui.screens.library
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -14,19 +12,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.model.Playlist
 import com.example.model.Track
-import com.example.ui.components.ArtworkImage
 import com.example.ui.components.TrackListItem
 import com.example.ui.navigation.LibraryTab
 import com.example.ui.navigation.NavScreen
+import com.example.ui.screens.library.components.*
 import com.example.ui.theme.CardBorder
 import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.TextMuted
@@ -36,6 +31,13 @@ import com.example.ui.theme.TextSecondary
 /**
  * Pantalla de Tu Biblioteca con pestañas modulares (Canciones, Álbumes, Artistas, Playlists, Favoritos),
  * barra de búsqueda en tiempo real, creación de listas y filtros ágiles.
+ * Arquitectura Modular (MVVM):
+ * Delega la representación de elementos y vistas en submódulos especializados en [com.example.ui.screens.library.components]:
+ * - [FavoritesPlaylistBannerCard]: Tarjeta destacada de "Tus Me Gusta".
+ * - [PlaylistRowItem]: Fila de lista de reproducción con menú contextual.
+ * - [AlbumGroupCard] / [ArtistGroupCard]: Vistas agrupadas de álbumes y artistas.
+ * - [CreatePlaylistDialog] / [RenamePlaylistDialog]: Diálogos modales para gestión de listas.
+ * - [EmptyLibraryView] / [EmptyPlaceholder]: Estados vacíos con botón de importación SAF.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,12 +65,7 @@ fun LibraryScreen(
     modifier: Modifier = Modifier
 ) {
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
-    var showRenamePlaylistDialog by remember { mutableStateOf(false) }
     var playlistToRename by remember { mutableStateOf<Playlist?>(null) }
-    var renamePlaylistName by remember { mutableStateOf("") }
-    var renamePlaylistDesc by remember { mutableStateOf("") }
-    var newPlaylistName by remember { mutableStateOf("") }
-    var newPlaylistDesc by remember { mutableStateOf("") }
 
     // Filtrar pistas por búsqueda
     val filteredTracks = remember(allTracks, searchQuery) {
@@ -228,7 +225,7 @@ fun LibraryScreen(
                         },
                         shape = RoundedCornerShape(24.dp),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
                         modifier = Modifier
                             .weight(1f)
                             .testTag("shuffle_all_btn")
@@ -327,12 +324,7 @@ fun LibraryScreen(
                         PlaylistRowItem(
                             playlist = playlist,
                             onClick = { onOpenPlaylist(playlist) },
-                            onRename = {
-                                playlistToRename = playlist
-                                renamePlaylistName = playlist.name
-                                renamePlaylistDesc = playlist.description
-                                showRenamePlaylistDialog = true
-                            },
+                            onRename = { playlistToRename = playlist },
                             onDelete = { onDeletePlaylist(playlist.id) }
                         )
                     }
@@ -378,440 +370,18 @@ fun LibraryScreen(
 
     // Cuadro de Diálogo para Crear Lista
     if (showCreatePlaylistDialog) {
-        AlertDialog(
+        CreatePlaylistDialog(
             onDismissRequest = { showCreatePlaylistDialog = false },
-            title = { Text("Crear Lista de Reproducción", fontWeight = FontWeight.Bold) },
-            text = {
-                Column {
-                    OutlinedTextField(
-                        value = newPlaylistName,
-                        onValueChange = { newPlaylistName = it },
-                        label = { Text("Nombre de la lista") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    OutlinedTextField(
-                        value = newPlaylistDesc,
-                        onValueChange = { newPlaylistDesc = it },
-                        label = { Text("Descripción (opcional)") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (newPlaylistName.isNotBlank()) {
-                            onCreatePlaylist(newPlaylistName, newPlaylistDesc)
-                            newPlaylistName = ""
-                            newPlaylistDesc = ""
-                            showCreatePlaylistDialog = false
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                ) {
-                    Text("Crear")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showCreatePlaylistDialog = false }) {
-                    Text("Cancelar")
-                }
-            }
+            onCreatePlaylist = onCreatePlaylist
         )
     }
 
     // Cuadro de Diálogo para Renombrar Lista
-    if (showRenamePlaylistDialog && playlistToRename != null) {
-        AlertDialog(
-            onDismissRequest = { showRenamePlaylistDialog = false },
-            title = { Text("Renombrar Lista de Reproducción", fontWeight = FontWeight.Bold) },
-            text = {
-                Column {
-                    OutlinedTextField(
-                        value = renamePlaylistName,
-                        onValueChange = { renamePlaylistName = it },
-                        label = { Text("Nombre de la lista") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    OutlinedTextField(
-                        value = renamePlaylistDesc,
-                        onValueChange = { renamePlaylistDesc = it },
-                        label = { Text("Descripción (opcional)") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (renamePlaylistName.isNotBlank()) {
-                            onRenamePlaylist(playlistToRename!!.id, renamePlaylistName, renamePlaylistDesc)
-                            showRenamePlaylistDialog = false
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                ) {
-                    Text("Guardar")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showRenamePlaylistDialog = false }) {
-                    Text("Cancelar")
-                }
-            }
-        )
-    }
-}
-
-@Composable
-private fun FavoritesPlaylistBannerCard(
-    trackCount: Int,
-    onClick: () -> Unit
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick),
-        color = SurfaceCard,
-        border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    androidx.compose.ui.graphics.Brush.horizontalGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.30f),
-                            MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f),
-                            SurfaceCard
-                        )
-                    )
-                )
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(54.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Default.Favorite,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Tus Me Gusta",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
-                    )
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "$trackCount canciones favoritas sincronizadas",
-                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
-                )
-            }
-            Icon(
-                imageVector = Icons.Default.ChevronRight,
-                contentDescription = "Abrir Tus Me Gusta",
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(26.dp)
-            )
-        }
-    }
-}
-
-@Composable
-private fun PlaylistRowItem(
-    playlist: Playlist,
-    onClick: () -> Unit,
-    onRename: () -> Unit,
-    onDelete: () -> Unit
-) {
-    var showMenu by remember { mutableStateOf(false) }
-
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick),
-        color = SurfaceCard,
-        border = CardBorder.let { androidx.compose.foundation.BorderStroke(1.dp, it) }
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                modifier = Modifier.size(48.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Default.QueueMusic,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.width(14.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = playlist.name,
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
-                    )
-                )
-                if (playlist.description.isNotBlank()) {
-                    Text(
-                        text = playlist.description,
-                        style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-            Box {
-                IconButton(onClick = { showMenu = true }) {
-                    Icon(
-                        imageVector = Icons.Default.MoreVert,
-                        contentDescription = "Opciones de lista",
-                        tint = TextMuted
-                    )
-                }
-                DropdownMenu(
-                    expanded = showMenu,
-                    onDismissRequest = { showMenu = false }
-                ) {
-                    DropdownMenuItem(
-                        text = { Text("Abrir lista") },
-                        leadingIcon = { Icon(Icons.Default.PlayArrow, contentDescription = null) },
-                        onClick = {
-                            showMenu = false
-                            onClick()
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Renombrar lista") },
-                        leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
-                        onClick = {
-                            showMenu = false
-                            onRename()
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Eliminar lista", color = MaterialTheme.colorScheme.error) },
-                        leadingIcon = { Icon(Icons.Default.DeleteOutline, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
-                        onClick = {
-                            showMenu = false
-                            onDelete()
-                        }
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AlbumGroupCard(
-    albumName: String,
-    artist: String,
-    trackCount: Int,
-    representativeTrack: Track?,
-    onClick: () -> Unit
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick),
-        color = SurfaceCard,
-        border = CardBorder.let { androidx.compose.foundation.BorderStroke(1.dp, it) }
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            ArtworkImage(
-                track = representativeTrack,
-                modifier = Modifier.size(54.dp),
-                cornerRadius = 8.dp
-            )
-            Spacer(modifier = Modifier.width(14.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = albumName,
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
-                    ),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = "$artist • $trackCount canción(es)",
-                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            Icon(
-                imageVector = Icons.Default.PlayCircle,
-                contentDescription = "Reproducir álbum",
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(32.dp)
-            )
-        }
-    }
-}
-
-@Composable
-private fun ArtistGroupCard(
-    artistName: String,
-    trackCount: Int,
-    representativeTrack: Track?,
-    onClick: () -> Unit
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick),
-        color = SurfaceCard,
-        border = CardBorder.let { androidx.compose.foundation.BorderStroke(1.dp, it) }
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Surface(
-                shape = CircleShape,
-                modifier = Modifier.size(50.dp)
-            ) {
-                ArtworkImage(
-                    track = representativeTrack,
-                    modifier = Modifier.fillMaxSize(),
-                    cornerRadius = 25.dp
-                )
-            }
-            Spacer(modifier = Modifier.width(14.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = artistName,
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
-                    ),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = "$trackCount canción(es) disponible(s)",
-                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
-                    maxLines = 1
-                )
-            }
-            Icon(
-                imageVector = Icons.Default.ChevronRight,
-                contentDescription = null,
-                tint = TextSecondary
-            )
-        }
-    }
-}
-
-@Composable
-private fun EmptyLibraryView(onImportClick: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 40.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Icon(
-            imageVector = Icons.Default.FolderOpen,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(60.dp)
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = "Sin canciones en tu biblioteca",
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = TextPrimary)
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = "Importa canciones de tu almacenamiento para comenzar a escuchar.",
-            style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-        )
-        Spacer(modifier = Modifier.height(20.dp))
-        Button(
-            onClick = onImportClick,
-            shape = RoundedCornerShape(24.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-        ) {
-            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Importar Música", fontWeight = FontWeight.Bold)
-        }
-    }
-}
-
-@Composable
-private fun EmptyPlaceholder(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    title: String,
-    subtitle: String
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 40.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = TextMuted,
-            modifier = Modifier.size(54.dp)
-        )
-        Spacer(modifier = Modifier.height(14.dp))
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = TextPrimary)
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = subtitle,
-            style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+    if (playlistToRename != null) {
+        RenamePlaylistDialog(
+            playlist = playlistToRename!!,
+            onDismissRequest = { playlistToRename = null },
+            onRenamePlaylist = onRenamePlaylist
         )
     }
 }
