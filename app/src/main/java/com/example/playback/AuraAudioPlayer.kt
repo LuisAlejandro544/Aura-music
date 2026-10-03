@@ -196,11 +196,10 @@ class AuraAudioPlayer(
     private fun ensurePlaybackServiceStarted() {
         try {
             val serviceIntent = Intent(context, AuraMediaPlaybackService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(serviceIntent)
-            } else {
-                context.startService(serviceIntent)
-            }
+            // Iniciamos con startService para no activar el temporizador estricto de 5 segundos de Android 14
+            // (ForegroundServiceDidNotStartInTimeException). Media3 MediaSessionService gestionará la elevación
+            // a primer plano de forma autónoma y reactiva una vez enlazada la sesión con addSession.
+            context.startService(serviceIntent)
         } catch (e: Throwable) {
             com.example.debug.AuraDebugManager.logWarning(
                 "AuraAudioPlayer",

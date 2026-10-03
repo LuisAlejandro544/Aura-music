@@ -45,10 +45,35 @@ class AuraMediaPlaybackService : MediaSessionService() {
                 "No se pudo inicializar DefaultMediaNotificationProvider personalizado, usando el predeterminado: ${e.message}"
             )
         }
+
+        attachActiveSessionIfAvailable()
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        attachActiveSessionIfAvailable()
+        return super.onStartCommand(intent, flags, startId)
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
-        return AuraAudioPlayer.activeMediaSession
+        val session = AuraAudioPlayer.activeMediaSession
+        if (session != null && !isSessionAdded(session)) {
+            addSession(session)
+        }
+        return session
+    }
+
+    private fun attachActiveSessionIfAvailable() {
+        val session = AuraAudioPlayer.activeMediaSession
+        if (session != null && !isSessionAdded(session)) {
+            try {
+                addSession(session)
+            } catch (e: Throwable) {
+                AuraDebugManager.logWarning(
+                    "AuraMediaPlaybackService",
+                    "Error al registrar sesión en MediaSessionService: ${e.message}"
+                )
+            }
+        }
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
@@ -62,6 +87,12 @@ class AuraMediaPlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        val session = AuraAudioPlayer.activeMediaSession
+        if (session != null && isSessionAdded(session)) {
+            try {
+                removeSession(session)
+            } catch (ignored: Throwable) {}
+        }
         super.onDestroy()
         AuraDebugManager.logInfo(
             "AuraMediaPlaybackService",
