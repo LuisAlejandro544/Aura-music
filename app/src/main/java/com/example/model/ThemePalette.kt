@@ -13,7 +13,8 @@ enum class AuraTheme(
     val description: String,
     val primaryColor: Color,
     val secondaryColor: Color,
-    val accentGradient: Brush
+    val accentGradient: Brush,
+    val isDynamic: Boolean = false
 ) {
     NEBULA_GLOW(
         title = "Nebula Violet",
@@ -42,5 +43,13 @@ enum class AuraTheme(
         primaryColor = OceanPrimary,
         secondaryColor = OceanSecondary,
         accentGradient = OceanGradient
+    ),
+    MATERIAL_YOU(
+        title = "Material You",
+        description = "Colores dinámicos del sistema Android (Material 3)",
+        primaryColor = Color(0xFF6750A4),
+        secondaryColor = Color(0xFF625B71),
+        accentGradient = Brush.horizontalGradient(listOf(Color(0xFF6750A4), Color(0xFF7D5260))),
+        isDynamic = true
     )
 }

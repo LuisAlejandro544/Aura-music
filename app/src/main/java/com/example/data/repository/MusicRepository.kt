@@ -311,4 +311,17 @@ class MusicRepository(private val database: AppDatabase) {
         }
         savedTrack
     }
+
+    /**
+     * Inserta directamente una pista creada (ej: descarga desde enlace web/TikTok)
+     * y genera su respaldo estructurado en metadata/.
+     */
+    suspend fun insertCustomTrack(context: Context, track: Track): Track = withContext(Dispatchers.IO) {
+        val storageManager = com.example.data.storage.AppStorageManager(context)
+        val entity = TrackEntity.fromDomain(track)
+        val newId = trackDao.insertTrack(entity)
+        val savedTrack = trackDao.getTrackById(newId)?.toDomain() ?: track.copy(id = newId)
+        storageManager.saveMetadataJson(savedTrack)
+        savedTrack
+    }
 }

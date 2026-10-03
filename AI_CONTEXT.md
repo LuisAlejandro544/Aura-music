@@ -47,6 +47,8 @@ Este archivo define el contexto de diseño, directrices técnicas y restriccione
    - La animación de salida de Now Playing hacia abajo debe realizarse sin superposiciones de capas negras residuales (`slideOutVertically` limpio sobre fondo nativo).
    - Todos los elementos interactivos deben cumplir con un tamaño mínimo de toque de **48.dp**.
    - Modularidad en pantallas: `Home`, `Library`, `Import`, `NowPlaying`, `Settings`, `PlaylistDetail`.
+   - **Soporte Material You**: Permitir seleccionar tema dinámico Material You en Android 12+ (API 31+) armonizado con el wallpaper del sistema sin perder las superficies oscuras puras OLED.
+   - **Protección Tipográfica Fija**: La escala tipográfica del sistema se fija mediante `LocalDensity` con `fontScale = 1.0f` para garantizar que la configuración global de tamaño de texto del usuario en Android no altere ni rompa la composición visual ni corte títulos o etiquetas en la app.
 
 8. **Suite de Diagnóstico Propia & LeakCanary**:
    - La actividad `DebugMonitorActivity` ("Aura Monitor") debe mantenerse accesible desde el cajón de aplicaciones con su propio icono independiente.
@@ -69,17 +71,23 @@ Este archivo define el contexto de diseño, directrices técnicas y restriccione
     - Captura automática de fotograma de video en alta definición a WebP sin pérdida en `images/` como carátula de álbum.
     - Vinculación automática del Video Canvas sincronizado y reproducción inmediata tras la conversión.
 
-11. **Suite de Auriculares y Ajustes Acústicos**:
+11. **Descarga Directa desde TikTok y Enlaces Web**:
+    - Permite a los usuarios descargar cualquier canción completa, parodia o audio de cualquier duración pegando un enlace de TikTok o URL web.
+    - Resolución de enlaces sin marcas de agua mediante streaming directo de alta definición.
+    - Almacenamiento organizado: audio `.m4a`/`.mp3` en `songs/`, carátula oficial en WebP sin pérdida en `images/`, y video vinculado en `videos/` para reproducir el Video Canvas de fondo.
+    - Inicio automático de reproducción en Now Playing al finalizar la descarga.
+
+12. **Suite de Auriculares y Ajustes Acústicos**:
     - **Filtro Crossfeed en C++20**: Algoritmo Bauer / Chu Moy que se activa **exclusivamente** cuando hay auriculares conectados (`isHeadphoneConnected`). Debe permanecer en reposo cuando se reproduzca por los altavoces del teléfono.
     - **Balance Estéreo Fino L/R**: Ajustable en tiempo real tanto en la pantalla de *Ajustes* como directamente en la pantalla completa *Now Playing* y en la hoja modal de efectos con botón de centrado.
     - **Protección Becoming Noisy y Fade-In**: Pausa inmediata ante desconexión de audífonos (cable o Bluetooth) y aumento progresivo de volumen en reanudación (~1s) para cuidar la salud auditiva.
     - **Controles de Auriculares Personalizables**: Manejo configurable de 1 clic, 2 clics, 3 clics y pulsación prolongada (hold) con mapeo flexible.
 
-12. **Notificación Nativa del Sistema y MediaSessionService (Media3)**:
+13. **Notificación Nativa del Sistema y MediaSessionService (Media3)**:
     - La reproducción en segundo plano debe apoyarse en `AuraMediaPlaybackService` extendiendo `MediaSessionService`.
     - Proporciona el controlador multimedia del sistema (System Media Controls) en Android 13, 14, 15+ (con carátula HD y barra ondulada de progreso) y compatibilidad retroactiva limpia en Android 8.0 a 12 (`MediaStyle`).
     - El canal de notificación debe ser silencioso (`IMPORTANCE_LOW`) para evitar pitidos en cada cambio de canción.
     - En Android 13+ (API 33+) se debe solicitar el permiso en tiempo de ejecución `POST_NOTIFICATIONS`.
 
-13. **Idioma de Comunicación**:
+14. **Idioma de Comunicación**:
    - La documentación, comentarios en código, cadenas de usuario (`strings.xml`) y mensajes de commit deben redactarse en **español**.
