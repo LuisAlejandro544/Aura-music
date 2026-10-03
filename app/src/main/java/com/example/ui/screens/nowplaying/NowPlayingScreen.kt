@@ -6,6 +6,8 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -23,6 +25,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -202,6 +205,17 @@ fun NowPlayingScreen(
         modifier = modifier
             .fillMaxSize()
             .background(BackgroundDark)
+            .pointerInput(Unit) {
+                detectTapGestures {
+                    // Consumir toques en áreas vacías para que no traspasen a las pantallas de fondo
+                }
+            }
+            .clickable(
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() }
+            ) {
+                // Interceptar clics residuales en cualquier espacio de NowPlayingScreen
+            }
             .testTag("now_playing_screen")
     ) {
         // Modo FONDO COMPLETO: Renderiza el video de fondo detrás de toda la pantalla completa
