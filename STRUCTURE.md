@@ -57,6 +57,7 @@ AuraMusic/
 │   │   │   │   │   └── ThemePalette.kt         # Enum de temas de color vibrantes
 │   │   │   │   ├── playback/                   # Capa de reproducción de audio
 │   │   │   │   │   ├── AuraAudioPlayer.kt      # Motor Media3 ExoPlayer, cola, throttling y recuperación
+│   │   │   │   │   ├── AuraMediaPlaybackService.kt # Servicio MediaSessionService en primer plano y notificación nativa
 │   │   │   │   │   ├── AudioEffectManager.kt   # Gestor de EQ 10 bandas, BassBoost y Audio 8D
 │   │   │   │   │   ├── HeadphoneController.kt  # Gestor de auriculares, Becoming Noisy y botones físicos
 │   │   │   │   │   ├── NativeAudioEngine.kt    # Puente JNI hacia C++20 (EQ 10 bandas, 8D, Crossfeed y Balance)
