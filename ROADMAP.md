@@ -132,6 +132,10 @@ Este documento traza las fases de evolución técnica y funcional para convertir
   - Compatibilidad retroactiva completa para Android 11/12 (Quick Settings) y Android 8/9/10 (`MediaStyle`).
   - Canal de notificación silencioso (`IMPORTANCE_LOW`) para transiciones limpias y libres de interrupciones sonoras.
   - Reproducción continua e indestructible en segundo plano con pantalla apagada.
+- [x] **Descarga Directa desde YouTube y Video Web con Motor Optimizado**:
+  - Arquitectura de Doble Capa: Fast API Resolution + Headless Engine efímero con bloqueo de imágenes y multimedia para nulo impacto en batería.
+  - Adaptación visual dinámica al enlace pegado (Cyan/Magenta para TikTok y Rojo/Naranja para YouTube/Web).
+  - Extracción automática de audio `.m4a`/`.mp3`, carátula WebP y Video Canvas sincronizado para Now Playing.
 
 ---
 

@@ -28,6 +28,11 @@ import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import kotlinx.coroutines.launch
 
+enum class DownloadSourceMode(val label: String) {
+    TIKTOK("TikTok"),
+    YOUTUBE_WEB("YouTube / Web")
+}
+
 /**
  * Diálogo modal para descargar música y Video Canvas directamente desde enlaces de TikTok o videos web.
  *
@@ -40,6 +45,7 @@ import kotlinx.coroutines.launch
  */
 @Composable
 fun DownloadFromLinkDialog(
+    initialMode: DownloadSourceMode = DownloadSourceMode.TIKTOK,
     onDismiss: () -> Unit,
     onConfirmDownload: (
         resolvedInfo: OnlineVideoAudioImporter.ResolvedMediaInfo,
@@ -50,7 +56,9 @@ fun DownloadFromLinkDialog(
 ) {
     val coroutineScope = rememberCoroutineScope()
     val clipboardManager = LocalClipboardManager.current
+    val context = androidx.compose.ui.platform.LocalContext.current
 
+    var selectedMode by remember { mutableStateOf(initialMode) }
     var linkUrl by remember { mutableStateOf("") }
     var isResolving by remember { mutableStateOf(false) }
     var resolveError by remember { mutableStateOf<String?>(null) }
@@ -75,6 +83,13 @@ fun DownloadFromLinkDialog(
                     .fillMaxWidth()
                     .padding(20.dp)
             ) {
+                val isYoutube = linkUrl.contains("youtu", ignoreCase = true) || selectedMode == DownloadSourceMode.YOUTUBE_WEB
+                val headerGradient = if (isYoutube) {
+                    Brush.linearGradient(listOf(Color(0xFFFF0033), Color(0xFFFF3366), Color(0xFFFF8800)))
+                } else {
+                    Brush.linearGradient(listOf(Color(0xFF00F2FE), Color(0xFF4FACFE), Color(0xFFFF007F)))
+                }
+
                 // Cabecera con degradado
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -82,17 +97,13 @@ fun DownloadFromLinkDialog(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(42.dp)
+                            .size(44.dp)
                             .clip(RoundedCornerShape(12.dp))
-                            .background(
-                                Brush.linearGradient(
-                                    listOf(Color(0xFF00F2FE), Color(0xFF4FACFE), Color(0xFFFF007F))
-                                )
-                            ),
+                            .background(headerGradient),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Default.CloudDownload,
+                            imageVector = if (isYoutube) Icons.Default.SmartDisplay else Icons.Default.CloudDownload,
                             contentDescription = null,
                             tint = Color.White,
                             modifier = Modifier.size(24.dp)
@@ -103,7 +114,7 @@ fun DownloadFromLinkDialog(
 
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Descargar desde TikTok",
+                            text = if (isYoutube) "Descargar desde YouTube / Web" else "Descargar desde TikTok",
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.Bold,
                                 color = TextPrimary
@@ -125,6 +136,37 @@ fun DownloadFromLinkDialog(
                             tint = TextSecondary
                         )
                     }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Selector rápido de fuente
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        selected = selectedMode == DownloadSourceMode.TIKTOK,
+                        onClick = {
+                            selectedMode = DownloadSourceMode.TIKTOK
+                            resolveError = null
+                        },
+                        label = { Text("TikTok", fontSize = 12.sp) },
+                        leadingIcon = {
+                            Icon(Icons.Default.MusicNote, contentDescription = null, modifier = Modifier.size(16.dp))
+                        }
+                    )
+                    FilterChip(
+                        selected = selectedMode == DownloadSourceMode.YOUTUBE_WEB,
+                        onClick = {
+                            selectedMode = DownloadSourceMode.YOUTUBE_WEB
+                            resolveError = null
+                        },
+                        label = { Text("YouTube / Web", fontSize = 12.sp) },
+                        leadingIcon = {
+                            Icon(Icons.Default.SmartDisplay, contentDescription = null, modifier = Modifier.size(16.dp))
+                        }
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -190,7 +232,7 @@ fun DownloadFromLinkDialog(
                             isResolving = true
                             resolveError = null
                             coroutineScope.launch {
-                                val result = OnlineVideoAudioImporter.resolveMediaLink(linkUrl)
+                                val result = OnlineVideoAudioImporter.resolveMediaLink(linkUrl, context)
                                 isResolving = false
                                 result.onSuccess { info ->
                                     resolvedInfo = info

@@ -88,8 +88,12 @@ Este documento define el protocolo de trabajo para los agentes de software y des
 - [x] ¿El Balance Estéreo Fino (L/R) se puede ajustar en tiempo real en Now Playing y hoja modal?
 - [x] ¿La protección contra desconexiones ("Becoming Noisy" Guard) y Fade-In suave están activos?
 - [x] ¿La memoria de volumen dedicada y el control avanzado por botones de audífonos son configurables?
-- [x] ¿La notificación nativa del reproductor de Android (System Media Controls con MediaSessionService y MediaStyle retrocompatible) está integrada y funcional?
+- [x] ¿La notificación nativa del reproductor de Android (System Media Controls con MediaSessionService, ForwardingPlayer completo con Anterior/Play/Siguiente y MediaStyle retrocompatible) está integrada y funcional?
+- [x] ¿Las 10 bandas del ecualizador cuentan con etiquetas acústicas intuitivas (Subgraves, Bajos, Graves, Voces, Claridad, Brillo, Aire) junto a los Hz?
+- [x] ¿El botón de modo de video en Now Playing tiene formato de cápsula elevada visible y ergonómica de alto contraste?
+- [x] ¿El temporizador de apagado ejecuta su atenuación suave y pausa en el hilo principal (Main Thread) previniendo excepciones de ExoPlayer?
 - [x] ¿La función de descarga desde TikTok y enlaces web extrae la música de cualquier duración, genera carátula en WebP y vincula el Video Canvas de fondo automáticamente?
+- [x] ¿La descarga desde YouTube / Video Web con resolución optimizada de doble capa (Fast API + Headless Engine efímero anti-batería) y tema visual adaptativo está integrada y operativa?
 - [x] ¿La opción de paleta dinámica 'Material You' está disponible y operativa en ajustes para Android 12+?
 - [x] ¿La escala tipográfica está fijada a un valor cómodo (fontScale = 1.0f) para evitar que los ajustes de texto del sistema desborden la interfaz?
 - [x] ¿Los 5 archivos Markdown (`README.md`, `ROADMAP.md`, `STRUCTURE.md`, `AI_CONTEXT.md`, `AGENTS.md`) están actualizados y en español?

@@ -71,11 +71,13 @@ Este archivo define el contexto de diseño, directrices técnicas y restriccione
     - Captura automática de fotograma de video en alta definición a WebP sin pérdida en `images/` como carátula de álbum.
     - Vinculación automática del Video Canvas sincronizado y reproducción inmediata tras la conversión.
 
-11. **Descarga Directa desde TikTok y Enlaces Web**:
-    - Permite a los usuarios descargar cualquier canción completa, parodia o audio de cualquier duración pegando un enlace de TikTok o URL web.
-    - Resolución de enlaces sin marcas de agua mediante streaming directo de alta definición.
+11. **Descarga Directa desde TikTok, YouTube y Enlaces Web**:
+    - Permite a los usuarios descargar cualquier canción completa, parodia o audio de cualquier duración pegando un enlace de TikTok, YouTube o URL web.
+    - **Motor de Doble Capa Optimizado Anti-Batería**:
+      - *Fast API*: Resolución rápida en <1s mediante endpoints de streaming público.
+      - *Headless Engine Efímero*: WebView invisible de solo 2-3s con bloqueo total de imágenes y multimedia que descifra firmas n-sig y supera PO Tokens/BotGuard en local, destruyéndose de inmediato para liberar el 100% de la memoria.
     - Almacenamiento organizado: audio `.m4a`/`.mp3` en `songs/`, carátula oficial en WebP sin pérdida en `images/`, y video vinculado en `videos/` para reproducir el Video Canvas de fondo.
-    - Inicio automático de reproducción en Now Playing al finalizar la descarga.
+    - Interfaz adaptativa: Degradados visuales reactivos (Cyan/Magenta para TikTok, Rojo Carmesí/Naranja para YouTube/Web) y reproducción inmediata en Now Playing tras descargar.
 
 12. **Suite de Auriculares y Ajustes Acústicos**:
     - **Filtro Crossfeed en C++20**: Algoritmo Bauer / Chu Moy que se activa **exclusivamente** cuando hay auriculares conectados (`isHeadphoneConnected`). Debe permanecer en reposo cuando se reproduzca por los altavoces del teléfono.

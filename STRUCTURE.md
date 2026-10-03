@@ -51,8 +51,11 @@ AuraMusic/
 │   │   │   │   │   │       └── PlaylistTrackCrossRef.kt # Relación muchos a muchos
 │   │   │   │   │   ├── repository/
 │   │   │   │   │   │   └── MusicRepository.kt  # Repositorio central de datos, SAF y Playlists
-│   │   │   │   │   └── storage/
-│   │   │   │   │       └── AppStorageManager.kt # Almacenamiento estructurado y carátulas WebP
+│   │   │   │   │   ├── storage/
+│   │   │   │   │   │   └── AppStorageManager.kt # Almacenamiento estructurado y carátulas WebP
+│   │   │   │   │   └── importer/
+│   │   │   │   │       ├── OnlineVideoAudioImporter.kt # Importador de TikTok y enlaces web
+│   │   │   │   │       └── WebStreamExtractor.kt # Extractor optimizado de streaming y video web
 │   │   │   │   ├── model/                      # Modelos de dominio
 │   │   │   │   │   ├── Track.kt                # Modelo de datos de canción
 │   │   │   │   │   ├── Playlist.kt             # Modelo de datos de lista

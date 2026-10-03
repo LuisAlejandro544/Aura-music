@@ -31,8 +31,18 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
   - Hoja de especificaciones de audio y modal para **editar metadatos y carátula**.
 
 ### 2. Ecualizador C++20 Integrado en Modal (Sin Apartados Aislados)
-- **10 Bandas Paramétricas ISO**:
-  - Frecuencias centrales: `31 Hz, 62 Hz, 125 Hz, 250 Hz, 500 Hz, 1 kHz, 2 kHz, 4 kHz, 8 kHz, 16 kHz`.
+- **10 Bandas Paramétricas ISO con Nombres Intuitivos**:
+  - Cada perilla incluye su descriptor acústico en lenguaje claro junto a los hercios:
+    - `31 Hz`: **Subgraves** (vibración sísmica y bajos sub-graves).
+    - `62 Hz`: **Bajos** (graves contundentes y bombo).
+    - `125 Hz`: **Graves** (calidez y bajo melódico).
+    - `250 Hz`: **Cuerpo** (resonancia acústica de instrumentos).
+    - `500 Hz`: **Medios Bajos** (peso instrumental).
+    - `1 kHz`: **Voces** (presencia vocal principal).
+    - `2 kHz`: **Claridad** (definición y articulación de voz).
+    - `4 kHz`: **Presencia** (ataque de percusión y guitarras).
+    - `8 kHz`: **Brillo** (platillos y detalle agudo).
+    - `16 kHz`: **Aire / Agudos** (apertura Hi-Fi y espacialidad).
   - Filtros IIR Bi-cuadráticos (*Peaking Biquads*) en coma flotante de 64 bits con limitador suave anti-clipping.
   - Rango de ganancia de `-15 dB` a `+15 dB`.
 - **Integración Total en Hoja Modal**: Ya no existe una pantalla separada que interrumpa la navegación; se abre como una pestaña directa en la hoja de efectos desde el Mini Reproductor o Now Playing.
@@ -76,13 +86,16 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
   - 🎬 **Video Canvas Vinculado**: Vincula el video como Canvas de fondo sincronizado en `NowPlayingScreen`.
 - **Reproducción Inmediata**: Al finalizar la conversión, la pista recién creada se reproduce de inmediato con su Video Canvas y atmósfera lumínica armonizada.
 
-### 6. Descarga Directa desde TikTok y Enlaces Web (Música, Carátula y Video Canvas) 🎬🔗🎵
-- **Descargas sin Límite de Duración**: Permite pegar cualquier enlace de video de TikTok (o URL de video web) para descargar música completa, parodias, versiones especiales o directos de cualquier duración.
-- **Extracción Automática sin Marcas de Agua**:
+### 6. Descarga Directa desde TikTok, YouTube y Enlaces Web (Música, Carátula y Video Canvas) 🎬🔗🎵
+- **Descargas sin Límite de Duración**: Permite pegar enlaces de **TikTok**, **YouTube** y videos web para descargar música completa, directos, sesiones o parodias de cualquier duración.
+- **Motor de Doble Capa Optimizado Anti-Batería (Sin Sobrecarga ni Wrappers Pesados)**:
+  - ⚡ **Fast API Resolution (500ms - 1.5s)**: Consulta directa de endpoints públicos para obtener el flujo sin abrir motores pesados.
+  - 🛡️ **Headless Engine Efímero (2s - 3s)**: Si hay bloqueos o retos de BotGuard / PO Token, un WebView invisible y ultra optimizado ejecuta el JavaScript oficial con bloqueo total de imágenes, estilos y multimedia. En cuanto captura la URL descifrada del stream, se destruye y libera el 100% de la RAM, consumiendo cero batería.
+- **Extracción Automática 3 en 1**:
   - 🎵 **Audio de Alta Fidelidad**: Extrae la pista de audio pura en formato `.m4a` o `.mp3` directamente a `songs/`.
   - 🖼️ **Carátula Oficial en WebP**: Descarga la portada en alta resolución (o extrae fotograma clave) y la procesa a WebP sin pérdida en `images/`.
   - 🎬 **Video Canvas Vinculado**: Almacena el video en `videos/` para reproducirlo de fondo continuo o sincronizado en *Now Playing*.
-- **Previsualización y Edición Rápida**: Muestra título, autor/creador, duración y portada antes de confirmar, permitiendo ajustar los nombres antes de guardar.
+- **Previsualización y Edición Rápida**: Muestra título, autor/creador, duración y portada antes de confirmar con temas visuales adaptativos (Cyan/Magenta para TikTok, Rojo Carmesí/Naranja para YouTube/Web).
 - **Reproducción al Instante**: Una vez descargada, inicia la reproducción automáticamente abriendo Now Playing.
 
 ### 7. Carátulas Personalizadas de Galería & Arte Procedural
@@ -109,8 +122,8 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
 
 ### 9. Notificación Nativa del Reproductor de Android & Segundo Plano 🔔
 - **Controlador Multimedia Nativo de Android (System Media Controls)**:
-  - Integración completa con **Jetpack Media3 `MediaSessionService`** y `MediaSession`.
-  - **Android 13, 14, 15+**: Tarjeta multimedia nativa en la cortina de notificaciones con arte de tapa en alta resolución, colores adaptativos dinámicos y **línea ondulada interactiva (*squiggled seekbar*)** para avanzar o retroceder sin abrir la app.
+  - Integración completa con **Jetpack Media3 `MediaSessionService`**, `MediaSession` y `ForwardingPlayer`.
+  - **Android 13, 14, 15+**: Tarjeta multimedia simétrica y completa en la cortina de notificaciones con arte de tapa en alta resolución, colores adaptativos dinámicos, **línea ondulada interactiva (*squiggled seekbar*)** y botonera completa con **Anterior (|<<), Play/Pausa (||) y Siguiente (>>|)** siempre disponibles.
   - **Android 11 y 12**: Controles multimedia integrados en el panel de Ajustes Rápidos (*Quick Settings*).
   - **Android 8.0 Oreo, 9 Pie y 10**: Notificación de estilo multimedia retrocompatible (`MediaStyle`) con botones de reproducción y carátula.
 - **Canal de Notificación Silencioso**: Configurado con `IMPORTANCE_LOW` para cambiar de pista sin emitir timbres o alertas intrusivas.

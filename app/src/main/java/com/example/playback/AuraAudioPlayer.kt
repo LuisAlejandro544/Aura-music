@@ -180,7 +180,47 @@ class AuraAudioPlayer(
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
 
-            val session = MediaSession.Builder(context, player)
+            val forwardingPlayer = object : androidx.media3.common.ForwardingPlayer(player) {
+                override fun getAvailableCommands(): Player.Commands {
+                    return super.getAvailableCommands().buildUpon()
+                        .add(Player.COMMAND_SEEK_TO_NEXT)
+                        .add(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
+                        .add(Player.COMMAND_SEEK_TO_PREVIOUS)
+                        .add(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
+                        .build()
+                }
+
+                override fun isCommandAvailable(command: Int): Boolean {
+                    return when (command) {
+                        Player.COMMAND_SEEK_TO_NEXT,
+                        Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM,
+                        Player.COMMAND_SEEK_TO_PREVIOUS,
+                        Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM -> true
+                        else -> super.isCommandAvailable(command)
+                    }
+                }
+
+                override fun seekToNext() {
+                    playNext()
+                }
+
+                override fun seekToNextMediaItem() {
+                    playNext()
+                }
+
+                override fun seekToPrevious() {
+                    playPrevious()
+                }
+
+                override fun seekToPreviousMediaItem() {
+                    playPrevious()
+                }
+
+                override fun hasNextMediaItem(): Boolean = true
+                override fun hasPreviousMediaItem(): Boolean = true
+            }
+
+            val session = MediaSession.Builder(context, forwardingPlayer)
                 .setSessionActivity(sessionActivityPendingIntent)
                 .build()
             mediaSession = session
@@ -321,7 +361,13 @@ class AuraAudioPlayer(
 
     fun setVolume(volume: Float) {
         baseVolume = volume.coerceIn(0.0f, 1.0f)
-        exoPlayer?.volume = baseVolume
+        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
+            exoPlayer?.volume = baseVolume
+        } else {
+            playerScope.launch(Dispatchers.Main) {
+                exoPlayer?.volume = baseVolume
+            }
+        }
     }
 
     fun getVolume(): Float = baseVolume

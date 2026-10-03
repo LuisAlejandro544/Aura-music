@@ -537,7 +537,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         )
         audioPlayer.setVolume(1.0f)
 
-        sleepTimerJob = viewModelScope.launch(Dispatchers.Default) {
+        sleepTimerJob = viewModelScope.launch(Dispatchers.Main) {
             var currentRemaining = totalSec
             while (currentRemaining > 0) {
                 kotlinx.coroutines.delay(1000)
