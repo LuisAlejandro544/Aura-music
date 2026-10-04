@@ -29,6 +29,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.material3.MaterialTheme
+import com.example.model.VideoDisplayMode
 import com.example.ui.components.BottomNavBar
 import com.example.ui.components.MiniPlayer
 import com.example.ui.navigation.NavScreen
@@ -39,8 +41,10 @@ import com.example.ui.screens.library.LibraryScreen
 import com.example.ui.screens.nowplaying.NowPlayingScreen
 import com.example.ui.screens.playlist.PlaylistDetailScreen
 import com.example.ui.screens.settings.SettingsScreen
+import com.example.ui.theme.ArtworkColorExtractor
 import com.example.ui.theme.AuraMusicTheme
 import com.example.ui.theme.BackgroundDark
+import com.example.ui.theme.ExtractedArtworkColors
 import com.example.viewmodel.MusicViewModel
 
 /**
@@ -143,6 +147,7 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
 
     val sleepTimerState by viewModel.sleepTimerState.collectAsStateWithLifecycle()
     val spatial8DConfig by viewModel.spatial8DConfig.collectAsStateWithLifecycle()
+    val reverbConfig by viewModel.reverbConfig.collectAsStateWithLifecycle()
     val playbackSpeed by viewModel.playbackSpeed.collectAsStateWithLifecycle()
     val playbackPitch by viewModel.playbackPitch.collectAsStateWithLifecycle()
     val crossfadeSeconds by viewModel.crossfadeSeconds.collectAsStateWithLifecycle()
@@ -157,6 +162,53 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
 
     var showGlobalAudioEffectsSheet by remember { mutableStateOf(false) }
     var initialAudioEffectsTab by remember { mutableIntStateOf(0) }
+
+    // Paleta de color dinámica para el Mini Reproductor sincronizada con la pista activa
+    val defaultMiniPrimary = MaterialTheme.colorScheme.primary
+    val defaultMiniSecondary = MaterialTheme.colorScheme.secondary
+    var miniPlayerColors by remember {
+        mutableStateOf(
+            ExtractedArtworkColors(
+                primary = defaultMiniPrimary,
+                secondary = defaultMiniSecondary,
+                accent = defaultMiniPrimary,
+                ambientTopGlow = defaultMiniPrimary.copy(alpha = 0.25f)
+            )
+        )
+    }
+
+    LaunchedEffect(currentTrack?.id, currentTrack?.albumArtPath, currentTrack?.videoUri, isDynamicArtworkColorEnabled) {
+        if (currentTrack != null && isDynamicArtworkColorEnabled) {
+            val isVideo = (videoDisplayMode != VideoDisplayMode.OFF) && !currentTrack?.videoUri.isNullOrEmpty()
+            miniPlayerColors = ArtworkColorExtractor.extractPlaybackColors(
+                context = context,
+                track = currentTrack,
+                isVideoActive = isVideo,
+                isDynamicEnabled = isDynamicArtworkColorEnabled,
+                fallbackPrimary = defaultMiniPrimary,
+                fallbackSecondary = defaultMiniSecondary,
+                positionMs = currentPosition
+            )
+        } else {
+            miniPlayerColors = ExtractedArtworkColors(
+                primary = defaultMiniPrimary,
+                secondary = defaultMiniSecondary,
+                accent = defaultMiniPrimary,
+                ambientTopGlow = defaultMiniPrimary.copy(alpha = 0.25f)
+            )
+        }
+    }
+
+    val animatedMiniPrimary by animateColorAsState(
+        targetValue = miniPlayerColors.primary,
+        animationSpec = tween(600),
+        label = "MiniPlayerPrimary"
+    )
+    val animatedMiniSecondary by animateColorAsState(
+        targetValue = miniPlayerColors.secondary,
+        animationSpec = tween(600),
+        label = "MiniPlayerSecondary"
+    )
 
     // Manejo de botón Atrás
     val canGoBack = isNowPlayingExpanded || (currentScreen !is NavScreen.Home)
@@ -179,7 +231,7 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                         .fillMaxWidth()
                         .background(BackgroundDark)
                 ) {
-                    // Mini reproductor flotante con transición suave
+                    // Mini reproductor flotante con transición suave y fondo tintado dinámico
                     AnimatedVisibility(
                         visible = currentTrack != null && !isNowPlayingExpanded,
                         enter = fadeIn(animationSpec = tween(220)) + slideInVertically(
@@ -198,11 +250,10 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                             durationMs = duration,
                             onTogglePlayPause = { viewModel.togglePlayPause() },
                             onSkipNext = { viewModel.playNext() },
-                            onOpenEqualizer = {
-                                initialAudioEffectsTab = 0
-                                showGlobalAudioEffectsSheet = true
-                            },
-                            onClick = { viewModel.setNowPlayingExpanded(true) }
+                            onSkipPrevious = { viewModel.playPrevious() },
+                            onClick = { viewModel.setNowPlayingExpanded(true) },
+                            dynamicPrimary = animatedMiniPrimary,
+                            dynamicSecondary = animatedMiniSecondary
                         )
                     }
 
@@ -433,6 +484,12 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                 onSet8DOrbitSpeed = { viewModel.set8DOrbitSpeed(it) },
                 onSet8DSpatialIntensity = { viewModel.set8DSpatialIntensity(it) },
                 onSet8DRoomDepth = { viewModel.set8DRoomDepth(it) },
+                reverbConfig = reverbConfig,
+                onSetReverbEnabled = { viewModel.setReverbEnabled(it) },
+                onSetReverbPreset = { viewModel.setReverbPreset(it) },
+                onSetReverbCustomParameters = { roomSize, decayMs, levelDb ->
+                    viewModel.setReverbCustomParameters(roomSize, decayMs, levelDb)
+                },
                 playbackSpeed = playbackSpeed,
                 onSetPlaybackSpeed = { viewModel.setPlaybackSpeed(it) },
                 playbackPitch = playbackPitch,
@@ -475,15 +532,21 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                 onBandLevelChange = { index, level -> viewModel.setBandLevel(index, level) },
                 onBassBoostChange = { viewModel.setBassBoost(it) },
                 onPresetSelect = { viewModel.applyPreset(it) },
-                sleepTimerState = sleepTimerState,
-                onStartSleepTimer = { viewModel.startSleepTimer(it) },
-                onCancelSleepTimer = { viewModel.cancelSleepTimer() },
-                onAddSleepTimerMinutes = { viewModel.addSleepTimerMinutes(it) },
                 spatial8DConfig = spatial8DConfig,
                 onSet8DEnabled = { viewModel.set8DEnabled(it) },
                 onSet8DOrbitSpeed = { viewModel.set8DOrbitSpeed(it) },
                 onSet8DSpatialIntensity = { viewModel.set8DSpatialIntensity(it) },
                 onSet8DRoomDepth = { viewModel.set8DRoomDepth(it) },
+                reverbConfig = reverbConfig,
+                onSetReverbEnabled = { viewModel.setReverbEnabled(it) },
+                onSetReverbPreset = { viewModel.setReverbPreset(it) },
+                onSetReverbCustomParameters = { roomSize, decayMs, levelDb ->
+                    viewModel.setReverbCustomParameters(roomSize, decayMs, levelDb)
+                },
+                sleepTimerState = sleepTimerState,
+                onStartSleepTimer = { viewModel.startSleepTimer(it) },
+                onCancelSleepTimer = { viewModel.cancelSleepTimer() },
+                onAddSleepTimerMinutes = { viewModel.addSleepTimerMinutes(it) },
                 playbackSpeed = playbackSpeed,
                 onSetPlaybackSpeed = { viewModel.setPlaybackSpeed(it) },
                 playbackPitch = playbackPitch,

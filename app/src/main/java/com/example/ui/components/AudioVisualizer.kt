@@ -18,6 +18,9 @@ import androidx.compose.ui.unit.dp
  * Visualizador interactivo de ondas de audio impulsado por el motor C++20 DSP de Aura Music.
  * Dibuja barras rítmicas de ecualización en tiempo real calculadas directamente a partir
  * de la intensidad acústica y la energía espectral de las muestras PCM.
+ *
+ * Soporta degradado vertical fluido (de primario superior a secundario inferior)
+ * adaptado dinámicamente en tiempo real al color del Video Canvas o carátula.
  */
 @Composable
 fun AudioVisualizer(
@@ -26,10 +29,12 @@ fun AudioVisualizer(
     realBands: FloatArray? = null,
     barCount: Int = 28,
     barHeight: Dp = 48.dp,
-    customColor: Color? = null
+    customColor: Color? = null,
+    customPrimaryColor: Color? = null,
+    customSecondaryColor: Color? = null
 ) {
-    val primaryColor = customColor ?: MaterialTheme.colorScheme.primary
-    val secondaryColor = MaterialTheme.colorScheme.secondary
+    val primaryColor = customPrimaryColor ?: customColor ?: MaterialTheme.colorScheme.primary
+    val secondaryColor = customSecondaryColor ?: MaterialTheme.colorScheme.secondary
 
     Canvas(
         modifier = modifier

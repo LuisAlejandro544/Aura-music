@@ -41,7 +41,10 @@ AuraMusic/
 │   │   │   │   │   │   ├── ProceduralArtworkGenerator.kt # Generador procedural de carátulas
 │   │   │   │   │   │   ├── SampleMusicGenerator.kt # Sintetizador de audio WAV para demos
 │   │   │   │   │   │   ├── VideoAudioExtractor.kt  # Extractor de audio nativo y generador 3 en 1 de Video a Música
-│   │   │   │   │   │   └── WebStreamExtractor.kt   # Extractor híbrido (InnerTube API nativa + Headless WebView)
+│   │   │   │   │   │   ├── InnerTubeClient.kt      # Cliente InnerTube multi-cliente sin fricción (ANDROID_VR, VISIONOS)
+│   │   │   │   │   │   ├── InvidiousStreamResolver.kt # Resolvedor de respaldo para canciones con restricción de derechos
+│   │   │   │   │   │   ├── HeadlessWebViewExtractor.kt # Extractor móvil en segundo plano sobre m.youtube.com
+│   │   │   │   │   │   └── WebStreamExtractor.kt   # Orquestador híbrido de 3 niveles con fallback automático
 │   │   │   │   │   ├── local/                  # Capa de persistencia local Room SQLite
 │   │   │   │   │   │   ├── AppDatabase.kt      # Base de datos Room
 │   │   │   │   │   │   ├── dao/
@@ -79,15 +82,16 @@ AuraMusic/
 │   │   │   │   │   │   ├── audioeffects/       # Pestañas modulares de efectos acústicos
 │   │   │   │   │   │   │   ├── EqualizerTabContent.kt         # Ecualizador 10 bandas ISO, presets y Bass Boost
 │   │   │   │   │   │   │   ├── Spatial8DTabContent.kt         # Motor Audio 8D Espacial y controles de órbita
+│   │   │   │   │   │   │   ├── ReverbTabContent.kt            # Suite Reverb híbrida (Presets + personalización)
 │   │   │   │   │   │   │   ├── SleepTimerTabContent.kt        # Temporizador de apagado con fade-out de 10s
 │   │   │   │   │   │   │   ├── PlaybackParametersTabContent.kt# Velocidad y Tono (Pitch Shift) con protección
 │   │   │   │   │   │   │   ├── TransitionsTabContent.kt       # Crossfade de 0-12s y conmutador Gapless
 │   │   │   │   │   │   │   └── BalanceAndHeadphonesTabContent.kt# Balance L/R y Crossfeed C++20 rápido
-│   │   │   │   │   │   ├── AudioVisualizer.kt  # Visualizador de ondas en tiempo real
+│   │   │   │   │   │   ├── AudioVisualizer.kt  # Visualizador de ondas en tiempo real con degradado dinámico
 │   │   │   │   │   │   ├── BackgroundVideoPlayer.kt # Renderizador de video de fondo (Loops Canvas y Video Sync)
 │   │   │   │   │   │   ├── BottomNavBar.kt     # Barra de navegación limpia (4 pestañas)
 │   │   │   │   │   │   ├── EditTrackDialog.kt  # Modal con Photo Picker y edición de carátula/video
-│   │   │   │   │   │   ├── MiniPlayer.kt       # Mini reproductor opaco con acceso directo a EQ modal
+│   │   │   │   │   │   ├── MiniPlayer.kt       # Mini reproductor tintado con controles Anterior/Play/Siguiente
 │   │   │   │   │   │   ├── ProceduralArtwork.kt # Arte vectorial dinámico en tiempo real
 │   │   │   │   │   │   ├── TrackListItem.kt    # Fila de canción con menú contextual
 │   │   │   │   │   │   ├── VideoToMusicDialog.kt # Diálogo de conversión y previsualización de Video a Música

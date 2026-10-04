@@ -133,10 +133,11 @@ Este documento traza las fases de evolución técnica y funcional para convertir
   - Compatibilidad retroactiva completa para Android 11/12 (Quick Settings) y Android 8/9/10 (`MediaStyle`).
   - Canal de notificación silencioso (`IMPORTANCE_LOW`) para transiciones limpias y libres de interrupciones sonoras.
   - Reproducción continua e indestructible en segundo plano con pantalla apagada.
-- [x] **Descarga Directa desde YouTube y Video Web con Motor Dual (InnerTube + WebView Reparado)**:
-  - **Motor Nativo InnerTube (YouTube Music)**: Clientes `ANDROID_MUSIC` y `WEB_REMIX` para extracción directa, gratuita y sin bloqueo por IP de centro de datos en <300ms.
-  - **Motor Headless WebView Reparado**: Solución del bloqueo de gestos (`mediaPlaybackRequiresUserGesture = false`), bypass de muros de cookies con modo Embed nocookie, e intercepción de red / evaluación de `ytInitialPlayerResponse`.
-  - **Selector Interactivo de Motor**: Permite al usuario alternar entre InnerTube y WebView en el diálogo de descarga con auto-fallback cruzado.
+- [x] **Descarga Directa desde YouTube y Video Web con Arquitectura Resiliente de 3 Niveles**:
+  - **Motor Nativo InnerTube (`InnerTubeClient`)**: Clientes de baja fricción `ANDROID_VR` y `VISIONOS` para extracción ultrarrápida (<300ms) libre de `LOGIN_REQUIRED` o cifrado de firma `n-sig`.
+  - **Bypass de Respaldo Invidious (`InvidiousStreamResolver`)**: Consulta en tiempo real a espejos de alta disponibilidad para resolver pistas protegidas por derechos o VEVO.
+  - **Motor Headless WebView Reparado (`HeadlessWebViewExtractor`)**: Navegador efímero móvil (`m.youtube.com`) con bypass de gestos, timeout de 22s y captura en memoria.
+  - **Selector Interactivo de Motor**: Permite al usuario alternar entre InnerTube y WebView en el diálogo con auto-fallback cruzado de 3 capas.
   - Adaptación visual dinámica al enlace pegado (Cyan/Magenta para TikTok y Rojo/Naranja para YouTube/Web).
   - Extracción automática de audio `.m4a`/`.mp3`, carátula WebP y Video Canvas sincronizado para Now Playing.
 
@@ -144,15 +145,15 @@ Este documento traza las fases de evolución técnica y funcional para convertir
 
 ## 🎤 Fase 6: Visualizador Espectral, Intensidad Acústica C++20 y Letras Karaoke (Completada ✅)
 
-- [x] **Reacción Dinámica por Intensidad Acústica Ligada a C++20 DSP**:
+- [x] **Visualizador Espectral y Armonización Dinámica de Video Canvas**:
   - Medición RMS en tiempo real y cálculo de envolvente espectral de 28 bandas directamente en el motor nativo (`getAudioIntensity()` y `getVisualizerBands()`).
-  - Respiración física de la carátula y el Video Canvas (`scale` elástico de 1.00x a 1.04x) sincronizado con el compás musical.
-  - Sombra dinámica y halo lumínico ambiental superior con modulación de opacidad y elevación al ritmo de la música.
-  - Visualizador de ondas sonoras `AudioVisualizer` alimentado por las bandas de frecuencia calculadas en C++.
-- [x] **Cápsula Ergonómica Flotante de Alto Contraste para Video Canvas**:
-  - Sustitución de selectores pequeños o apretados por una cápsula flotante visible y ergonómica al pie de la carátula con área táctil superior a **48.dp**.
-  - Fondo negro cinematográfico de alto contraste, borde neón reactivo y feedback táctil claro.
-  - Alternado con un toque entre los 3 modos (*Fondo Completo*, *En Carátula* y *Desactivado*) y apertura del selector modal con pulsación prolongada.
+  - Carátula central y Video Canvas despejados al 100% (eliminación de cápsulas flotantes superpuestas) con escala fija 1.0f para máxima nitidez sin movimientos no deseados.
+  - Sombra y halo lumínico ambiental superior modulando brillo y color en intervalos de 2.5s según las escenas del video con fundido suave (`tween(1200)`).
+  - Visualizador de ondas sonoras `AudioVisualizer` alimentado por las bandas calculadas en C++.
+- [x] **Mini Reproductor Tintado y Atajos Equilibrados**:
+  - Fondo del mini reproductor completamente tintado y degradado con los colores extraídos de la pista o video actual.
+  - Botonera inferior de Now Playing rediseñada en 3 módulos simétricos con área táctil superior a 48dp, resolviendo el corte vertical en el botón de cola.
+  - Desbloqueo total de duración en TikTok mediante demuxing directo de audio sin recodificación para pistas de hasta 1 hora.
 - [x] **Letras Sincronizadas (.LRC) Estilo Karaoke con Descarga Automática**:
   - Descarga automática libre desde el servicio público **LRCLIB** al iniciar canciones sin letra, sin registro ni claves externas.
   - Persistencia local en la subcarpeta estructurada `lyrics/track_{id}.lrc`.

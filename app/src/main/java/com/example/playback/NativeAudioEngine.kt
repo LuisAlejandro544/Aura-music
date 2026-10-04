@@ -177,6 +177,13 @@ object NativeAudioEngine {
         fallbackStereoBalance = clamped
     }
 
+    fun setReverbParameters(enabled: Boolean, roomSize: Float, decayMs: Int, levelDb: Float) {
+        fallbackReverbEnabled = enabled
+        fallbackReverbRoomSize = roomSize.coerceIn(0.1f, 2.0f)
+        fallbackReverbDecayMs = decayMs.coerceIn(100, 6000)
+        fallbackReverbLevelDb = levelDb.coerceIn(-30.0f, 6.0f)
+    }
+
     /**
      * Retorna la intensidad acústica RMS en tiempo real calculada en C++20 (0.0 a 1.0).
      */
@@ -253,6 +260,17 @@ object NativeAudioEngine {
     private var fallbackStereoBalance = 0.0f
     private var fallbackIntensity = 0.20f
     private val fallbackVisualizerBands = FloatArray(28) { 0.25f }
+
+    private var fallbackReverbEnabled = false
+    private var fallbackReverbRoomSize = 0.5f
+    private var fallbackReverbDecayMs = 1500
+    private var fallbackReverbLevelDb = -4.0f
+    private val combBufferL1 = DoubleArray(1116)
+    private val combBufferL2 = DoubleArray(1356)
+    private val combBufferR1 = DoubleArray(1277)
+    private val combBufferR2 = DoubleArray(1422)
+    private var combIdxL1 = 0; private var combIdxL2 = 0
+    private var combIdxR1 = 0; private var combIdxR2 = 0
 
     private class BiquadCoeffs {
         var b0 = 1.0; var b1 = 0.0; var b2 = 0.0
@@ -374,6 +392,34 @@ object NativeAudioEngine {
                 if (fallbackBalanceEnabled && fallbackChannels > 1) {
                     sL *= gainL
                     sR *= gainR
+                }
+
+                // Reverb Ambiental en Fallback
+                if (fallbackReverbEnabled) {
+                    val wet = 10.0.pow(fallbackReverbLevelDb / 20.0).coerceIn(0.0, 1.2)
+                    val feedback = (0.42 + (fallbackReverbRoomSize * 0.22)).coerceIn(0.35, 0.90)
+
+                    val delayedL1 = combBufferL1[combIdxL1]
+                    combBufferL1[combIdxL1] = sL + delayedL1 * feedback
+                    combIdxL1 = (combIdxL1 + 1) % combBufferL1.size
+
+                    val delayedL2 = combBufferL2[combIdxL2]
+                    combBufferL2[combIdxL2] = sL + delayedL2 * feedback
+                    combIdxL2 = (combIdxL2 + 1) % combBufferL2.size
+
+                    val delayedR1 = combBufferR1[combIdxR1]
+                    combBufferR1[combIdxR1] = sR + delayedR1 * feedback
+                    combIdxR1 = (combIdxR1 + 1) % combBufferR1.size
+
+                    val delayedR2 = combBufferR2[combIdxR2]
+                    combBufferR2[combIdxR2] = sR + delayedR2 * feedback
+                    combIdxR2 = (combIdxR2 + 1) % combBufferR2.size
+
+                    val revL = (delayedL1 + delayedL2) * 0.5
+                    val revR = (delayedR1 + delayedR2) * 0.5
+
+                    sL = (sL * 0.85) + (revL * wet * 0.40)
+                    sR = (sR * 0.85) + (revR * wet * 0.40)
                 }
 
                 sL = (sL.coerceIn(-1.2, 1.2)).let { it - (it * it * it) / 6.0 }

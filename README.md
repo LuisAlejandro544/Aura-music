@@ -49,7 +49,14 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
 - **Perfiles Acústicos (Presets)**: Rock, Pop, Electrónica, Jazz, Acústico, Bass Boost y Plano.
 - **Refuerzo de Bajos C++ (Bass Boost)** calibrado a 60 Hz con modulación precisa.
 
-### 3. Audio 8D Espacial y Controles Avanzados de Escucha
+### 3. Audio 8D Espacial, Suite Reverb y Controles Avanzados de Escucha
+- **Suite Reverb Híbrida & Filtros Acústicos Ambientales**:
+  - Simulación de espacios físicos reales mediante presets de alta fidelidad: *Estudio*, *Sala Mediana*, *Club En Vivo*, *Gran Hall / Teatro*, *Catedral* y *Eco Espacial*.
+  - Personalización acústica libre para ajuste milimétrico:
+    - *Tamaño de Sala / Espacio* (0.1x a 2.0x).
+    - *Tiempo de Decaimiento / Resonancia* (200 ms a 6000 ms).
+    - *Nivel de Reverberación / Mezcla Húmeda* (-24 dB a +6 dB).
+  - Algoritmo de filtrado comb nativo y vinculación complementaria a sesiones de audio por hardware.
 - **Audio Espacial 8D Binaural para Auriculares**:
   - Paneo orbital tridimensional continuo en tiempo real (4s a 30s por rotación completa).
   - Simulación acústica de sombra de cabeza (*Head Shadow Filtering*) y reverberación espacial ambiental.
@@ -68,21 +75,25 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
 ### 4. Video Canvas Multifuncional y Reacción por Intensidad Ligada a C++20 DSP 🎬⚡
 - **Respiración y Pulsación Acústica Ligada a C++20 DSP**:
   - Medición RMS y envolvente espectral continua en tiempo real calculada dentro del motor nativo en C++20 (`getAudioIntensity()` y `getVisualizerBands()`).
-  - La carátula central y el Video Canvas respiran sutilmente con el compás de la música (`scale` dinámico y elevación de sombra de 18dp a 34dp).
-  - El halo lumínico de luz ambiental superior y el visualizador de 28 bandas modulan su brillo e intensidad armónica al ritmo acústico real de la pista.
-- **Cápsula Flotante Ergonómica de Alto Contraste para Video Canvas**:
-  - Sustituye cualquier botón pequeño o apretado por una cápsula flotante visible y ergonómica ubicada en la parte inferior de la carátula.
-  - Diseñada con área táctil superior a **48.dp**, fondo negro cinematográfico de alto contraste (`Color.Black.copy(alpha = 0.88f)`), borde neón reactivo y feedback táctil claro.
-  - Muestra el modo activo con iconos dedicados (*Fondo Completo*, *En Carátula* o *Desactivado*) y permite alternar modos con un solo toque o abrir el selector modal al mantener presionado.
+  - Carátula central y Video Canvas con diseño limpio y 100% despejado (sin cápsulas que obstruyan el arte) y visualización estática fija sin movimientos o distorsiones para máxima nitidez.
+  - Halo lumínico ambiental superior y visualizador de 28 bandas con degradado vertical fluido (primario superior a secundario inferior) modulando brillo y color en tiempo real según el Video Canvas.
+- **Armonización Cromática Dinámica en Video Canvas (Cada 2.5s)**:
+  - Muestreo periódico de fotogramas del video en reproducción en intervalos de 2.5 segundos con fundido suave (`tween(1200)`), adaptando la atmósfera visual al compás de los cambios de escena del video.
+- **Mini Reproductor Tintado Dinámicamente con Botón de Canción Anterior**:
+  - Superficie con fondo tintado y degradado armónico extraído de la carátula o fotograma del video activo, manteniendo coherencia estética en toda la app.
+  - Botonera ergonómica estándar: **Canción Anterior** (⏮️), **Play/Pausa** (⏯️) y **Siguiente** (⏭️), permitiendo regresar a la pista previa sin abrir Now Playing.
+- **Colas de Reproducción Contextuales Fieles**:
+  - Al reproducir desde una Playlist, Álbum o Artista, la cola activa (`queue`) se adapta estrictamente a las pistas de esa lista, permitiendo navegar ordenadamente dentro de ese contenido.
+- **Atajos Inferiores Espaciosos y Equilibrados**:
+  - Botonera inferior de Now Playing distribuida uniformemente en 3 módulos compactos (`EQ FX`, `Letras`/`Carátula` y `Cola`), con área táctil superior a 48dp y texto protegido sin desbordamientos ni saltos verticales.
 - **3 Modos de Visualización Seleccionables por el Usuario**:
-  - 🌌 **Fondo Completo (Full Background)**: El video se reproduce ocupando todo el fondo de pantalla de Now Playing detrás de la interfaz gráfica con un velo oscuro/gradiente para máxima legibilidad, mientras la carátula flota al frente con su aura lumínica, elevación y sombra.
+  - 🌌 **Fondo Completo (Full Background)**: El video se reproduce ocupando todo el fondo de pantalla de Now Playing detrás de la interfaz gráfica con un velo oscuro/gradiente para máxima legibilidad, mientras la carátula flota al frente con su aura lumínica y sombra.
   - 🔲 **Lienzo en Carátula (Card Canvas)**: El video se reproduce dentro del marco central de la carátula (relación de aspecto 1:1 estilo Spotify Canvas).
   - 🖼️ **Solo Carátula**: Muestra únicamente la carátula estática o procedural sin video.
 - **Detección Automática y Forzado Manual**:
   - **Loop Canvas (≤ 10s - 20s)**: Bucle infinito continuo silenciado.
   - **Video Largo Sincronizado (> 20s)**: Sincronizado con la reproducción y los saltos temporales (`seekTo`).
-  - **Selector en Edición**: Opción de forzar bucle o sincronización desde `EditTrackDialog`.
-- **Armonización Cromática Inteligente**: Extracción en tiempo real del halo de luz y visualizador a partir de fotogramas del video para armonizar la interfaz.
+  - **Selector en Edición y Barra Superior**: Accesible cómodamente desde `NowPlayingTopBar` y `EditTrackDialog`.
 - **Sincronización Instantánea de Favoritos**: El botón de corazón en Now Playing y en la Biblioteca refleja reactivamente el estado en tiempo real (icono relleno en rojo `Color(0xFFEF4444)` al marcar favorito).
 - **Lista de Inicio Estable**: La sección "Populares en tu biblioteca" permanece fija y nunca elimina otras canciones al marcar un favorito.
 
@@ -107,10 +118,11 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
 
 ### 7. Descarga Directa desde TikTok, YouTube y Enlaces Web (Música, Carátula y Video Canvas) 🎬🔗🎵
 - **Descargas sin Límite de Duración**: Permite pegar enlaces de **TikTok**, **YouTube** y videos web para descargar música completa, directos, sesiones o parodias de cualquier duración.
-- **Arquitectura de Extracción con Selector de Motor (InnerTube vs WebView)**:
-  - ⚡ **Motor InnerTube (YouTube Music - Nativo & Ultrarrápido)**: Consulta directa y 100% gratuita al endpoint de YouTube Music mediante los clientes oficiales `ANDROID_MUSIC` y `WEB_REMIX`. Al ejecutarse directamente desde la conexión local del teléfono (IP residencial/datos móviles 4G/5G), sortea los bloqueos por IP de datacenter y resuelve el stream de audio en alta fidelidad en menos de ~300ms sin consumir batería.
-  - 🌐 **Motor Headless WebView Reparado**: Navegador efímero en segundo plano con `mediaPlaybackRequiresUserGesture = false` y modo embebido sin cookies (`youtube-nocookie.com/embed/`), capaz de auto-reproducir silenciado e interceptar peticiones de red a `googlevideo.com` o evaluar `ytInitialPlayerResponse` en memoria.
-  - 🎛️ **Selector Interactivo en el Diálogo**: El usuario puede alternar entre ambos motores directamente en el diálogo de descarga según su preferencia, contando con auto-fallback cruzado si uno de ellos experimenta anomalías temporales.
+- **Arquitectura de Extracción Resiliente de 3 Niveles (InnerTube + Invidious Bypass + WebView Móvil)**:
+  - ⚡ **Motor InnerTube Nativo (`InnerTubeClient`)**: Consulta directa ultrarrápida al endpoint oficial de YouTube mediante clientes de baja fricción (`ANDROID_VR` y `VISIONOS`). Entrega flujos de audio y video directos sin cifrado de firma (`n-sig`) ni bloqueos de `LOGIN_REQUIRED` en menos de ~300ms.
+  - 🛡️ **Bypass de Respaldo Invidious (`InvidiousStreamResolver`)**: Para pistas con restricciones estrictas de derechos de autor (VEVO, discográficas) que exigen inicio de sesión en clientes anónimos, consulta en milisegundos instancias públicas de alta disponibilidad que descifran los enlaces directos a `googlevideo.com`.
+  - 🌐 **Motor Headless WebView Reparado (`HeadlessWebViewExtractor`)**: Navegador efímero en segundo plano cargado sobre `m.youtube.com` (evitando el error 150 de reproductores embebidos) con `mediaPlaybackRequiresUserGesture = false`, timeout ampliado a 22s e intercepción del stream en memoria.
+  - 🎛️ **Selector Interactivo en el Diálogo**: El usuario puede alternar entre ambos motores en el diálogo de descarga con auto-fallback cruzado de 3 capas.
 - **Extracción Automática 3 en 1**:
   - 🎵 **Audio de Alta Fidelidad**: Extrae la pista de audio pura en formato `.m4a` o `.mp3` directamente a `songs/`.
   - 🖼️ **Carátula Oficial en WebP**: Descarga la portada en alta resolución (o extrae fotograma clave) y la procesa a WebP sin pérdida en `images/`.

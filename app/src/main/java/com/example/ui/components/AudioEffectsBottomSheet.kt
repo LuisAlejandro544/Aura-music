@@ -18,6 +18,8 @@ import androidx.compose.ui.unit.dp
 import com.example.model.EqualizerBand
 import com.example.model.EqualizerPreset
 import com.example.model.HeadphoneConfig
+import com.example.model.ReverbConfig
+import com.example.model.ReverbPreset
 import com.example.model.SleepTimerState
 import com.example.model.Spatial8DConfig
 import com.example.ui.components.audioeffects.*
@@ -33,6 +35,7 @@ import com.example.ui.theme.TextSecondary
  * en submódulos especializados en [com.example.ui.components.audioeffects]:
  * - [EqualizerTabContent]: Ecualizador Paramétrico de 10 Bandas ISO en C++20, Presets y Bass Boost.
  * - [Spatial8DTabContent]: Motor de Audio Espacial 8D Binaural nativo en C++20.
+ * - [ReverbTabContent]: Suite Reverb Híbrida (Presets ambientales de sala/catedral/club + Ajuste libre de tamaño, decay y wet).
  * - [SleepTimerTabContent]: Temporizador de Apagado personalizable con fade-out progresivo de 10s.
  * - [PlaybackParametersTabContent]: Control de Velocidad y Tono (Pitch Shift) con protección anti-pausas.
  * - [TransitionsTabContent]: Transiciones suaves (Crossfade configurable) y Reproducción Gapless.
@@ -51,28 +54,33 @@ fun AudioEffectsBottomSheet(
     onBandLevelChange: (Int, Int) -> Unit = { _, _ -> },
     onBassBoostChange: (Int) -> Unit = {},
     onPresetSelect: (EqualizerPreset) -> Unit = {},
-    // Temporizador de Apagado
-    sleepTimerState: SleepTimerState,
-    onStartSleepTimer: (Int) -> Unit,
-    onCancelSleepTimer: () -> Unit,
-    onAddSleepTimerMinutes: (Int) -> Unit,
     // Audio 8D
-    spatial8DConfig: Spatial8DConfig,
-    onSet8DEnabled: (Boolean) -> Unit,
-    onSet8DOrbitSpeed: (Float) -> Unit,
-    onSet8DSpatialIntensity: (Float) -> Unit,
-    onSet8DRoomDepth: (Float) -> Unit,
+    spatial8DConfig: Spatial8DConfig = Spatial8DConfig(),
+    onSet8DEnabled: (Boolean) -> Unit = {},
+    onSet8DOrbitSpeed: (Float) -> Unit = {},
+    onSet8DSpatialIntensity: (Float) -> Unit = {},
+    onSet8DRoomDepth: (Float) -> Unit = {},
+    // Suite Reverb & Filtros Acústicos
+    reverbConfig: ReverbConfig = ReverbConfig(),
+    onSetReverbEnabled: (Boolean) -> Unit = {},
+    onSetReverbPreset: (ReverbPreset) -> Unit = {},
+    onSetReverbCustomParameters: (roomSize: Float, decayMs: Int, levelDb: Float) -> Unit = { _, _, _ -> },
+    // Temporizador de Apagado
+    sleepTimerState: SleepTimerState = SleepTimerState(),
+    onStartSleepTimer: (Int) -> Unit = {},
+    onCancelSleepTimer: () -> Unit = {},
+    onAddSleepTimerMinutes: (Int) -> Unit = {},
     // Velocidad y Tono
-    playbackSpeed: Float,
-    onSetPlaybackSpeed: (Float) -> Unit,
-    playbackPitch: Float,
-    onSetPlaybackPitch: (Float) -> Unit,
-    onResetSpeedAndPitch: () -> Unit,
+    playbackSpeed: Float = 1.0f,
+    onSetPlaybackSpeed: (Float) -> Unit = {},
+    playbackPitch: Float = 1.0f,
+    onSetPlaybackPitch: (Float) -> Unit = {},
+    onResetSpeedAndPitch: () -> Unit = {},
     // Transiciones
-    crossfadeSeconds: Int,
-    onSetCrossfadeSeconds: (Int) -> Unit,
-    isGaplessEnabled: Boolean,
-    onSetGaplessEnabled: (Boolean) -> Unit,
+    crossfadeSeconds: Int = 0,
+    onSetCrossfadeSeconds: (Int) -> Unit = {},
+    isGaplessEnabled: Boolean = true,
+    onSetGaplessEnabled: (Boolean) -> Unit = {},
     // Auriculares y Balance L/R
     headphoneConfig: HeadphoneConfig = HeadphoneConfig(),
     onSetCrossfeedEnabled: (Boolean) -> Unit = {},
@@ -82,7 +90,7 @@ fun AudioEffectsBottomSheet(
     initialTab: Int = 0,
     modifier: Modifier = Modifier
 ) {
-    var selectedTab by remember(initialTab) { mutableIntStateOf(initialTab.coerceIn(0, 5)) }
+    var selectedTab by remember(initialTab) { mutableIntStateOf(initialTab.coerceIn(0, 6)) }
     val keyboardController = LocalSoftwareKeyboardController.current
 
     ModalBottomSheet(
@@ -155,24 +163,30 @@ fun AudioEffectsBottomSheet(
                 Tab(
                     selected = selectedTab == 2,
                     onClick = { selectedTab = 2 },
-                    text = { Text("Temporizador", style = MaterialTheme.typography.labelSmall) },
-                    icon = { Icon(Icons.Default.Timer, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                    text = { Text("Reverb", style = MaterialTheme.typography.labelSmall) },
+                    icon = { Icon(Icons.Default.SurroundSound, contentDescription = null, modifier = Modifier.size(18.dp)) }
                 )
                 Tab(
                     selected = selectedTab == 3,
                     onClick = { selectedTab = 3 },
-                    text = { Text("Velocidad/Voz", style = MaterialTheme.typography.labelSmall) },
-                    icon = { Icon(Icons.Default.Speed, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                    text = { Text("Temporizador", style = MaterialTheme.typography.labelSmall) },
+                    icon = { Icon(Icons.Default.Timer, contentDescription = null, modifier = Modifier.size(18.dp)) }
                 )
                 Tab(
                     selected = selectedTab == 4,
                     onClick = { selectedTab = 4 },
-                    text = { Text("Transiciones", style = MaterialTheme.typography.labelSmall) },
-                    icon = { Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                    text = { Text("Velocidad/Voz", style = MaterialTheme.typography.labelSmall) },
+                    icon = { Icon(Icons.Default.Speed, contentDescription = null, modifier = Modifier.size(18.dp)) }
                 )
                 Tab(
                     selected = selectedTab == 5,
                     onClick = { selectedTab = 5 },
+                    text = { Text("Transiciones", style = MaterialTheme.typography.labelSmall) },
+                    icon = { Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                )
+                Tab(
+                    selected = selectedTab == 6,
+                    onClick = { selectedTab = 6 },
                     text = { Text("Balance L/R", style = MaterialTheme.typography.labelSmall) },
                     icon = { Icon(Icons.Default.Balance, contentDescription = null, modifier = Modifier.size(18.dp)) }
                 )
@@ -205,7 +219,13 @@ fun AudioEffectsBottomSheet(
                         onIntensityChange = onSet8DSpatialIntensity,
                         onDepthChange = onSet8DRoomDepth
                     )
-                    2 -> SleepTimerTabContent(
+                    2 -> ReverbTabContent(
+                        config = reverbConfig,
+                        onToggle = onSetReverbEnabled,
+                        onSelectPreset = onSetReverbPreset,
+                        onCustomParametersChange = onSetReverbCustomParameters
+                    )
+                    3 -> SleepTimerTabContent(
                         timerState = sleepTimerState,
                         onStartTimer = {
                             keyboardController?.hide()
@@ -214,20 +234,20 @@ fun AudioEffectsBottomSheet(
                         onCancelTimer = onCancelSleepTimer,
                         onAddMinutes = onAddSleepTimerMinutes
                     )
-                    3 -> PlaybackParametersTabContent(
+                    4 -> PlaybackParametersTabContent(
                         speed = playbackSpeed,
                         onSpeedChange = onSetPlaybackSpeed,
                         pitch = playbackPitch,
                         onPitchChange = onSetPlaybackPitch,
                         onReset = onResetSpeedAndPitch
                     )
-                    4 -> TransitionsTabContent(
+                    5 -> TransitionsTabContent(
                         crossfadeSeconds = crossfadeSeconds,
                         onCrossfadeChange = onSetCrossfadeSeconds,
                         isGapless = isGaplessEnabled,
                         onGaplessToggle = onSetGaplessEnabled
                     )
-                    5 -> BalanceAndHeadphonesTabContent(
+                    6 -> BalanceAndHeadphonesTabContent(
                         headphoneConfig = headphoneConfig,
                         onSetCrossfeedEnabled = onSetCrossfeedEnabled,
                         onSetCrossfeedStrength = onSetCrossfeedStrength,
