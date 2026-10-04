@@ -204,7 +204,7 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
 
 ### 13. Suite de Diagnóstico Autónoma: Aura Monitor 🛠️ & LeakCanary
 - **Aura Monitor (App Debug Propia con Navegación Modular por Pestañas)**:
-  - Cuenta con su propio icono de acceso directo en el cajón de apps del teléfono móvil.
+  - Accesible directamente desde **Ajustes > Arquitectura y Privacidad > Abrir Aura Monitor**, manteniendo `MainActivity` como la única actividad `LAUNCHER` principal del reproductor.
   - 📋 **Pestaña 1: Incidentes & Logs**:
     - Atrapa y registra automáticamente **Crashes** no controlados mediante `UncaughtExceptionHandler`, **Errores Críticos**, **Warnings de Memoria** y eventos de Media3 / JNI.
     - Registra datos técnicos del teléfono móvil: Modelo, Fabricante, Versión de Android / SDK API, CPU ABI (64-bit / 32-bit), memoria RAM libre/total y espacio de disco disponible.

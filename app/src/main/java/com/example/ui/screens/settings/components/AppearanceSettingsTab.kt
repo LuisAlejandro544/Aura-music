@@ -9,7 +9,9 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.*
@@ -214,6 +216,7 @@ fun LazyListScope.appearanceSettingsTab(
 
     // Información de Privacidad y Arquitectura Local
     item {
+        val context = androidx.compose.ui.platform.LocalContext.current
         Spacer(modifier = Modifier.height(24.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
@@ -245,6 +248,56 @@ fun LazyListScope.appearanceSettingsTab(
                 SettingDetailRow("Acceso a Archivos", "SAF (Storage Access Framework)")
                 SettingDetailRow("Escaneo Automático", "Desactivado (100% bajo control del usuario)")
                 SettingDetailRow("Versión", "1.1 (Aura Music Edition)")
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // Acceso directo a Aura Monitor (Diagnóstico & Telemetría)
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = SurfaceCard),
+            border = BorderStroke(1.dp, CardBorder),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(18.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Build,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Aura Monitor (Telemetría & Diagnóstico)",
+                        style = MaterialTheme.typography.titleSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                    )
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Inspecciona el consumo de RAM en tiempo real (Java, C++ Nativo, PSS), la carga de procesador, los hilos de ejecución activos y el registro detallado de incidentes.",
+                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                )
+                Spacer(modifier = Modifier.height(14.dp))
+                Button(
+                    onClick = {
+                        val intent = android.content.Intent(context, com.example.debug.DebugMonitorActivity::class.java)
+                        context.startActivity(intent)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("open_aura_monitor_btn")
+                ) {
+                    Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Abrir Aura Monitor", fontWeight = FontWeight.Bold)
+                }
             }
         }
     }
