@@ -93,15 +93,15 @@ fun NowPlayingLyricsCard(
     }
 
     Card(
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.88f)),
+        shape = RoundedCornerShape(26.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF0D0D12).copy(alpha = 0.95f)),
         border = BorderStroke(1.2.dp, animatedPrimary.copy(alpha = 0.5f)),
         modifier = modifier
-            .fillMaxWidth(0.92f)
-            .aspectRatio(0.95f)
+            .fillMaxWidth(0.86f)
+            .aspectRatio(1f)
             .shadow(
                 elevation = 20.dp,
-                shape = RoundedCornerShape(24.dp),
+                shape = RoundedCornerShape(26.dp),
                 ambientColor = animatedPrimary,
                 spotColor = animatedPrimary
             )
@@ -110,7 +110,7 @@ fun NowPlayingLyricsCard(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp)
+                .padding(14.dp)
         ) {
             // Barra superior de la tarjeta de letras
             Row(
@@ -118,35 +118,49 @@ fun NowPlayingLyricsCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Mic,
-                        contentDescription = null,
-                        tint = animatedPrimary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "LETRAS KARAOKE",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            letterSpacing = 1.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = animatedPrimary
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = animatedPrimary.copy(alpha = 0.15f),
+                    border = BorderStroke(1.dp, animatedPrimary.copy(alpha = 0.35f))
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Mic,
+                            contentDescription = null,
+                            tint = animatedPrimary,
+                            modifier = Modifier.size(13.dp)
                         )
-                    )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "KARAOKE",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                letterSpacing = 1.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = animatedPrimary,
+                                fontSize = 10.5.sp
+                            ),
+                            maxLines = 1
+                        )
+                    }
                 }
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Botón para buscar por nombre y elegir versión
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    // Botón para buscar en línea y elegir versiones
                     IconButton(
                         onClick = onOpenSearchLyrics,
-                        modifier = Modifier.size(34.dp)
+                        modifier = Modifier.size(30.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Search,
                             contentDescription = "Buscar y elegir versión de letras",
                             tint = animatedPrimary,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(17.dp)
                         )
                     }
 
@@ -157,67 +171,45 @@ fun NowPlayingLyricsCard(
                                 arrayOf("text/*", "application/octet-stream", "*/*")
                             )
                         },
-                        modifier = Modifier.size(34.dp)
+                        modifier = Modifier.size(30.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.FileUpload,
                             contentDescription = "Importar archivo .LRC o .TXT del celular",
                             tint = TextSecondary,
-                            modifier = Modifier.size(19.dp)
+                            modifier = Modifier.size(17.dp)
                         )
                     }
 
-                    // Botón para buscar en línea rápido
-                    IconButton(
-                        onClick = onFetchOnlineLyrics,
-                        enabled = !lyricsState.isLoading,
-                        modifier = Modifier.size(34.dp)
-                    ) {
-                        if (lyricsState.isLoading) {
-                            CircularProgressIndicator(
-                                strokeWidth = 2.dp,
-                                color = animatedPrimary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        } else {
-                            Icon(
-                                imageVector = Icons.Default.CloudDownload,
-                                contentDescription = "Descargar automáticamente",
-                                tint = TextSecondary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-
-                    // Botón para pegar / editar texto
+                    // Botón para pegar / editar texto manualmente
                     IconButton(
                         onClick = { showPasteDialog = true },
-                        modifier = Modifier.size(34.dp)
+                        modifier = Modifier.size(30.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Edit,
                             contentDescription = "Editar letra",
                             tint = TextSecondary,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(16.dp)
                         )
                     }
 
                     // Botón para volver a la carátula
                     IconButton(
                         onClick = onCloseLyrics,
-                        modifier = Modifier.size(34.dp)
+                        modifier = Modifier.size(30.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Volver a carátula",
                             tint = TextSecondary,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Contenido principal de letras
             when {
@@ -227,11 +219,11 @@ fun NowPlayingLyricsCard(
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            CircularProgressIndicator(color = animatedPrimary)
-                            Spacer(modifier = Modifier.height(12.dp))
+                            CircularProgressIndicator(color = animatedPrimary, modifier = Modifier.size(32.dp))
+                            Spacer(modifier = Modifier.height(10.dp))
                             Text(
-                                text = "Buscando letras sincronizadas...",
-                                style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                                text = "Buscando letras...",
+                                style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary, fontSize = 12.sp)
                             )
                         }
                     }
@@ -242,33 +234,31 @@ fun NowPlayingLyricsCard(
                         state = listState,
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(horizontal = 6.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp),
-                        contentPadding = PaddingValues(vertical = 20.dp)
+                            .padding(horizontal = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(vertical = 12.dp)
                     ) {
                         itemsIndexed(lyricsState.lines) { index, line ->
                             val isActive = index == activeIndex
-                            val scale by animateFloatAsState(
-                                targetValue = if (isActive) 1.05f else 0.95f,
-                                animationSpec = tween(200),
-                                label = "lyric_scale"
-                            )
 
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(8.dp))
+                                    .background(
+                                        if (isActive) animatedPrimary.copy(alpha = 0.16f) else Color.Transparent
+                                    )
                                     .clickable { onSeekTo(line.timeMs) }
-                                    .padding(vertical = 4.dp, horizontal = 6.dp)
+                                    .padding(vertical = 5.dp, horizontal = 8.dp)
                             ) {
                                 Text(
                                     text = line.text.ifBlank { "♪ ♪ ♪" },
                                     style = MaterialTheme.typography.bodyLarge.copy(
-                                        fontSize = if (isActive) 19.sp else 14.sp,
+                                        fontSize = if (isActive) 16.5.sp else 13.5.sp,
                                         fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.Medium,
-                                        color = if (isActive) animatedPrimary else TextSecondary.copy(alpha = 0.55f),
+                                        color = if (isActive) animatedPrimary else TextSecondary.copy(alpha = 0.6f),
                                         textAlign = TextAlign.Start,
-                                        lineHeight = if (isActive) 26.sp else 20.sp
+                                        lineHeight = if (isActive) 22.sp else 18.sp
                                     )
                                 )
                             }
@@ -283,14 +273,15 @@ fun NowPlayingLyricsCard(
                     ) {
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(8.dp)
+                            contentPadding = PaddingValues(6.dp)
                         ) {
                             item {
                                 Text(
                                     text = lyricsState.plainLyrics,
                                     style = MaterialTheme.typography.bodyMedium.copy(
                                         color = TextPrimary.copy(alpha = 0.85f),
-                                        lineHeight = 22.sp
+                                        lineHeight = 20.sp,
+                                        fontSize = 13.sp
                                     )
                                 )
                             }
@@ -299,29 +290,29 @@ fun NowPlayingLyricsCard(
                 }
 
                 else -> {
-                    // Estado vacío compacto, armónico y con desplazamiento suave sin recortes ni desbordamientos
+                    // Estado vacío perfectamente ajustado sin desbordamientos
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .verticalScroll(rememberScrollState())
-                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                                .padding(horizontal = 8.dp)
                         ) {
                             Surface(
-                                shape = RoundedCornerShape(14.dp),
-                                color = animatedPrimary.copy(alpha = 0.12f),
-                                modifier = Modifier.size(40.dp)
+                                shape = RoundedCornerShape(12.dp),
+                                color = animatedPrimary.copy(alpha = 0.14f),
+                                modifier = Modifier.size(38.dp)
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
                                         imageVector = Icons.Default.Lyrics,
                                         contentDescription = null,
                                         tint = animatedPrimary,
-                                        modifier = Modifier.size(24.dp)
+                                        modifier = Modifier.size(22.dp)
                                     )
                                 }
                             }
@@ -329,43 +320,43 @@ fun NowPlayingLyricsCard(
                             Spacer(modifier = Modifier.height(8.dp))
 
                             Text(
-                                text = "Sin letras para esta canción",
+                                text = "Sin letras para esta pista",
                                 style = MaterialTheme.typography.titleSmall.copy(
                                     fontWeight = FontWeight.Bold,
                                     color = TextPrimary,
-                                    fontSize = 14.sp
+                                    fontSize = 13.5.sp
                                 ),
                                 maxLines = 1
                             )
 
-                            Spacer(modifier = Modifier.height(3.dp))
+                            Spacer(modifier = Modifier.height(2.dp))
 
                             Text(
                                 text = "Descarga la letra sincronizada o escribe tu versión.",
                                 style = MaterialTheme.typography.bodySmall.copy(
                                     color = TextSecondary,
                                     textAlign = TextAlign.Center,
-                                    fontSize = 11.sp
+                                    fontSize = 10.5.sp
                                 ),
                                 maxLines = 1
                             )
 
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(10.dp))
 
                             // Botón principal: Buscar por nombre y elegir versión
                             Button(
                                 onClick = onOpenSearchLyrics,
-                                shape = RoundedCornerShape(12.dp),
+                                shape = RoundedCornerShape(10.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = animatedPrimary),
-                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
                                 modifier = Modifier
-                                    .fillMaxWidth(0.95f)
-                                    .height(42.dp)
+                                    .fillMaxWidth(0.92f)
+                                    .height(38.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Search,
                                     contentDescription = null,
-                                    modifier = Modifier.size(17.dp),
+                                    modifier = Modifier.size(16.dp),
                                     tint = Color.Black
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
@@ -373,16 +364,16 @@ fun NowPlayingLyricsCard(
                                     text = "Buscar Letras en Línea",
                                     fontWeight = FontWeight.Bold,
                                     color = Color.Black,
-                                    fontSize = 13.sp,
+                                    fontSize = 12.5.sp,
                                     maxLines = 1
                                 )
                             }
 
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            // Fila horizontal equilibrada: Importar archivo y Pegar manual (sin ocupar espacio vertical excesivo)
+                            // Fila horizontal equilibrada: Importar archivo y Pegar manual
                             Row(
-                                modifier = Modifier.fillMaxWidth(0.95f),
+                                modifier = Modifier.fillMaxWidth(0.92f),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 OutlinedButton(
@@ -391,48 +382,48 @@ fun NowPlayingLyricsCard(
                                             arrayOf("text/*", "application/octet-stream", "*/*")
                                         )
                                     },
-                                    shape = RoundedCornerShape(12.dp),
+                                    shape = RoundedCornerShape(10.dp),
                                     border = BorderStroke(1.dp, CardBorder),
-                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
                                     modifier = Modifier
                                         .weight(1f)
-                                        .height(38.dp)
+                                        .height(34.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.FileUpload,
                                         contentDescription = null,
-                                        modifier = Modifier.size(15.dp),
+                                        modifier = Modifier.size(14.dp),
                                         tint = animatedPrimary
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
                                         text = "Importar",
                                         color = TextPrimary,
-                                        fontSize = 12.sp,
+                                        fontSize = 11.5.sp,
                                         maxLines = 1
                                     )
                                 }
 
                                 OutlinedButton(
                                     onClick = { showPasteDialog = true },
-                                    shape = RoundedCornerShape(12.dp),
+                                    shape = RoundedCornerShape(10.dp),
                                     border = BorderStroke(1.dp, CardBorder),
-                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
                                     modifier = Modifier
                                         .weight(1f)
-                                        .height(38.dp)
+                                        .height(34.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Edit,
                                         contentDescription = null,
-                                        modifier = Modifier.size(15.dp),
+                                        modifier = Modifier.size(14.dp),
                                         tint = TextSecondary
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
                                         text = "Escribir",
                                         color = TextPrimary,
-                                        fontSize = 12.sp,
+                                        fontSize = 11.5.sp,
                                         maxLines = 1
                                     )
                                 }

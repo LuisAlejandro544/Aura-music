@@ -87,7 +87,7 @@ object InvidiousStreamResolver {
             var maxAudioBitrate = 0L
 
             var bestVideoUrl: String? = null
-            var maxVideoBitrate = 0L
+            var bestVideoDiff = 9999
 
             if (adaptiveFormats != null) {
                 for (i in 0 until adaptiveFormats.length()) {
@@ -103,8 +103,16 @@ object InvidiousStreamResolver {
                                 bestAudioUrl = url
                             }
                         } else if (mimeType.contains("video/")) {
-                            if (bitrate >= maxVideoBitrate) {
-                                maxVideoBitrate = bitrate
+                            val qualityLabel = format.optString("qualityLabel", "")
+                            val height = format.optInt("height", 0).takeIf { it > 0 }
+                                ?: qualityLabel.replace("p", "").toIntOrNull() ?: 0
+                            val targetHeight = 480
+                            val diff = kotlin.math.abs(height - targetHeight)
+                            if (height == 480) {
+                                bestVideoUrl = url
+                                bestVideoDiff = 0
+                            } else if (bestVideoDiff > 0 && diff < bestVideoDiff) {
+                                bestVideoDiff = diff
                                 bestVideoUrl = url
                             }
                         }

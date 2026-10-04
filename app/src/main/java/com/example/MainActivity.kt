@@ -451,7 +451,10 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                             onSetFadeInOnResumeEnabled = { viewModel.setFadeInOnResumeEnabled(it) },
                             onSetDedicatedVolumeMemoryEnabled = { viewModel.setDedicatedVolumeMemoryEnabled(it) },
                             onSetHeadsetControlsEnabled = { viewModel.setHeadsetControlsEnabled(it) },
-                            onSetHeadsetAction = { type, action -> viewModel.setHeadsetAction(type, action) }
+                            onSetHeadsetAction = { type, action -> viewModel.setHeadsetAction(type, action) },
+                            allTracks = allTracks,
+                            onDeleteTrackArtwork = { viewModel.deleteTrackArtwork(it) },
+                            onDeleteTrackVideo = { viewModel.deleteTrackVideo(it) }
                         )
                     }
                 }

@@ -85,6 +85,8 @@ Este archivo define el contexto de diseño, directrices técnicas y restriccione
       - **Compilación Autónoma y Caché en GitHub Actions**: En CI/CD, las dependencias nativas se restauran en 3-5 segundos vía `actions/cache@v4` o se compilan y ensamblan automáticamente con el Android NDK usando `scripts/compile_native_deps.sh` ante cache-miss o cambio de parámetros.
       - Paquetes de librerías dinámicas optimizados para audio/video (`libffmpeg.zip.so`) y entorno Python (`libpython.zip.so`) con OpenSSL y CA certificados, descomprimidos atómicamente en segundo plano sin inflar el APK con encoders innecesarios.
       - Copia base de `yt-dlp` en `assets/bin/yt-dlp` para funcionamiento inmediato offline y actualización en caliente OTA desde GitHub Releases en `files/bin/yt-dlp` sin forzar la publicación de nuevos APKs en Uptodown.
+    - **Acelerador de Descarga sin Estrangulamiento (Chunked Range Download)**: Neutraliza la limitación artificial de ~63 KB/s de YouTube mediante solicitudes HTTP fragmentadas (`Range: bytes=X-Y` de 2.5 MB) descargando a 10 - 40 MB/s.
+    - **Resolución de Video Canvas 480p por Defecto**: Tanto `yt-dlp` como `InnerTube` e `Invidious` priorizan estrictamente flujos de video a 480p (`height=480`) garantizando ligereza, rendimiento térmico y vinculación automática al Video Canvas de fondo sin omitir el video.
     - Almacenamiento organizado: audio `.m4a`/`.mp3` en `songs/`, carátula oficial en WebP sin pérdida en `images/`, y video vinculado en `videos/` para reproducir el Video Canvas de fondo.
     - Interfaz adaptativa: Degradados visuales reactivos (Cyan/Magenta para TikTok, Rojo Carmesí/Naranja para YouTube/Web) y reproducción inmediata en Now Playing tras descargar.
 
@@ -132,5 +134,10 @@ Este archivo define el contexto de diseño, directrices técnicas y restriccione
     - La barra superior `NowPlayingTopBar` debe mantenerse despejada sin el texto redundante "REPRODUCIENDO AURA / álbum".
     - Los títulos largos deben desplazarse suavemente con `basicMarquee` en *Now Playing*, *Mini Reproductor* y en la canción en reproducción dentro de las listas y la cola.
 
-18. **Idioma de Comunicación**:
+18. **Transparencia y Gestión de Medios Guardados, Carátulas en Cola y Consistencia en Letras**:
+    - En la pantalla de Ajustes, la 3ª pestaña 'Medios' (`StoredMediaSettingsTab`) ofrece total transparencia sobre el almacenamiento: lista exhaustiva de canciones con carátula WebP o Video Canvas MP4 en disco (`images/` y `videos/`), tamaño consumido en KB/MB y botones individuales con confirmación para borrar la carátula o el video de cualquier pista, liberando espacio físico de inmediato.
+    - La hoja modal de la cola de reproducción (`NowPlayingQueueSheet`) incluye miniatura en alta resolución (`ArtworkImage` de 42dp con esquinas redondeadas) junto a cada canción para su reconocimiento visual inmediato.
+    - `NowPlayingLyricsCard` comparte idénticas dimensiones y proporción (`fillMaxWidth(0.86f).aspectRatio(1f)` con esquinas de 26dp) que `NowPlayingArtworkCard` para erradicar cualquier salto vertical al alternar entre carátula y letras; el texto de insignias en `SearchLyricsDialog` está optimizado para evitar colisiones o desbordamientos en cualquier teléfono móvil.
+
+19. **Idioma de Comunicación**:
    - La documentación, comentarios en código, cadenas de usuario (`strings.xml`) y mensajes de commit deben redactarse en **español**.

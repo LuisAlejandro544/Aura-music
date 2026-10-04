@@ -175,7 +175,7 @@ object YtDlpNativeEngine {
             add("--no-warnings")
             add("--no-check-certificates")
             add("--format")
-            add("bestaudio/best")
+            add("bestvideo[height<=480]+bestaudio/best[height<=480]/best")
             if (qjsBin != null && qjsBin.exists()) {
                 add("--js-runtimes")
                 add("quickjs:${qjsBin.absolutePath}")
@@ -260,33 +260,92 @@ object YtDlpNativeEngine {
             val duration = rootJson.optLong("duration", 0L)
             val thumbnail = rootJson.optString("thumbnail", "")
 
-            val directAudioUrl = rootJson.optString("url", "")
-            var videoPlayUrl = directAudioUrl
+            var directAudioUrl: String? = null
+            var directVideoUrl: String? = null
 
-            val formats = rootJson.optJSONArray("formats")
-            if (formats != null) {
-                for (i in 0 until formats.length()) {
-                    val fmt = formats.getJSONObject(i)
+            // 1. Revisar formatos seleccionados explícitamente por yt-dlp (requested_formats)
+            val requestedFormats = rootJson.optJSONArray("requested_formats")
+            if (requestedFormats != null) {
+                for (i in 0 until requestedFormats.length()) {
+                    val fmt = requestedFormats.getJSONObject(i)
                     val vcodec = fmt.optString("vcodec", "none")
+                    val acodec = fmt.optString("acodec", "none")
                     val fmtUrl = fmt.optString("url", "")
-                    if (vcodec != "none" && fmtUrl.isNotBlank()) {
-                        videoPlayUrl = fmtUrl
-                        break
+                    if (fmtUrl.isNotBlank()) {
+                        if (vcodec != "none" && directVideoUrl == null) {
+                            directVideoUrl = fmtUrl
+                        }
+                        if (acodec != "none" && directAudioUrl == null) {
+                            directAudioUrl = fmtUrl
+                        }
                     }
                 }
             }
 
+            // 2. Inspeccionar la lista completa de formatos disponibles para forzar 480p de forma estricta
+            val formats = rootJson.optJSONArray("formats")
+            if (formats != null) {
+                var bestAudioBitrate = 0.0
+                var selectedVideoUrl: String? = null
+                var selectedVideoDiff = 9999
+
+                for (i in 0 until formats.length()) {
+                    val fmt = formats.getJSONObject(i)
+                    val fmtUrl = fmt.optString("url", "")
+                    if (fmtUrl.isBlank()) continue
+
+                    val vcodec = fmt.optString("vcodec", "none")
+                    val acodec = fmt.optString("acodec", "none")
+                    val height = fmt.optInt("height", 0)
+                    val abr = fmt.optDouble("abr", 0.0).takeIf { it > 0 } ?: fmt.optDouble("tbr", 0.0)
+
+                    // Audio de alta fidelidad
+                    if (acodec != "none" && vcodec == "none") {
+                        if (abr > bestAudioBitrate || directAudioUrl == null) {
+                            bestAudioBitrate = abr
+                            directAudioUrl = fmtUrl
+                        }
+                    }
+
+                    // Video con prioridad estricta a 480p
+                    if (vcodec != "none") {
+                        val targetHeight = 480
+                        val diff = kotlin.math.abs(height - targetHeight)
+                        if (height == 480) {
+                            // Coincidencia exacta a 480p
+                            selectedVideoUrl = fmtUrl
+                            selectedVideoDiff = 0
+                        } else if (selectedVideoDiff > 0 && diff < selectedVideoDiff) {
+                            selectedVideoUrl = fmtUrl
+                            selectedVideoDiff = diff
+                        }
+                    }
+                }
+
+                if (selectedVideoUrl != null) {
+                    directVideoUrl = selectedVideoUrl
+                }
+            }
+
+            if (directAudioUrl == null) {
+                directAudioUrl = rootJson.optString("url", "").ifBlank { null }
+            }
+            if (directVideoUrl == null) {
+                directVideoUrl = directAudioUrl
+            }
+
+            val finalVideoUrl = directVideoUrl ?: directAudioUrl ?: url
             val mediaInfo = OnlineVideoAudioImporter.ResolvedMediaInfo(
                 originalUrl = url,
                 suggestedTitle = title,
                 suggestedArtist = uploader,
-                videoUrl = videoPlayUrl,
-                audioUrl = directAudioUrl.ifBlank { null },
+                videoUrl = finalVideoUrl,
+                audioUrl = directAudioUrl,
                 coverUrl = thumbnail.ifBlank { null },
                 durationSeconds = duration
             )
 
-            AuraDebugManager.logInfo(TAG, "¡yt-dlp resolvió exitosamente: '$title' de $uploader ($duration s)!")
+            AuraDebugManager.logInfo(TAG, "¡yt-dlp resolvió exitosamente: '$title' de $uploader ($duration s) con video 480p!")
             Result.success(mediaInfo)
         } catch (e: Exception) {
             AuraDebugManager.logWarning(TAG, "Fallo al ejecutar proceso yt-dlp: ${e.message}")

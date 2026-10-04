@@ -50,7 +50,7 @@ AuraMusic/
 │   │   │   │   │   │   ├── AudioSilenceTrimmer.kt # Detector y recortador inteligente de silencios al inicio y final (-42 dB RMS)
 │   │   │   │   │   │   ├── IncomingMediaHandler.kt # Detector y clasificador inteligente de Intents externos (Audio, Video, Link)
 │   │   │   │   │   │   ├── LyricsManager.kt        # Analizador de .LRC, descarga de LRCLIB y persistencia local
-│   │   │   │   │   │   ├── OnlineVideoAudioImporter.kt # Descargador de audio, carátula y Video Canvas desde TikTok y web
+│   │   │   │   │   │   ├── OnlineVideoAudioImporter.kt # Descargador acelerado por bloques (Chunked Range) de audio, carátula y Video Canvas (480p) desde TikTok y web
 │   │   │   │   │   │   ├── ProceduralArtworkGenerator.kt # Generador procedural de carátulas
 │   │   │   │   │   │   ├── SampleMusicGenerator.kt # Sintetizador de audio WAV para demos
 │   │   │   │   │   │   ├── VideoAudioExtractor.kt  # Extractor de audio nativo y generador 3 en 1 de Video a Música
@@ -135,7 +135,7 @@ AuraMusic/
 │   │   │   │   │   │   │       ├── NowPlayingLyricsCard.kt        # Tarjeta Karaoke interactiva con auto-scroll y resaltado neón
 │   │   │   │   │   │   │       ├── NowPlayingPlaybackControls.kt  # Info de pista, seekbar y botonera de control
 │   │   │   │   │   │   │       ├── NowPlayingBalanceBar.kt        # Barra de balance estéreo L/R en vivo
-│   │   │   │   │   │   │       ├── NowPlayingQueueSheet.kt        # Hoja modal de cola de reproducción ("Up Next")
+│   │   │   │   │   │   │       ├── NowPlayingQueueSheet.kt        # Hoja modal de cola de reproducción ("Up Next") con carátulas y marquesina
 │   │   │   │   │   │   │       ├── AudioSpecsDialog.kt            # Diálogo con ficha técnica del archivo
 │   │   │   │   │   │   │       └── VideoDisplayModeDialog.kt      # Diálogo selector de los 3 modos de video
 │   │   │   │   │   │   ├── equalizer/EqualizerScreen.kt # Referencia de ecualizador (integrado en modal)
@@ -143,6 +143,7 @@ AuraMusic/
 │   │   │   │   │   │   │   ├── SettingsScreen.kt # Pantalla de ajustes y selector de pestañas
 │   │   │   │   │   │   │   └── components/     # Componentes modulares de configuración
 │   │   │   │   │   │   │       ├── AppearanceSettingsTab.kt       # Pestaña de temas OLED, paletas y privacidad
+│   │   │   │   │   │   │       ├── StoredMediaSettingsTab.kt      # Pestaña de transparencia y gestor de carátulas WebP y videos con borrado
 │   │   │   │   │   │   │       ├── HeadphoneStatusCard.kt         # Tarjeta de estado de auriculares en tiempo real
 │   │   │   │   │   │   │       ├── HeadphonesAcousticsSection.kt  # Crossfeed C++20 y balance estéreo fino
 │   │   │   │   │   │   │       ├── HeadphonesSecuritySection.kt   # Becoming Noisy, Fade-In y memoria volumen

@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.sp
 import com.example.model.AuraTheme
 import com.example.model.HeadphoneConfig
 import com.example.model.HeadsetButtonAction
+import com.example.model.Track
 import com.example.ui.screens.settings.components.*
 import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.TextPrimary
@@ -52,6 +53,10 @@ fun SettingsScreen(
     onSetDedicatedVolumeMemoryEnabled: (Boolean) -> Unit = {},
     onSetHeadsetControlsEnabled: (Boolean) -> Unit = {},
     onSetHeadsetAction: (Int, HeadsetButtonAction) -> Unit = { _, _ -> },
+    // Transparencia de Almacenamiento y Gestión Multimedia
+    allTracks: List<Track> = emptyList(),
+    onDeleteTrackArtwork: (Track) -> Unit = {},
+    onDeleteTrackVideo: (Track) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var mainSettingsTab by remember { mutableIntStateOf(0) }
@@ -83,7 +88,7 @@ fun SettingsScreen(
             )
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Selector de Pestaña Principal (Temas vs Auriculares)
+            // Selector de Pestaña Principal (Temas vs Auriculares vs Medios Guardados)
             TabRow(
                 selectedTabIndex = mainSettingsTab,
                 containerColor = SurfaceCard,
@@ -95,28 +100,48 @@ fun SettingsScreen(
                 Tab(
                     selected = mainSettingsTab == 0,
                     onClick = { mainSettingsTab = 0 },
-                    text = { Text("Apariencia & Temas", fontWeight = FontWeight.SemiBold) },
-                    icon = { Icon(Icons.Default.Palette, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                    text = { Text("Apariencia", fontWeight = FontWeight.SemiBold, fontSize = 12.sp) },
+                    icon = { Icon(Icons.Default.Palette, contentDescription = null, modifier = Modifier.size(19.dp)) },
                     modifier = Modifier.testTag("settings_tab_appearance")
                 )
                 Tab(
                     selected = mainSettingsTab == 1,
                     onClick = { mainSettingsTab = 1 },
-                    text = { Text("Auriculares", fontWeight = FontWeight.SemiBold) },
+                    text = { Text("Auriculares", fontWeight = FontWeight.SemiBold, fontSize = 12.sp) },
                     icon = {
                         BadgedBox(
                             badge = {
                                 if (headphoneConfig.isHeadphoneConnected) {
                                     Badge(containerColor = MaterialTheme.colorScheme.secondary) {
-                                        Text("ON", fontSize = 9.sp)
+                                        Text("ON", fontSize = 8.sp)
                                     }
                                 }
                             }
                         ) {
-                            Icon(Icons.Default.Headphones, contentDescription = null, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Default.Headphones, contentDescription = null, modifier = Modifier.size(19.dp))
                         }
                     },
                     modifier = Modifier.testTag("settings_tab_headphones")
+                )
+                Tab(
+                    selected = mainSettingsTab == 2,
+                    onClick = { mainSettingsTab = 2 },
+                    text = { Text("Medios", fontWeight = FontWeight.SemiBold, fontSize = 12.sp) },
+                    icon = {
+                        val mediaCount = allTracks.count { !it.albumArtPath.isNullOrBlank() || !it.videoUri.isNullOrBlank() }
+                        BadgedBox(
+                            badge = {
+                                if (mediaCount > 0) {
+                                    Badge(containerColor = MaterialTheme.colorScheme.primary) {
+                                        Text("$mediaCount", fontSize = 8.sp)
+                                    }
+                                }
+                            }
+                        ) {
+                            Icon(Icons.Default.PermMedia, contentDescription = null, modifier = Modifier.size(19.dp))
+                        }
+                    },
+                    modifier = Modifier.testTag("settings_tab_stored_media")
                 )
             }
             Spacer(modifier = Modifier.height(20.dp))
@@ -203,6 +228,17 @@ fun SettingsScreen(
                     onOpenEditClickType = { editingClickType = it }
                 )
             }
+        }
+
+        // ==========================================
+        // PESTAÑA 2: MEDIOS Y ARCHIVOS GUARDADOS (TRANSPARENCIA)
+        // ==========================================
+        if (mainSettingsTab == 2) {
+            storedMediaSettingsTab(
+                allTracks = allTracks,
+                onDeleteTrackArtwork = onDeleteTrackArtwork,
+                onDeleteTrackVideo = onDeleteTrackVideo
+            )
         }
     }
 

@@ -441,6 +441,32 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * Elimina físicamente la carátula guardada de una canción del almacenamiento y actualiza Room.
+     */
+    fun deleteTrackArtwork(track: Track) {
+        updateTrackDetails(
+            trackId = track.id,
+            newTitle = track.title,
+            newArtist = track.artist,
+            newAlbum = track.album,
+            removeArtwork = true
+        )
+    }
+
+    /**
+     * Elimina físicamente el Video Canvas guardado de una canción del almacenamiento y actualiza Room.
+     */
+    fun deleteTrackVideo(track: Track) {
+        updateTrackDetails(
+            trackId = track.id,
+            newTitle = track.title,
+            newArtist = track.artist,
+            newAlbum = track.album,
+            removeVideo = true
+        )
+    }
+
     fun updatePlaylist(playlistId: Long, newName: String, newDescription: String = "") {
         if (newName.isBlank()) return
         viewModelScope.launch {

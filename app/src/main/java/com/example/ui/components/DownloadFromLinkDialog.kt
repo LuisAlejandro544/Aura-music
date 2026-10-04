@@ -72,7 +72,7 @@ fun DownloadFromLinkDialog(
             if (initialUrl.contains("youtu", ignoreCase = true)) DownloadSourceMode.YOUTUBE_WEB else initialMode
         )
     }
-    var selectedEngine by remember { mutableStateOf(YoutubeExtractionEngine.INNERTUBE) }
+    var selectedEngine by remember { mutableStateOf(YoutubeExtractionEngine.YTDLP) }
     var linkUrl by remember { mutableStateOf(initialUrl) }
     var isResolving by remember { mutableStateOf(false) }
     var resolveError by remember { mutableStateOf<String?>(null) }
@@ -608,14 +608,14 @@ fun DownloadFromLinkDialog(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Vincular Video Canvas de fondo",
+                                text = "Vincular Video Canvas de fondo (480p)",
                                 style = MaterialTheme.typography.bodyMedium.copy(
                                     fontWeight = FontWeight.SemiBold,
                                     color = TextPrimary
                                 )
                             )
                             Text(
-                                text = "Reproduce el video detrás de la pantalla Now Playing o en recuadro",
+                                text = "Descarga por defecto en 480p de alta fluidez y lo reproduce detrás de Now Playing o en recuadro",
                                 style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
                             )
                         }

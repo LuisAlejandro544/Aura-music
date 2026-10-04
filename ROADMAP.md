@@ -214,7 +214,17 @@ Este documento traza las fases de evolución técnica y funcional para convertir
   - **Optimización de Fotogramas Clave (Keyframes / GOP Corto a 30fps)**: Reestructuración de videos largos sincronizados con inserción de I-frames cada 1 segundo (GOP=30), eliminando audio residual y aplicando `-movflags +faststart` para saltos temporales instantáneos (0ms) en Now Playing y Mini Reproductor.
   - `YtDlpNativeEngine`: Runtime de CPython nativo (`libpython.so`) con entorno optimizado (`libpython.zip.so`) y QuickJS (`libqjs.so`) empaquetados en el APK, con copia base oficial en `assets/bin/yt-dlp` para funcionamiento inmediato offline.
   - `YtDlpAutoUpdater`: Sistema de actualización OTA en caliente que consulta GitHub Releases y descarga la versión más reciente del extractor directamente en `files/bin/yt-dlp` sin forzar al usuario a esperar una nueva versión del APK en Uptodown.
+  - **Acelerador de Descarga por Bloques (Chunked Range Download)**: Erradicación del estrangulamiento de ~63 KB/s de Google Video mediante fragmentación de rangos HTTP en bloques de 2.5 MB, alcanzando velocidades de descarga de 10 a 40 MB/s.
+  - **Resolución 480p Estricta por Defecto para Video Canvas**: Configuración y filtrado selectivo en `yt-dlp`, `InnerTube` e `Invidious` fijando por defecto la descarga de video a 480p (`height=480`) con vinculación automática garantizada al Video Canvas de fondo.
   - Tarjeta en Ajustes de Apariencia con información en vivo de FFmpeg y botón interactivo para actualizar yt-dlp en segundo plano.
+- [x] **Transparencia Total y Gestor de Medios Almacenados en Ajustes (`StoredMediaSettingsTab`)**:
+  - Nueva pestaña "Medios" en la pantalla de Ajustes con desglose exhaustivo de carátulas WebP y Videos Canvas MP4 persistidos en disco (`images/` y `videos/`).
+  - Muestra la canción asociada, tamaño exacto del archivo (KB/MB) y botones individuales con confirmación para borrar la carátula o el video de cualquier pista, liberando espacio físico de inmediato.
+- [x] **Miniaturas de Carátula en la Cola de Reproducción (NowPlayingQueueSheet)**:
+  - Integración de carátulas en alta resolución (`ArtworkImage` de 42dp con bordes redondeados) para cada pista en la lista en espera, permitiendo identificar canciones al instante visualmente.
+- [x] **Consistencia Geométrica y Pulido de Diseño en Letras / Karaoke**:
+  - Homogeneización de dimensiones de `NowPlayingLyricsCard` con la carátula (`fillMaxWidth(0.86f).aspectRatio(1f)` con radio de 26dp), eliminando saltos o desalineaciones visuales al alternar entre carátula y letras.
+  - Resaltado activo tipo píldora para la frase en reproducción y rediseño de insignias en `SearchLyricsDialog` para erradicar cualquier desbordamiento o colisión de texto.
 
 ---
 

@@ -388,7 +388,7 @@ private fun LyricResultItemCard(
                 .fillMaxWidth()
                 .padding(14.dp)
         ) {
-            // Fila superior: Insignia Oficial y Tipo de Letra
+            // Fila superior: Insignia Oficial y Tipo de Formato (diseño compacto anti-desbordamiento)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -396,23 +396,23 @@ private fun LyricResultItemCard(
             ) {
                 if (isOfficial) {
                     Surface(
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(6.dp),
                         color = accentColor,
-                        modifier = Modifier.height(24.dp)
+                        modifier = Modifier.height(22.dp)
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 8.dp)
+                            modifier = Modifier.padding(horizontal = 7.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Star,
                                 contentDescription = null,
                                 tint = Color.Black,
-                                modifier = Modifier.size(13.dp)
+                                modifier = Modifier.size(12.dp)
                             )
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Spacer(modifier = Modifier.width(3.dp))
                             Text(
-                                text = "OFICIAL / RECOMENDADA",
+                                text = "OFICIAL",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontWeight = FontWeight.ExtraBold,
                                     fontSize = 10.sp,
@@ -426,14 +426,14 @@ private fun LyricResultItemCard(
                     Surface(
                         shape = RoundedCornerShape(6.dp),
                         color = Color.White.copy(alpha = 0.08f),
-                        modifier = Modifier.height(22.dp)
+                        modifier = Modifier.height(20.dp)
                     ) {
                         Box(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier.padding(horizontal = 6.dp)
                         ) {
                             Text(
-                                text = "VERSIÓN ALTERNATIVA",
+                                text = "VERSIÓN",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 9.5.sp,
@@ -444,18 +444,19 @@ private fun LyricResultItemCard(
                     }
                 }
 
-                // Chip de formato: Sincronizada o Texto plano
+                // Chip de formato: Sincronizada (LRC) o Texto plano
                 Surface(
                     shape = RoundedCornerShape(6.dp),
-                    color = if (result.isSynced) Color(0xFF10B981).copy(alpha = 0.2f) else Color.White.copy(alpha = 0.08f),
+                    color = if (result.isSynced) Color(0xFF10B981).copy(alpha = 0.18f) else Color.White.copy(alpha = 0.08f),
                     border = BorderStroke(
                         0.8.dp,
-                        if (result.isSynced) Color(0xFF10B981).copy(alpha = 0.6f) else Color.Transparent
-                    )
+                        if (result.isSynced) Color(0xFF10B981).copy(alpha = 0.5f) else Color.Transparent
+                    ),
+                    modifier = Modifier.height(22.dp)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        modifier = Modifier.padding(horizontal = 6.dp)
                     ) {
                         Icon(
                             imageVector = if (result.isSynced) Icons.Default.Sync else Icons.Default.Notes,
@@ -463,9 +464,9 @@ private fun LyricResultItemCard(
                             tint = if (result.isSynced) Color(0xFF10B981) else TextSecondary,
                             modifier = Modifier.size(11.dp)
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(3.dp))
                         Text(
-                            text = if (result.isSynced) "Sincronizada (Karaoke)" else "Texto Plano",
+                            text = if (result.isSynced) "Karaoke LRC" else "Texto",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
@@ -490,7 +491,7 @@ private fun LyricResultItemCard(
                 overflow = TextOverflow.Ellipsis
             )
 
-            // Artista y álbum
+            // Artista, álbum y duración con restricción armónica
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
@@ -499,7 +500,7 @@ private fun LyricResultItemCard(
                     text = result.artistName.ifBlank { "Artista desconocido" },
                     style = MaterialTheme.typography.bodyMedium.copy(
                         color = TextPrimary.copy(alpha = 0.85f),
-                        fontSize = 13.sp
+                        fontSize = 12.5.sp
                     ),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -511,10 +512,11 @@ private fun LyricResultItemCard(
                         text = " • ${result.albumName}",
                         style = MaterialTheme.typography.bodySmall.copy(
                             color = TextSecondary,
-                            fontSize = 12.sp
+                            fontSize = 11.5.sp
                         ),
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
                     )
                 }
 
@@ -522,11 +524,12 @@ private fun LyricResultItemCard(
                     val m = result.durationSeconds / 60
                     val s = result.durationSeconds % 60
                     Text(
-                        text = " (${String.format("%02d:%02d", m, s)})",
+                        text = "  (${String.format("%02d:%02d", m, s)})",
                         style = MaterialTheme.typography.bodySmall.copy(
                             color = TextSecondary,
                             fontSize = 11.sp
-                        )
+                        ),
+                        maxLines = 1
                     )
                 }
             }

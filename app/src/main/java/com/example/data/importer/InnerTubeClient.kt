@@ -144,9 +144,9 @@ object InnerTubeClient {
             var maxAudioBitrate = 0
 
             var bestVideoUrl: String? = null
-            var maxVideoBitrate = 0
+            var bestVideoDiff = 9999
 
-            // 1. Revisar formatos adaptativos
+            // 1. Revisar formatos adaptativos priorizando estrictamente 480p para Video Canvas
             for (i in 0 until adaptiveFormats.length()) {
                 val format = adaptiveFormats.getJSONObject(i)
                 val mimeType = format.optString("mimeType", "")
@@ -160,8 +160,14 @@ object InnerTubeClient {
                             bestAudioUrl = url
                         }
                     } else if (mimeType.contains("video/")) {
-                        if (bitrate >= maxVideoBitrate) {
-                            maxVideoBitrate = bitrate
+                        val height = format.optInt("height", 0)
+                        val targetHeight = 480
+                        val diff = kotlin.math.abs(height - targetHeight)
+                        if (height == 480) {
+                            bestVideoUrl = url
+                            bestVideoDiff = 0
+                        } else if (bestVideoDiff > 0 && diff < bestVideoDiff) {
+                            bestVideoDiff = diff
                             bestVideoUrl = url
                         }
                     }

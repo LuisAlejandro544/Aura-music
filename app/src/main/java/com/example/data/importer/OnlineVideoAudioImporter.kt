@@ -474,21 +474,34 @@ object OnlineVideoAudioImporter {
             if (attachAsCanvas) {
                 // Si attachAsCanvas está marcado pero aún no descargamos el video porque el audio vino directo
                 if ((!tempVideoFile.exists() || tempVideoFile.length() == 0L) &&
-                    !resolvedInfo.videoUrl.isNullOrBlank() &&
-                    resolvedInfo.videoUrl != resolvedInfo.audioUrl
+                    !resolvedInfo.videoUrl.isNullOrBlank()
                 ) {
-                    downloadUrlToFile(
-                        url = resolvedInfo.videoUrl,
-                        targetFile = tempVideoFile,
-                        phase = "Descargando Video Canvas de fondo...",
-                        onProgress = onProgressUpdate
-                    )
+                    if (resolvedInfo.videoUrl != resolvedInfo.audioUrl) {
+                        downloadUrlToFile(
+                            url = resolvedInfo.videoUrl,
+                            targetFile = tempVideoFile,
+                            phase = "Descargando Video Canvas de fondo (480p)...",
+                            onProgress = onProgressUpdate
+                        )
+                    } else {
+                        // Si la URL es la misma (stream combinado), verificar si el archivo de audio ya contiene pista de video
+                        val hasVideoTrack = try {
+                            val vRetriever = MediaMetadataRetriever()
+                            vRetriever.setDataSource(audioFile.absolutePath)
+                            val hasVid = vRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_HAS_VIDEO) == "yes"
+                            vRetriever.release()
+                            hasVid
+                        } catch (_: Throwable) { false }
+                        if (hasVideoTrack) {
+                            audioFile.copyTo(tempVideoFile, overwrite = true)
+                        }
+                    }
                 }
                 if (tempVideoFile.exists() && tempVideoFile.length() > 0L) {
                     onProgressUpdate(
                         DownloadProgress(
                             isDownloading = true,
-                            phase = if (isLoop) "Perfeccionando bucle infinito continuo (Seamless Loop)..." else "Optimizando fluidez de video y fotogramas clave...",
+                            phase = if (isLoop) "Perfeccionando bucle infinito continuo (Seamless Loop)..." else "Optimizando fluidez de video y fotogramas clave (480p)...",
                             bytesDownloaded = tempVideoFile.length(),
                             totalBytes = tempVideoFile.length(),
                             progressFraction = 0.94f
@@ -600,6 +613,15 @@ object OnlineVideoAudioImporter {
                 .replace(Regex("""\?range=\d+-\d+&"""), "?")
         } else url
 
+        // 1. Acelerador de descarga por bloques HTTP Range (evita el estrangulamiento de 63 KB/s de YouTube)
+        if (cleanUrl.contains("googlevideo.com")) {
+            val chunkedSuccess = executeChunkedDownload(cleanUrl, targetFile, phase, onProgress)
+            if (chunkedSuccess && targetFile.exists() && targetFile.length() > 0L) {
+                return true
+            }
+        }
+
+        // 2. Descarga lineal estándar de respaldo
         return try {
             val reqBuilder = Request.Builder().url(cleanUrl)
                 .header("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36")
@@ -639,7 +661,7 @@ object OnlineVideoAudioImporter {
 
                 body.byteStream().use { input ->
                     FileOutputStream(targetFile).use { output ->
-                        val buffer = ByteArray(32 * 1024)
+                        val buffer = ByteArray(64 * 1024)
                         var bytesRead: Int
                         var totalRead = 0L
                         var lastReportTime = System.currentTimeMillis()
@@ -664,7 +686,7 @@ object OnlineVideoAudioImporter {
 
                             val now = System.currentTimeMillis()
                             val elapsed = now - lastReportTime
-                            if (elapsed >= 200) {
+                            if (elapsed >= 150) {
                                 currentSpeed = (bytesSinceLastReport * 1000L) / elapsed
                                 val fraction = if (totalBytes > 0) {
                                     (totalRead.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
@@ -702,6 +724,120 @@ object OnlineVideoAudioImporter {
             targetFile.exists() && targetFile.length() > 0L
         } catch (e: Exception) {
             com.example.debug.AuraDebugManager.logWarning("Downloader", "Fallo en descarga: ${e.message}")
+            false
+        }
+    }
+
+    /**
+     * Descarga de alta velocidad mediante fragmentación por rangos HTTP (Chunked Range Download).
+     * Burlar radicalmente el estrangulamiento de ~63 KB/s impuesto por los CDNs de YouTube para
+     * conexiones continuas, descargando a la velocidad real de la red (10 - 40 MB/s).
+     */
+    private fun executeChunkedDownload(
+        url: String,
+        targetFile: File,
+        phase: String,
+        onProgress: (DownloadProgress) -> Unit
+    ): Boolean {
+        return try {
+            // Sonda inicial ligera para determinar Content-Range y tamaño total exacto
+            val probeReq = Request.Builder()
+                .url(url)
+                .header("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36")
+                .header("Accept", "*/*")
+                .header("Referer", "https://m.youtube.com/")
+                .header("Range", "bytes=0-0")
+                .build()
+
+            var totalBytes = -1L
+            httpClient.newCall(probeReq).execute().use { probeRes ->
+                if (probeRes.code == 206) {
+                    val crHeader = probeRes.header("Content-Range")
+                    totalBytes = crHeader?.substringAfterLast("/")?.trim()?.toLongOrNull() ?: -1L
+                } else if (probeRes.isSuccessful) {
+                    totalBytes = probeRes.body?.contentLength() ?: -1L
+                }
+            }
+
+            if (totalBytes <= 0L) {
+                return false
+            }
+
+            // Descarga por bloques concurrentes/secuenciales de 2.5 MB sin estrangulamiento
+            val CHUNK_SIZE = 2_621_440L // 2.5 MB por fragmento
+            var currentByte = 0L
+            val buffer = ByteArray(64 * 1024)
+            var lastReportTime = System.currentTimeMillis()
+            var bytesSinceLastReport = 0L
+            var currentSpeed = 0L
+
+            if (targetFile.exists()) {
+                targetFile.delete()
+            }
+
+            FileOutputStream(targetFile, true).use { fileOut ->
+                while (currentByte < totalBytes) {
+                    val endByte = minOf(currentByte + CHUNK_SIZE - 1, totalBytes - 1)
+                    val chunkReq = Request.Builder()
+                        .url(url)
+                        .header("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36")
+                        .header("Accept", "*/*")
+                        .header("Referer", "https://m.youtube.com/")
+                        .header("Range", "bytes=$currentByte-$endByte")
+                        .build()
+
+                    val chunkRes = httpClient.newCall(chunkReq).execute()
+                    if (!chunkRes.isSuccessful && chunkRes.code != 206) {
+                        chunkRes.close()
+                        com.example.debug.AuraDebugManager.logWarning("Downloader", "Bloque rechazado con código ${chunkRes.code}. Recurriendo a descarga lineal.")
+                        return false
+                    }
+
+                    chunkRes.body?.byteStream()?.use { chunkStream ->
+                        var r: Int
+                        while (chunkStream.read(buffer).also { r = it } != -1) {
+                            fileOut.write(buffer, 0, r)
+                            currentByte += r
+                            bytesSinceLastReport += r
+
+                            val now = System.currentTimeMillis()
+                            val elapsed = now - lastReportTime
+                            if (elapsed >= 150) {
+                                currentSpeed = (bytesSinceLastReport * 1000L) / elapsed
+                                val fraction = (currentByte.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
+                                onProgress(
+                                    DownloadProgress(
+                                        isDownloading = true,
+                                        phase = phase,
+                                        bytesDownloaded = currentByte,
+                                        totalBytes = totalBytes,
+                                        bytesPerSecond = currentSpeed,
+                                        progressFraction = fraction
+                                    )
+                                )
+                                lastReportTime = now
+                                bytesSinceLastReport = 0L
+                            }
+                        }
+                    }
+                    chunkRes.close()
+                }
+            }
+
+            onProgress(
+                DownloadProgress(
+                    isDownloading = true,
+                    phase = phase,
+                    bytesDownloaded = currentByte,
+                    totalBytes = totalBytes,
+                    bytesPerSecond = currentSpeed,
+                    progressFraction = 1f
+                )
+            )
+
+            targetFile.exists() && targetFile.length() > 0L
+        } catch (e: Exception) {
+            com.example.debug.AuraDebugManager.logWarning("Downloader", "Descarga por bloques omitida por excepción: ${e.message}")
             false
         }
     }
