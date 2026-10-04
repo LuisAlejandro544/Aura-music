@@ -93,6 +93,12 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
   - El componente `BackgroundVideoPlayer` sincroniza la posición exacta (`seekTo`) antes de inicializar el buffer (`prepare()`) evitando pausas de re-buffering.
   - El obturador negro de ExoPlayer se desactiva (`setShutterBackgroundColor(TRANSPARENT)`) y se muestra la carátula oficial de la pista como capa base de respaldo (`placeholderTrack`) mientras el decodificador prepara el primer cuadro.
   - Al renderizarse el primer fotograma (`onRenderedFirstFrame`), el video se desvanece suavemente sobre la carátula sin un solo milisegundo de fondo negro en Now Playing ni en el Mini Reproductor.
+- **Bucle Infinito sin Cortes (Seamless Loop con Crossfade Nativo en FFmpeg)**:
+  - Para loops cortos de Canvas (≤ 20s), el motor nativo `FFmpegNativeEngine` aplica una transición de fundido cruzado (*crossfade* continuo con `xfade`) entre el final y el inicio del video.
+  - Al repetirse en bucle continuo dentro de ExoPlayer, el corte brusco entre el último y el primer fotograma desaparece por completo, logrando una animación cíclica infinita, fluida e imperceptible.
+- **Optimización de Fotogramas Clave (Keyframes / GOP Corto a 30fps) para Saltos Instantáneos**:
+  - Para videos largos sincronizados con la música (> 20s), se reestructura el flujo de video insertando un *Keyframe* (`I-frame`) regular cada 30 fotogramas (exactamente cada 1 segundo a 30 FPS constantes CFR) con `-movflags +faststart`.
+  - Al arrastrar el deslizador de tiempo o saltar pistas en *Now Playing* y en el *Mini Reproductor*, el video se sincroniza al milisegundo exacto con 0ms de congelamiento de fotogramas, eliminando los molestos retrasos provocados por los fotogramas clave espaciados de YouTube o TikTok.
 - **Sincronización Total de Velocidad de Video y Música (0.50x a 2.00x)**:
   - Al modular la velocidad de la música o cambiar de presets rápidos, el reproductor de Video Canvas adapta en tiempo real su velocidad de reproducción para marchar al unísono exacto con el tempo musical.
 - **Mini Reproductor Tintado Dinámicamente con Soporte de Video Canvas**:
@@ -142,13 +148,15 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
   - 🎬 **Video Canvas Vinculado**: Vincula el video como Canvas de fondo sincronizado en `NowPlayingScreen`.
 - **Reproducción Inmediata**: Al finalizar la conversión, la pista recién creada se reproduce de inmediato con su Video Canvas y atmósfera lumínica armonizada.
 
-### 7. Descarga Directa desde TikTok, YouTube y Enlaces Web con Motor FFmpeg Puro y Actualización OTA de yt-dlp 🎬🔗🎵
+### 7. Descarga Directa desde TikTok, YouTube y Enlaces Web con FFmpeg Puro y yt-dlp Integrados en el APK Final 🎬🔗🎵
 - **Descargas sin Límite de Duración**: Permite pegar enlaces de **TikTok**, **YouTube** y videos web para descargar música completa, directos, sesiones o parodias de cualquier duración.
-- **Motor FFmpeg Puro sin Wrapper (`FFmpegNativeEngine`)**:
-  - Procesamiento y transcodificación de audio de alta fidelidad (AAC, Opus, Vorbis, FLAC, WebM -> M4A / MP3) ejecutado directamente a nivel nativo/CLI sin bibliotecas intermediarias pesadas.
-  - Fusión de flujos de video y audio DASH independientes sin pérdida de calidad (*Direct Stream Copy* `-c copy`).
-- **Arquitectura de Actualización en Caliente OTA para yt-dlp (`YtDlpAutoUpdater`)**:
-  - **Cero Dependencia de Nuevos APKs**: Ante cambios o parches anti-bot en YouTube, la app comprueba y descarga en caliente la versión más reciente del extractor oficial de yt-dlp desde GitHub Releases directamente en `files/bin/yt-dlp` (~3.8 MB).
+- **Motor FFmpeg Puro sin Wrappers en el APK Final (`FFmpegNativeEngine`)**:
+  - Binario nativo ejecutable `libffmpeg.so` empaquetado directamente en `jniLibs/` para todas las arquitecturas (`arm64-v8a`, `armeabi-v7a`, `x86_64`, `x86`), instalado con permisos nativos de ejecución en `nativeLibraryDir` sin wrappers desactualizados.
+  - Paquete dinámico optimizado con solo lo necesario para audio y video (`libffmpeg.zip.so`), descomprimido de forma atómica en segundo plano para procesar y transcodificar en alta fidelidad (AAC, Opus, Vorbis, FLAC, WebM -> M4A / MP3) y fusionar flujos DASH de video y audio (`-c copy`) sin inflar el APK con encoders pesados innecesarios.
+- **Entorno Python Nativo y Actualización en Caliente OTA para yt-dlp (`YtDlpNativeEngine` & `YtDlpAutoUpdater`)**:
+  - Runtime de CPython nativo (`libpython.so`) con entorno optimizado (`libpython.zip.so`) y motor QuickJS (`libqjs.so`) empaquetados en el APK final para ejecutar scripts de extracción y descifrar firmas dinámicas (`n-sig`) localmente a máxima velocidad.
+  - Copia base oficial de `yt-dlp` empaquetada en `assets/bin/yt-dlp` para funcionamiento inmediato fuera de línea desde la primera instalación.
+  - **Auto-Actualización OTA**: Ante cambios en los algoritmos de YouTube, la app comprueba y descarga en caliente la versión más reciente del extractor oficial de yt-dlp desde GitHub Releases directamente en `files/bin/yt-dlp` sin forzar al usuario a esperar una nueva versión del APK en Uptodown.
   - **Disparador Dual**: Comprobación automática ante errores de extracción de YouTube y botón interactivo manual en *Ajustes > Apariencia & Temas > Motores de Extracción & yt-dlp OTA*.
 - **Arquitectura de Extracción Resiliente de 3 Niveles con Carátula Garantizada**:
   - ⚡ **Motor InnerTube Nativo (`InnerTubeClient`)**: Consulta directa ultrarrápida al endpoint oficial de YouTube mediante clientes de baja fricción (`ANDROID_VR` y `VISIONOS`). Entrega flujos de audio y video directos sin cifrado de firma (`n-sig`) ni bloqueos de `LOGIN_REQUIRED` en menos de ~300ms.

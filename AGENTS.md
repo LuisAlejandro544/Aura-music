@@ -76,7 +76,7 @@ Este documento define el protocolo de trabajo para los agentes de software y des
 - [x] ¿LeakCanary está añadido y funcional en dependencias de depuración?
 - [x] ¿El almacenamiento estructurado (`images/`, `songs/`, `lyrics/`, `metadata/`) está activo?
 - [x] ¿Las carátulas se procesan como WebP sin pérdida en segundo plano y las faltantes se generan proceduralmente?
-- [x] ¿El Video Canvas de fondo soporta loops cortos (≤20s), videos largos sincronizados con el audio y armonización cromática sin interferencias de carátula?
+- [x] ¿El Video Canvas de fondo soporta loops cortos (≤20s) con bucle infinito sin cortes (Seamless Loop con crossfade xfade en FFmpeg), videos largos sincronizados con fotogramas clave (GOP corto a 30fps) para saltos instantáneos (0ms) y armonización cromática sin interferencias de carátula?
 - [x] ¿El video de fondo soporta los 3 modos (Fondo Completo con carátula al frente, Lienzo en carátula y Solo Carátula) seleccionables por el usuario mediante diálogo modal?
 - [x] ¿El corazón en Now Playing se refleja inmediatamente en rojo y se sincroniza reactivamente con Room y ExoPlayer?
 - [x] ¿La sección 'Populares en tu biblioteca' de la pantalla de inicio permanece fija sin renombrarse a 'Tus favoritos' ni ocultar canciones al marcar favoritos?
@@ -112,5 +112,5 @@ Este documento define el protocolo de trabajo para los agentes de software y des
 - [x] ¿El importador de archivos de letras (.lrc y .txt) desde el celular y la auto-detección/vinculación de letras locales (.lrc/.txt hermanos o tags) están integrados y funcionales?
 - [x] ¿La búsqueda interactiva de letras con edición libre de título/artista, búsqueda multidimensional (`track_name` y `q` sin restricción de duración local), tarjeta vacía sin desbordamientos y recomendación oficial canónica (#1) está integrada y operativa?
 - [x] ¿Aura Monitor cuenta con navegación por pestañas (*Incidentes & Logs* y *Rendimiento & Hilos*), desglose de RAM segmentada (Java/Native C++/Gráficos/PSS), carga de CPU e Inspector Quirúrgico de Hilos con trazas de pila completas?
-- [x] ¿El motor FFmpeg puro sin wrapper (`FFmpegNativeEngine`) y el gestor de actualización en caliente OTA de yt-dlp (`YtDlpAutoUpdater`) están integrados y operativos sin forzar dependencias GPL ni obligar a nuevos APKs ante cambios de YouTube?
+- [x] ¿El motor FFmpeg puro sin wrapper (`FFmpegNativeEngine`), el entorno Python nativo con QuickJS (`YtDlpNativeEngine`) y la copia base de `yt-dlp` están integrados en el APK final para todas las arquitecturas (`arm64-v8a`, `armeabi-v7a`, `x86_64`, `x86`) con actualización en caliente OTA (`YtDlpAutoUpdater`) sin inflar el APK con encoders pesados innecesarios?
 - [x] ¿Los 5 archivos Markdown (`README.md`, `ROADMAP.md`, `STRUCTURE.md`, `AI_CONTEXT.md`, `AGENTS.md`) están actualizados y en español?

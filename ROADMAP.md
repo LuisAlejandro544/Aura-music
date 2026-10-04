@@ -207,9 +207,12 @@ Este documento traza las fases de evolución técnica y funcional para convertir
   - Lista completa de opciones comunitarias con comparador de formato (Sincronizada vs Texto plano), duración y previsualización de versos.
   - Integración accesible tanto desde el botón de búsqueda en la tarjeta de Karaoke como desde el estado de canción sin letra.
 
-- [x] **Motor FFmpeg Puro sin Wrapper y Actualización en Caliente OTA de yt-dlp**:
-  - `FFmpegNativeEngine`: Motor de procesamiento multimedia a nivel nativo/CLI sin bibliotecas intermediarias pesadas ni riesgos de licencias GPL, optimizado para extracción de audio, transcodificación a AAC/MP3 y fusión de streams video/audio.
-  - `YtDlpAutoUpdater`: Sistema de actualización OTA en caliente que consulta GitHub Releases y descarga la versión más reciente del extractor (~3.8 MB) directamente en `files/bin/yt-dlp` sin forzar al usuario a esperar una nueva versión del APK en Uptodown.
+- [x] **Integración Completa de FFmpeg Puro y Entorno Python con yt-dlp en el APK Final**:
+  - `FFmpegNativeEngine`: Motor de procesamiento multimedia a nivel nativo/CLI sin wrappers obsoletos, con binario ejecutable `libffmpeg.so` y paquete dinámico depurado (`libffmpeg.zip.so`) empaquetados en `jniLibs/` para todas las arquitecturas (`arm64-v8a`, `armeabi-v7a`, `x86_64`, `x86`), optimizado para extracción de audio, transcodificación a AAC/MP3 y fusión DASH `-c copy`.
+  - **Bucle Infinito sin Cortes (Seamless Loop con Crossfade)**: Creación automatizada de loops de Video Canvas (≤ 20s) con fundido continuo mediante `xfade` para repetición cíclica continua e imperceptible sin saltos en ExoPlayer.
+  - **Optimización de Fotogramas Clave (Keyframes / GOP Corto a 30fps)**: Reestructuración de videos largos sincronizados con inserción de I-frames cada 1 segundo (GOP=30), eliminando audio residual y aplicando `-movflags +faststart` para saltos temporales instantáneos (0ms) en Now Playing y Mini Reproductor.
+  - `YtDlpNativeEngine`: Runtime de CPython nativo (`libpython.so`) con entorno optimizado (`libpython.zip.so`) y QuickJS (`libqjs.so`) empaquetados en el APK, con copia base oficial en `assets/bin/yt-dlp` para funcionamiento inmediato offline.
+  - `YtDlpAutoUpdater`: Sistema de actualización OTA en caliente que consulta GitHub Releases y descarga la versión más reciente del extractor directamente en `files/bin/yt-dlp` sin forzar al usuario a esperar una nueva versión del APK en Uptodown.
   - Tarjeta en Ajustes de Apariencia con información en vivo de FFmpeg y botón interactivo para actualizar yt-dlp en segundo plano.
 
 ---

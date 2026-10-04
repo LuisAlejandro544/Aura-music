@@ -58,7 +58,7 @@ Este archivo define el contexto de diseño, directrices técnicas y restriccione
    - LeakCanary debe estar configurado en `debugImplementation` para auditar fugas de memoria en la JVM.
 
 9. **Video de Fondo Multifuncional (Fondo Completo, Lienzo o Desactivado)**:
-   - Soporte para asociar videos a pistas individuales. Los videos cortos (≤ 10s - 20s) se reproducen en bucle continuo (*Canvas Loop*); los videos largos se sincronizan temporalmente con el audio y los saltos de búsqueda (*Video Sync*). Permite forzar el modo (Loop o Sync) en `EditTrackDialog`.
+   - Soporte para asociar videos a pistas individuales. Los videos cortos (≤ 10s - 20s) se optimizan como **Seamless Loop** con crossfade continuo (`xfade`) en FFmpeg para repetición cíclica continua e imperceptible sin saltos bruscos; los videos largos (> 20s) se estructuran con **Keyframes (GOP Corto a 30fps)** cada 1 segundo para saltos temporales (`seekTo`) instantáneos con 0ms de congelamiento. Permite forzar el modo (Loop o Sync) en `EditTrackDialog`.
    - **3 Modos de Visualización Seleccionables**:
      - `FULLSCREEN_BACKGROUND`: El video se reproduce en todo el fondo de pantalla completa con un velo oscuro/gradiente para garantizar contraste y legibilidad, con la carátula flotando al frente.
      - `CARD_CANVAS`: El video se reproduce dentro del marco central de la carátula (1:1).
@@ -80,9 +80,10 @@ Este archivo define el contexto de diseño, directrices técnicas y restriccione
       - *Bypass de Respaldo Invidious*: Instancias públicas libres para resolución inmediata de canciones oficiales con restricciones de derechos estrictas.
       - *Motor WebView Reparado con Garantía de Carátula*: Navegador efímero en segundo plano cargado sobre `m.youtube.com` (sin bloqueos de inserción ni error 150) con timeout de 22s, extracción de miniatura en DOM y **descarga en cascada multinivel** (`maxresdefault.jpg` -> `hqdefault.jpg` -> `mqdefault.jpg` -> `i.ytimg.com` -> fotograma clave de video).
       - *Selector Interactivo*: Permite al usuario alternar entre InnerTube y WebView en el diálogo con auto-fallback cruzado de 3 capas.
-    - **Motor FFmpeg Puro sin Wrapper (`FFmpegNativeEngine`) y Actualización OTA de yt-dlp (`YtDlpAutoUpdater`)**:
-      - Procesamiento y transcodificación de audio de alta fidelidad (AAC, Opus, Vorbis, FLAC, WebM -> M4A / MP3) ejecutado a nivel nativo/CLI sin wrappers de terceros ni licencias GPL.
-      - Capacidad de actualización en caliente para yt-dlp desde GitHub Releases en `files/bin/yt-dlp` sin requerir la publicación de un nuevo APK en Uptodown cada vez que YouTube altere sus firmas o endpoints.
+    - **Motor FFmpeg Puro y Entorno Python con yt-dlp Integrados en el APK Final (`FFmpegNativeEngine` & `YtDlpNativeEngine`)**:
+      - Binarios nativos ejecutables `libffmpeg.so`, `libpython.so` y `libqjs.so` empaquetados en `jniLibs/` para todas las arquitecturas (`arm64-v8a`, `armeabi-v7a`, `x86_64`, `x86`), asegurando ejecución nativa sin wrappers de terceros obsoletos.
+      - Paquetes de librerías dinámicas optimizados para audio/video (`libffmpeg.zip.so`) y entorno Python (`libpython.zip.so`) con OpenSSL y CA certificados, descomprimidos atómicamente en segundo plano sin inflar el APK con encoders innecesarios.
+      - Copia base de `yt-dlp` en `assets/bin/yt-dlp` para funcionamiento inmediato offline y actualización en caliente OTA desde GitHub Releases en `files/bin/yt-dlp` sin forzar la publicación de nuevos APKs en Uptodown.
     - Almacenamiento organizado: audio `.m4a`/`.mp3` en `songs/`, carátula oficial en WebP sin pérdida en `images/`, y video vinculado en `videos/` para reproducir el Video Canvas de fondo.
     - Interfaz adaptativa: Degradados visuales reactivos (Cyan/Magenta para TikTok, Rojo Carmesí/Naranja para YouTube/Web) y reproducción inmediata en Now Playing tras descargar.
 

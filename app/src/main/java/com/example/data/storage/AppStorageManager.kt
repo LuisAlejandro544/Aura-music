@@ -231,13 +231,31 @@ class AppStorageManager(private val context: Context) {
                  } catch (ignored: Exception) {}
              }
 
-             // 3. Copiar archivo al directorio videos/
+             // 3. Copiar archivo temporal y procesar con FFmpeg para fluidez absoluta
+             val rawTempFile = File(videosDir, "canvas_raw_${trackId}_${System.currentTimeMillis()}.tmp")
              val newFile = File(videosDir, "canvas_${trackId}_${System.currentTimeMillis()}.mp4")
              context.contentResolver.openInputStream(sourceUri)?.use { input ->
-                 FileOutputStream(newFile).use { output ->
+                 FileOutputStream(rawTempFile).use { output ->
                      input.copyTo(output)
                  }
              } ?: return@withContext null
+
+             // 4. Optimizar con FFmpeg nativo: Seamless Loop con crossfade si es <=20s, o GOP corto a 30fps si es sincronizado
+             try {
+                 val processResult = com.example.data.importer.FFmpegNativeEngine.processVideoForCanvas(
+                     context = context,
+                     inputFile = rawTempFile,
+                     outputFile = newFile,
+                     isLoop = isLoop
+                 )
+                 if (!processResult.success || !newFile.exists() || newFile.length() == 0L) {
+                     rawTempFile.renameTo(newFile)
+                 } else {
+                     rawTempFile.delete()
+                 }
+             } catch (_: Exception) {
+                 rawTempFile.renameTo(newFile)
+             }
 
              Pair(newFile.absolutePath, isLoop)
          } catch (e: Exception) {

@@ -485,7 +485,28 @@ object OnlineVideoAudioImporter {
                     )
                 }
                 if (tempVideoFile.exists() && tempVideoFile.length() > 0L) {
-                    videoCanvasPath = tempVideoFile.absolutePath
+                    onProgressUpdate(
+                        DownloadProgress(
+                            isDownloading = true,
+                            phase = if (isLoop) "Perfeccionando bucle infinito continuo (Seamless Loop)..." else "Optimizando fluidez de video y fotogramas clave...",
+                            bytesDownloaded = tempVideoFile.length(),
+                            totalBytes = tempVideoFile.length(),
+                            progressFraction = 0.94f
+                        )
+                    )
+                    val optimizedVideoFile = File(storageManager.videosDir, "canvas_opt_${timestamp}.mp4")
+                    val canvasResult = FFmpegNativeEngine.processVideoForCanvas(
+                        context = context,
+                        inputFile = tempVideoFile,
+                        outputFile = optimizedVideoFile,
+                        isLoop = isLoop
+                    )
+                    if (canvasResult.success && optimizedVideoFile.exists() && optimizedVideoFile.length() > 0L) {
+                        tempVideoFile.delete()
+                        videoCanvasPath = optimizedVideoFile.absolutePath
+                    } else {
+                        videoCanvasPath = tempVideoFile.absolutePath
+                    }
                 }
             } else {
                 // Si el usuario no quería video de fondo, eliminamos el archivo de video para no gastar espacio
