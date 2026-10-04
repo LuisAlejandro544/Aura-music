@@ -153,6 +153,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val _pendingIncomingWebLink = MutableStateFlow<String?>(null)
     val pendingIncomingWebLink: StateFlow<String?> = _pendingIncomingWebLink.asStateFlow()
 
+    // Estado en tiempo real del progreso de descarga de video/audio web (bytes, total, velocidad)
+    private val _downloadProgress = MutableStateFlow(DownloadProgress())
+    val downloadProgress: StateFlow<DownloadProgress> = _downloadProgress.asStateFlow()
+
     init {
         // Al iniciar por primera vez, si la biblioteca está vacía, no forzamos escaneo global,
         // pero sugerimos al usuario en la vista de importación o le permitimos generar demos
@@ -509,6 +513,14 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     ) {
         viewModelScope.launch {
             _isImporting.value = true
+            _downloadProgress.value = DownloadProgress(
+                isDownloading = true,
+                phase = "Iniciando descarga...",
+                bytesDownloaded = 0L,
+                totalBytes = -1L,
+                bytesPerSecond = 0L,
+                progressFraction = 0f
+            )
             _importStatusMessage.value = "Iniciando descarga de video y audio..."
             val storageManager = com.example.data.storage.AppStorageManager(getApplication())
             val result = com.example.data.importer.OnlineVideoAudioImporter.downloadAndImport(
@@ -518,12 +530,14 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 customTitle = customTitle,
                 customArtist = customArtist,
                 attachAsCanvas = attachAsCanvas,
-                onProgressUpdate = { status ->
-                    _importStatusMessage.value = status
+                onProgressUpdate = { progress ->
+                    _downloadProgress.value = progress
+                    _importStatusMessage.value = "${progress.phase} • ${progress.formattedProgress} • ${progress.formattedSpeed}"
                 }
             )
 
             _isImporting.value = false
+            _downloadProgress.value = DownloadProgress(isDownloading = false)
             result.onSuccess { track ->
                 val saved = repository.insertCustomTrack(getApplication(), track)
                 _importStatusMessage.value = "¡Éxito! Se descargó \"${saved.title}\" con carátula y Video Canvas."

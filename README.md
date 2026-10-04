@@ -50,12 +50,13 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
 - **Refuerzo de Bajos C++ (Bass Boost)** calibrado a 60 Hz con modulación precisa.
 
 ### 3. Audio 8D Espacial, Suite Reverb y Controles Avanzados de Escucha
-- **Suite Reverb Híbrida & Filtros Acústicos Ambientales**:
+- **Suite Reverb Híbrida & Filtros Acústicos Ambientales (Corregido y Optimizado)**:
   - Simulación de espacios físicos reales mediante presets de alta fidelidad: *Estudio*, *Sala Mediana*, *Club En Vivo*, *Gran Hall / Teatro*, *Catedral* y *Eco Espacial*.
+  - **Motor Acústico Blindado en C++20**: Corregido el problema de silencio al activar la reverberación mediante la adición de filtros peine con amortiguación paso-bajos activa (*Low-Pass Feedback Comb Filters - LBCF*), pasa-todo Schroeder de ganancia unitaria, desacoplamiento de presets inactivos y protección contra valores NaN/Inf en el limitador suave *softClip*.
   - Personalización acústica libre para ajuste milimétrico:
     - *Tamaño de Sala / Espacio* (0.1x a 2.0x).
-    - *Tiempo de Decaimiento / Resonancia* (200 ms a 6000 ms).
-    - *Nivel de Reverberación / Mezcla Húmeda* (-24 dB a +6 dB).
+    - *Tiempo de Decaimiento / Resonancia* (100 ms a 6000 ms).
+    - *Nivel de Reverberación / Mezcla Húmeda* (-30 dB a +6 dB).
   - Algoritmo de filtrado comb nativo y vinculación complementaria a sesiones de audio por hardware.
 - **Audio Espacial 8D Binaural para Auriculares**:
   - Paneo orbital tridimensional continuo en tiempo real (4s a 30s por rotación completa).

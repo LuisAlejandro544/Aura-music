@@ -1,8 +1,8 @@
 package com.example.playback
 
 import android.media.audiofx.BassBoost
-import android.media.audiofx.Equalizer
 import android.media.audiofx.EnvironmentalReverb
+import android.media.audiofx.Equalizer
 import android.media.audiofx.PresetReverb
 import com.example.model.EqualizerBand
 import com.example.model.EqualizerPreset
@@ -18,7 +18,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * Controla:
  * - Ecualizador paramétrico de 10 bandas y refuerzo de graves en tiempo real.
  * - Motor de Audio Espacial 8D Binaural.
- * - Suite Reverb Híbrida (Presets ambientales de sala/catedral/club + Ajuste libre de tamaño, decay y wet).
+ * - Suite Reverb Híbrida C++20 (Presets ambientales + Ajuste libre de tamaño, decay y wet).
  * - Crossfeed y balance estéreo fino L/R.
  */
 class AudioEffectManager {
@@ -72,23 +72,12 @@ class AudioEffectManager {
                     setStrength(_bassBoostLevel.value.toShort())
                 }
             }
-        } catch (ignored: Exception) {}
-
-        try {
-            hardwarePresetReverb = PresetReverb(0, audioSessionId).apply {
-                enabled = _reverbConfig.value.isEnabled
-                if (_reverbConfig.value.isEnabled && _reverbConfig.value.preset != ReverbPreset.OFF) {
-                    preset = _reverbConfig.value.preset.androidPreset
-                }
-            }
-        } catch (ignored: Exception) {}
-
-        try {
-            hardwareEnvReverb = EnvironmentalReverb(0, audioSessionId).apply {
-                enabled = _reverbConfig.value.isEnabled
-                decayTime = _reverbConfig.value.decayMs
-                roomLevel = (_reverbConfig.value.reverbLevelDb * 100).toInt().coerceIn(-9000, 0).toShort()
-            }
+            try {
+                hardwarePresetReverb = PresetReverb(0, audioSessionId)
+            } catch (_: Exception) {}
+            try {
+                hardwareEnvReverb = EnvironmentalReverb(0, audioSessionId)
+            } catch (_: Exception) {}
         } catch (ignored: Exception) {}
 
         syncWithNativeEngine()
@@ -169,7 +158,24 @@ class AudioEffectManager {
 
     // --- Control de Suite Reverb Acústica ---
     fun setReverbEnabled(enabled: Boolean) {
-        val cfg = _reverbConfig.value.copy(isEnabled = enabled)
+        val currentPreset = if (enabled && _reverbConfig.value.preset == ReverbPreset.OFF) {
+            ReverbPreset.ROOM
+        } else if (!enabled) {
+            ReverbPreset.OFF
+        } else {
+            _reverbConfig.value.preset
+        }
+        val targetRoomSize = if (enabled && _reverbConfig.value.preset == ReverbPreset.OFF) currentPreset.defaultRoomSize else _reverbConfig.value.roomSize
+        val targetDecayMs = if (enabled && _reverbConfig.value.preset == ReverbPreset.OFF) currentPreset.defaultDecayMs else _reverbConfig.value.decayMs
+        val targetLevelDb = if (enabled && _reverbConfig.value.preset == ReverbPreset.OFF) currentPreset.defaultLevelDb else _reverbConfig.value.reverbLevelDb
+
+        val cfg = _reverbConfig.value.copy(
+            isEnabled = enabled,
+            preset = currentPreset,
+            roomSize = targetRoomSize,
+            decayMs = targetDecayMs,
+            reverbLevelDb = targetLevelDb
+        )
         _reverbConfig.value = cfg
         applyReverbToHardware(cfg)
         NativeAudioEngine.setReverbParameters(enabled, cfg.roomSize, cfg.decayMs, cfg.reverbLevelDb)

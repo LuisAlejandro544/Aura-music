@@ -30,6 +30,15 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import com.example.ui.theme.CardBorder
+import com.example.ui.theme.TextPrimary
+import com.example.ui.theme.TextSecondary
 import com.example.model.VideoDisplayMode
 import com.example.ui.components.BottomNavBar
 import com.example.ui.components.MiniPlayer
@@ -173,6 +182,7 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
     val lyricsState by viewModel.lyricsState.collectAsStateWithLifecycle()
     val pendingIncomingVideoUri by viewModel.pendingIncomingVideoUri.collectAsStateWithLifecycle()
     val pendingIncomingWebLink by viewModel.pendingIncomingWebLink.collectAsStateWithLifecycle()
+    val downloadProgress by viewModel.downloadProgress.collectAsStateWithLifecycle()
 
     var showGlobalAudioEffectsSheet by remember { mutableStateOf(false) }
     var initialAudioEffectsTab by remember { mutableIntStateOf(0) }
@@ -349,6 +359,7 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                             allTracks = allTracks,
                             isImporting = isImporting,
                             importStatusMessage = importStatusMessage,
+                            downloadProgress = downloadProgress,
                             onImportUris = { viewModel.importUris(it) },
                             onImportFolder = { viewModel.importFolder(it) },
                             onSeedDemoTracks = { viewModel.seedDemoTracks() },
@@ -605,6 +616,7 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
         if (pendingIncomingWebLink != null) {
             com.example.ui.components.DownloadFromLinkDialog(
                 initialUrl = pendingIncomingWebLink!!,
+                downloadProgress = downloadProgress,
                 onDismiss = { viewModel.clearPendingIncomingWebLink() },
                 onConfirmDownload = { resolvedInfo, title, artist, attachAsCanvas ->
                     viewModel.importFromWebVideoLink(
@@ -615,10 +627,92 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                     ) { track ->
                         viewModel.playTrack(track)
                         viewModel.setNowPlayingExpanded(true)
+                        viewModel.clearPendingIncomingWebLink()
                     }
-                    viewModel.clearPendingIncomingWebLink()
                 }
             )
+        }
+
+        // Tarjeta flotante de telemetría en tiempo real si la descarga ocurre en segundo plano
+        if (downloadProgress.isDownloading && pendingIncomingWebLink == null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp, vertical = 84.dp),
+                contentAlignment = androidx.compose.ui.Alignment.BottomCenter
+            ) {
+                androidx.compose.material3.Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = androidx.compose.material3.CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    ),
+                    border = BorderStroke(1.dp, CardBorder),
+                    elevation = androidx.compose.material3.CardDefaults.cardElevation(defaultElevation = 8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(
+                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            androidx.compose.material3.CircularProgressIndicator(
+                                progress = { if (downloadProgress.totalBytes > 0) downloadProgress.progressFraction else 0f },
+                                modifier = Modifier.size(24.dp),
+                                color = MaterialTheme.colorScheme.primary,
+                                trackColor = CardBorder,
+                                strokeWidth = 3.dp
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = downloadProgress.phase.ifBlank { "Descargando..." },
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                    color = TextPrimary
+                                ),
+                                maxLines = 1,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                text = downloadProgress.formattedSpeed,
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                    color = Color(0xFF10B981)
+                                )
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        if (downloadProgress.totalBytes > 0) {
+                            androidx.compose.material3.LinearProgressIndicator(
+                                progress = { downloadProgress.progressFraction },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(4.dp)
+                                    .clip(RoundedCornerShape(2.dp)),
+                                color = MaterialTheme.colorScheme.primary,
+                                trackColor = CardBorder
+                            )
+                        } else {
+                            androidx.compose.material3.LinearProgressIndicator(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(4.dp)
+                                    .clip(RoundedCornerShape(2.dp)),
+                                color = MaterialTheme.colorScheme.primary,
+                                trackColor = CardBorder
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        Text(
+                            text = downloadProgress.formattedProgress,
+                            style = MaterialTheme.typography.labelSmall.copy(color = TextSecondary)
+                        )
+                    }
+                }
+            }
         }
     }
 }
