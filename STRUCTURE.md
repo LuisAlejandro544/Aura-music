@@ -36,10 +36,12 @@ AuraMusic/
 │   │   │   │   ├── data/
 │   │   │   │   │   ├── importer/               # Módulos de importación y análisis
 │   │   │   │   │   │   ├── AudioMetadataParser.kt # Extractor ID3 y conversor a WebP
+│   │   │   │   │   │   ├── LyricsManager.kt        # Analizador de .LRC, descarga de LRCLIB y persistencia local
 │   │   │   │   │   │   ├── OnlineVideoAudioImporter.kt # Descargador de audio, carátula y Video Canvas desde TikTok y web
 │   │   │   │   │   │   ├── ProceduralArtworkGenerator.kt # Generador procedural de carátulas
 │   │   │   │   │   │   ├── SampleMusicGenerator.kt # Sintetizador de audio WAV para demos
-│   │   │   │   │   │   └── VideoAudioExtractor.kt  # Extractor de audio nativo y generador 3 en 1 de Video a Música
+│   │   │   │   │   │   ├── VideoAudioExtractor.kt  # Extractor de audio nativo y generador 3 en 1 de Video a Música
+│   │   │   │   │   │   └── WebStreamExtractor.kt   # Extractor híbrido (InnerTube API nativa + Headless WebView)
 │   │   │   │   │   ├── local/                  # Capa de persistencia local Room SQLite
 │   │   │   │   │   │   ├── AppDatabase.kt      # Base de datos Room
 │   │   │   │   │   │   ├── dao/
@@ -51,13 +53,11 @@ AuraMusic/
 │   │   │   │   │   │       └── PlaylistTrackCrossRef.kt # Relación muchos a muchos
 │   │   │   │   │   ├── repository/
 │   │   │   │   │   │   └── MusicRepository.kt  # Repositorio central de datos, SAF y Playlists
-│   │   │   │   │   ├── storage/
-│   │   │   │   │   │   └── AppStorageManager.kt # Almacenamiento estructurado y carátulas WebP
-│   │   │   │   │   └── importer/
-│   │   │   │   │       ├── OnlineVideoAudioImporter.kt # Importador de TikTok y enlaces web
-│   │   │   │   │       └── WebStreamExtractor.kt # Extractor híbrido de streaming (InnerTube y WebView reparado)
+│   │   │   │   │   └── storage/
+│   │   │   │   │       └── AppStorageManager.kt # Almacenamiento estructurado y carátulas WebP
 │   │   │   │   ├── model/                      # Modelos de dominio
 │   │   │   │   │   ├── Track.kt                # Modelo de datos de canción
+│   │   │   │   │   ├── LyricsState.kt          # Modelo de letras sincronizadas (.LRC) y líneas temporizadas
 │   │   │   │   │   ├── Playlist.kt             # Modelo de datos de lista
 │   │   │   │   │   ├── RepeatMode.kt           # Enum de modos de repetición
 │   │   │   │   │   ├── EqualizerConfig.kt      # Modelo de 10 bandas y presets de EQ
@@ -109,7 +109,8 @@ AuraMusic/
 │   │   │   │   │   │   │   ├── NowPlayingScreen.kt # Vista completa de reproducción
 │   │   │   │   │   │   │   └── components/     # Componentes modulares de reproducción
 │   │   │   │   │   │   │       ├── NowPlayingTopBar.kt            # Barra superior con botones de acción
-│   │   │   │   │   │   │       ├── NowPlayingArtworkCard.kt       # Carátula y Video Canvas con aura y elevación
+│   │   │   │   │   │   │       ├── NowPlayingArtworkCard.kt       # Carátula y Video Canvas con aura, respiración C++ y cápsula ergonómica
+│   │   │   │   │   │   │       ├── NowPlayingLyricsCard.kt        # Tarjeta Karaoke interactiva con auto-scroll y resaltado neón
 │   │   │   │   │   │   │       ├── NowPlayingPlaybackControls.kt  # Info de pista, seekbar y botonera de control
 │   │   │   │   │   │   │       ├── NowPlayingBalanceBar.kt        # Barra de balance estéreo L/R en vivo
 │   │   │   │   │   │   │       ├── NowPlayingQueueSheet.kt        # Hoja modal de cola de reproducción ("Up Next")

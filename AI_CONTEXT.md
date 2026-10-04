@@ -41,6 +41,7 @@ Este archivo define el contexto de diseño, directrices técnicas y restriccione
    - El motor de **Audio 8D Espacial** está integrado en **ISO C++20** mediante paneo orbital continuo de potencia constante, filtro de sombra de cabeza y reverberación binaural para auriculares.
    - El ecualizador **NO DEBE TENER UN APARTADO APARTE DE PANTALLA COMPLETA**. Se integra y despliega como una hoja modal unificada (`AudioEffectsBottomSheet`) accesible desde el Mini Reproductor y Now Playing con un solo toque.
    - Los cambios de velocidad y tono (*playback parameters*) deben contar con amortiguación (*throttling* con corrutinas) para no saturar ExoPlayer ni pausar la canción accidentalmente.
+   - La finalización de pista debe avanzar de forma continua a la siguiente canción, y las transiciones con fundido (*fade-out / fade-in*) deben reestablecer progresivamente el 100% del volumen original sin interrupciones.
 
 7. **Diseño de Interfaz (Jetpack Compose & M3)**:
    - Fondos 100% opacos OLED: evitar transparencias que permitan que las listas o cabeceras se filtren por detrás del reproductor o mini reproductor.
@@ -92,5 +93,14 @@ Este archivo define el contexto de diseño, directrices técnicas y restriccione
     - El canal de notificación debe ser silencioso (`IMPORTANCE_LOW`) para evitar pitidos en cada cambio de canción.
     - En Android 13+ (API 33+) se debe solicitar el permiso en tiempo de ejecución `POST_NOTIFICATIONS`.
 
-14. **Idioma de Comunicación**:
+14. **Reacción Acústica por Intensidad Ligada a C++20 DSP y Cápsula Ergonómica de Video Canvas**:
+    - La respiración física (`scale`), elevación de sombra y halo ambiental de Now Playing están directamente sincronizados con la intensidad RMS calculada dentro del motor nativo en C++20 (`getAudioIntensity()`), complementando las 28 bandas de `getVisualizerBands()`.
+    - El selector para alternar modos de Video Canvas debe presentarse como una cápsula flotante ergonómica de alto contraste (`Color.Black.copy(alpha = 0.88f)`) con área táctil superior a **48.dp**, visible en los 3 modos siempre que haya video, permitiendo alternar con un toque o abrir el selector modal al mantener presionado.
+
+15. **Letras Sincronizadas (.LRC) Estilo Karaoke**:
+    - Integración de analizador de marcas de tiempo `[mm:ss.xx]` con persistencia local en `Android/data/.../files/lyrics/track_{id}.lrc`.
+    - Descarga automática libre desde **LRCLIB** al cambiar a canciones sin letra, sin registro ni API keys.
+    - Interfaz Karaoke interactiva con desplazamiento automático suave (*auto-scroll*), tipografía resaltada neón para el verso actual, y salto directo en la canción (*Seek-to-time*) al compás de cualquier línea pulsada.
+
+16. **Idioma de Comunicación**:
    - La documentación, comentarios en código, cadenas de usuario (`strings.xml`) y mensajes de commit deben redactarse en **español**.

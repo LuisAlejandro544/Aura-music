@@ -22,12 +22,14 @@ import com.example.ui.theme.TextSecondary
 
 /**
  * Barra superior de la pantalla completa Now Playing.
- * Arquitectura: Componente modular de UI que presenta:
+ *
+ * Características:
  * - Botón de repliegue/cierre suave hacia abajo.
- * - Cabecera "REPRODUCIENDO AURA" y nombre del álbum.
+ * - Título "REPRODUCIENDO AURA" y nombre del álbum con ajuste elástico contra desbordes.
+ * - Botón de Letras Sincronizadas Karaoke (Mic).
  * - Botón de acceso a Efectos de Audio y Temporizador (con badge indicadora activa).
  * - Botón de especificaciones técnicas y edición.
- * - Botón de selección de Modo de Video (Fondo completo, Canvas o Off).
+ * - Botón de Video Canvas con tamaño geométrico fijo (40dp x 38dp) que jamás se deforma ni se aplasta.
  */
 @Composable
 fun NowPlayingTopBar(
@@ -40,6 +42,8 @@ fun NowPlayingTopBar(
     onOpenEffects: () -> Unit,
     onOpenDetails: () -> Unit,
     onOpenVideoMode: () -> Unit,
+    isLyricsActive: Boolean = false,
+    onToggleLyrics: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val hasVideo = !currentTrack.videoUri.isNullOrEmpty()
@@ -47,30 +51,38 @@ fun NowPlayingTopBar(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 12.dp),
+            .padding(vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconButton(
             onClick = onCollapse,
-            modifier = Modifier.testTag("now_playing_collapse_btn")
+            modifier = Modifier
+                .size(40.dp)
+                .testTag("now_playing_collapse_btn")
         ) {
             Icon(
                 imageVector = Icons.Default.KeyboardArrowDown,
                 contentDescription = "Ocultar reproductor",
                 tint = TextPrimary,
-                modifier = Modifier.size(32.dp)
+                modifier = Modifier.size(30.dp)
             )
         }
 
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .weight(1f, fill = false)
+                .padding(horizontal = 6.dp)
+        ) {
             Text(
                 text = "REPRODUCIENDO AURA",
                 style = MaterialTheme.typography.labelSmall.copy(
-                    letterSpacing = 2.sp,
+                    letterSpacing = 1.8.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.secondary
-                )
+                ),
+                maxLines = 1
             )
             Text(
                 text = currentTrack.album,
@@ -80,10 +92,31 @@ fun NowPlayingTopBar(
             )
         }
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            // Botón de Letras Karaoke (Mic)
+            IconButton(
+                onClick = onToggleLyrics,
+                modifier = Modifier
+                    .size(38.dp)
+                    .testTag("now_playing_lyrics_btn")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Mic,
+                    contentDescription = "Letras Karaoke",
+                    tint = if (isLyricsActive) animatedPrimary else TextSecondary,
+                    modifier = Modifier.size(21.dp)
+                )
+            }
+
+            // Botón de Efectos de Audio y Temporizador
             IconButton(
                 onClick = onOpenEffects,
-                modifier = Modifier.testTag("now_playing_effects_btn")
+                modifier = Modifier
+                    .size(38.dp)
+                    .testTag("now_playing_effects_btn")
             ) {
                 BadgedBox(
                     badge = {
@@ -98,39 +131,44 @@ fun NowPlayingTopBar(
                     Icon(
                         imageVector = Icons.Default.Tune,
                         contentDescription = "Efectos de Audio y Temporizador",
-                        tint = if (sleepTimerState.isActive || spatial8DConfig.enabled) MaterialTheme.colorScheme.primary else TextSecondary
+                        tint = if (sleepTimerState.isActive || spatial8DConfig.enabled) MaterialTheme.colorScheme.primary else TextSecondary,
+                        modifier = Modifier.size(21.dp)
                     )
                 }
             }
 
+            // Botón de Detalles Técnicos
             IconButton(
                 onClick = onOpenDetails,
-                modifier = Modifier.testTag("now_playing_details_btn")
+                modifier = Modifier
+                    .size(38.dp)
+                    .testTag("now_playing_details_btn")
             ) {
                 Icon(
                     imageVector = Icons.Default.Info,
                     contentDescription = "Detalles técnicos de audio",
-                    tint = TextSecondary
+                    tint = TextSecondary,
+                    modifier = Modifier.size(20.dp)
                 )
             }
 
+            // Botón de Modo de Video (tamaño ergonómico y robusto de alto contraste, cero deformación)
             if (hasVideo) {
-                Spacer(modifier = Modifier.width(4.dp))
                 Surface(
                     onClick = onOpenVideoMode,
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
-                    color = Color.Black.copy(alpha = 0.70f),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+                    color = Color.Black.copy(alpha = 0.75f),
                     border = androidx.compose.foundation.BorderStroke(
                         1.5.dp,
                         if (videoDisplayMode != VideoDisplayMode.OFF) animatedPrimary else Color.White.copy(alpha = 0.40f)
                     ),
                     modifier = Modifier
-                        .height(38.dp)
+                        .size(44.dp)
                         .testTag("now_playing_toggle_video_canvas_btn")
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = when (videoDisplayMode) {
@@ -140,19 +178,7 @@ fun NowPlayingTopBar(
                             },
                             contentDescription = "Modo de Video: ${videoDisplayMode.label}",
                             tint = if (videoDisplayMode != VideoDisplayMode.OFF) animatedPrimary else Color.White,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = when (videoDisplayMode) {
-                                VideoDisplayMode.FULLSCREEN_BACKGROUND -> "Fondo"
-                                VideoDisplayMode.CARD_CANVAS -> "Lienzo"
-                                VideoDisplayMode.OFF -> "Off"
-                            },
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = if (videoDisplayMode != VideoDisplayMode.OFF) animatedPrimary else Color.White
-                            )
+                            modifier = Modifier.size(22.dp)
                         )
                     }
                 }

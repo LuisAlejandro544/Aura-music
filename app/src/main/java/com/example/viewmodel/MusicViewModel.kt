@@ -128,9 +128,62 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val _importStatusMessage = MutableStateFlow<String?>(null)
     val importStatusMessage: StateFlow<String?> = _importStatusMessage.asStateFlow()
 
+    val storageManager = com.example.data.storage.AppStorageManager(application)
+
+    // Bandas espectrales en tiempo real calculadas en C++20 (28 bandas)
+    private val _visualizerBands = MutableStateFlow(FloatArray(28) { 0.15f })
+    val visualizerBands: StateFlow<FloatArray> = _visualizerBands.asStateFlow()
+
+    // Intensidad acústica RMS en tiempo real calculada directamente en el motor nativo C++20
+    private val _audioIntensity = MutableStateFlow(0.15f)
+    val audioIntensity: StateFlow<Float> = _audioIntensity.asStateFlow()
+
+    // Estado reactivo de Letras Sincronizadas (.LRC)
+    private val _lyricsState = MutableStateFlow(LyricsState())
+    val lyricsState: StateFlow<LyricsState> = _lyricsState.asStateFlow()
+
     init {
         // Al iniciar por primera vez, si la biblioteca está vacía, no forzamos escaneo global,
         // pero sugerimos al usuario en la vista de importación o le permitimos generar demos
+
+        // Ciclo de alta frecuencia en hilo secundario para alimentar el visualizador C++20 y la intensidad acústica
+        viewModelScope.launch(Dispatchers.Default) {
+            val buffer = FloatArray(28)
+            while (true) {
+                if (audioPlayer.isPlaying.value) {
+                    com.example.playback.NativeAudioEngine.getVisualizerBands(buffer)
+                    _visualizerBands.value = buffer.copyOf()
+                    val intensity = com.example.playback.NativeAudioEngine.getAudioIntensity()
+                    _audioIntensity.value = intensity
+                    kotlinx.coroutines.delay(25L)
+                } else {
+                    var needsDecay = false
+                    for (i in buffer.indices) {
+                        if (buffer[i] > 0.08f) {
+                            buffer[i] = buffer[i] * 0.82f
+                            needsDecay = true
+                        }
+                    }
+                    if (_audioIntensity.value > 0.06f) {
+                        _audioIntensity.value = _audioIntensity.value * 0.80f
+                        needsDecay = true
+                    }
+                    if (needsDecay) {
+                        _visualizerBands.value = buffer.copyOf()
+                        kotlinx.coroutines.delay(35L)
+                    } else {
+                        kotlinx.coroutines.delay(120L)
+                    }
+                }
+            }
+        }
+
+        // Carga automática de letras sincronizadas al cambiar de canción
+        viewModelScope.launch {
+            audioPlayer.currentTrack.collect { track ->
+                loadLyrics(track)
+            }
+        }
 
         // Sincronización reactiva del reproductor con la base de datos Room (favoritos, metadatos, video)
         viewModelScope.launch {
@@ -214,7 +267,15 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     fun playTrack(track: Track, fromList: List<Track>? = null) {
         viewModelScope.launch {
             repository.incrementPlayCount(track.id)
-            val list = fromList ?: allTracks.value
+            val fullList = allTracks.value
+            val list = if (fromList != null && fromList.size > 1) {
+                fromList
+            } else if (fullList.isNotEmpty()) {
+                if (fullList.any { it.id == track.id }) fullList
+                else (listOf(track) + fullList).distinctBy { it.id }
+            } else {
+                listOf(track)
+            }
             val index = list.indexOfFirst { it.id == track.id }.coerceAtLeast(0)
             audioPlayer.playTrackList(list, index)
         }
@@ -649,6 +710,46 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             2 -> headphoneController.setDoubleClickAction(action)
             3 -> headphoneController.setTripleClickAction(action)
             4 -> headphoneController.setLongClickAction(action)
+        }
+    }
+
+    // --- Métodos de Gestión de Letras Sincronizadas (.LRC) ---
+
+    fun loadLyrics(track: Track?) {
+        if (track == null) {
+            _lyricsState.value = com.example.model.LyricsState()
+            return
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            val local = com.example.data.importer.LyricsManager.loadLocalLyrics(track, storageManager)
+            if (local != null) {
+                _lyricsState.value = local
+            } else {
+                _lyricsState.value = com.example.model.LyricsState(trackId = track.id)
+                // Intento automático de descarga para canciones sin letras
+                fetchOnlineLyrics(track)
+            }
+        }
+    }
+
+    fun fetchOnlineLyrics(track: Track? = null) {
+        val target = track ?: currentTrack.value ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            _lyricsState.value = _lyricsState.value.copy(isLoading = true, error = null)
+            val result = com.example.data.importer.LyricsManager.fetchLyricsOnline(target, storageManager)
+            result.onSuccess { state ->
+                _lyricsState.value = state
+            }.onFailure { err ->
+                _lyricsState.value = _lyricsState.value.copy(isLoading = false, error = err.message)
+            }
+        }
+    }
+
+    fun saveCustomLyrics(content: String, track: Track? = null) {
+        val target = track ?: currentTrack.value ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            val state = com.example.data.importer.LyricsManager.saveLyrics(target, storageManager, content)
+            _lyricsState.value = state
         }
     }
 

@@ -151,6 +151,9 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
     val isVideoCanvasActive by viewModel.isVideoCanvasActive.collectAsStateWithLifecycle()
     val isDynamicArtworkColorEnabled by viewModel.isDynamicArtworkColorEnabled.collectAsStateWithLifecycle()
     val headphoneConfig by viewModel.headphoneConfig.collectAsStateWithLifecycle()
+    val visualizerBands by viewModel.visualizerBands.collectAsStateWithLifecycle()
+    val audioIntensity by viewModel.audioIntensity.collectAsStateWithLifecycle()
+    val lyricsState by viewModel.lyricsState.collectAsStateWithLifecycle()
 
     var showGlobalAudioEffectsSheet by remember { mutableStateOf(false) }
     var initialAudioEffectsTab by remember { mutableIntStateOf(0) }
@@ -288,13 +291,13 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                             onDismissStatusMessage = { viewModel.dismissImportStatus() },
                             onImportVideoAsMusic = { videoUri, title, artist, album, attachCanvas, forceLoop ->
                                 viewModel.importVideoAsTrack(videoUri, title, artist, album, attachCanvas, forceLoop) { createdTrack ->
-                                    viewModel.playTrack(createdTrack, listOf(createdTrack))
+                                    viewModel.playTrack(createdTrack)
                                     viewModel.setNowPlayingExpanded(true)
                                 }
                             },
                             onDownloadFromLink = { info, title, artist, canvas ->
                                 viewModel.importFromWebVideoLink(info, title, artist, canvas) { createdTrack ->
-                                    viewModel.playTrack(createdTrack, listOf(createdTrack))
+                                    viewModel.playTrack(createdTrack)
                                     viewModel.setNowPlayingExpanded(true)
                                 }
                             }
@@ -451,7 +454,12 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                 onSetCrossfeedEnabled = { viewModel.setCrossfeedEnabled(it) },
                 onSetCrossfeedStrength = { viewModel.setCrossfeedStrength(it) },
                 onSetBalanceControlEnabled = { viewModel.setBalanceControlEnabled(it) },
-                onSetStereoBalance = { viewModel.setStereoBalance(it) }
+                onSetStereoBalance = { viewModel.setStereoBalance(it) },
+                visualizerBands = visualizerBands,
+                audioIntensity = audioIntensity,
+                lyricsState = lyricsState,
+                onFetchOnlineLyrics = { viewModel.fetchOnlineLyrics() },
+                onSaveCustomLyrics = { viewModel.saveCustomLyrics(it) }
             )
         }
 

@@ -83,6 +83,7 @@ class AuraAudioPlayer(
     private var baseVolume = 1.0f
     private var fadeInJob: Job? = null
     private var playbackParamsJob: Job? = null
+    private var isTransitioningTrack = false
 
     private val nativeAudioProcessor = NativeAudioProcessor()
 
@@ -290,24 +291,15 @@ class AuraAudioPlayer(
             ensurePlaybackServiceStarted()
             player.play()
 
-            // Manejar fundido de entrada si el crossfade está configurado
-            fadeInJob?.cancel()
-            if (_crossfadeSeconds.value > 0) {
-                player.volume = 0.05f * baseVolume
-                fadeInJob = playerScope.launch {
-                    val steps = 15
-                    val stepDelay = (_crossfadeSeconds.value * 1000L) / steps
-                    for (i in 1..steps) {
-                        delay(stepDelay.coerceAtLeast(40L))
-                        if (!isActive) break
-                        val factor = i.toFloat() / steps.toFloat()
-                        player.volume = baseVolume * factor
-                    }
-                    player.volume = baseVolume
-                }
+            // Manejar fundido de entrada para volver al volumen original poco a poco tras la transición
+            val fadeDurationMs = if (_crossfadeSeconds.value > 0) {
+                (_crossfadeSeconds.value * 1000L).coerceIn(1200L, 5000L)
+            } else if (isFadeInOnResume) {
+                1500L
             } else {
-                player.volume = baseVolume
+                1000L
             }
+            startSmoothFadeIn(fadeDurationMs)
         } catch (e: Exception) {
             _playbackError.value = "No se pudo cargar la pista: ${e.message}"
         }
@@ -361,11 +353,13 @@ class AuraAudioPlayer(
 
     fun setVolume(volume: Float) {
         baseVolume = volume.coerceIn(0.0f, 1.0f)
-        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
-            exoPlayer?.volume = baseVolume
-        } else {
-            playerScope.launch(Dispatchers.Main) {
+        if (fadeInJob?.isActive != true) {
+            if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
                 exoPlayer?.volume = baseVolume
+            } else {
+                playerScope.launch(Dispatchers.Main) {
+                    exoPlayer?.volume = baseVolume
+                }
             }
         }
     }
@@ -378,18 +372,22 @@ class AuraAudioPlayer(
         isFadeInOnResume = enabled
     }
 
-    fun triggerSmoothFadeIn(durationMs: Long = 1000L) {
+    fun triggerSmoothFadeIn(durationMs: Long = 1200L) {
+        startSmoothFadeIn(durationMs)
+    }
+
+    fun startSmoothFadeIn(durationMs: Long = 1500L) {
         val player = exoPlayer ?: return
         fadeInJob?.cancel()
-        player.volume = 0.08f * baseVolume
-        fadeInJob = playerScope.launch {
-            val steps = 16
-            val delayStep = durationMs / steps
+        player.volume = 0.05f * baseVolume
+        fadeInJob = playerScope.launch(Dispatchers.Main) {
+            val steps = 20
+            val delayStep = (durationMs / steps).coerceAtLeast(30L)
             for (i in 1..steps) {
-                delay(delayStep.coerceAtLeast(30L))
+                delay(delayStep)
                 if (!isActive) break
-                val factor = i.toFloat() / steps.toFloat()
-                player.volume = baseVolume * factor
+                val factor = (i.toFloat() / steps.toFloat()).coerceIn(0.05f, 1.0f)
+                player.volume = (baseVolume * factor).coerceIn(0.0f, 1.0f)
             }
             player.volume = baseVolume
         }
@@ -408,7 +406,10 @@ class AuraAudioPlayer(
         ensurePlaybackServiceStarted()
         player.play()
         if (isFadeInOnResume) {
-            triggerSmoothFadeIn()
+            startSmoothFadeIn(1200L)
+        } else {
+            fadeInJob?.cancel()
+            player.volume = baseVolume
         }
     }
 
@@ -431,7 +432,10 @@ class AuraAudioPlayer(
                 ensurePlaybackServiceStarted()
                 player.play()
                 if (isFadeInOnResume) {
-                    triggerSmoothFadeIn()
+                    startSmoothFadeIn(1200L)
+                } else {
+                    fadeInJob?.cancel()
+                    player.volume = baseVolume
                 }
             }
         }
@@ -454,16 +458,11 @@ class AuraAudioPlayer(
         }
 
         val nextIndex = if (_shuffleEnabled.value) {
-            (q.indices - _currentIndex.value).randomOrNull() ?: 0
+            if (q.size > 1) {
+                (q.indices - _currentIndex.value).randomOrNull() ?: 0
+            } else 0
         } else {
             (_currentIndex.value + 1) % q.size
-        }
-
-        if (nextIndex == 0 && _repeatMode.value == RepeatMode.OFF && _currentIndex.value == q.size - 1) {
-            // Llegó al final y la repetición está apagada
-            exoPlayer?.pause()
-            _isPlaying.value = false
-            return
         }
 
         _currentIndex.value = nextIndex
@@ -554,22 +553,17 @@ class AuraAudioPlayer(
             RepeatMode.ONE -> {
                 seekTo(0L)
                 exoPlayer?.play()
+                startSmoothFadeIn(1200L)
             }
-            RepeatMode.ALL -> {
+            RepeatMode.ALL, RepeatMode.OFF -> {
+                // Avanza y reproduce automáticamente a la otra canción
                 playNext()
-            }
-            RepeatMode.OFF -> {
-                if (_currentIndex.value < _queue.value.size - 1) {
-                    playNext()
-                } else {
-                    _isPlaying.value = false
-                }
             }
         }
     }
 
     private fun startProgressTracking() {
-        stopProgressTracking()
+        progressJob?.cancel()
         progressJob = playerScope.launch {
             while (isActive) {
                 exoPlayer?.let { player ->
@@ -578,17 +572,30 @@ class AuraAudioPlayer(
                         _duration.value = player.duration
                     }
 
-                    // Atenuación progresiva al acercarse al final si el crossfade está habilitado
+                    // Atenuación progresiva (fade-out) al acercarse al final si el crossfade está habilitado
                     if (_crossfadeSeconds.value > 0 && player.duration > 0 && player.isPlaying && fadeInJob?.isActive != true) {
                         val remainingMs = player.duration - player.currentPosition
                         val crossfadeMs = _crossfadeSeconds.value * 1000L
                         if (remainingMs in 0..crossfadeMs) {
                             val factor = (remainingMs.toFloat() / crossfadeMs.toFloat()).coerceIn(0.05f, 1.0f)
-                            player.volume = baseVolume * factor
+                            player.volume = (baseVolume * factor).coerceIn(0.0f, 1.0f)
+                        }
+                    }
+
+                    // Detección proactiva de fin de pista para reproducir automáticamente la siguiente sin silencios muertos
+                    if (player.duration > 0 && player.isPlaying && !isTransitioningTrack) {
+                        val remainingMs = player.duration - player.currentPosition
+                        if (remainingMs in 1..250L) {
+                            isTransitioningTrack = true
+                            playerScope.launch(Dispatchers.Main) {
+                                handleTrackEnded()
+                                delay(600L)
+                                isTransitioningTrack = false
+                            }
                         }
                     }
                 }
-                delay(250)
+                delay(200)
             }
         }
     }
@@ -596,14 +603,16 @@ class AuraAudioPlayer(
     private fun stopProgressTracking() {
         progressJob?.cancel()
         progressJob = null
-        fadeInJob?.cancel()
-        fadeInJob = null
         playbackParamsJob?.cancel()
         playbackParamsJob = null
+        // NOTA: NO cancelamos fadeInJob aquí para permitir que la rampa suave de volumen
+        // alcance el volumen original sin interrupción.
     }
 
     fun release() {
         stopProgressTracking()
+        fadeInJob?.cancel()
+        fadeInJob = null
         try {
             mediaSession?.run {
                 release()

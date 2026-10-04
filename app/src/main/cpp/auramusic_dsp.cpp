@@ -103,5 +103,24 @@ Java_com_example_playback_NativeAudioEngine_nativeSetStereoBalance(JNIEnv* /* en
     sDspEngine.setStereoBalance(static_cast<double>(balance));
 }
 
+JNIEXPORT jfloat JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeGetAudioIntensity(JNIEnv* /* env */, jobject /* thiz */) {
+    return sDspEngine.getAudioIntensity();
+}
+
+JNIEXPORT void JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeGetVisualizerBands(JNIEnv* env, jobject /* thiz */, jfloatArray outBands) {
+    if (!outBands) return;
+    jsize len = env->GetArrayLength(outBands);
+    if (len <= 0) return;
+
+    jfloat* elements = env->GetFloatArrayElements(outBands, nullptr);
+    if (elements) {
+        std::span<float> span(elements, static_cast<size_t>(len));
+        sDspEngine.getVisualizerBands(span);
+        env->ReleaseFloatArrayElements(outBands, elements, 0);
+    }
+}
+
 }
 

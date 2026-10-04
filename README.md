@@ -60,16 +60,24 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
   - Minutos personalizados o chips rápidos (15m, 30m, 45m, 60m).
   - Contador regresivo en tiempo real con opción de añadir +5 minutos.
   - **Atenuación suave de volumen de 10 segundos** (*fade-out*) antes de pausar.
-- **Transición Suave (Crossfade) y Reproducción Gapless**:
-  - Fundido cruzado de 0 a 12 segundos con desvanecimiento de volumen progresivo.
-  - Modo Gapless para reproducción continua sin silencios entre pistas.
+- **Reproducción Continua Automática y Transición Suave (Crossfade / Fade-In)**:
+  - Al terminar cualquier canción, avanza y reproduce automáticamente la siguiente pista de la cola o biblioteca de forma ininterrumpida.
+  - Fundido de salida progresivo al acercarse al final de la pista y rampa de entrada suave (*fade-in*) calibrada al iniciar la siguiente canción, subiendo poco a poco hasta restaurar el 100% del volumen original sin quedarse atrapado en volumen bajo.
+  - Modo Gapless para reproducción continua sin silencios intermedios.
 
-### 4. Video de Fondo Multifuncional (Fondo Completo, Lienzo en Carátula o Desactivado)
+### 4. Video Canvas Multifuncional y Reacción por Intensidad Ligada a C++20 DSP 🎬⚡
+- **Respiración y Pulsación Acústica Ligada a C++20 DSP**:
+  - Medición RMS y envolvente espectral continua en tiempo real calculada dentro del motor nativo en C++20 (`getAudioIntensity()` y `getVisualizerBands()`).
+  - La carátula central y el Video Canvas respiran sutilmente con el compás de la música (`scale` dinámico y elevación de sombra de 18dp a 34dp).
+  - El halo lumínico de luz ambiental superior y el visualizador de 28 bandas modulan su brillo e intensidad armónica al ritmo acústico real de la pista.
+- **Cápsula Flotante Ergonómica de Alto Contraste para Video Canvas**:
+  - Sustituye cualquier botón pequeño o apretado por una cápsula flotante visible y ergonómica ubicada en la parte inferior de la carátula.
+  - Diseñada con área táctil superior a **48.dp**, fondo negro cinematográfico de alto contraste (`Color.Black.copy(alpha = 0.88f)`), borde neón reactivo y feedback táctil claro.
+  - Muestra el modo activo con iconos dedicados (*Fondo Completo*, *En Carátula* o *Desactivado*) y permite alternar modos con un solo toque o abrir el selector modal al mantener presionado.
 - **3 Modos de Visualización Seleccionables por el Usuario**:
   - 🌌 **Fondo Completo (Full Background)**: El video se reproduce ocupando todo el fondo de pantalla de Now Playing detrás de la interfaz gráfica con un velo oscuro/gradiente para máxima legibilidad, mientras la carátula flota al frente con su aura lumínica, elevación y sombra.
   - 🔲 **Lienzo en Carátula (Card Canvas)**: El video se reproduce dentro del marco central de la carátula (relación de aspecto 1:1 estilo Spotify Canvas).
   - 🖼️ **Solo Carátula**: Muestra únicamente la carátula estática o procedural sin video.
-- **Selector Modal Interactivo**: El usuario puede abrir un cuadro de diálogo modal desde el icono de video en la barra superior o alternar con un solo toque desde la etiqueta en la carátula.
 - **Detección Automática y Forzado Manual**:
   - **Loop Canvas (≤ 10s - 20s)**: Bucle infinito continuo silenciado.
   - **Video Largo Sincronizado (> 20s)**: Sincronizado con la reproducción y los saltos temporales (`seekTo`).
@@ -78,7 +86,18 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
 - **Sincronización Instantánea de Favoritos**: El botón de corazón en Now Playing y en la Biblioteca refleja reactivamente el estado en tiempo real (icono relleno en rojo `Color(0xFFEF4444)` al marcar favorito).
 - **Lista de Inicio Estable**: La sección "Populares en tu biblioteca" permanece fija y nunca elimina otras canciones al marcar un favorito.
 
-### 5. Video a Música (Extracción 3 en 1 Directa en el Teléfono) 🎬➡️🎵
+### 5. Letras Sincronizadas (.LRC) Estilo Karaoke con Descarga Automática 🎤📜
+- **Descarga Automática 100% Gratuita**: Al iniciar la reproducción de cualquier canción sin letra, consulta automáticamente el servicio público libre LRCLIB mediante metadatos y búsqueda inteligente (sanitizando sufijos como *official*, *video*, *remastered* o *feat.*) sin requerir registro ni API keys.
+- **Persistencia en Almacenamiento Estructurado**: Almacena las letras en archivos `.lrc` locales organizados en `Android/data/.../files/lyrics/track_{id}.lrc` para consulta sin conexión a internet.
+- **Experiencia Karaoke Fluida**:
+  - Resaltado lumínico neón con tipografía ampliada (`19.sp`, negrita extra) para la frase que se está cantando.
+  - Desplazamiento automático (*auto-scroll*) continuo y suave para mantener la frase activa centrada en pantalla.
+  - Atenuación de frases anteriores y estilo neutro para los versos venideros.
+  - Salto táctil instantáneo (*Seek-to-time*): Tocar cualquier verso rebobina o avanza la canción exactamente a esa marca de tiempo `[mm:ss.xx]`.
+- **Edición y Carga Manual**: Diálogo modal para ingresar o pegar letras `.lrc` personalizadas o texto plano en cualquier momento.
+- **Acceso Rápido**: Botón de micrófono en la barra superior de Now Playing y botón alternador en los atajos inferiores para alternar entre carátula/canvas y vista karaoke con un solo toque.
+
+### 6. Video a Música (Extracción 3 en 1 Directa en el Teléfono) 🎬➡️🎵
 - **Solución Nativa para Usuarios Móviles sin PC**: Permite seleccionar cualquier video de la galería (conciertos, clips de redes, TikToks, descargas) y transformarlo instantáneamente en una pista de música completa.
 - **Flujo 3 en 1 Automático**:
   - 🎵 **Extracción de Audio Directa**: Demuxing sin recodificación (*Direct Stream Copy*) mediante `MediaExtractor` y `MediaMuxer` en Android a formato `.m4a` guardado en `songs/`, preservando la fidelidad acústica al 100% y ejecutándose en ~1 segundo.
@@ -86,7 +105,7 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
   - 🎬 **Video Canvas Vinculado**: Vincula el video como Canvas de fondo sincronizado en `NowPlayingScreen`.
 - **Reproducción Inmediata**: Al finalizar la conversión, la pista recién creada se reproduce de inmediato con su Video Canvas y atmósfera lumínica armonizada.
 
-### 6. Descarga Directa desde TikTok, YouTube y Enlaces Web (Música, Carátula y Video Canvas) 🎬🔗🎵
+### 7. Descarga Directa desde TikTok, YouTube y Enlaces Web (Música, Carátula y Video Canvas) 🎬🔗🎵
 - **Descargas sin Límite de Duración**: Permite pegar enlaces de **TikTok**, **YouTube** y videos web para descargar música completa, directos, sesiones o parodias de cualquier duración.
 - **Arquitectura de Extracción con Selector de Motor (InnerTube vs WebView)**:
   - ⚡ **Motor InnerTube (YouTube Music - Nativo & Ultrarrápido)**: Consulta directa y 100% gratuita al endpoint de YouTube Music mediante los clientes oficiales `ANDROID_MUSIC` y `WEB_REMIX`. Al ejecutarse directamente desde la conexión local del teléfono (IP residencial/datos móviles 4G/5G), sortea los bloqueos por IP de datacenter y resuelve el stream de audio en alta fidelidad en menos de ~300ms sin consumir batería.
@@ -99,12 +118,12 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
 - **Previsualización y Edición Rápida**: Muestra título, autor/creador, duración y portada antes de confirmar con temas visuales adaptativos (Cyan/Magenta para TikTok, Rojo Carmesí/Naranja para YouTube/Web).
 - **Reproducción al Instante**: Una vez descargada, inicia la reproducción automáticamente abriendo Now Playing.
 
-### 7. Carátulas Personalizadas de Galería & Arte Procedural
+### 8. Carátulas Personalizadas de Galería & Arte Procedural
 - **Selección de Carátula desde Galería**: Mediante el Android Photo Picker nativo del sistema.
 - **Compresión WebP y Borrado Inteligente**: Conversión en segundo plano (`Dispatchers.IO`) a WebP sin pérdida y eliminación de carátulas residuales del disco.
 - **Generador de Arte Procedural**: Ilustración matemática vectorial única para canciones sin portada.
 
-### 8. Suite Acústica y Ajustes para Auriculares / Audífonos 🎧
+### 9. Suite Acústica y Ajustes para Auriculares / Audífonos 🎧
 - **Filtro Crossfeed Acústico (Algoritmo Bauer / Chu Moy en ISO C++20)**:
   - Elimina la fatiga auditiva mezclando sutilmente una porción de audio con filtro paso-bajos (~700 Hz) y retardo temporal interaural (ITD de 250 µs a 340 µs) hacia el oído opuesto, emulando la escucha natural de monitores de estudio en sala.
   - **Activación Exclusiva por Hardware**: Solo se aplica en la música cuando el sistema detecta que hay auriculares conectados (jack 3.5mm, USB-C DAC o Bluetooth), pausándose automáticamente en los altavoces del teléfono.
@@ -121,7 +140,7 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
 - **Mapeo Avanzado de Botones y Gestos Físicos de Auriculares (Headset Controls)**:
   - Totalmente configurable por el usuario mediante diálogo modal para 1 pulsación, 2 pulsaciones, 3 pulsaciones y pulsación prolongada (Play/Pausa, Siguiente, Anterior, Me Gusta ❤️, Avanzar 15s, Retroceder 15s).
 
-### 9. Notificación Nativa del Reproductor de Android & Segundo Plano 🔔
+### 10. Notificación Nativa del Reproductor de Android & Segundo Plano 🔔
 - **Controlador Multimedia Nativo de Android (System Media Controls)**:
   - Integración completa con **Jetpack Media3 `MediaSessionService`**, `MediaSession` y `ForwardingPlayer`.
   - **Android 13, 14, 15+**: Tarjeta multimedia simétrica y completa en la cortina de notificaciones con arte de tapa en alta resolución, colores adaptativos dinámicos, **línea ondulada interactiva (*squiggled seekbar*)** y botonera completa con **Anterior (|<<), Play/Pausa (||) y Siguiente (>>|)** siempre disponibles.
@@ -131,7 +150,7 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
 - **Reproducción Continua en Segundo Plano (*Foreground Service*)**: Mantiene la música sonando ininterrumpidamente cuando la pantalla está apagada o la aplicación se minimiza.
 - **Soporte Extendido**: Detección automática en **relojes inteligentes (Wear OS)**, **Android Auto** y mandos remotos Bluetooth.
 
-### 10. Playlists y Almacenamiento Estructurado
+### 11. Playlists y Almacenamiento Estructurado
 - **Pestaña "Playlists" en Tu Biblioteca**: Tarjeta "Tus Me Gusta" sincronizada, creación, renombrado y adición rápida de canciones.
 - **Almacenamiento Organizado** en `Android/data/com.aistudio.musicplayer.aurasound/files/`:
   - 📁 `images/`: Carátulas en WebP Lossless.
@@ -140,7 +159,7 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
   - 📁 `metadata/`: Ficheros JSON estructurados con información técnica.
   - 📁 `videos/`: Videos de fondo y loops de Canvas (.mp4/.webm).
 
-### 11. Suite de Diagnóstico Autónoma: Aura Monitor 🛠️ & LeakCanary
+### 12. Suite de Diagnóstico Autónoma: Aura Monitor 🛠️ & LeakCanary
 - **Aura Monitor (App Debug Propia en el Cajón de Aplicaciones)**:
   - Cuenta con su propio icono de acceso directo en el cajón de apps del teléfono móvil.
   - Atrapa y registra automáticamente **Crashes** no controlados mediante `UncaughtExceptionHandler`, **Errores Críticos**, **Warnings de Memoria** y eventos de Media3 / JNI.
