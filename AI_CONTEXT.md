@@ -107,10 +107,16 @@ Este archivo define el contexto de diseño, directrices técnicas y restriccione
 
 16. **Recepción Inteligente 'Abrir con...' y 'Compartir con...' (Puente con Gestores de Descarga y Apps Externas)**:
     - Debe responder a `ACTION_VIEW`, `ACTION_SEND` y `ACTION_SEND_MULTIPLE` mediante `IncomingMediaHandler`.
-    - Si es audio (`audio/*`), copiar inmediatamente a la subcarpeta estructurada `songs/` para garantizar persistencia sin conexión de por vida, añadir a Room e iniciar reproducción instantánea con Now Playing expandido.
+    - Si es audio (`audio/*`), preguntar mediante diálogo con interruptor de recorte de silencios, copiar a la subcarpeta estructurada `songs/` para garantizar persistencia sin conexión de por vida, añadir a Room e iniciar reproducción instantánea con Now Playing expandido.
     - Si es video (`video/*`), activar automáticamente el diálogo de conversión 'Video a Música' 3 en 1 para demuxing rápido a `.m4a`, carátula WebP y Video Canvas vinculado.
     - Si es enlace web (`text/plain` o URL), abrir el diálogo de descarga de enlaces con auto-resolución de información (título, autor y carátula).
     - Soportar `singleTop` y `onNewIntent` sin recreación destructiva de la interfaz ni reinicio de pistas en reproducción.
 
-17. **Idioma de Comunicación**:
+17. **Eliminación Inteligente de Silencios, Repetidor A-B y Marquesina**:
+    - Antes de cada importación (SAF archivos/carpetas, Video a Música, descargas TikTok/YouTube y 'Abrir con...'), el usuario dispone de un interruptor interactivo para eliminar automáticamente los silencios iniciales y finales (`AudioSilenceTrimmer`, umbral `-42 dB` RMS).
+    - El repetidor de segmento A-B (`ABLoopState`) se controla tanto desde la barra compacta junto al progreso en *Now Playing* como desde la pestaña de transiciones/bucle en la hoja modal de efectos (con ajuste fino de ±1s).
+    - La barra superior `NowPlayingTopBar` debe mantenerse despejada sin el texto redundante "REPRODUCIENDO AURA / álbum".
+    - Los títulos largos deben desplazarse suavemente con `basicMarquee` en *Now Playing*, *Mini Reproductor* y en la canción en reproducción dentro de las listas y la cola.
+
+18. **Idioma de Comunicación**:
    - La documentación, comentarios en código, cadenas de usuario (`strings.xml`) y mensajes de commit deben redactarse en **español**.

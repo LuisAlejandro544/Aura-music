@@ -1,5 +1,7 @@
 package com.example.ui.screens.nowplaying.components
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -24,7 +26,7 @@ import com.example.ui.theme.TextSecondary
 /**
  * Hoja inferior modal con la cola de reproducción (Up Next).
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun NowPlayingQueueSheet(
     queue: List<Track>,
@@ -89,12 +91,25 @@ fun NowPlayingQueueSheet(
                                         color = if (isSelected) MaterialTheme.colorScheme.primary else TextPrimary
                                     ),
                                     maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
+                                    overflow = if (isSelected) TextOverflow.Clip else TextOverflow.Ellipsis,
+                                    modifier = if (isSelected) {
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .basicMarquee(
+                                                iterations = Int.MAX_VALUE,
+                                                repeatDelayMillis = 1600,
+                                                initialDelayMillis = 1000,
+                                                velocity = 30.dp
+                                            )
+                                    } else {
+                                        Modifier.fillMaxWidth()
+                                    }
                                 )
                                 Text(
                                     text = track.artist,
                                     style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
-                                    maxLines = 1
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                             if (isSelected && isPlaying) {

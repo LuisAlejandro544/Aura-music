@@ -1,6 +1,8 @@
 package com.example.ui.components
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,10 +32,12 @@ import com.example.ui.theme.TextSecondary
  *
  * Características:
  * - Fondo completamente tintado y degradado con los colores extraídos de la carátula/video actual.
+ * - Desplazamiento horizontal automático (Marquee) para títulos y artistas largos en reproducción.
  * - Barra de progreso, botón de reproducción y acentos sincronizados con la paleta activa.
  * - Controles ergonómicos estándar: Anterior (⏮️), Play/Pausa (⏯️) y Siguiente (⏭️).
  * - Permanece visible sobre la barra de navegación inferior con acceso instantáneo a Now Playing.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MiniPlayer(
     currentTrack: Track?,
@@ -102,9 +106,11 @@ fun MiniPlayer(
 
                 Spacer(modifier = Modifier.width(12.dp))
 
-                // Título y artista
+                // Título y artista con Marquesina fluida para evitar recortes
                 Column(
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 4.dp)
                 ) {
                     Text(
                         text = currentTrack.title,
@@ -113,14 +119,31 @@ fun MiniPlayer(
                             color = TextPrimary
                         ),
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Clip,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .basicMarquee(
+                                iterations = Int.MAX_VALUE,
+                                repeatDelayMillis = 1600,
+                                initialDelayMillis = 1200,
+                                velocity = 30.dp
+                            )
+                            .testTag("mini_player_marquee_title")
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = currentTrack.artist,
                         style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Clip,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .basicMarquee(
+                                iterations = Int.MAX_VALUE,
+                                repeatDelayMillis = 2000,
+                                initialDelayMillis = 1600,
+                                velocity = 25.dp
+                            )
                     )
                 }
 

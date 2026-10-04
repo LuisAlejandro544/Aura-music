@@ -45,7 +45,8 @@ fun VideoToMusicDialog(
         artist: String,
         album: String,
         attachAsCanvas: Boolean,
-        forceLoop: Boolean?
+        forceLoop: Boolean?,
+        trimSilence: Boolean
     ) -> Unit
 ) {
     val context = LocalContext.current
@@ -59,6 +60,7 @@ fun VideoToMusicDialog(
     var thumbnailBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var attachAsCanvas by remember { mutableStateOf(true) }
     var selectedLoopMode by remember { mutableStateOf<Boolean?>(null) } // null = Auto (<= 20s), true = Loop, false = Sync
+    var trimSilence by remember { mutableStateOf(true) }
 
     LaunchedEffect(videoUri) {
         coroutineScope.launch {
@@ -297,6 +299,38 @@ fun VideoToMusicDialog(
                                     )
                                 }
                             }
+
+                            HorizontalDivider(color = CardBorder.copy(alpha = 0.5f))
+
+                            // Opción de eliminación inteligente de silencios al inicio y final
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Eliminar silencios al inicio y final",
+                                        style = MaterialTheme.typography.titleSmall.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = TextPrimary
+                                        )
+                                    )
+                                    Text(
+                                        text = "Recorta automáticamente espacios en silencio antes y después de la canción.",
+                                        style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                                    )
+                                }
+                                Switch(
+                                    checked = trimSilence,
+                                    onCheckedChange = { trimSilence = it },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = Color.White,
+                                        checkedTrackColor = Color(0xFF10B981)
+                                    ),
+                                    modifier = Modifier.testTag("video_trim_silence_switch")
+                                )
+                            }
                         }
                     }
                 }
@@ -311,7 +345,8 @@ fun VideoToMusicDialog(
                             suggestedArtist,
                             suggestedAlbum,
                             attachAsCanvas,
-                            selectedLoopMode
+                            selectedLoopMode,
+                            trimSilence
                         )
                         onDismiss()
                     }

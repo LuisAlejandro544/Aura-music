@@ -13,6 +13,8 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
+import com.example.data.importer.AudioSilenceTrimmer
+import com.example.model.ABLoopState
 import com.example.model.RepeatMode
 import com.example.model.Track
 import java.io.File
@@ -79,6 +81,9 @@ class AuraAudioPlayer(
 
     private val _isGaplessEnabled = MutableStateFlow(true)
     val isGaplessEnabled: StateFlow<Boolean> = _isGaplessEnabled.asStateFlow()
+
+    private val _abLoopState = MutableStateFlow(ABLoopState())
+    val abLoopState: StateFlow<ABLoopState> = _abLoopState.asStateFlow()
 
     private var baseVolume = 1.0f
     private var fadeInJob: Job? = null
@@ -261,6 +266,7 @@ class AuraAudioPlayer(
         _currentTrack.value = track
         _currentPosition.value = 0L
         _duration.value = track.durationMs
+        _abLoopState.value = ABLoopState()
 
         val player = exoPlayer ?: return
         try {
@@ -280,10 +286,21 @@ class AuraAudioPlayer(
                 }
                 .build()
 
-            val mediaItem = MediaItem.Builder()
+            val clipBounds = AudioSilenceTrimmer.getClippingBounds(context, track.uriString)
+            val mediaItemBuilder = MediaItem.Builder()
                 .setUri(Uri.parse(track.uriString))
                 .setMediaMetadata(mediaMetadata)
-                .build()
+
+            if (clipBounds != null && clipBounds.endMs > clipBounds.startMs) {
+                mediaItemBuilder.setClippingConfiguration(
+                    MediaItem.ClippingConfiguration.Builder()
+                        .setStartPositionMs(clipBounds.startMs)
+                        .setEndPositionMs(clipBounds.endMs)
+                        .build()
+                )
+            }
+
+            val mediaItem = mediaItemBuilder.build()
 
             player.setMediaItem(mediaItem)
             player.playbackParameters = androidx.media3.common.PlaybackParameters(_playbackSpeed.value, _playbackPitch.value)
@@ -419,6 +436,71 @@ class AuraAudioPlayer(
 
     fun setGaplessEnabled(enabled: Boolean) {
         _isGaplessEnabled.value = enabled
+    }
+
+    // --- Controles del Repetidor de Segmento A-B (A-B Loop) ---
+
+    fun markABPointA(positionMs: Long = _currentPosition.value) {
+        val current = _abLoopState.value
+        val clampedA = positionMs.coerceIn(0L, _duration.value.coerceAtLeast(0L))
+        val validB = current.pointBMs?.takeIf { it > clampedA + 400L }
+        _abLoopState.value = ABLoopState(
+            pointAMs = clampedA,
+            pointBMs = validB,
+            isEnabled = validB != null
+        )
+    }
+
+    fun markABPointB(positionMs: Long = _currentPosition.value) {
+        val current = _abLoopState.value
+        val startA = current.pointAMs ?: 0L
+        val maxDur = _duration.value.coerceAtLeast(startA + 500L)
+        val clampedB = positionMs.coerceIn(startA + 400L, maxDur)
+        if (clampedB > startA) {
+            _abLoopState.value = ABLoopState(
+                pointAMs = startA,
+                pointBMs = clampedB,
+                isEnabled = true
+            )
+            val curPos = exoPlayer?.currentPosition ?: _currentPosition.value
+            if (curPos >= clampedB || curPos < startA) {
+                seekTo(startA)
+            }
+        }
+    }
+
+    fun toggleABLoopEnabled(enabled: Boolean) {
+        val current = _abLoopState.value
+        if (current.pointAMs != null && current.pointBMs != null && current.pointBMs > current.pointAMs) {
+            _abLoopState.value = current.copy(isEnabled = enabled)
+            if (enabled) {
+                val curPos = exoPlayer?.currentPosition ?: _currentPosition.value
+                if (curPos < current.pointAMs || curPos >= current.pointBMs) {
+                    seekTo(current.pointAMs)
+                }
+            }
+        }
+    }
+
+    fun adjustABPointA(deltaMs: Long) {
+        val current = _abLoopState.value
+        val curA = current.pointAMs ?: return
+        val maxA = (current.pointBMs?.minus(500L) ?: _duration.value).coerceAtLeast(0L)
+        val newA = (curA + deltaMs).coerceIn(0L, maxA)
+        _abLoopState.value = current.copy(pointAMs = newA)
+    }
+
+    fun adjustABPointB(deltaMs: Long) {
+        val current = _abLoopState.value
+        val curB = current.pointBMs ?: return
+        val minB = (current.pointAMs ?: 0L) + 500L
+        val maxB = _duration.value.coerceAtLeast(minB)
+        val newB = (curB + deltaMs).coerceIn(minB, maxB)
+        _abLoopState.value = current.copy(pointBMs = newB, isEnabled = true)
+    }
+
+    fun clearABLoop() {
+        _abLoopState.value = ABLoopState()
     }
 
     fun togglePlayPause() {
@@ -566,36 +648,48 @@ class AuraAudioPlayer(
         progressJob?.cancel()
         progressJob = playerScope.launch {
             while (isActive) {
+                val loopState = _abLoopState.value
                 exoPlayer?.let { player ->
-                    _currentPosition.value = player.currentPosition.coerceAtLeast(0L)
+                    val pos = player.currentPosition.coerceAtLeast(0L)
+                    _currentPosition.value = pos
                     if (player.duration > 0) {
                         _duration.value = player.duration
                     }
 
-                    // Atenuación progresiva (fade-out) al acercarse al final si el crossfade está habilitado
-                    if (_crossfadeSeconds.value > 0 && player.duration > 0 && player.isPlaying && fadeInJob?.isActive != true) {
-                        val remainingMs = player.duration - player.currentPosition
-                        val crossfadeMs = _crossfadeSeconds.value * 1000L
-                        if (remainingMs in 0..crossfadeMs) {
-                            val factor = (remainingMs.toFloat() / crossfadeMs.toFloat()).coerceIn(0.05f, 1.0f)
-                            player.volume = (baseVolume * factor).coerceIn(0.0f, 1.0f)
+                    // Vigilancia activa del Repetidor de Segmento A-B
+                    if (loopState.isLooping) {
+                        val aMs = loopState.pointAMs ?: 0L
+                        val bMs = loopState.pointBMs ?: Long.MAX_VALUE
+                        if (pos >= bMs || pos < (aMs - 350L)) {
+                            player.seekTo(aMs)
+                            _currentPosition.value = aMs
                         }
-                    }
+                    } else {
+                        // Atenuación progresiva (fade-out) al acercarse al final si el crossfade está habilitado
+                        if (_crossfadeSeconds.value > 0 && player.duration > 0 && player.isPlaying && fadeInJob?.isActive != true) {
+                            val remainingMs = player.duration - pos
+                            val crossfadeMs = _crossfadeSeconds.value * 1000L
+                            if (remainingMs in 0..crossfadeMs) {
+                                val factor = (remainingMs.toFloat() / crossfadeMs.toFloat()).coerceIn(0.05f, 1.0f)
+                                player.volume = (baseVolume * factor).coerceIn(0.0f, 1.0f)
+                            }
+                        }
 
-                    // Detección proactiva de fin de pista para reproducir automáticamente la siguiente sin silencios muertos
-                    if (player.duration > 0 && player.isPlaying && !isTransitioningTrack) {
-                        val remainingMs = player.duration - player.currentPosition
-                        if (remainingMs in 1..250L) {
-                            isTransitioningTrack = true
-                            playerScope.launch(Dispatchers.Main) {
-                                handleTrackEnded()
-                                delay(600L)
-                                isTransitioningTrack = false
+                        // Detección proactiva de fin de pista para reproducir automáticamente la siguiente sin silencios muertos
+                        if (player.duration > 0 && player.isPlaying && !isTransitioningTrack) {
+                            val remainingMs = player.duration - pos
+                            if (remainingMs in 1..250L) {
+                                isTransitioningTrack = true
+                                playerScope.launch(Dispatchers.Main) {
+                                    handleTrackEnded()
+                                    delay(600L)
+                                    isTransitioningTrack = false
+                                }
                             }
                         }
                     }
                 }
-                delay(200)
+                delay(if (loopState.isLooping) 75L else 180L)
             }
         }
     }

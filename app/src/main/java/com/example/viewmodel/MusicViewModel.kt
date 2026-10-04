@@ -91,11 +91,12 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val spatial8DConfig = effectManager.spatial8DConfig
     val reverbConfig = effectManager.reverbConfig
 
-    // Estados de velocidad, tono, crossfade y gapless
+    // Estados de velocidad, tono, crossfade, gapless y bucle A-B
     val playbackSpeed = audioPlayer.playbackSpeed
     val playbackPitch = audioPlayer.playbackPitch
     val crossfadeSeconds = audioPlayer.crossfadeSeconds
     val isGaplessEnabled = audioPlayer.isGaplessEnabled
+    val abLoopState = audioPlayer.abLoopState
 
     // Estado del Temporizador de Apagado (Sleep Timer)
     private var sleepTimerJob: kotlinx.coroutines.Job? = null
@@ -147,6 +148,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val lyricsState: StateFlow<LyricsState> = _lyricsState.asStateFlow()
 
     // Gestión de medios externos entrantes ("Abrir con...", "Compartir con...", SnapTube, etc.)
+    private val _pendingIncomingAudioUris = MutableStateFlow<List<Uri>>(emptyList())
+    val pendingIncomingAudioUris: StateFlow<List<Uri>> = _pendingIncomingAudioUris.asStateFlow()
+
     private val _pendingIncomingVideoUri = MutableStateFlow<Uri?>(null)
     val pendingIncomingVideoUri: StateFlow<Uri?> = _pendingIncomingVideoUri.asStateFlow()
 
@@ -426,29 +430,45 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // Acciones de Importación
-    fun importUris(uris: List<Uri>) {
+    fun importUris(uris: List<Uri>, trimSilence: Boolean = false) {
         if (uris.isEmpty()) return
         viewModelScope.launch {
             _isImporting.value = true
-            _importStatusMessage.value = "Importando canciones seleccionadas..."
-            val count = repository.importUris(getApplication(), uris)
+            _importStatusMessage.value = if (trimSilence) {
+                "Importando y eliminando silencios al inicio y final..."
+            } else {
+                "Importando canciones seleccionadas..."
+            }
+            val count = repository.importUris(getApplication(), uris, trimSilence = trimSilence)
             _isImporting.value = false
             _importStatusMessage.value = if (count > 0) {
-                "¡Éxito! Se importaron $count canción(es) a tu biblioteca."
+                if (trimSilence) {
+                    "¡Éxito! Se importaron $count canción(es) sin silencios en los extremos."
+                } else {
+                    "¡Éxito! Se importaron $count canción(es) a tu biblioteca."
+                }
             } else {
                 "Las canciones seleccionadas ya estaban en tu biblioteca."
             }
         }
     }
 
-    fun importFolder(treeUri: Uri) {
+    fun importFolder(treeUri: Uri, trimSilence: Boolean = false) {
         viewModelScope.launch {
             _isImporting.value = true
-            _importStatusMessage.value = "Analizando carpeta seleccionada..."
-            val count = repository.importTreeUri(getApplication(), treeUri)
+            _importStatusMessage.value = if (trimSilence) {
+                "Analizando carpeta y eliminando silencios al inicio y final..."
+            } else {
+                "Analizando carpeta seleccionada..."
+            }
+            val count = repository.importTreeUri(getApplication(), treeUri, trimSilence = trimSilence)
             _isImporting.value = false
             _importStatusMessage.value = if (count > 0) {
-                "¡Éxito! Se importaron $count canción(es) desde la carpeta."
+                if (trimSilence) {
+                    "¡Éxito! Se importaron $count canción(es) de la carpeta sin silencios."
+                } else {
+                    "¡Éxito! Se importaron $count canción(es) desde la carpeta."
+                }
             } else {
                 "No se encontraron canciones nuevas en la carpeta seleccionada."
             }
@@ -476,11 +496,16 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         album: String,
         attachAsCanvas: Boolean,
         forceLoop: Boolean?,
+        trimSilence: Boolean = false,
         onTrackCreated: ((Track) -> Unit)? = null
     ) {
         viewModelScope.launch {
             _isImporting.value = true
-            _importStatusMessage.value = "Convirtiendo video a música, extrayendo carátula y Video Canvas..."
+            _importStatusMessage.value = if (trimSilence) {
+                "Convirtiendo video a música, recortando silencios y generando carátula..."
+            } else {
+                "Convirtiendo video a música, extrayendo carátula y Video Canvas..."
+            }
             val track = repository.importVideoAsTrack(
                 context = getApplication(),
                 videoUri = videoUri,
@@ -488,7 +513,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 artist = artist,
                 album = album,
                 attachAsCanvas = attachAsCanvas,
-                forceLoop = forceLoop
+                forceLoop = forceLoop,
+                trimSilence = trimSilence
             )
             _isImporting.value = false
             if (track != null) {
@@ -509,6 +535,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         customTitle: String,
         customArtist: String,
         attachAsCanvas: Boolean,
+        trimSilence: Boolean = false,
         onSuccess: (Track) -> Unit
     ) {
         viewModelScope.launch {
@@ -530,6 +557,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 customTitle = customTitle,
                 customArtist = customArtist,
                 attachAsCanvas = attachAsCanvas,
+                trimSilence = trimSilence,
                 onProgressUpdate = { progress ->
                     _downloadProgress.value = progress
                     _importStatusMessage.value = "${progress.phase} • ${progress.formattedProgress} • ${progress.formattedSpeed}"
@@ -612,10 +640,22 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun resetSpeedAndPitch() = audioPlayer.resetSpeedAndPitch()
 
-    // Acciones de Transición de Pistas (Crossfade y Gapless)
+    // Acciones de Transición de Pistas (Crossfade, Gapless y Repetidor A-B)
     fun setCrossfadeSeconds(seconds: Int) = audioPlayer.setCrossfadeSeconds(seconds)
 
     fun setGaplessEnabled(enabled: Boolean) = audioPlayer.setGaplessEnabled(enabled)
+
+    fun markABPointA(positionMs: Long = audioPlayer.currentPosition.value) = audioPlayer.markABPointA(positionMs)
+
+    fun markABPointB(positionMs: Long = audioPlayer.currentPosition.value) = audioPlayer.markABPointB(positionMs)
+
+    fun toggleABLoopEnabled(enabled: Boolean) = audioPlayer.toggleABLoopEnabled(enabled)
+
+    fun adjustABPointA(deltaMs: Long) = audioPlayer.adjustABPointA(deltaMs)
+
+    fun adjustABPointB(deltaMs: Long) = audioPlayer.adjustABPointB(deltaMs)
+
+    fun clearABLoop() = audioPlayer.clearABLoop()
 
     // Acciones del Temporizador de Apagado (Sleep Timer con Fade-Out de 10s)
     fun startSleepTimer(minutes: Int) {
@@ -794,10 +834,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         val incoming = IncomingMediaHandler.parseIntent(getApplication(), intent) ?: return
         when (incoming) {
             is IncomingMedia.Audio -> {
-                handleIncomingAudioUri(incoming.uri)
+                _pendingIncomingAudioUris.value = listOf(incoming.uri)
             }
             is IncomingMedia.MultipleAudios -> {
-                handleIncomingMultipleAudioUris(incoming.uris)
+                _pendingIncomingAudioUris.value = incoming.uris
             }
             is IncomingMedia.Video -> {
                 _pendingIncomingVideoUri.value = incoming.uri
@@ -805,6 +845,25 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             is IncomingMedia.WebLink -> {
                 _pendingIncomingWebLink.value = incoming.url
             }
+        }
+    }
+
+    fun clearPendingIncomingAudio() {
+        _pendingIncomingAudioUris.value = emptyList()
+    }
+
+    /**
+     * Confirma la importación de los archivos de audio externos pendientes aplicando o no
+     * el recorte inteligente de silencios elegido en el interruptor del diálogo.
+     */
+    fun confirmIncomingAudioImport(trimSilence: Boolean) {
+        val uris = _pendingIncomingAudioUris.value
+        _pendingIncomingAudioUris.value = emptyList()
+        if (uris.isEmpty()) return
+        if (uris.size == 1) {
+            handleIncomingAudioUri(uris.first(), trimSilence)
+        } else {
+            handleIncomingMultipleAudioUris(uris, trimSilence)
         }
     }
 
@@ -820,11 +879,15 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
      * Procesa y reproduce inmediatamente un archivo de audio recibido desde una app externa.
      * Persiste la canción en la biblioteca estructurada `songs/` y en Room.
      */
-    fun handleIncomingAudioUri(uri: Uri) {
+    fun handleIncomingAudioUri(uri: Uri, trimSilence: Boolean = false) {
         viewModelScope.launch {
             _isImporting.value = true
-            _importStatusMessage.value = "Cargando audio externo..."
-            val track = repository.importSingleAudioFromExternalUri(getApplication(), uri)
+            _importStatusMessage.value = if (trimSilence) {
+                "Cargando audio externo y eliminando silencios..."
+            } else {
+                "Cargando audio externo..."
+            }
+            val track = repository.importSingleAudioFromExternalUri(getApplication(), uri, trimSilence = trimSilence)
             _isImporting.value = false
             if (track != null) {
                 _importStatusMessage.value = "Reproduciendo: \"${track.title}\""
@@ -840,14 +903,18 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     /**
      * Procesa e importa un lote de archivos de audio compartidos a la vez.
      */
-    fun handleIncomingMultipleAudioUris(uris: List<Uri>) {
+    fun handleIncomingMultipleAudioUris(uris: List<Uri>, trimSilence: Boolean = false) {
         if (uris.isEmpty()) return
         viewModelScope.launch {
             _isImporting.value = true
-            _importStatusMessage.value = "Importando ${uris.size} canciones recibidas..."
+            _importStatusMessage.value = if (trimSilence) {
+                "Importando ${uris.size} canciones y eliminando silencios..."
+            } else {
+                "Importando ${uris.size} canciones recibidas..."
+            }
             val importedList = mutableListOf<Track>()
             for (u in uris) {
-                val t = repository.importSingleAudioFromExternalUri(getApplication(), u)
+                val t = repository.importSingleAudioFromExternalUri(getApplication(), u, trimSilence = trimSilence)
                 if (t != null) importedList.add(t)
             }
             _isImporting.value = false

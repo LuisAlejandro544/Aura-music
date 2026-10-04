@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.model.ABLoopState
 import com.example.model.EqualizerBand
 import com.example.model.EqualizerPreset
 import com.example.model.HeadphoneConfig
@@ -38,7 +39,7 @@ import com.example.ui.theme.TextSecondary
  * - [ReverbTabContent]: Suite Reverb Híbrida (Presets ambientales de sala/catedral/club + Ajuste libre de tamaño, decay y wet).
  * - [SleepTimerTabContent]: Temporizador de Apagado personalizable con fade-out progresivo de 10s.
  * - [PlaybackParametersTabContent]: Control de Velocidad y Tono (Pitch Shift) con protección anti-pausas.
- * - [TransitionsTabContent]: Transiciones suaves (Crossfade configurable) y Reproducción Gapless.
+ * - [TransitionsTabContent]: Repetidor de Segmento A-B, Transiciones suaves (Crossfade configurable) y Reproducción Gapless.
  * - [BalanceAndHeadphonesTabContent]: Balance Estéreo Fino L/R y Filtro Crossfeed C++20 para audífonos.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -76,11 +77,18 @@ fun AudioEffectsBottomSheet(
     playbackPitch: Float = 1.0f,
     onSetPlaybackPitch: (Float) -> Unit = {},
     onResetSpeedAndPitch: () -> Unit = {},
-    // Transiciones
+    // Transiciones y Repetidor A-B
     crossfadeSeconds: Int = 0,
     onSetCrossfadeSeconds: (Int) -> Unit = {},
     isGaplessEnabled: Boolean = true,
     onSetGaplessEnabled: (Boolean) -> Unit = {},
+    abLoopState: ABLoopState = ABLoopState(),
+    onMarkABPointA: () -> Unit = {},
+    onMarkABPointB: () -> Unit = {},
+    onToggleABLoopEnabled: (Boolean) -> Unit = {},
+    onAdjustABPointA: (Long) -> Unit = {},
+    onAdjustABPointB: (Long) -> Unit = {},
+    onClearABLoop: () -> Unit = {},
     // Auriculares y Balance L/R
     headphoneConfig: HeadphoneConfig = HeadphoneConfig(),
     onSetCrossfeedEnabled: (Boolean) -> Unit = {},
@@ -181,8 +189,8 @@ fun AudioEffectsBottomSheet(
                 Tab(
                     selected = selectedTab == 5,
                     onClick = { selectedTab = 5 },
-                    text = { Text("Transiciones", style = MaterialTheme.typography.labelSmall) },
-                    icon = { Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                    text = { Text("Bucle A-B / Trans.", style = MaterialTheme.typography.labelSmall) },
+                    icon = { Icon(Icons.Default.Repeat, contentDescription = null, modifier = Modifier.size(18.dp)) }
                 )
                 Tab(
                     selected = selectedTab == 6,
@@ -245,7 +253,14 @@ fun AudioEffectsBottomSheet(
                         crossfadeSeconds = crossfadeSeconds,
                         onCrossfadeChange = onSetCrossfadeSeconds,
                         isGapless = isGaplessEnabled,
-                        onGaplessToggle = onSetGaplessEnabled
+                        onGaplessToggle = onSetGaplessEnabled,
+                        abLoopState = abLoopState,
+                        onMarkABPointA = onMarkABPointA,
+                        onMarkABPointB = onMarkABPointB,
+                        onToggleABLoopEnabled = onToggleABLoopEnabled,
+                        onAdjustABPointA = onAdjustABPointA,
+                        onAdjustABPointB = onAdjustABPointB,
+                        onClearABLoop = onClearABLoop
                     )
                     6 -> BalanceAndHeadphonesTabContent(
                         headphoneConfig = headphoneConfig,

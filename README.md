@@ -20,14 +20,16 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
   - 🍃 **Cyber Mint**: Esmeralda brillante y menta líquida.
   - 🔥 **Sunset Ember**: Coral cálido, naranja fuego y destellos dorados.
   - 🌊 **Ocean Abyss**: Azul zafiro profundo y agua bioluminiscente.
-- **Protección Tipográfica Fija (Cero Desbordamientos)**:
+- **Protección Tipográfica Fija y Marquesina Automática (Cero Desbordamientos)**:
   - Escala de densidad y fuente estabilizada (`fontScale = 1.0f`) para que las configuraciones globales de tamaño de letra en Android no rompan la maquetación ni corten textos.
+  - **Títulos en Movimiento (Marquee Fluido)**: Los títulos y artistas largos se desplazan horizontalmente de forma continua (`basicMarquee`) en la pantalla completa *Now Playing*, en el *Mini Reproductor* y en la canción en reproducción dentro de las listas y la cola.
 - **Mini Reproductor Flotante**:
-  - Barra persistente con barra de progreso y controles táctiles.
+  - Barra persistente con barra de progreso, controles táctiles y títulos animados en marquesina.
   - **Acceso Directo al Ecualizador C++20 integrado** mediante hoja modal inferior sin abandonar la vista actual.
 - **Pantalla Completa Now Playing**:
+  - Cabecera superior minimalista y despejada (sin textos redundantes que ocupen espacio).
   - Visualizador de ondas animado en tiempo real.
-  - Deslizador de búsqueda interactivo con formato de tiempo `mm:ss`.
+  - Deslizador de búsqueda interactivo con formato de tiempo `mm:ss` y **barra compacta del Repetidor de Segmento A-B**.
   - Hoja de especificaciones de audio y modal para **editar metadatos y carátula**.
 
 ### 2. Ecualizador C++20 Integrado en Modal (Sin Apartados Aislados)
@@ -49,7 +51,14 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
 - **Perfiles Acústicos (Presets)**: Rock, Pop, Electrónica, Jazz, Acústico, Bass Boost y Plano.
 - **Refuerzo de Bajos C++ (Bass Boost)** calibrado a 60 Hz con modulación precisa.
 
-### 3. Audio 8D Espacial, Suite Reverb y Controles Avanzados de Escucha
+### 3. Audio 8D Espacial, Repetidor A-B, Eliminación Inteligente de Silencios y Controles Avanzados
+- **Eliminación Inteligente de Silencios al Inicio y Final (`AudioSilenceTrimmer`)**:
+  - Antes de cada importación (archivos locales, carpetas, conversión *Video a Música*, descargas desde *TikTok/YouTube* o recepción vía *Abrir con... / Compartir con...*), la app presenta un interruptor interactivo para activar o desactivar el recorte inteligente de silencios.
+  - Analiza las muestras PCM de los primeros y últimos 25 segundos calculando la energía RMS por ventanas (umbral `-42 dB`) para detectar dónde empieza y termina realmente la música.
+  - Ejecuta recorte físico sin pérdida (*Direct Stream Copy*) en contenedores `.m4a`/`.mp4` o recorte exacto en `.wav`, además de persistir límites de recorte no destructivos (`MediaItem.ClippingConfiguration`) para cualquier formato.
+- **Repetidor de Segmento A-B (A-B Loop)**:
+  - **Barra Compacta en Now Playing**: Botones rápidos `[A]`, `[B]` y limpiar (`×`) situados junto al indicador de progreso, con franja luminosa sobre el deslizador que demarca el fragmento activo.
+  - **Panel Detallado en Efectos de Audio**: Ajuste fino de ±1 segundo para los puntos A y B (`A -1s`, `A +1s`, `B -1s`, `B +1s`), interruptor de activación y reinicio automático al cambiar de pista.
 - **Suite Reverb Híbrida & Filtros Acústicos Ambientales (Corregido y Optimizado)**:
   - Simulación de espacios físicos reales mediante presets de alta fidelidad: *Estudio*, *Sala Mediana*, *Club En Vivo*, *Gran Hall / Teatro*, *Catedral* y *Eco Espacial*.
   - **Motor Acústico Blindado en C++20**: Corregido el problema de silencio al activar la reverberación mediante la adición de filtros peine con amortiguación paso-bajos activa (*Low-Pass Feedback Comb Filters - LBCF*), pasa-todo Schroeder de ganancia unitaria, desacoplamiento de presets inactivos y protección contra valores NaN/Inf en el limitador suave *softClip*.

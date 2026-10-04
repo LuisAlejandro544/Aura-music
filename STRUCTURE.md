@@ -36,6 +36,7 @@ AuraMusic/
 │   │   │   │   ├── data/
 │   │   │   │   │   ├── importer/               # Módulos de importación y análisis
 │   │   │   │   │   │   ├── AudioMetadataParser.kt # Extractor ID3 y conversor a WebP
+│   │   │   │   │   │   ├── AudioSilenceTrimmer.kt # Detector y recortador inteligente de silencios al inicio y final (-42 dB RMS)
 │   │   │   │   │   │   ├── IncomingMediaHandler.kt # Detector y clasificador inteligente de Intents externos (Audio, Video, Link)
 │   │   │   │   │   │   ├── LyricsManager.kt        # Analizador de .LRC, descarga de LRCLIB y persistencia local
 │   │   │   │   │   │   ├── OnlineVideoAudioImporter.kt # Descargador de audio, carátula y Video Canvas desde TikTok y web
@@ -65,12 +66,12 @@ AuraMusic/
 │   │   │   │   │   ├── Playlist.kt             # Modelo de datos de lista
 │   │   │   │   │   ├── RepeatMode.kt           # Enum de modos de repetición
 │   │   │   │   │   ├── EqualizerConfig.kt      # Modelo de 10 bandas y presets de EQ
-│   │   │   │   │   ├── AudioEffectsConfig.kt   # Modelos para Audio 8D, Temporizador y Gapless/Crossfade
+│   │   │   │   │   ├── AudioEffectsConfig.kt   # Modelos para Audio 8D, Temporizador, Bucle A-B y Gapless/Crossfade
 │   │   │   │   │   ├── HeadphoneConfig.kt      # Configuración de Crossfeed C++20, Balance L/R y gestos
 │   │   │   │   │   ├── VideoDisplayMode.kt     # Enum de modos de visualización de video (Fondo Completo, Carátula, Off)
 │   │   │   │   │   └── ThemePalette.kt         # Enum de temas de color vibrantes
 │   │   │   │   ├── playback/                   # Capa de reproducción de audio
-│   │   │   │   │   ├── AuraAudioPlayer.kt      # Motor Media3 ExoPlayer, cola, throttling y recuperación
+│   │   │   │   │   ├── AuraAudioPlayer.kt      # Motor Media3 ExoPlayer, bucle A-B, recorte de silencios, cola y recuperación
 │   │   │   │   │   ├── AuraMediaPlaybackService.kt # Servicio MediaSessionService en primer plano y notificación nativa
 │   │   │   │   │   ├── AudioEffectManager.kt   # Gestor de EQ 10 bandas, BassBoost y Audio 8D
 │   │   │   │   │   ├── HeadphoneController.kt  # Gestor de auriculares, Becoming Noisy y botones físicos
@@ -79,24 +80,24 @@ AuraMusic/
 │   │   │   │   ├── ui/
 │   │   │   │   │   ├── components/             # Componentes visuales reutilizables
 │   │   │   │   │   │   ├── ArtworkImage.kt     # Renderizador de carátulas (WebP + Procedural)
-│   │   │   │   │   │   ├── AudioEffectsBottomSheet.kt # Modal unificado orquestador de EQ 10 bandas, 8D y efectos
+│   │   │   │   │   │   ├── AudioEffectsBottomSheet.kt # Modal unificado orquestador de EQ 10 bandas, 8D, Bucle A-B y efectos
 │   │   │   │   │   │   ├── audioeffects/       # Pestañas modulares de efectos acústicos
 │   │   │   │   │   │   │   ├── EqualizerTabContent.kt         # Ecualizador 10 bandas ISO, presets y Bass Boost
 │   │   │   │   │   │   │   ├── Spatial8DTabContent.kt         # Motor Audio 8D Espacial y controles de órbita
 │   │   │   │   │   │   │   ├── ReverbTabContent.kt            # Suite Reverb híbrida (Presets + personalización)
 │   │   │   │   │   │   │   ├── SleepTimerTabContent.kt        # Temporizador de apagado con fade-out de 10s
 │   │   │   │   │   │   │   ├── PlaybackParametersTabContent.kt# Velocidad y Tono (Pitch Shift) con protección
-│   │   │   │   │   │   │   ├── TransitionsTabContent.kt       # Crossfade de 0-12s y conmutador Gapless
+│   │   │   │   │   │   │   ├── TransitionsTabContent.kt       # Repetidor A-B con ajuste fino, Crossfade 0-12s y Gapless
 │   │   │   │   │   │   │   └── BalanceAndHeadphonesTabContent.kt# Balance L/R y Crossfeed C++20 rápido
 │   │   │   │   │   │   ├── AudioVisualizer.kt  # Visualizador de ondas en tiempo real con degradado dinámico
 │   │   │   │   │   │   ├── BackgroundVideoPlayer.kt # Renderizador de video de fondo (Loops Canvas y Video Sync)
 │   │   │   │   │   │   ├── BottomNavBar.kt     # Barra de navegación limpia (4 pestañas)
 │   │   │   │   │   │   ├── EditTrackDialog.kt  # Modal con Photo Picker y edición de carátula/video
-│   │   │   │   │   │   ├── MiniPlayer.kt       # Mini reproductor tintado con controles Anterior/Play/Siguiente
+│   │   │   │   │   │   ├── MiniPlayer.kt       # Mini reproductor tintado con marquesina y controles Anterior/Play/Siguiente
 │   │   │   │   │   │   ├── ProceduralArtwork.kt # Arte vectorial dinámico en tiempo real
-│   │   │   │   │   │   ├── TrackListItem.kt    # Fila de canción con menú contextual
-│   │   │   │   │   │   ├── VideoToMusicDialog.kt # Diálogo de conversión y previsualización de Video a Música
-│   │   │   │   │   │   └── DownloadFromLinkDialog.kt # Diálogo de descarga desde enlaces de TikTok y videos web
+│   │   │   │   │   │   ├── TrackListItem.kt    # Fila de canción con marquesina en pista activa y menú contextual
+│   │   │   │   │   │   ├── VideoToMusicDialog.kt # Diálogo de conversión Video a Música con interruptor de recorte de silencios
+│   │   │   │   │   │   └── DownloadFromLinkDialog.kt # Diálogo de descarga web/TikTok/YouTube con interruptor de recorte de silencios
 │   │   │   │   │   ├── navigation/
 │   │   │   │   │   │   └── NavScreen.kt        # Destinos de navegación y pestañas
 │   │   │   │   │   ├── screens/                # Pantallas principales modulares

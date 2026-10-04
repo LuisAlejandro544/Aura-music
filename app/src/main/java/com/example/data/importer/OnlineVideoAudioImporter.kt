@@ -200,6 +200,7 @@ object OnlineVideoAudioImporter {
         customArtist: String? = null,
         attachAsCanvas: Boolean = true,
         forceLoop: Boolean? = null,
+        trimSilence: Boolean = false,
         onProgressUpdate: (DownloadProgress) -> Unit = {}
     ): Result<Track> = withContext(Dispatchers.IO) {
         val timestamp = System.currentTimeMillis()
@@ -246,7 +247,8 @@ object OnlineVideoAudioImporter {
                             artist = finalArtist,
                             album = if (isYoutube) "YouTube Music" else "TikTok Music",
                             attachAsCanvas = false,
-                            forceLoop = forceLoop
+                            forceLoop = forceLoop,
+                            trimSilence = false
                         )
                         if (dummyTrack != null) {
                             val extractedFile = File(Uri.parse(dummyTrack.uriString).path ?: "")
@@ -278,6 +280,27 @@ object OnlineVideoAudioImporter {
             } catch (_: Throwable) {
             } finally {
                 try { retriever.release() } catch (_: Throwable) {}
+            }
+
+            // Si el usuario activó el interruptor para eliminar silencios al inicio y al final
+            if (trimSilence) {
+                onProgressUpdate(
+                    DownloadProgress(
+                        isDownloading = true,
+                        phase = "Eliminando silencios al inicio y final...",
+                        bytesDownloaded = audioFile.length(),
+                        totalBytes = audioFile.length(),
+                        progressFraction = 0.86f
+                    )
+                )
+                val trimResult = AudioSilenceTrimmer.processLocalAudioFile(
+                    context = context,
+                    audioFile = audioFile,
+                    originalDurationMs = durationMs
+                )
+                if (trimResult.wasTrimmed && trimResult.newDurationMs > 0L) {
+                    durationMs = trimResult.newDurationMs
+                }
             }
 
             onProgressUpdate(

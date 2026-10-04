@@ -24,6 +24,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.model.ABLoopState
 import com.example.model.EqualizerBand
 import com.example.model.EqualizerPreset
 import com.example.model.HeadphoneConfig
@@ -110,6 +111,14 @@ fun NowPlayingScreen(
     onSetCrossfadeSeconds: (Int) -> Unit = {},
     isGaplessEnabled: Boolean = true,
     onSetGaplessEnabled: (Boolean) -> Unit = {},
+    // Repetidor de Segmento A-B
+    abLoopState: ABLoopState = ABLoopState(),
+    onMarkABPointA: () -> Unit = {},
+    onMarkABPointB: () -> Unit = {},
+    onToggleABLoopEnabled: (Boolean) -> Unit = {},
+    onAdjustABPointA: (Long) -> Unit = {},
+    onAdjustABPointB: (Long) -> Unit = {},
+    onClearABLoop: () -> Unit = {},
     // Parámetros de Ecualizador C++20 integrados
     isEqEnabled: Boolean = true,
     eqBands: List<EqualizerBand> = emptyList(),
@@ -305,7 +314,8 @@ fun NowPlayingScreen(
                 onOpenDetails = { showDetailsDialog = true },
                 onOpenVideoMode = { showVideoModeDialog = true },
                 isLyricsActive = showLyrics,
-                onToggleLyrics = { showLyrics = !showLyrics }
+                onToggleLyrics = { showLyrics = !showLyrics },
+                isABLoopActive = abLoopState.isLoopingActive
             )
 
             Spacer(modifier = Modifier.weight(0.5f))
@@ -366,7 +376,11 @@ fun NowPlayingScreen(
                 onPlayPrevious = onPlayPrevious,
                 onToggleShuffle = onToggleShuffle,
                 onCycleRepeat = onCycleRepeat,
-                onToggleFavorite = onToggleFavorite
+                onToggleFavorite = onToggleFavorite,
+                abLoopState = abLoopState,
+                onMarkABPointA = onMarkABPointA,
+                onMarkABPointB = onMarkABPointB,
+                onClearABLoop = onClearABLoop
             )
 
             // Barra de Balance Estéreo Fino L/R en Tiempo Real
@@ -592,6 +606,13 @@ fun NowPlayingScreen(
                 onSetCrossfadeSeconds = onSetCrossfadeSeconds,
                 isGaplessEnabled = isGaplessEnabled,
                 onSetGaplessEnabled = onSetGaplessEnabled,
+                abLoopState = abLoopState,
+                onMarkABPointA = onMarkABPointA,
+                onMarkABPointB = onMarkABPointB,
+                onToggleABLoopEnabled = onToggleABLoopEnabled,
+                onAdjustABPointA = onAdjustABPointA,
+                onAdjustABPointB = onAdjustABPointB,
+                onClearABLoop = onClearABLoop,
                 headphoneConfig = headphoneConfig,
                 onSetCrossfeedEnabled = onSetCrossfeedEnabled,
                 onSetCrossfeedStrength = onSetCrossfeedStrength,

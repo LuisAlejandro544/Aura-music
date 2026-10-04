@@ -173,6 +173,7 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
     val playbackPitch by viewModel.playbackPitch.collectAsStateWithLifecycle()
     val crossfadeSeconds by viewModel.crossfadeSeconds.collectAsStateWithLifecycle()
     val isGaplessEnabled by viewModel.isGaplessEnabled.collectAsStateWithLifecycle()
+    val abLoopState by viewModel.abLoopState.collectAsStateWithLifecycle()
     val videoDisplayMode by viewModel.videoDisplayMode.collectAsStateWithLifecycle()
     val isVideoCanvasActive by viewModel.isVideoCanvasActive.collectAsStateWithLifecycle()
     val isDynamicArtworkColorEnabled by viewModel.isDynamicArtworkColorEnabled.collectAsStateWithLifecycle()
@@ -180,6 +181,7 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
     val visualizerBands by viewModel.visualizerBands.collectAsStateWithLifecycle()
     val audioIntensity by viewModel.audioIntensity.collectAsStateWithLifecycle()
     val lyricsState by viewModel.lyricsState.collectAsStateWithLifecycle()
+    val pendingIncomingAudioUris by viewModel.pendingIncomingAudioUris.collectAsStateWithLifecycle()
     val pendingIncomingVideoUri by viewModel.pendingIncomingVideoUri.collectAsStateWithLifecycle()
     val pendingIncomingWebLink by viewModel.pendingIncomingWebLink.collectAsStateWithLifecycle()
     val downloadProgress by viewModel.downloadProgress.collectAsStateWithLifecycle()
@@ -360,19 +362,19 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                             isImporting = isImporting,
                             importStatusMessage = importStatusMessage,
                             downloadProgress = downloadProgress,
-                            onImportUris = { viewModel.importUris(it) },
-                            onImportFolder = { viewModel.importFolder(it) },
+                            onImportUris = { uris, trimSilence -> viewModel.importUris(uris, trimSilence) },
+                            onImportFolder = { treeUri, trimSilence -> viewModel.importFolder(treeUri, trimSilence) },
                             onSeedDemoTracks = { viewModel.seedDemoTracks() },
                             onClearLibrary = { viewModel.clearAllTracks() },
                             onDismissStatusMessage = { viewModel.dismissImportStatus() },
-                            onImportVideoAsMusic = { videoUri, title, artist, album, attachCanvas, forceLoop ->
-                                viewModel.importVideoAsTrack(videoUri, title, artist, album, attachCanvas, forceLoop) { createdTrack ->
+                            onImportVideoAsMusic = { videoUri, title, artist, album, attachCanvas, forceLoop, trimSilence ->
+                                viewModel.importVideoAsTrack(videoUri, title, artist, album, attachCanvas, forceLoop, trimSilence) { createdTrack ->
                                     viewModel.playTrack(createdTrack)
                                     viewModel.setNowPlayingExpanded(true)
                                 }
                             },
-                            onDownloadFromLink = { info, title, artist, canvas ->
-                                viewModel.importFromWebVideoLink(info, title, artist, canvas) { createdTrack ->
+                            onDownloadFromLink = { info, title, artist, canvas, trimSilence ->
+                                viewModel.importFromWebVideoLink(info, title, artist, canvas, trimSilence) { createdTrack ->
                                     viewModel.playTrack(createdTrack)
                                     viewModel.setNowPlayingExpanded(true)
                                 }
@@ -524,6 +526,13 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                 onSetCrossfadeSeconds = { viewModel.setCrossfadeSeconds(it) },
                 isGaplessEnabled = isGaplessEnabled,
                 onSetGaplessEnabled = { viewModel.setGaplessEnabled(it) },
+                abLoopState = abLoopState,
+                onMarkABPointA = { viewModel.markABPointA() },
+                onMarkABPointB = { viewModel.markABPointB() },
+                onToggleABLoopEnabled = { viewModel.toggleABLoopEnabled(it) },
+                onAdjustABPointA = { viewModel.adjustABPointA(it) },
+                onAdjustABPointB = { viewModel.adjustABPointB(it) },
+                onClearABLoop = { viewModel.clearABLoop() },
                 isEqEnabled = isEqEnabled,
                 eqBands = eqBands,
                 bassBoostLevel = bassBoostLevel,
@@ -581,6 +590,13 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                 onSetCrossfadeSeconds = { viewModel.setCrossfadeSeconds(it) },
                 isGaplessEnabled = isGaplessEnabled,
                 onSetGaplessEnabled = { viewModel.setGaplessEnabled(it) },
+                abLoopState = abLoopState,
+                onMarkABPointA = { viewModel.markABPointA() },
+                onMarkABPointB = { viewModel.markABPointB() },
+                onToggleABLoopEnabled = { viewModel.toggleABLoopEnabled(it) },
+                onAdjustABPointA = { viewModel.adjustABPointA(it) },
+                onAdjustABPointB = { viewModel.adjustABPointB(it) },
+                onClearABLoop = { viewModel.clearABLoop() },
                 headphoneConfig = headphoneConfig,
                 onSetCrossfeedEnabled = { viewModel.setCrossfeedEnabled(it) },
                 onSetCrossfeedStrength = { viewModel.setCrossfeedStrength(it) },
@@ -590,19 +606,100 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
             )
         }
 
+        // Diálogo emergente interactivo cuando se abre o comparte un archivo de audio ("Abrir con..." o "Compartir con...")
+        if (pendingIncomingAudioUris != null && pendingIncomingAudioUris!!.isNotEmpty()) {
+            val incomingCount = pendingIncomingAudioUris!!.size
+            var incomingTrimSilence by remember(pendingIncomingAudioUris) { mutableStateOf(true) }
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { viewModel.clearPendingIncomingAudio() },
+                title = {
+                    Text(
+                        text = if (incomingCount == 1) "Importar y Reproducir Audio" else "Importar $incomingCount Pistas de Audio",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                    )
+                },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(
+                            text = "Se guardará una copia en el almacenamiento privado de Aura Music y comenzará la reproducción.",
+                            style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                        )
+                        androidx.compose.material3.Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                            border = BorderStroke(1.dp, CardBorder)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Eliminar silencios al inicio y final",
+                                        style = MaterialTheme.typography.titleSmall.copy(
+                                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                            color = TextPrimary
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = "Recorta automáticamente espacios silenciosos antes y después de la canción.",
+                                        style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                androidx.compose.material3.Switch(
+                                    checked = incomingTrimSilence,
+                                    onCheckedChange = { incomingTrimSilence = it },
+                                    colors = androidx.compose.material3.SwitchDefaults.colors(
+                                        checkedThumbColor = Color.White,
+                                        checkedTrackColor = Color(0xFF10B981)
+                                    )
+                                )
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    androidx.compose.material3.Button(
+                        onClick = { viewModel.confirmIncomingAudioImport(incomingTrimSilence) },
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Importar y Reproducir", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    androidx.compose.material3.TextButton(
+                        onClick = { viewModel.clearPendingIncomingAudio() }
+                    ) {
+                        Text("Cancelar", color = TextSecondary)
+                    }
+                },
+                containerColor = com.example.ui.theme.SurfaceCard,
+                shape = RoundedCornerShape(20.dp)
+            )
+        }
+
         // Diálogo emergente interactivo cuando se abre o comparte un archivo de video ("Abrir con..." o SnapTube)
         if (pendingIncomingVideoUri != null) {
             com.example.ui.components.VideoToMusicDialog(
                 videoUri = pendingIncomingVideoUri!!,
                 onDismiss = { viewModel.clearPendingIncomingVideo() },
-                onConfirm = { title, artist, album, attachAsCanvas, forceLoop ->
+                onConfirm = { title, artist, album, attachAsCanvas, forceLoop, trimSilence ->
                     viewModel.importVideoAsTrack(
                         videoUri = pendingIncomingVideoUri!!,
                         title = title,
                         artist = artist,
                         album = album,
                         attachAsCanvas = attachAsCanvas,
-                        forceLoop = forceLoop
+                        forceLoop = forceLoop,
+                        trimSilence = trimSilence
                     ) { track ->
                         viewModel.playTrack(track)
                         viewModel.setNowPlayingExpanded(true)
@@ -618,12 +715,13 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                 initialUrl = pendingIncomingWebLink!!,
                 downloadProgress = downloadProgress,
                 onDismiss = { viewModel.clearPendingIncomingWebLink() },
-                onConfirmDownload = { resolvedInfo, title, artist, attachAsCanvas ->
+                onConfirmDownload = { resolvedInfo, title, artist, attachAsCanvas, trimSilence ->
                     viewModel.importFromWebVideoLink(
                         resolvedInfo = resolvedInfo,
                         customTitle = title,
                         customArtist = artist,
-                        attachAsCanvas = attachAsCanvas
+                        attachAsCanvas = attachAsCanvas,
+                        trimSilence = trimSilence
                     ) { track ->
                         viewModel.playTrack(track)
                         viewModel.setNowPlayingExpanded(true)

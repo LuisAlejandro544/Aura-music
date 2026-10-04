@@ -59,3 +59,24 @@ data class PlaybackTransitionConfig(
     val crossfadeSeconds: Int = 0, // 0 = Gapless directo; 1..12 = segundos de fundido cruzado
     val isGapless: Boolean = true
 )
+
+/**
+ * Estado del Repetidor de Segmento A-B (A-B Loop).
+ * Permite fijar un punto de inicio A y un punto de fin B para ciclar continuamente
+ * un fragmento de la canción actual.
+ */
+data class ABLoopState(
+    val pointAMs: Long? = null,
+    val pointBMs: Long? = null,
+    val isEnabled: Boolean = false
+) {
+    val enabled: Boolean
+        get() = isEnabled
+
+    val isLooping: Boolean
+        get() = isEnabled && pointAMs != null && pointBMs != null && pointBMs > pointAMs
+
+    val isLoopingActive: Boolean
+        get() = isLooping
+}
+

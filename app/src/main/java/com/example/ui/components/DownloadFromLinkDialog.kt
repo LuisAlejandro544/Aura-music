@@ -57,7 +57,8 @@ fun DownloadFromLinkDialog(
         resolvedInfo: OnlineVideoAudioImporter.ResolvedMediaInfo,
         customTitle: String,
         customArtist: String,
-        attachAsCanvas: Boolean
+        attachAsCanvas: Boolean,
+        trimSilence: Boolean
     ) -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -78,6 +79,7 @@ fun DownloadFromLinkDialog(
     var editableTitle by remember { mutableStateOf("") }
     var editableArtist by remember { mutableStateOf("") }
     var attachAsCanvas by remember { mutableStateOf(true) }
+    var trimSilence by remember { mutableStateOf(true) }
 
     // Auto-resolución si se recibe una URL inicial compartida desde otra app
     LaunchedEffect(initialUrl) {
@@ -604,7 +606,39 @@ fun DownloadFromLinkDialog(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Switch para Eliminación Inteligente de Silencios al inicio y final
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Eliminar silencios al inicio y final",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = TextPrimary
+                                )
+                            )
+                            Text(
+                                text = "Recorta inteligentemente espacios vacíos o silenciosos antes y después de la canción",
+                                style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                            )
+                        }
+                        Switch(
+                            checked = trimSilence,
+                            onCheckedChange = { trimSilence = it },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = Color(0xFF10B981)
+                            ),
+                            modifier = Modifier.testTag("download_trim_silence_switch")
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(18.dp))
 
                     // Botones de acción
                     Row(
@@ -627,7 +661,8 @@ fun DownloadFromLinkDialog(
                                     currentInfo,
                                     editableTitle.ifBlank { currentInfo.suggestedTitle },
                                     editableArtist.ifBlank { currentInfo.suggestedArtist },
-                                    attachAsCanvas
+                                    attachAsCanvas,
+                                    trimSilence
                                 )
                             },
                             shape = RoundedCornerShape(14.dp),

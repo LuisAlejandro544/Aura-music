@@ -40,20 +40,25 @@ fun ImportMusicScreen(
     allTracks: List<Track>,
     isImporting: Boolean,
     importStatusMessage: String?,
-    onImportUris: (List<Uri>) -> Unit,
-    onImportFolder: (Uri) -> Unit,
+    onImportUris: (List<Uri>, Boolean) -> Unit,
+    onImportFolder: (Uri, Boolean) -> Unit,
     onSeedDemoTracks: () -> Unit,
     onClearLibrary: () -> Unit,
     onDismissStatusMessage: () -> Unit,
     downloadProgress: com.example.model.DownloadProgress = com.example.model.DownloadProgress(),
-    onImportVideoAsMusic: (videoUri: Uri, title: String, artist: String, album: String, attachAsCanvas: Boolean, forceLoop: Boolean?) -> Unit = { _, _, _, _, _, _ -> },
-    onDownloadFromLink: (resolvedInfo: com.example.data.importer.OnlineVideoAudioImporter.ResolvedMediaInfo, customTitle: String, customArtist: String, attachAsCanvas: Boolean) -> Unit = { _, _, _, _ -> },
+    onImportVideoAsMusic: (videoUri: Uri, title: String, artist: String, album: String, attachAsCanvas: Boolean, forceLoop: Boolean?, trimSilence: Boolean) -> Unit = { _, _, _, _, _, _, _ -> },
+    onDownloadFromLink: (resolvedInfo: com.example.data.importer.OnlineVideoAudioImporter.ResolvedMediaInfo, customTitle: String, customArtist: String, attachAsCanvas: Boolean, trimSilence: Boolean) -> Unit = { _, _, _, _, _ -> },
     modifier: Modifier = Modifier
 ) {
     var showClearConfirmation by remember { mutableStateOf(false) }
     var selectedVideoForConversion by remember { mutableStateOf<Uri?>(null) }
     var showDownloadFromLinkDialog by remember { mutableStateOf(false) }
     var downloadDialogMode by remember { mutableStateOf(com.example.ui.components.DownloadSourceMode.TIKTOK) }
+
+    // Estados pendientes para preguntar al usuario con interruptor antes de importar archivos o carpeta
+    var pendingAudioUris by remember { mutableStateOf<List<Uri>?>(null) }
+    var pendingFolderUri by remember { mutableStateOf<Uri?>(null) }
+    var trimSilenceSelection by remember { mutableStateOf(true) }
 
     // Lanzador Photo/Media Picker para seleccionar un video y convertirlo a música
     val videoPickerLauncher = rememberLauncherForActivityResult(
@@ -69,7 +74,8 @@ fun ImportMusicScreen(
         contract = ActivityResultContracts.OpenMultipleDocuments()
     ) { uris: List<Uri> ->
         if (uris.isNotEmpty()) {
-            onImportUris(uris)
+            trimSilenceSelection = true
+            pendingAudioUris = uris
         }
     }
 
@@ -77,7 +83,10 @@ fun ImportMusicScreen(
     val folderPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
     ) { treeUri: Uri? ->
-        treeUri?.let { onImportFolder(it) }
+        if (treeUri != null) {
+            trimSilenceSelection = true
+            pendingFolderUri = treeUri
+        }
     }
 
     LazyColumn(
@@ -424,12 +433,125 @@ fun ImportMusicScreen(
         )
     }
 
+    if (pendingAudioUris != null || pendingFolderUri != null) {
+        val isFolder = pendingFolderUri != null
+        val itemCount = pendingAudioUris?.size ?: 1
+        AlertDialog(
+            onDismissRequest = {
+                pendingAudioUris = null
+                pendingFolderUri = null
+            },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.AutoFixHigh,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = if (isFolder) "Opciones de Importación de Carpeta" else "Opciones de Importación ($itemCount)",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                    )
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = if (isFolder) {
+                            "Antes de importar las pistas de la carpeta seleccionada, elige si deseas aplicar el recorte inteligente de silencios."
+                        } else {
+                            "Antes de importar ${if (itemCount == 1) "la canción seleccionada" else "las $itemCount canciones seleccionadas"}, configura el recorte inteligente:"
+                        },
+                        style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                    )
+
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Eliminar silencios al inicio y final",
+                                    style = MaterialTheme.typography.titleSmall.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = TextPrimary
+                                    )
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "Detecta y recorta automáticamente espacios vacíos al principio y al final de cada pista sin perder calidad.",
+                                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Switch(
+                                checked = trimSilenceSelection,
+                                onCheckedChange = { trimSilenceSelection = it },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = Color(0xFF10B981)
+                                ),
+                                modifier = Modifier.testTag("import_files_trim_silence_switch")
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val uris = pendingAudioUris
+                        val folder = pendingFolderUri
+                        val shouldTrim = trimSilenceSelection
+                        pendingAudioUris = null
+                        pendingFolderUri = null
+                        if (uris != null) {
+                            onImportUris(uris, shouldTrim)
+                        } else if (folder != null) {
+                            onImportFolder(folder, shouldTrim)
+                        }
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.testTag("confirm_import_files_btn")
+                ) {
+                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Importar Ahora", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        pendingAudioUris = null
+                        pendingFolderUri = null
+                    }
+                ) {
+                    Text("Cancelar", color = TextSecondary)
+                }
+            },
+            containerColor = SurfaceCard,
+            shape = RoundedCornerShape(20.dp)
+        )
+    }
+
     if (selectedVideoForConversion != null) {
         com.example.ui.components.VideoToMusicDialog(
             videoUri = selectedVideoForConversion!!,
             onDismiss = { selectedVideoForConversion = null },
-            onConfirm = { title, artist, album, attachAsCanvas, forceLoop ->
-                onImportVideoAsMusic(selectedVideoForConversion!!, title, artist, album, attachAsCanvas, forceLoop)
+            onConfirm = { title, artist, album, attachAsCanvas, forceLoop, trimSilence ->
+                onImportVideoAsMusic(selectedVideoForConversion!!, title, artist, album, attachAsCanvas, forceLoop, trimSilence)
                 selectedVideoForConversion = null
             }
         )
@@ -447,8 +569,8 @@ fun ImportMusicScreen(
             initialMode = downloadDialogMode,
             downloadProgress = downloadProgress,
             onDismiss = { showDownloadFromLinkDialog = false },
-            onConfirmDownload = { info, title, artist, attachCanvas ->
-                onDownloadFromLink(info, title, artist, attachCanvas)
+            onConfirmDownload = { info, title, artist, attachCanvas, trimSilence ->
+                onDownloadFromLink(info, title, artist, attachCanvas, trimSilence)
             }
         )
     }

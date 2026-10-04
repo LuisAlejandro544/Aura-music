@@ -92,7 +92,8 @@ object VideoAudioExtractor {
         artist: String,
         album: String,
         attachAsCanvas: Boolean,
-        forceLoop: Boolean?
+        forceLoop: Boolean?,
+        trimSilence: Boolean = false
     ): Track? = withContext(Dispatchers.IO) {
         val tempTrackId = System.currentTimeMillis()
 
@@ -150,6 +151,18 @@ object VideoAudioExtractor {
             try {
                 retriever.release()
             } catch (_: Throwable) {}
+        }
+
+        // 2.5. Si el usuario activó la eliminación inteligente de silencios al inicio y final
+        if (trimSilence) {
+            val trimResult = AudioSilenceTrimmer.processLocalAudioFile(
+                context = context,
+                audioFile = finalAudioFile,
+                originalDurationMs = durationMs
+            )
+            if (trimResult.wasTrimmed && trimResult.newDurationMs > 0L) {
+                durationMs = trimResult.newDurationMs
+            }
         }
 
         // 3. Vincular como Video Canvas si el usuario lo solicitó

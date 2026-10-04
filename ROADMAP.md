@@ -168,6 +168,15 @@ Este documento traza las fases de evolución técnica y funcional para convertir
   - Para videos (`video/*`): apertura inmediata de `VideoToMusicDialog` para conversión 3 en 1 (.m4a, carátula WebP y Video Canvas sincronizado).
   - Para enlaces web (`text/plain` / URL): apertura directa de `DownloadFromLinkDialog` con auto-resolución del título, autor y carátula.
   - Soporte `singleTop` en `MainActivity` y manejo fluido tanto en arranque en frío como en segundo plano vía `onNewIntent`.
+- [x] **Eliminación Inteligente de Silencios al Inicio y Final (`AudioSilenceTrimmer`)**:
+  - Interruptor interactivo previo a cada importación (archivos, carpetas, Video a Música, descargas de TikTok/YouTube y recepción con 'Abrir con...').
+  - Detección acústica de silencios iniciales y finales por umbral RMS (`-42 dB`) decodificando únicamente las colas inicial y final.
+  - Recorte sin pérdida por *Direct Stream Copy* en contenedores compatibles y configuración de recorte exacto con `MediaItem.ClippingConfiguration`.
+- [x] **Repetidor de Segmento A-B (A-B Loop) y Ergonomía Visual**:
+  - Barra compacta `[A]`, `[B]` y limpiar (`×`) integrada junto al progreso en *Now Playing* con marcador visual sobre el Seekbar.
+  - Panel detallado en la hoja modal de efectos con ajuste fino de ±1 segundo (`-1s` / `+1s`) e interruptor de bucle.
+  - Limpieza de la barra superior de *Now Playing* eliminando el texto redundante "REPRODUCIENDO AURA / álbum" para dar mayor amplitud a los iconos de acción.
+  - Desplazamiento horizontal continuo tipo marquesina (`basicMarquee`) para títulos largos en *Now Playing*, *Mini Reproductor* y canción activa en listas y cola.
 
 ---
 

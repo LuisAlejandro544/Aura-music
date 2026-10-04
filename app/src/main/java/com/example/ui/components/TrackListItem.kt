@@ -1,6 +1,8 @@
 package com.example.ui.components
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,8 +29,10 @@ import com.example.ui.theme.TextSecondary
 
 /**
  * Elemento de fila para cada canción en la lista, inspirado en el diseño de Spotify
- * pero enriquecido con etiquetas de formato de audio, estado activo iluminado y acciones rápidas.
+ * pero enriquecido con etiquetas de formato de audio, estado activo iluminado,
+ * desplazamiento tipo marquesina en la canción en reproducción y acciones rápidas.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun TrackListItem(
     track: Track,
@@ -72,7 +76,7 @@ fun TrackListItem(
 
         Spacer(modifier = Modifier.width(14.dp))
 
-        // Título y artista
+        // Título y artista (con marquesina automática cuando la canción está activa/reproduciéndose)
         Column(
             modifier = Modifier.weight(1f)
         ) {
@@ -83,7 +87,19 @@ fun TrackListItem(
                     color = if (isCurrentTrack) MaterialTheme.colorScheme.primary else TextPrimary
                 ),
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow = if (isCurrentTrack) TextOverflow.Clip else TextOverflow.Ellipsis,
+                modifier = if (isCurrentTrack) {
+                    Modifier
+                        .fillMaxWidth()
+                        .basicMarquee(
+                            iterations = Int.MAX_VALUE,
+                            repeatDelayMillis = 1600,
+                            initialDelayMillis = 1000,
+                            velocity = 30.dp
+                        )
+                } else {
+                    Modifier.fillMaxWidth()
+                }
             )
 
             Spacer(modifier = Modifier.height(2.dp))

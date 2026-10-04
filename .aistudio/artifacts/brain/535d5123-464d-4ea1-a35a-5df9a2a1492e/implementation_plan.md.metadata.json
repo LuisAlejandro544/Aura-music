@@ -1,0 +1,6 @@
+{
+  "summary":  "Plan de implementación para eliminación inteligente de silencios al inicio y final con interruptor previo en cada importación, repetidor de segmento A-B en Now Playing y Efectos, limpieza de la barra superior de Now Playing y desplazamiento automático (marquesina) para títulos largos en reproducción.",
+  "updatedAt":  "2026-10-04T04:43:19.603860486Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}

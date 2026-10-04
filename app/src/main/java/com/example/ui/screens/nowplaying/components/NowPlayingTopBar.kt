@@ -44,9 +44,11 @@ fun NowPlayingTopBar(
     onOpenVideoMode: () -> Unit,
     isLyricsActive: Boolean = false,
     onToggleLyrics: () -> Unit = {},
+    isABLoopActive: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val hasVideo = !currentTrack.videoUri.isNullOrEmpty()
+    val hasActiveEffect = sleepTimerState.isActive || spatial8DConfig.enabled || isABLoopActive
 
     Row(
         modifier = modifier
@@ -58,56 +60,33 @@ fun NowPlayingTopBar(
         IconButton(
             onClick = onCollapse,
             modifier = Modifier
-                .size(40.dp)
+                .size(48.dp)
                 .testTag("now_playing_collapse_btn")
         ) {
             Icon(
                 imageVector = Icons.Default.KeyboardArrowDown,
                 contentDescription = "Ocultar reproductor",
                 tint = TextPrimary,
-                modifier = Modifier.size(30.dp)
-            )
-        }
-
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier
-                .weight(1f, fill = false)
-                .padding(horizontal = 6.dp)
-        ) {
-            Text(
-                text = "REPRODUCIENDO AURA",
-                style = MaterialTheme.typography.labelSmall.copy(
-                    letterSpacing = 1.8.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.secondary
-                ),
-                maxLines = 1
-            )
-            Text(
-                text = currentTrack.album,
-                style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                modifier = Modifier.size(32.dp)
             )
         }
 
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             // Botón de Letras Karaoke (Mic)
             IconButton(
                 onClick = onToggleLyrics,
                 modifier = Modifier
-                    .size(38.dp)
+                    .size(42.dp)
                     .testTag("now_playing_lyrics_btn")
             ) {
                 Icon(
                     imageVector = Icons.Default.Mic,
                     contentDescription = "Letras Karaoke",
                     tint = if (isLyricsActive) animatedPrimary else TextSecondary,
-                    modifier = Modifier.size(21.dp)
+                    modifier = Modifier.size(22.dp)
                 )
             }
 
@@ -115,12 +94,12 @@ fun NowPlayingTopBar(
             IconButton(
                 onClick = onOpenEffects,
                 modifier = Modifier
-                    .size(38.dp)
+                    .size(42.dp)
                     .testTag("now_playing_effects_btn")
             ) {
                 BadgedBox(
                     badge = {
-                        if (sleepTimerState.isActive || spatial8DConfig.enabled) {
+                        if (hasActiveEffect) {
                             Badge(
                                 containerColor = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(8.dp)
@@ -131,8 +110,8 @@ fun NowPlayingTopBar(
                     Icon(
                         imageVector = Icons.Default.Tune,
                         contentDescription = "Efectos de Audio y Temporizador",
-                        tint = if (sleepTimerState.isActive || spatial8DConfig.enabled) MaterialTheme.colorScheme.primary else TextSecondary,
-                        modifier = Modifier.size(21.dp)
+                        tint = if (hasActiveEffect) MaterialTheme.colorScheme.primary else TextSecondary,
+                        modifier = Modifier.size(22.dp)
                     )
                 }
             }

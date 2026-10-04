@@ -170,7 +170,7 @@ class MusicRepository(private val database: AppDatabase) {
     /**
      * Importa una lista de URIs seleccionadas por el usuario a través del selector de archivos SAF.
      */
-    suspend fun importUris(context: Context, uris: List<Uri>): Int = withContext(Dispatchers.IO) {
+    suspend fun importUris(context: Context, uris: List<Uri>, trimSilence: Boolean = false): Int = withContext(Dispatchers.IO) {
         var importedCount = 0
         val entities = mutableListOf<TrackEntity>()
 
@@ -182,8 +182,18 @@ class MusicRepository(private val database: AppDatabase) {
                     context.contentResolver.takePersistableUriPermission(uri, takeFlags)
                 } catch (ignored: SecurityException) {}
 
-                val track = AudioMetadataParser.parseUri(context, uri)
+                var track = AudioMetadataParser.parseUri(context, uri)
                 if (track != null) {
+                    if (trimSilence) {
+                        val trimRes = com.example.data.importer.AudioSilenceTrimmer.processUriForSilenceTrim(
+                            context = context,
+                            uri = uri,
+                            originalDurationMs = track.durationMs
+                        )
+                        if (trimRes.wasTrimmed && trimRes.newDurationMs > 0L) {
+                            track = track.copy(durationMs = trimRes.newDurationMs)
+                        }
+                    }
                     // Verificar si ya existe por uriString
                     val existing = trackDao.getTrackByUri(track.uriString)
                     if (existing == null) {
@@ -207,7 +217,7 @@ class MusicRepository(private val database: AppDatabase) {
     /**
      * Importa una carpeta completa seleccionada por el usuario (SAF OpenDocumentTree).
      */
-    suspend fun importTreeUri(context: Context, treeUri: Uri): Int = withContext(Dispatchers.IO) {
+    suspend fun importTreeUri(context: Context, treeUri: Uri, trimSilence: Boolean = false): Int = withContext(Dispatchers.IO) {
         var importedCount = 0
         try {
             val takeFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION
@@ -223,8 +233,18 @@ class MusicRepository(private val database: AppDatabase) {
 
                 val entities = mutableListOf<TrackEntity>()
                 for (doc in audioFiles) {
-                    val track = AudioMetadataParser.parseUri(context, doc.uri, folderName = folderName)
+                    var track = AudioMetadataParser.parseUri(context, doc.uri, folderName = folderName)
                     if (track != null) {
+                        if (trimSilence) {
+                            val trimRes = com.example.data.importer.AudioSilenceTrimmer.processUriForSilenceTrim(
+                                context = context,
+                                uri = doc.uri,
+                                originalDurationMs = track.durationMs
+                            )
+                            if (trimRes.wasTrimmed && trimRes.newDurationMs > 0L) {
+                                track = track.copy(durationMs = trimRes.newDurationMs)
+                            }
+                        }
                         val existing = trackDao.getTrackByUri(track.uriString)
                         if (existing == null) {
                             entities.add(TrackEntity.fromDomain(track))
@@ -289,7 +309,8 @@ class MusicRepository(private val database: AppDatabase) {
         artist: String,
         album: String,
         attachAsCanvas: Boolean,
-        forceLoop: Boolean?
+        forceLoop: Boolean?,
+        trimSilence: Boolean = false
     ): Track? = withContext(Dispatchers.IO) {
         val storageManager = com.example.data.storage.AppStorageManager(context)
         val extractedTrack = com.example.data.importer.VideoAudioExtractor.convertVideoToTrack(
@@ -300,7 +321,8 @@ class MusicRepository(private val database: AppDatabase) {
             artist = artist,
             album = album,
             attachAsCanvas = attachAsCanvas,
-            forceLoop = forceLoop
+            forceLoop = forceLoop,
+            trimSilence = trimSilence
         ) ?: return@withContext null
 
         val entity = TrackEntity.fromDomain(extractedTrack)
@@ -333,7 +355,11 @@ class MusicRepository(private val database: AppDatabase) {
      * copia el flujo a `songs/` en el almacenamiento privado estructurado de Aura Music,
      * extrae portada WebP y genera persistencia completa en Room y `metadata/`.
      */
-    suspend fun importSingleAudioFromExternalUri(context: Context, uri: Uri): Track? = withContext(Dispatchers.IO) {
+    suspend fun importSingleAudioFromExternalUri(
+        context: Context,
+        uri: Uri,
+        trimSilence: Boolean = false
+    ): Track? = withContext(Dispatchers.IO) {
         try {
             // Intentar persistir permiso si es una URI de tipo SAF
             try {
@@ -358,6 +384,8 @@ class MusicRepository(private val database: AppDatabase) {
 
             var finalUriString = uri.toString()
             var fileSizeFormatted = parsed?.fileSizeFormatted ?: ""
+            var durationMs = parsed?.durationMs ?: 0L
+            var copiedLocalFile: java.io.File? = null
 
             // Copia segura a la carpeta estructurada songs/ para disponibilidad sin conexión
             try {
@@ -366,11 +394,38 @@ class MusicRepository(private val database: AppDatabase) {
                     val safeTitle = title.replace(Regex("[^a-zA-Z0-9._-]"), "_").take(25)
                     val fileName = "ext_${System.currentTimeMillis()}_$safeTitle.$ext"
                     val copiedFile = storageManager.saveSongFile(fileName, inStream)
+                    copiedLocalFile = copiedFile
                     finalUriString = Uri.fromFile(copiedFile).toString()
                     val mb = copiedFile.length() / (1024f * 1024f)
                     fileSizeFormatted = String.format("%.1f MB", mb)
                 }
             } catch (_: Exception) {}
+
+            // Si el usuario activó la eliminación inteligente de silencios al inicio y final
+            if (trimSilence) {
+                val localFile = copiedLocalFile
+                if (localFile != null && localFile.exists()) {
+                    val trimRes = com.example.data.importer.AudioSilenceTrimmer.processLocalAudioFile(
+                        context = context,
+                        audioFile = localFile,
+                        originalDurationMs = durationMs
+                    )
+                    if (trimRes.wasTrimmed && trimRes.newDurationMs > 0L) {
+                        durationMs = trimRes.newDurationMs
+                    }
+                    val mb = localFile.length() / (1024f * 1024f)
+                    fileSizeFormatted = String.format("%.1f MB", mb)
+                } else {
+                    val trimRes = com.example.data.importer.AudioSilenceTrimmer.processUriForSilenceTrim(
+                        context = context,
+                        uri = uri,
+                        originalDurationMs = durationMs
+                    )
+                    if (trimRes.wasTrimmed && trimRes.newDurationMs > 0L) {
+                        durationMs = trimRes.newDurationMs
+                    }
+                }
+            }
 
             // Verificar si ya existe con la URI de destino
             val existingWithCopiedUri = trackDao.getTrackByUri(finalUriString)
@@ -383,7 +438,7 @@ class MusicRepository(private val database: AppDatabase) {
                 title = title,
                 artist = artist,
                 album = album,
-                durationMs = 0L,
+                durationMs = durationMs,
                 uriString = finalUriString,
                 albumArtPath = null,
                 mimeType = "audio/mpeg",
@@ -394,6 +449,8 @@ class MusicRepository(private val database: AppDatabase) {
                 fileSizeFormatted = fileSizeFormatted
             )).copy(
                 uriString = finalUriString,
+                durationMs = durationMs,
+                fileSizeFormatted = fileSizeFormatted,
                 folderName = "Externo"
             )
 

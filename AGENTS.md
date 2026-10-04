@@ -101,4 +101,8 @@ Este documento define el protocolo de trabajo para los agentes de software y des
 - [x] ¿La reproducción continua automática al finalizar una pista pasa fluidamente a la siguiente canción de la biblioteca sin detenerse?
 - [x] ¿El fundido de transición (fade-out) y entrada progresiva (fade-in) restauran suavemente el volumen original sin quedarse atrapados en volumen bajo?
 - [x] ¿La recepción inteligente 'Abrir con...' y 'Compartir con...' (puente para SnapTube, gestores de descarga, mensajería y navegadores) discrimina con precisión entre audio, video y enlaces web, copiando a 'songs/' y reproduciendo al instante?
+- [x] ¿La opción con interruptor para eliminar inteligentemente los silencios al inicio y al final está disponible antes de cada importación (archivos, carpetas, Video a Música, descargas de TikTok/YouTube y 'Abrir con...')?
+- [x] ¿El repetidor de segmento A-B está integrado como barra compacta junto al progreso en Now Playing y con ajuste fino (±1s) en la hoja modal de efectos?
+- [x] ¿Se eliminó el texto redundante 'REPRODUCIENDO AURA / álbum' de la barra superior de Now Playing para liberar espacio visual?
+- [x] ¿Los títulos largos se desplazan automáticamente con marquesina fluida (basicMarquee) en Now Playing, Mini Reproductor y en la canción activa dentro de listas y cola?
 - [x] ¿Los 5 archivos Markdown (`README.md`, `ROADMAP.md`, `STRUCTURE.md`, `AI_CONTEXT.md`, `AGENTS.md`) están actualizados y en español?
