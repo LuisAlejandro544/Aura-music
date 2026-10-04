@@ -16,3 +16,12 @@
 local.properties
 .env
 debug.keystore
+
+# Binarios nativos y dependencias pesadas (gestionados y cacheados en CI/CD)
+*.so
+*.zip.so
+app/src/main/jniLibs/**/*.so
+app/src/main/jniLibs/**/*.zip.so
+app/src/main/assets/bin/*
+!app/src/main/assets/bin/.gitkeep
+!app/src/main/jniLibs/**/.gitkeep

@@ -1,0 +1,72 @@
+name: Purgar Binarios Nativos del Historial Git
+
+# Este flujo se ejecuta EXCLUSIVAMENTE de forma manual previa confirmación explícita
+# para eliminar del historial de Git los archivos binarios pesados (.so, .zip.so y yt-dlp)
+# y reducir drásticamente el tamaño del repositorio.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_purge:
+        description: 'Escribe "PURGAR" para confirmar la reescritura del historial Git'
+        required: true
+        type: string
+        default: 'CANCELAR'
+
+jobs:
+  purge-history:
+    name: Purgar archivos .so y binarios del historial Git
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: 🛑 1. Verificar confirmación de seguridad
+        run: |
+          if [ "${{ inputs.confirm_purge }}" != "PURGAR" ]; then
+            echo "❌ Operación cancelada. Debes escribir exactamente 'PURGAR' para ejecutar esta acción."
+            exit 1
+          fi
+          echo "✅ Confirmación válida. Procediendo a limpiar el historial de Git..."
+
+      - name: 📥 2. Clonar historial completo del repositorio
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Clona todo el historial para poder reescribirlo
+
+      - name: 🐍 3. Configurar Python e instalar git-filter-repo
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: 🛠️ 4. Instalar git-filter-repo
+        run: |
+          echo "Instalando la herramienta estándar git-filter-repo..."
+          pip install git-filter-repo
+
+      - name: 🧹 5. Purgar archivos .so, .zip.so y yt-dlp de todo el historial
+        run: |
+          echo "=== Eliminando binarios pesados del historial Git ==="
+          # Se eliminan únicamente los binarios nativos (.so, .zip.so y yt-dlp)
+          # preservando los archivos .gitkeep y el código fuente intactos
+          git filter-repo \
+            --invert-paths \
+            --path-glob '*.so' \
+            --path-glob '*.zip.so' \
+            --path-glob 'app/src/main/assets/bin/yt-dlp' \
+            --force
+
+          echo "✅ Historial reescrito localmente sin archivos binarios pesados."
+
+      - name: 🚀 6. Forzar actualización del repositorio en GitHub
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "=== Aplicando cambios en el repositorio remoto ==="
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git" || git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
+          
+          # Actualizar ramas
+          git push origin --force --all
+          # Actualizar etiquetas si existen
+          git push origin --force --tags || true
+          
+          echo "🎉 ¡Historial purgado exitosamente! El repositorio ahora es ultra liviano."

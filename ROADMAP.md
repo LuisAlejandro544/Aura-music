@@ -37,9 +37,10 @@ Este documento traza las fases de evolución técnica y funcional para convertir
   - Transiciones de pantalla fluidas con `AnimatedContent` (desvanecimiento y deslizamiento).
   - Expansión y repliegue elástico de la pantalla completa Now Playing.
   - Micro-interacciones y feedback táctil enriquecido.
-- [x] **Pipeline de CI/CD GitHub Actions y Script Shell**:
+- [x] **Pipeline de CI/CD GitHub Actions con Caché Nativa y Script Shell**:
   - Workflow manual (`workflow_dispatch`) con generación forzada de firma `debug.keystore` RSA 2048-bit.
-  - Script autónomo `scripts/generate_keystore_and_build.sh`.
+  - Script autónomo `scripts/generate_keystore_and_build.sh` para compilación local.
+  - **Caché Inteligente de Binarios Nativos (`actions/cache@v4`)**: Sistema en GitHub Actions que almacena y restaura los `.so` de FFmpeg, Python y el binario de `yt-dlp` en segundos, con compilación y ensamblaje autónomo mediante `scripts/compile_native_deps.sh` ante cache-miss o actualización de parámetros.
 
 ---
 

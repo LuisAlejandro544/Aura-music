@@ -264,10 +264,15 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
 ./scripts/generate_keystore_and_build.sh
 ```
 
-### GitHub Actions (Activación Manual):
-- Se incluye el flujo `.github/workflows/build-debug-apk.yml`.
-- Se activa manualmente desde la pestaña **Actions -> Run workflow** (`workflow_dispatch`).
-- Genera la firma `debug.keystore` de forma autónoma en el runner, compila con C++20 y sube el APK Debug listo para descargar.
+### GitHub Actions (Activación Manual y Caché de Dependencias Nativas):
+- **Compilación de APK (`.github/workflows/build-debug-apk.yml`)**:
+  - Se activa manualmente desde la pestaña **Actions -> Run workflow** (`workflow_dispatch`).
+  - **Caché Inteligente de Dependencias Nativas**: Mediante `actions/cache@v4`, almacena y restaura instantáneamente los binarios de FFmpeg, Python y yt-dlp (`app/src/main/jniLibs` y `app/src/main/assets/bin`) basados en el hash de `scripts/compile_native_deps.sh`.
+  - **Compilación Autónoma ante Cache Miss**: Si no existe la caché o si se activa el parámetro `force_rebuild_native`, el runner ejecuta `scripts/compile_native_deps.sh` para compilar y preparar los binarios nativos para las 4 arquitecturas (`arm64-v8a`, `armeabi-v7a`, `x86_64`, `x86`) con el Android NDK.
+  - Genera la firma `debug.keystore` de forma autónoma en el runner, compila con C++20 y sube el APK Debug listo para descargar.
+- **Purgar Binarios del Historial Git (`.github/workflows/purge-native-binaries-history.yml`)**:
+  - Permite limpiar definitivamente los archivos `.so`, `.zip.so` y `yt-dlp` del historial remoto usando `git-filter-repo` previa confirmación manual (`PURGAR`), dejando el repositorio ultra liviano.
+  - El archivo `.gitignore` está configurado para evitar que los archivos binarios compilados vuelvan a ser añadidos al control de versiones.
 
 ---
 

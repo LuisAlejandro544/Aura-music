@@ -82,6 +82,7 @@ Este archivo define el contexto de diseño, directrices técnicas y restriccione
       - *Selector Interactivo*: Permite al usuario alternar entre InnerTube y WebView en el diálogo con auto-fallback cruzado de 3 capas.
     - **Motor FFmpeg Puro y Entorno Python con yt-dlp Integrados en el APK Final (`FFmpegNativeEngine` & `YtDlpNativeEngine`)**:
       - Binarios nativos ejecutables `libffmpeg.so`, `libpython.so` y `libqjs.so` empaquetados en `jniLibs/` para todas las arquitecturas (`arm64-v8a`, `armeabi-v7a`, `x86_64`, `x86`), asegurando ejecución nativa sin wrappers de terceros obsoletos.
+      - **Compilación Autónoma y Caché en GitHub Actions**: En CI/CD, las dependencias nativas se restauran en 3-5 segundos vía `actions/cache@v4` o se compilan y ensamblan automáticamente con el Android NDK usando `scripts/compile_native_deps.sh` ante cache-miss o cambio de parámetros.
       - Paquetes de librerías dinámicas optimizados para audio/video (`libffmpeg.zip.so`) y entorno Python (`libpython.zip.so`) con OpenSSL y CA certificados, descomprimidos atómicamente en segundo plano sin inflar el APK con encoders innecesarios.
       - Copia base de `yt-dlp` en `assets/bin/yt-dlp` para funcionamiento inmediato offline y actualización en caliente OTA desde GitHub Releases en `files/bin/yt-dlp` sin forzar la publicación de nuevos APKs en Uptodown.
     - Almacenamiento organizado: audio `.m4a`/`.mp3` en `songs/`, carátula oficial en WebP sin pérdida en `images/`, y video vinculado en `videos/` para reproducir el Video Canvas de fondo.

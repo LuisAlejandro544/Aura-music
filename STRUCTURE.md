@@ -10,7 +10,8 @@ Este documento describe la arquitectura modular, la jerarquía de directorios y 
 AuraMusic/
 ├── .github/
 │   └── workflows/
-│       └── build-debug-apk.yml                 # CI/CD: Workflow manual de compilación APK Debug y firma
+│       ├── build-debug-apk.yml                 # CI/CD: Workflow manual de compilación APK Debug con caché y NDK
+│       └── purge-native-binaries-history.yml   # Utilidad: Workflow manual para purgar binarios .so del historial Git
 ├── app/
 │   ├── src/
 │   │   ├── main/
@@ -18,13 +19,13 @@ AuraMusic/
 │   │   │   │   ├── CMakeLists.txt              # Configuración CMake integrada en Gradle (C++20)
 │   │   │   │   ├── auramusic_dsp.h             # Ecualizador 10 bandas biquad, limiter y buffers
 │   │   │   │   └── auramusic_dsp.cpp           # Implementación JNI del motor nativo
-│   │   │   ├── jniLibs/                        # Binarios nativos empaquetados por ABI en APK final
-│   │   │   │   ├── arm64-v8a/                  # 64-bit ARM (libffmpeg.so, libffmpeg.zip.so, libpython.so, libpython.zip.so, libqjs.so)
-│   │   │   │   ├── armeabi-v7a/                # 32-bit ARM (libffmpeg.so, libffmpeg.zip.so, libpython.so, libpython.zip.so, libqjs.so)
-│   │   │   │   ├── x86_64/                     # 64-bit Intel/AMD (libffmpeg.so, libffmpeg.zip.so, libpython.so, libpython.zip.so, libqjs.so)
-│   │   │   │   └── x86/                        # 32-bit Intel (libffmpeg.so, libffmpeg.zip.so, libpython.so, libpython.zip.so, libqjs.so)
+│   │   │   ├── jniLibs/                        # Estructura ABI protegida por .gitkeep e ignorada en Git (*.so en CI/CD)
+│   │   │   │   ├── arm64-v8a/.gitkeep          # 64-bit ARM
+│   │   │   │   ├── armeabi-v7a/.gitkeep        # 32-bit ARM
+│   │   │   │   ├── x86_64/.gitkeep             # 64-bit Intel/AMD
+│   │   │   │   └── x86/.gitkeep                # 32-bit Intel
 │   │   │   ├── assets/                         # Recursos empaquetados en APK
-│   │   │   │   └── bin/yt-dlp                  # Binario base oficial de yt-dlp empaquetado para operatividad inmediata offline
+│   │   │   │   └── bin/.gitkeep                # Directorio para ejecutable yt-dlp aprovisionado en CI/CD o OTA
 │   │   │   ├── java/com/example/
 │   │   │   │   ├── AuraApplication.kt         # Clase Application con inicio de AuraDebugManager
 │   │   │   │   ├── MainActivity.kt             # Actividad principal, insets, animaciones y navegación
@@ -160,7 +161,8 @@ AuraMusic/
 │   │   └── test/                               # Pruebas unitarias y Robolectric
 │   └── build.gradle.kts                        # Configuración Gradle con CMake, NDK y LeakCanary
 ├── scripts/
-│   └── generate_keystore_and_build.sh          # Script ejecutable de generación de firma y build
+│   ├── compile_native_deps.sh          # Script de compilación y aprovisionamiento nativo con NDK y caché de CI/CD
+│   └── generate_keystore_and_build.sh  # Script ejecutable de generación de firma y build local
 ├── gradle/
 │   └── libs.versions.toml                      # Catálogo de versiones centralizado (incluye LeakCanary)
 ├── README.md                                   # Descripción general e instalación

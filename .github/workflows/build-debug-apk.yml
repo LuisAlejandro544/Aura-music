@@ -6,10 +6,15 @@ on:
   workflow_dispatch:
     inputs:
       enable_cache:
-        description: 'Habilitar caché de dependencias Gradle'
+        description: 'Habilitar caché de dependencias Gradle y nativas'
         required: false
         type: boolean
         default: true
+      force_rebuild_native:
+        description: 'Forzar recompilación de dependencias nativas (FFmpeg y yt-dlp) ignorando la caché'
+        required: false
+        type: boolean
+        default: false
       force_new_keystore:
         description: 'Obligar a generar firma debug desde cero sin esperar ninguna'
         required: false
@@ -18,7 +23,7 @@ on:
 
 jobs:
   build-debug-apk:
-    name: Compilación APK Debug con Motor C++20 y Firma Autónoma
+    name: Compilación APK Debug con Motor C++20, Dependencias Nativas y Firma Autónoma
     runs-on: ubuntu-latest
 
     steps:
@@ -66,7 +71,26 @@ jobs:
             echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.1.8937393" >> $GITHUB_ENV
           fi
 
-      - name: 💾 5. Configurar Caché de Gradle (Opcional)
+      - name: 💾 5. Verificar o Restaurar Caché de Dependencias Nativas (FFmpeg, Python, yt-dlp)
+        if: ${{ inputs.enable_cache }}
+        id: cache-native-deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            app/src/main/jniLibs
+            app/src/main/assets/bin
+          key: native-deps-${{ runner.os }}-${{ hashFiles('scripts/compile_native_deps.sh') }}
+          restore-keys: |
+            native-deps-${{ runner.os }}-
+
+      - name: ⚙️ 6. Compilar / Aprovisionar Dependencias Nativas (Cache Miss o Rebuild Forzado)
+        if: steps.cache-native-deps.outputs.cache-hit != 'true' || inputs.force_rebuild_native == true
+        run: |
+          echo "=== Ejecutando compilación / ensamblaje de librerías nativas ==="
+          chmod +x ./scripts/compile_native_deps.sh
+          ./scripts/compile_native_deps.sh
+
+      - name: 💾 7. Configurar Caché de Gradle (Opcional)
         if: ${{ inputs.enable_cache }}
         uses: actions/cache@v4
         with:
@@ -77,7 +101,7 @@ jobs:
           restore-keys: |
             gradle-${{ runner.os }}-
 
-      - name: 🔑 6. Generar firma de depuración desde cero
+      - name: 🔑 8. Generar firma de depuración desde cero
         run: |
           echo "=== Verificando / Generando firma debug.keystore limpia ==="
           if [ "${{ inputs.force_new_keystore }}" = "true" ] || [ ! -f "debug.keystore" ]; then
@@ -97,7 +121,7 @@ jobs:
             echo "Reutilizando firma debug.keystore existente."
           fi
 
-      - name: 🔧 7. Preparar Gradle Wrapper
+      - name: 🔧 9. Preparar Gradle Wrapper
         run: |
           if [ ! -f "./gradlew" ]; then
             echo "Generando gradle wrapper..."
@@ -105,12 +129,12 @@ jobs:
           fi
           chmod +x ./gradlew
 
-      - name: 🚀 8. Compilar APK Debug con motor DSP C++20
+      - name: 🚀 10. Compilar APK Debug con motor DSP C++20
         run: |
           echo "Iniciando compilación de Aura Music Debug APK..."
           ./gradlew :app:assembleDebug --no-daemon --stacktrace
 
-      - name: 📦 9. Publicar APK Debug como Artefacto descargable
+      - name: 📦 11. Publicar APK Debug como Artefacto descargable
         uses: actions/upload-artifact@v4
         with:
           name: AuraMusic-Debug-APK
