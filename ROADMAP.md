@@ -162,6 +162,13 @@ Este documento traza las fases de evolución técnica y funcional para convertir
   - Salto interactivo a la marca de tiempo (*Seek*) al tocar cualquier verso.
   - Diálogo para carga o edición manual de letras en formato `.lrc` o texto plano.
 
+- [x] **Integración Inteligente 'Abrir con...' y 'Compartir con...' (Puente con SnapTube, Gestores de Descarga y Navegadores)**:
+  - Detección automática y triaje certero de medios (`IncomingMediaHandler`) combinando MIME type, extensión de archivo y análisis de cabeceras en `MediaMetadataRetriever`.
+  - Para audios (`audio/*`): copia segura a `songs/` para evitar pérdidas si la app externa borra caché o revoca permisos, inserción en Room y reproducción inmediata con Now Playing expandido y búsqueda de letras LRCLIB.
+  - Para videos (`video/*`): apertura inmediata de `VideoToMusicDialog` para conversión 3 en 1 (.m4a, carátula WebP y Video Canvas sincronizado).
+  - Para enlaces web (`text/plain` / URL): apertura directa de `DownloadFromLinkDialog` con auto-resolución del título, autor y carátula.
+  - Soporte `singleTop` en `MainActivity` y manejo fluido tanto en arranque en frío como en segundo plano vía `onNewIntent`.
+
 ---
 
 ## 🔊 Fase 7: Modo Bit-Perfect y Salida de Ultra-Baja Latencia (Siguiente Paso 🔄)

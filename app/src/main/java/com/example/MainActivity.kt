@@ -64,6 +64,12 @@ class MainActivity : ComponentActivity() {
         setContent {
             val viewModel: MusicViewModel = viewModel()
             musicViewModel = viewModel
+
+            // Procesar Intent de inicio ("Abrir con..." o "Compartir con...")
+            LaunchedEffect(intent) {
+                viewModel.onIncomingIntent(intent)
+            }
+
             val currentTheme by viewModel.currentTheme.collectAsStateWithLifecycle()
 
             val currentDensity = androidx.compose.ui.platform.LocalDensity.current
@@ -78,6 +84,12 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        musicViewModel?.onIncomingIntent(intent)
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
@@ -159,6 +171,8 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
     val visualizerBands by viewModel.visualizerBands.collectAsStateWithLifecycle()
     val audioIntensity by viewModel.audioIntensity.collectAsStateWithLifecycle()
     val lyricsState by viewModel.lyricsState.collectAsStateWithLifecycle()
+    val pendingIncomingVideoUri by viewModel.pendingIncomingVideoUri.collectAsStateWithLifecycle()
+    val pendingIncomingWebLink by viewModel.pendingIncomingWebLink.collectAsStateWithLifecycle()
 
     var showGlobalAudioEffectsSheet by remember { mutableStateOf(false) }
     var initialAudioEffectsTab by remember { mutableIntStateOf(0) }
@@ -562,6 +576,48 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                 onSetBalanceControlEnabled = { viewModel.setBalanceControlEnabled(it) },
                 onSetStereoBalance = { viewModel.setStereoBalance(it) },
                 initialTab = initialAudioEffectsTab
+            )
+        }
+
+        // Diálogo emergente interactivo cuando se abre o comparte un archivo de video ("Abrir con..." o SnapTube)
+        if (pendingIncomingVideoUri != null) {
+            com.example.ui.components.VideoToMusicDialog(
+                videoUri = pendingIncomingVideoUri!!,
+                onDismiss = { viewModel.clearPendingIncomingVideo() },
+                onConfirm = { title, artist, album, attachAsCanvas, forceLoop ->
+                    viewModel.importVideoAsTrack(
+                        videoUri = pendingIncomingVideoUri!!,
+                        title = title,
+                        artist = artist,
+                        album = album,
+                        attachAsCanvas = attachAsCanvas,
+                        forceLoop = forceLoop
+                    ) { track ->
+                        viewModel.playTrack(track)
+                        viewModel.setNowPlayingExpanded(true)
+                    }
+                    viewModel.clearPendingIncomingVideo()
+                }
+            )
+        }
+
+        // Diálogo emergente interactivo cuando se comparte un enlace web o video online
+        if (pendingIncomingWebLink != null) {
+            com.example.ui.components.DownloadFromLinkDialog(
+                initialUrl = pendingIncomingWebLink!!,
+                onDismiss = { viewModel.clearPendingIncomingWebLink() },
+                onConfirmDownload = { resolvedInfo, title, artist, attachAsCanvas ->
+                    viewModel.importFromWebVideoLink(
+                        resolvedInfo = resolvedInfo,
+                        customTitle = title,
+                        customArtist = artist,
+                        attachAsCanvas = attachAsCanvas
+                    ) { track ->
+                        viewModel.playTrack(track)
+                        viewModel.setNowPlayingExpanded(true)
+                    }
+                    viewModel.clearPendingIncomingWebLink()
+                }
             )
         }
     }

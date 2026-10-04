@@ -130,12 +130,31 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
 - **Previsualización y Edición Rápida**: Muestra título, autor/creador, duración y portada antes de confirmar con temas visuales adaptativos (Cyan/Magenta para TikTok, Rojo Carmesí/Naranja para YouTube/Web).
 - **Reproducción al Instante**: Una vez descargada, inicia la reproducción automáticamente abriendo Now Playing.
 
-### 8. Carátulas Personalizadas de Galería & Arte Procedural
+### 8. Integración Inteligente "Abrir con..." y "Compartir con..." (Puente con Gestores de Descarga y Apps Externas) 🔗📲
+- **Detección Automática y Triaje Inteligente (`IncomingMediaHandler`)**:
+  - Al abrir o compartir cualquier contenido hacia Aura Music desde aplicaciones como SnapTube, NewPipe, Seal, Telegram, WhatsApp, gestores de archivos o navegadores web, el sistema clasifica de forma inmediata y certera la naturaleza del medio:
+    - 🎵 **Archivo de Audio (`audio/*`, `.mp3`, `.m4a`, `.flac`, `.wav`, `.ogg`, `.opus`, etc.)**:
+      - Extrae los metadatos ID3 y la portada con `AudioMetadataParser`.
+      - Realiza una copia segura hacia el almacenamiento estructurado `songs/` para garantizar que la canción persista localmente de por vida, incluso si la app externa revoca permisos o borra su caché temporal.
+      - La registra reactivamente en Room Database y en `metadata/`.
+      - Inicia la reproducción de inmediato (`playTrack`), despliega *Now Playing* y consulta letras automáticamente en LRCLIB.
+    - 🎬 **Archivo de Video (`video/*`, `.mp4`, `.mkv`, `.webm`, `.3gp`)**:
+      - Identifica pistas de video reales mediante inspección profunda con `MediaMetadataRetriever` (diferenciando contenedores de solo audio de videos reales).
+      - Despliega automáticamente el diálogo **Video a Música**, permitiendo previsualizar el fotograma clave, personalizar título/artista y convertirlo en 1 segundo a música `.m4a` con carátula WebP y Video Canvas sincronizado.
+    - 🌐 **Enlace Web o Texto Compartido (`text/plain`, URLs `http`/`https`)**:
+      - Reconoce enlaces provenientes de TikTok, YouTube, redes o navegadores.
+      - Abre directamente el diálogo de descarga de enlaces con la URL pre-cargada e inicia la resolución automática del título, creador y carátula.
+    - 🎶 **Múltiples Audios Compartidos**:
+      - Importa el lote completo a la biblioteca y comienza la reproducción continua del primer elemento en cola.
+- **Soporte `singleTop` e Intent Filters Completos**:
+  - Tanto si Aura Music está cerrada (arranque en frío) como si ya se encuentra en segundo plano reproduciendo música, `onNewIntent` gestiona la nueva solicitud sin interrumpir la interfaz ni recrear la pila de Compose.
+
+### 9. Carátulas Personalizadas de Galería & Arte Procedural
 - **Selección de Carátula desde Galería**: Mediante el Android Photo Picker nativo del sistema.
 - **Compresión WebP y Borrado Inteligente**: Conversión en segundo plano (`Dispatchers.IO`) a WebP sin pérdida y eliminación de carátulas residuales del disco.
 - **Generador de Arte Procedural**: Ilustración matemática vectorial única para canciones sin portada.
 
-### 9. Suite Acústica y Ajustes para Auriculares / Audífonos 🎧
+### 10. Suite Acústica y Ajustes para Auriculares / Audífonos 🎧
 - **Filtro Crossfeed Acústico (Algoritmo Bauer / Chu Moy en ISO C++20)**:
   - Elimina la fatiga auditiva mezclando sutilmente una porción de audio con filtro paso-bajos (~700 Hz) y retardo temporal interaural (ITD de 250 µs a 340 µs) hacia el oído opuesto, emulando la escucha natural de monitores de estudio en sala.
   - **Activación Exclusiva por Hardware**: Solo se aplica en la música cuando el sistema detecta que hay auriculares conectados (jack 3.5mm, USB-C DAC o Bluetooth), pausándose automáticamente en los altavoces del teléfono.
@@ -152,7 +171,7 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
 - **Mapeo Avanzado de Botones y Gestos Físicos de Auriculares (Headset Controls)**:
   - Totalmente configurable por el usuario mediante diálogo modal para 1 pulsación, 2 pulsaciones, 3 pulsaciones y pulsación prolongada (Play/Pausa, Siguiente, Anterior, Me Gusta ❤️, Avanzar 15s, Retroceder 15s).
 
-### 10. Notificación Nativa del Reproductor de Android & Segundo Plano 🔔
+### 11. Notificación Nativa del Reproductor de Android & Segundo Plano 🔔
 - **Controlador Multimedia Nativo de Android (System Media Controls)**:
   - Integración completa con **Jetpack Media3 `MediaSessionService`**, `MediaSession` y `ForwardingPlayer`.
   - **Android 13, 14, 15+**: Tarjeta multimedia simétrica y completa en la cortina de notificaciones con arte de tapa en alta resolución, colores adaptativos dinámicos, **línea ondulada interactiva (*squiggled seekbar*)** y botonera completa con **Anterior (|<<), Play/Pausa (||) y Siguiente (>>|)** siempre disponibles.
@@ -162,7 +181,7 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
 - **Reproducción Continua en Segundo Plano (*Foreground Service*)**: Mantiene la música sonando ininterrumpidamente cuando la pantalla está apagada o la aplicación se minimiza.
 - **Soporte Extendido**: Detección automática en **relojes inteligentes (Wear OS)**, **Android Auto** y mandos remotos Bluetooth.
 
-### 11. Playlists y Almacenamiento Estructurado
+### 12. Playlists y Almacenamiento Estructurado
 - **Pestaña "Playlists" en Tu Biblioteca**: Tarjeta "Tus Me Gusta" sincronizada, creación, renombrado y adición rápida de canciones.
 - **Almacenamiento Organizado** en `Android/data/com.aistudio.musicplayer.aurasound/files/`:
   - 📁 `images/`: Carátulas en WebP Lossless.
@@ -171,7 +190,7 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
   - 📁 `metadata/`: Ficheros JSON estructurados con información técnica.
   - 📁 `videos/`: Videos de fondo y loops de Canvas (.mp4/.webm).
 
-### 12. Suite de Diagnóstico Autónoma: Aura Monitor 🛠️ & LeakCanary
+### 13. Suite de Diagnóstico Autónoma: Aura Monitor 🛠️ & LeakCanary
 - **Aura Monitor (App Debug Propia en el Cajón de Aplicaciones)**:
   - Cuenta con su propio icono de acceso directo en el cajón de apps del teléfono móvil.
   - Atrapa y registra automáticamente **Crashes** no controlados mediante `UncaughtExceptionHandler`, **Errores Críticos**, **Warnings de Memoria** y eventos de Media3 / JNI.

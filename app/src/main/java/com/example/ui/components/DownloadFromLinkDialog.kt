@@ -48,6 +48,7 @@ enum class DownloadSourceMode(val label: String) {
 @Composable
 fun DownloadFromLinkDialog(
     initialMode: DownloadSourceMode = DownloadSourceMode.TIKTOK,
+    initialUrl: String = "",
     onDismiss: () -> Unit,
     onConfirmDownload: (
         resolvedInfo: OnlineVideoAudioImporter.ResolvedMediaInfo,
@@ -60,9 +61,13 @@ fun DownloadFromLinkDialog(
     val clipboardManager = LocalClipboardManager.current
     val context = androidx.compose.ui.platform.LocalContext.current
 
-    var selectedMode by remember { mutableStateOf(initialMode) }
+    var selectedMode by remember {
+        mutableStateOf(
+            if (initialUrl.contains("youtu", ignoreCase = true)) DownloadSourceMode.YOUTUBE_WEB else initialMode
+        )
+    }
     var selectedEngine by remember { mutableStateOf(YoutubeExtractionEngine.INNERTUBE) }
-    var linkUrl by remember { mutableStateOf("") }
+    var linkUrl by remember { mutableStateOf(initialUrl) }
     var isResolving by remember { mutableStateOf(false) }
     var resolveError by remember { mutableStateOf<String?>(null) }
     var resolvedInfo by remember { mutableStateOf<OnlineVideoAudioImporter.ResolvedMediaInfo?>(null) }
@@ -70,6 +75,27 @@ fun DownloadFromLinkDialog(
     var editableTitle by remember { mutableStateOf("") }
     var editableArtist by remember { mutableStateOf("") }
     var attachAsCanvas by remember { mutableStateOf(true) }
+
+    // Auto-resolución si se recibe una URL inicial compartida desde otra app
+    LaunchedEffect(initialUrl) {
+        if (initialUrl.isNotBlank() && resolvedInfo == null) {
+            isResolving = true
+            resolveError = null
+            val result = OnlineVideoAudioImporter.resolveMediaLink(
+                linkUrl = initialUrl.trim(),
+                context = context,
+                engine = selectedEngine
+            )
+            isResolving = false
+            result.onSuccess { info ->
+                resolvedInfo = info
+                editableTitle = info.suggestedTitle
+                editableArtist = info.suggestedArtist
+            }.onFailure { err ->
+                resolveError = err.message ?: "No se pudo obtener información del enlace."
+            }
+        }
+    }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
