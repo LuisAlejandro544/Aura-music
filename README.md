@@ -142,8 +142,14 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
   - 🎬 **Video Canvas Vinculado**: Vincula el video como Canvas de fondo sincronizado en `NowPlayingScreen`.
 - **Reproducción Inmediata**: Al finalizar la conversión, la pista recién creada se reproduce de inmediato con su Video Canvas y atmósfera lumínica armonizada.
 
-### 7. Descarga Directa desde TikTok, YouTube y Enlaces Web (Música, Carátula Oficial y Video Canvas) 🎬🔗🎵
+### 7. Descarga Directa desde TikTok, YouTube y Enlaces Web con Motor FFmpeg Puro y Actualización OTA de yt-dlp 🎬🔗🎵
 - **Descargas sin Límite de Duración**: Permite pegar enlaces de **TikTok**, **YouTube** y videos web para descargar música completa, directos, sesiones o parodias de cualquier duración.
+- **Motor FFmpeg Puro sin Wrapper (`FFmpegNativeEngine`)**:
+  - Procesamiento y transcodificación de audio de alta fidelidad (AAC, Opus, Vorbis, FLAC, WebM -> M4A / MP3) ejecutado directamente a nivel nativo/CLI sin bibliotecas intermediarias pesadas.
+  - Fusión de flujos de video y audio DASH independientes sin pérdida de calidad (*Direct Stream Copy* `-c copy`).
+- **Arquitectura de Actualización en Caliente OTA para yt-dlp (`YtDlpAutoUpdater`)**:
+  - **Cero Dependencia de Nuevos APKs**: Ante cambios o parches anti-bot en YouTube, la app comprueba y descarga en caliente la versión más reciente del extractor oficial de yt-dlp desde GitHub Releases directamente en `files/bin/yt-dlp` (~3.8 MB).
+  - **Disparador Dual**: Comprobación automática ante errores de extracción de YouTube y botón interactivo manual en *Ajustes > Apariencia & Temas > Motores de Extracción & yt-dlp OTA*.
 - **Arquitectura de Extracción Resiliente de 3 Niveles con Carátula Garantizada**:
   - ⚡ **Motor InnerTube Nativo (`InnerTubeClient`)**: Consulta directa ultrarrápida al endpoint oficial de YouTube mediante clientes de baja fricción (`ANDROID_VR` y `VISIONOS`). Entrega flujos de audio y video directos sin cifrado de firma (`n-sig`) ni bloqueos de `LOGIN_REQUIRED` en menos de ~300ms.
   - 🛡️ **Bypass de Respaldo Invidious (`InvidiousStreamResolver`)**: Para pistas con restricciones estrictas de derechos de autor (VEVO, discográficas) que exigen inicio de sesión en clientes anónimos, consulta en milisegundos instancias públicas de alta disponibilidad que descifran los enlaces directos a `googlevideo.com`.

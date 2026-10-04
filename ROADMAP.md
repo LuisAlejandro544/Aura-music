@@ -207,6 +207,11 @@ Este documento traza las fases de evolución técnica y funcional para convertir
   - Lista completa de opciones comunitarias con comparador de formato (Sincronizada vs Texto plano), duración y previsualización de versos.
   - Integración accesible tanto desde el botón de búsqueda en la tarjeta de Karaoke como desde el estado de canción sin letra.
 
+- [x] **Motor FFmpeg Puro sin Wrapper y Actualización en Caliente OTA de yt-dlp**:
+  - `FFmpegNativeEngine`: Motor de procesamiento multimedia a nivel nativo/CLI sin bibliotecas intermediarias pesadas ni riesgos de licencias GPL, optimizado para extracción de audio, transcodificación a AAC/MP3 y fusión de streams video/audio.
+  - `YtDlpAutoUpdater`: Sistema de actualización OTA en caliente que consulta GitHub Releases y descarga la versión más reciente del extractor (~3.8 MB) directamente en `files/bin/yt-dlp` sin forzar al usuario a esperar una nueva versión del APK en Uptodown.
+  - Tarjeta en Ajustes de Apariencia con información en vivo de FFmpeg y botón interactivo para actualizar yt-dlp en segundo plano.
+
 ---
 
 ## 🔊 Fase 7: Modo Bit-Perfect y Salida de Ultra-Baja Latencia (Siguiente Paso 🔄)

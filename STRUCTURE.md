@@ -18,6 +18,11 @@ AuraMusic/
 │   │   │   │   ├── CMakeLists.txt              # Configuración CMake integrada en Gradle (C++20)
 │   │   │   │   ├── auramusic_dsp.h             # Ecualizador 10 bandas biquad, limiter y buffers
 │   │   │   │   └── auramusic_dsp.cpp           # Implementación JNI del motor nativo
+│   │   │   ├── jniLibs/                        # Binarios nativos precompilados por ABI (libffmpeg.so, etc.)
+│   │   │   │   ├── arm64-v8a/                  # 64-bit ARM
+│   │   │   │   ├── armeabi-v7a/                # 32-bit ARM
+│   │   │   │   ├── x86_64/                     # 64-bit Intel/AMD
+│   │   │   │   └── x86/                        # 32-bit Intel
 │   │   │   ├── java/com/example/
 │   │   │   │   ├── AuraApplication.kt         # Clase Application con inicio de AuraDebugManager
 │   │   │   │   ├── MainActivity.kt             # Actividad principal, insets, animaciones y navegación
@@ -46,6 +51,9 @@ AuraMusic/
 │   │   │   │   │   │   ├── ProceduralArtworkGenerator.kt # Generador procedural de carátulas
 │   │   │   │   │   │   ├── SampleMusicGenerator.kt # Sintetizador de audio WAV para demos
 │   │   │   │   │   │   ├── VideoAudioExtractor.kt  # Extractor de audio nativo y generador 3 en 1 de Video a Música
+│   │   │   │   │   │   ├── FFmpegNativeEngine.kt   # Motor multimedia nativo con FFmpeg puro sin wrapper (CLI / JNI)
+│   │   │   │   │   │   ├── YtDlpAutoUpdater.kt     # Gestor de actualización en caliente OTA para yt-dlp desde GitHub Releases
+│   │   │   │   │   │   ├── YtDlpNativeEngine.kt    # Extractor nativo local basado en yt-dlp y FFmpeg
 │   │   │   │   │   │   ├── InnerTubeClient.kt      # Cliente InnerTube multi-cliente sin fricción (ANDROID_VR, VISIONOS)
 │   │   │   │   │   │   ├── InvidiousStreamResolver.kt # Resolvedor de respaldo para canciones con restricción de derechos
 │   │   │   │   │   │   ├── HeadlessWebViewExtractor.kt # Extractor móvil en segundo plano sobre m.youtube.com

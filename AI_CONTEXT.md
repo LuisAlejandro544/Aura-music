@@ -80,6 +80,9 @@ Este archivo define el contexto de diseño, directrices técnicas y restriccione
       - *Bypass de Respaldo Invidious*: Instancias públicas libres para resolución inmediata de canciones oficiales con restricciones de derechos estrictas.
       - *Motor WebView Reparado con Garantía de Carátula*: Navegador efímero en segundo plano cargado sobre `m.youtube.com` (sin bloqueos de inserción ni error 150) con timeout de 22s, extracción de miniatura en DOM y **descarga en cascada multinivel** (`maxresdefault.jpg` -> `hqdefault.jpg` -> `mqdefault.jpg` -> `i.ytimg.com` -> fotograma clave de video).
       - *Selector Interactivo*: Permite al usuario alternar entre InnerTube y WebView en el diálogo con auto-fallback cruzado de 3 capas.
+    - **Motor FFmpeg Puro sin Wrapper (`FFmpegNativeEngine`) y Actualización OTA de yt-dlp (`YtDlpAutoUpdater`)**:
+      - Procesamiento y transcodificación de audio de alta fidelidad (AAC, Opus, Vorbis, FLAC, WebM -> M4A / MP3) ejecutado a nivel nativo/CLI sin wrappers de terceros ni licencias GPL.
+      - Capacidad de actualización en caliente para yt-dlp desde GitHub Releases en `files/bin/yt-dlp` sin requerir la publicación de un nuevo APK en Uptodown cada vez que YouTube altere sus firmas o endpoints.
     - Almacenamiento organizado: audio `.m4a`/`.mp3` en `songs/`, carátula oficial en WebP sin pérdida en `images/`, y video vinculado en `videos/` para reproducir el Video Canvas de fondo.
     - Interfaz adaptativa: Degradados visuales reactivos (Cyan/Magenta para TikTok, Rojo Carmesí/Naranja para YouTube/Web) y reproducción inmediata en Now Playing tras descargar.
 

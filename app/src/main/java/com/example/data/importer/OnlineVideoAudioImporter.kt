@@ -259,6 +259,20 @@ object OnlineVideoAudioImporter {
                         }
                     } catch (_: Throwable) {}
 
+                    if (!audioReady && FFmpegNativeEngine.isAvailable(context)) {
+                        val ffmpegResult = FFmpegNativeEngine.extractAudio(
+                            context = context,
+                            inputFile = tempVideoFile,
+                            outputFile = audioFile,
+                            audioBitrate = "256k",
+                            targetFormat = "m4a",
+                            totalDurationMs = durationMs
+                        )
+                        if (ffmpegResult.success && audioFile.exists() && audioFile.length() > 0L) {
+                            audioReady = true
+                        }
+                    }
+
                     if (!audioReady) {
                         tempVideoFile.copyTo(audioFile, overwrite = true)
                         audioReady = true

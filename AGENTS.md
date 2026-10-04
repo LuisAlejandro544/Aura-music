@@ -112,4 +112,5 @@ Este documento define el protocolo de trabajo para los agentes de software y des
 - [x] ¿El importador de archivos de letras (.lrc y .txt) desde el celular y la auto-detección/vinculación de letras locales (.lrc/.txt hermanos o tags) están integrados y funcionales?
 - [x] ¿La búsqueda interactiva de letras con edición libre de título/artista, búsqueda multidimensional (`track_name` y `q` sin restricción de duración local), tarjeta vacía sin desbordamientos y recomendación oficial canónica (#1) está integrada y operativa?
 - [x] ¿Aura Monitor cuenta con navegación por pestañas (*Incidentes & Logs* y *Rendimiento & Hilos*), desglose de RAM segmentada (Java/Native C++/Gráficos/PSS), carga de CPU e Inspector Quirúrgico de Hilos con trazas de pila completas?
+- [x] ¿El motor FFmpeg puro sin wrapper (`FFmpegNativeEngine`) y el gestor de actualización en caliente OTA de yt-dlp (`YtDlpAutoUpdater`) están integrados y operativos sin forzar dependencias GPL ni obligar a nuevos APKs ante cambios de YouTube?
 - [x] ¿Los 5 archivos Markdown (`README.md`, `ROADMAP.md`, `STRUCTURE.md`, `AI_CONTEXT.md`, `AGENTS.md`) están actualizados y en español?

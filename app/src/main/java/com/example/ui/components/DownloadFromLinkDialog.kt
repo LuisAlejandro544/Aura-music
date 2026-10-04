@@ -356,12 +356,20 @@ fun DownloadFromLinkDialog(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         FilterChip(
+                            selected = selectedEngine == YoutubeExtractionEngine.YTDLP,
+                            onClick = {
+                                selectedEngine = YoutubeExtractionEngine.YTDLP
+                                resolveError = null
+                            },
+                            label = { Text("⚡ yt-dlp + FFmpeg", fontSize = 11.sp) }
+                        )
+                        FilterChip(
                             selected = selectedEngine == YoutubeExtractionEngine.INNERTUBE,
                             onClick = {
                                 selectedEngine = YoutubeExtractionEngine.INNERTUBE
                                 resolveError = null
                             },
-                            label = { Text("⚡ InnerTube (Rápido)", fontSize = 11.sp) }
+                            label = { Text("InnerTube", fontSize = 11.sp) }
                         )
                         FilterChip(
                             selected = selectedEngine == YoutubeExtractionEngine.WEBVIEW,
@@ -369,14 +377,15 @@ fun DownloadFromLinkDialog(
                                 selectedEngine = YoutubeExtractionEngine.WEBVIEW
                                 resolveError = null
                             },
-                            label = { Text("🌐 Motor WebView", fontSize = 11.sp) }
+                            label = { Text("WebView", fontSize = 11.sp) }
                         )
                     }
                     Text(
-                        text = if (selectedEngine == YoutubeExtractionEngine.INNERTUBE)
-                            "API nativa directa de YouTube Music. Rápida, gratis y sin consumo de batería."
-                        else
-                            "Navegador efímero en segundo plano que ejecuta el reproductor en memoria.",
+                        text = when (selectedEngine) {
+                            YoutubeExtractionEngine.YTDLP -> "Extractor local avanzado con soporte para sortear firmas n-sig y protección de bots."
+                            YoutubeExtractionEngine.INNERTUBE -> "API nativa directa de YouTube Music. Rápida, gratis y sin consumo de batería."
+                            YoutubeExtractionEngine.WEBVIEW -> "Navegador efímero en segundo plano que ejecuta el reproductor en memoria."
+                        },
                         style = MaterialTheme.typography.labelSmall.copy(color = TextSecondary),
                         modifier = Modifier.padding(top = 2.dp, start = 2.dp)
                     )

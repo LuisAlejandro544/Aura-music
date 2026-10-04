@@ -73,6 +73,16 @@ android {
     buildConfig = true
   }
   testOptions { unitTests { isIncludeAndroidResources = true } }
+  packaging {
+    jniLibs {
+      useLegacyPackaging = true
+    }
+  }
+  sourceSets {
+    getByName("main") {
+      jniLibs.srcDirs("src/main/jniLibs")
+    }
+  }
   dependenciesInfo {
     includeInApk = false
     includeInBundle = true

@@ -99,7 +99,24 @@ object VideoAudioExtractor {
 
         // 1. Extraer o guardar el archivo de audio
         val audioFile = File(storageManager.songsDir, "track_video_${tempTrackId}.m4a")
-        val extractSuccess = demuxAudioStream(context, videoUri, audioFile)
+        var extractSuccess = demuxAudioStream(context, videoUri, audioFile)
+
+        // Si MediaMuxer falló (ej. contenedor MKV/WebM o códec no soportado), usar FFmpeg puro si está disponible
+        if ((!extractSuccess || !audioFile.exists() || audioFile.length() == 0L) && FFmpegNativeEngine.isAvailable(context)) {
+            val tempSourceFile = File(storageManager.videosDir, "temp_source_${tempTrackId}.tmp")
+            if (copyUriToFile(context, videoUri, tempSourceFile)) {
+                val ffmpegResult = FFmpegNativeEngine.extractAudio(
+                    context = context,
+                    inputFile = tempSourceFile,
+                    outputFile = audioFile,
+                    audioBitrate = "256k",
+                    targetFormat = "m4a",
+                    totalDurationMs = 0L
+                )
+                extractSuccess = ffmpegResult.success
+                tempSourceFile.delete()
+            }
+        }
 
         val finalAudioFile: File = if (extractSuccess && audioFile.exists() && audioFile.length() > 0) {
             audioFile
