@@ -110,5 +110,6 @@ Este documento define el protocolo de trabajo para los agentes de software y des
 - [x] ¿Tanto la Velocidad de la Música como la Velocidad de Voz / Tono (`Pitch`) llegan hasta 2.0x e incluyen botones rápidos con `2.0x`?
 - [x] ¿Las descargas de YouTube por WebView garantizan carátula oficial en WebP sin pérdida mediante descarga en cascada (maxresdefault, hqdefault, mqdefault, i.ytimg.com y fotograma clave)?
 - [x] ¿El importador de archivos de letras (.lrc y .txt) desde el celular y la auto-detección/vinculación de letras locales (.lrc/.txt hermanos o tags) están integrados y funcionales?
+- [x] ¿La búsqueda interactiva de letras con edición libre de título/artista, selección entre versiones y recomendación de la lírica oficial canónica en primera posición (#1) está integrada y operativa?
 - [x] ¿Aura Monitor cuenta con navegación por pestañas (*Incidentes & Logs* y *Rendimiento & Hilos*), desglose de RAM segmentada (Java/Native C++/Gráficos/PSS), carga de CPU e Inspector Quirúrgico de Hilos con trazas de pila completas?
 - [x] ¿Los 5 archivos Markdown (`README.md`, `ROADMAP.md`, `STRUCTURE.md`, `AI_CONTEXT.md`, `AGENTS.md`) están actualizados y en español?

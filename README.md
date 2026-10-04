@@ -110,7 +110,11 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
 - **Sincronización Instantánea de Favoritos**: El botón de corazón en Now Playing y en la Biblioteca refleja reactivamente el estado en tiempo real (icono relleno en rojo `Color(0xFFEF4444)` al marcar favorito).
 - **Lista de Inicio Estable**: La sección "Populares en tu biblioteca" permanece fija y nunca elimina otras canciones al marcar un favorito.
 
-### 5. Letras Sincronizadas (.LRC y .TXT) Estilo Karaoke con Importador Local y Descarga Automática 🎤📜
+### 5. Letras Sincronizadas (.LRC y .TXT) Estilo Karaoke con Búsqueda Interactiva, Elección de Versiones y Recomendación Oficial 🎤📜
+- **Búsqueda Interactiva Personalizada y Selección de Versiones (`SearchLyricsDialog`)**:
+  - Diálogo modal con diseño Dark Luxury Neo-Glass donde el usuario puede escribir o editar el nombre de la canción y el artista libremente para buscar letras exactas o variantes.
+  - **Recomendación de Lírica Oficial en Primer Lugar (#1)**: El sistema identifica y prioriza la versión canónica oficial de LRCLIB (o la coincidencia más fiel con timestamps sincronizados) presentándola en primera posición con una insignia destacada `⭐ OFICIAL / RECOMENDADA`, borde de neón y botón prioritario.
+  - **Comparación de Versiones Alternativas**: Muestra las opciones disponibles en la base de datos comunitaria, con etiquetas de formato (*Sincronizada (Karaoke)* vs *Texto Plano*), duración y previsualización de versos (*snippet*). El usuario puede elegir cualquier versión con un solo toque y aplicarla al instante.
 - **Descarga Automática 100% Gratuita**: Al iniciar la reproducción de cualquier canción sin letra, consulta automáticamente el servicio público libre LRCLIB mediante metadatos y búsqueda inteligente (sanitizando sufijos como *official*, *video*, *remastered* o *feat.*) sin requerir registro ni API keys.
 - **Importador de Archivos de Letras (.LRC y .TXT) desde el Celular**: Botón directo en la barra superior y en el estado vacío de la tarjeta de Karaoke para importar archivos de letras descargados en el teléfono mediante el selector de documentos nativo. Soporta tanto letras sincronizadas `.lrc` como letras en texto plano `.txt`.
 - **Detección y Vinculación Automática al Importar Música**: Al importar canciones desde el almacenamiento (SAF, carpetas o 'Abrir con...'), detecta automáticamente archivos hermanos `.lrc` o `.txt` con el mismo nombre en la carpeta o metadatos incrustados, asignando la letra al instante sin requerir internet.

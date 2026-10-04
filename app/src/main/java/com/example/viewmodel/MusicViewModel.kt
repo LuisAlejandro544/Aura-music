@@ -147,6 +147,19 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val _lyricsState = MutableStateFlow(LyricsState())
     val lyricsState: StateFlow<LyricsState> = _lyricsState.asStateFlow()
 
+    // Búsqueda interactiva de letras con selección de versiones y recomendación oficial
+    private val _isSearchLyricsDialogOpen = MutableStateFlow(false)
+    val isSearchLyricsDialogOpen: StateFlow<Boolean> = _isSearchLyricsDialogOpen.asStateFlow()
+
+    private val _isSearchingLyrics = MutableStateFlow(false)
+    val isSearchingLyrics: StateFlow<Boolean> = _isSearchingLyrics.asStateFlow()
+
+    private val _lyricsSearchResults = MutableStateFlow<List<com.example.model.LyricSearchResult>>(emptyList())
+    val lyricsSearchResults: StateFlow<List<com.example.model.LyricSearchResult>> = _lyricsSearchResults.asStateFlow()
+
+    private val _searchLyricsError = MutableStateFlow<String?>(null)
+    val searchLyricsError: StateFlow<String?> = _searchLyricsError.asStateFlow()
+
     // Gestión de medios externos entrantes ("Abrir con...", "Compartir con...", SnapTube, etc.)
     private val _pendingIncomingAudioUris = MutableStateFlow<List<Uri>>(emptyList())
     val pendingIncomingAudioUris: StateFlow<List<Uri>> = _pendingIncomingAudioUris.asStateFlow()
@@ -864,6 +877,62 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.IO) {
             val state = com.example.data.importer.LyricsManager.saveLyrics(target, storageManager, content)
             _lyricsState.value = state
+        }
+    }
+
+    /**
+     * Abre el diálogo interactivo de búsqueda de letras con el nombre y artista de la pista actual.
+     */
+    fun openSearchLyricsDialog() {
+        val target = currentTrack.value
+        _lyricsSearchResults.value = emptyList()
+        _searchLyricsError.value = null
+        _isSearchLyricsDialogOpen.value = true
+        if (target != null) {
+            searchLyricsOptions(target.title, target.artist)
+        }
+    }
+
+    fun closeSearchLyricsDialog() {
+        _isSearchLyricsDialogOpen.value = false
+    }
+
+    /**
+     * Realiza la búsqueda de letras en LRCLIB permitiendo que el usuario personalice el nombre de la canción.
+     */
+    fun searchLyricsOptions(title: String, artist: String = "") {
+        val target = currentTrack.value
+        val durationSec = (target?.durationMs ?: 0L) / 1000L
+        viewModelScope.launch(Dispatchers.IO) {
+            _isSearchingLyrics.value = true
+            _searchLyricsError.value = null
+            try {
+                val results = com.example.data.importer.LyricsManager.searchLyricsOptions(
+                    trackTitle = title,
+                    artistName = artist,
+                    durationSec = durationSec
+                )
+                _lyricsSearchResults.value = results
+                if (results.isEmpty()) {
+                    _searchLyricsError.value = "No se encontraron letras para \"$title\". Prueba simplificando el nombre de la canción o borrando el artista."
+                }
+            } catch (e: Throwable) {
+                _searchLyricsError.value = "Error al consultar catálogo de letras: ${e.message}"
+            } finally {
+                _isSearchingLyrics.value = false
+            }
+        }
+    }
+
+    /**
+     * Aplica la opción de letra seleccionada por el usuario (oficial o alternativa) a la pista activa.
+     */
+    fun selectLyricSearchResult(result: com.example.model.LyricSearchResult) {
+        val target = currentTrack.value ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            val state = com.example.data.importer.LyricsManager.applySearchResult(target, storageManager, result)
+            _lyricsState.value = state
+            _isSearchLyricsDialogOpen.value = false
         }
     }
 

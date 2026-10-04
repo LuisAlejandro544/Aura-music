@@ -199,6 +199,12 @@ Este documento traza las fases de evolución técnica y funcional para convertir
   - Soporte de Video Canvas miniatura en el Mini Reproductor flotante configurable por el usuario desde Ajustes.
   - Sincronización milimétrica de velocidad de reproducción (0.50x a 2.00x) entre la música y el video de fondo.
   - Erradicación de la fuga de memoria en `AuraMediaPlaybackService` (`ResourcesImpl.mAppContext`) detectada por LeakCanary.
+- [x] **Búsqueda Interactiva de Letras, Elección de Versiones y Recomendación de Lírica Oficial**:
+  - Diálogo interactivo `SearchLyricsDialog` donde el usuario puede escribir y modificar el nombre de la canción y el artista libremente.
+  - Algoritmo de priorización en `LyricsManager` que consulta endpoints canónicos (`/api/get`) y de búsqueda (`/api/search`) en LRCLIB para identificar la versión oficial.
+  - Posicionamiento estricto de la Lírica Oficial en primera posición (#1) con insignia luminosa `⭐ OFICIAL / RECOMENDADA` y borde de neón.
+  - Lista completa de opciones comunitarias con comparador de formato (Sincronizada vs Texto plano), duración y previsualización de versos.
+  - Integración accesible tanto desde el botón de búsqueda en la tarjeta de Karaoke como desde el estado de canción sin letra.
 
 ---
 

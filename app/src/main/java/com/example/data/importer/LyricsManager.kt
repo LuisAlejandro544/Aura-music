@@ -7,6 +7,7 @@ import androidx.documentfile.provider.DocumentFile
 import com.example.data.storage.AppStorageManager
 import com.example.debug.AuraDebugManager
 import com.example.model.LyricLine
+import com.example.model.LyricSearchResult
 import com.example.model.LyricsState
 import com.example.model.Track
 import kotlinx.coroutines.Dispatchers
@@ -235,6 +236,176 @@ object LyricsManager {
             return saveLyrics(track, storageManager, plain)
         }
         return null
+    }
+
+    /**
+     * Busca letras en LRCLIB permitiendo que el usuario ingrese o modifique el título de la pista y el artista,
+     * obteniendo una lista de opciones donde la versión oficial canónica se recomienda en primer lugar.
+     */
+    suspend fun searchLyricsOptions(
+        trackTitle: String,
+        artistName: String = "",
+        durationSec: Long = 0L
+    ): List<LyricSearchResult> = withContext(Dispatchers.IO) {
+        val results = mutableListOf<LyricSearchResult>()
+        val cleanTitle = cleanSearchTerm(trackTitle)
+        val cleanArtist = cleanSearchTerm(artistName)
+
+        if (cleanTitle.isBlank()) return@withContext emptyList()
+
+        // 1. Intento canónico directo (/api/get) para la Lírica Oficial
+        val officialResult = tryFetchOfficial(cleanTitle, cleanArtist, durationSec)
+        if (officialResult != null) {
+            results.add(officialResult)
+        }
+
+        // 2. Búsqueda amplia (/api/search)
+        val query = if (cleanArtist.isNotBlank()) "$cleanTitle $cleanArtist" else cleanTitle
+        val searchResults = trySearchOptions(query)
+
+        // 3. Fusionar evitando duplicados
+        for (item in searchResults) {
+            val isDuplicate = results.any { existing ->
+                (existing.id != 0L && existing.id == item.id) ||
+                (existing.trackName.equals(item.trackName, ignoreCase = true) &&
+                 existing.artistName.equals(item.artistName, ignoreCase = true) &&
+                 existing.isSynced == item.isSynced)
+            }
+            if (!isDuplicate) {
+                results.add(item)
+            }
+        }
+
+        // 4. Si la consulta directa no arrojó oficial pero tenemos resultados de búsqueda,
+        // promover como oficial/recomendada la mejor coincidencia que tenga syncedLyrics y coincida con el título/artista
+        if (results.none { it.isOfficialRecommended } && results.isNotEmpty()) {
+            val bestCandidateIndex = results.indexOfFirst {
+                it.isSynced && (cleanArtist.isBlank() || it.artistName.contains(cleanArtist, ignoreCase = true))
+            }.takeIf { it >= 0 } ?: 0
+
+            val candidate = results[bestCandidateIndex]
+            results[bestCandidateIndex] = candidate.copy(isOfficialRecommended = true)
+        }
+
+        // 5. Ordenar: La oficial/recomendada SIEMPRE de primera, luego las sincronizadas y luego las de texto plano
+        results.sortedWith(
+            compareByDescending<LyricSearchResult> { it.isOfficialRecommended }
+                .thenByDescending { it.isSynced }
+                .thenBy { it.trackName.lowercase() }
+        )
+    }
+
+    /**
+     * Aplica la opción de letra seleccionada por el usuario a la pista y la persiste en el almacenamiento local.
+     */
+    fun applySearchResult(
+        track: Track,
+        storageManager: AppStorageManager,
+        result: LyricSearchResult
+    ): LyricsState {
+        val contentToSave = if (result.syncedLyrics.isNotBlank()) {
+            result.syncedLyrics
+        } else {
+            result.plainLyrics
+        }
+        return saveLyrics(track, storageManager, contentToSave)
+    }
+
+    private fun tryFetchOfficial(title: String, artist: String, durationSec: Long): LyricSearchResult? {
+        if (title.isBlank()) return null
+        try {
+            val encodedTitle = URLEncoder.encode(title, "UTF-8")
+            var url = "https://lrclib.net/api/get?track_name=$encodedTitle"
+            if (artist.isNotBlank()) {
+                val encodedArtist = URLEncoder.encode(artist, "UTF-8")
+                url += "&artist_name=$encodedArtist"
+            }
+            if (durationSec > 0) {
+                url += "&duration=$durationSec"
+            }
+
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", "AuraMusic/1.0 (Android; Offline HiFi Player)")
+                .build()
+
+            httpClient.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    val body = response.body?.string() ?: return null
+                    val json = JSONObject(body)
+                    return parseLyricSearchResult(json, isOfficial = true)
+                }
+            }
+        } catch (t: Throwable) {
+            AuraDebugManager.logWarning("LyricsManager", "Fallo al consultar LRCLIB oficial: ${t.message}")
+        }
+        return null
+    }
+
+    private fun trySearchOptions(query: String): List<LyricSearchResult> {
+        val list = mutableListOf<LyricSearchResult>()
+        try {
+            val encodedQuery = URLEncoder.encode(query, "UTF-8")
+            val url = "https://lrclib.net/api/search?q=$encodedQuery"
+
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", "AuraMusic/1.0 (Android; Offline HiFi Player)")
+                .build()
+
+            httpClient.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    val body = response.body?.string() ?: return emptyList()
+                    val array = JSONArray(body)
+                    for (i in 0 until array.length()) {
+                        val item = array.getJSONObject(i)
+                        val parsed = parseLyricSearchResult(item, isOfficial = false)
+                        if (parsed != null) {
+                            list.add(parsed)
+                        }
+                    }
+                }
+            }
+        } catch (t: Throwable) {
+            AuraDebugManager.logWarning("LyricsManager", "Fallo al buscar opciones en LRCLIB: ${t.message}")
+        }
+        return list
+    }
+
+    private fun parseLyricSearchResult(json: JSONObject, isOfficial: Boolean): LyricSearchResult? {
+        val synced = json.optString("syncedLyrics", "").trim()
+        val plain = json.optString("plainLyrics", "").trim()
+        if (synced.isBlank() && plain.isBlank()) return null
+
+        val id = json.optLong("id", 0L)
+        val trackName = json.optString("trackName", json.optString("name", "Desconocida"))
+        val artistName = json.optString("artistName", "Artista desconocido")
+        val albumName = json.optString("albumName", "")
+        val duration = json.optDouble("duration", 0.0).toInt()
+
+        // Generar snippet a partir de las primeras 3 líneas no vacías
+        val rawText = if (synced.isNotBlank()) synced else plain
+        val snippetLines = rawText.lines()
+            .map { line ->
+                line.replace(Regex("""^\[\d{1,2}:\d{2}(?:[.:]\d{1,3})?\]"""), "").trim()
+            }
+            .filter { it.isNotBlank() && !it.startsWith("[") }
+            .take(3)
+
+        val snippet = snippetLines.joinToString("\n")
+
+        return LyricSearchResult(
+            id = id,
+            trackName = trackName,
+            artistName = artistName,
+            albumName = albumName,
+            durationSeconds = duration,
+            isSynced = synced.isNotBlank(),
+            isOfficialRecommended = isOfficial,
+            syncedLyrics = synced,
+            plainLyrics = plain,
+            previewSnippet = snippet
+        )
     }
 
     /**

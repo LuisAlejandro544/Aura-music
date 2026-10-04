@@ -39,6 +39,8 @@ import com.example.ui.components.AudioEffectsBottomSheet
 import com.example.ui.components.AudioVisualizer
 import com.example.ui.components.BackgroundVideoPlayer
 import com.example.ui.components.EditTrackDialog
+import com.example.ui.components.SearchLyricsDialog
+import com.example.model.LyricSearchResult
 import com.example.ui.screens.nowplaying.components.*
 import com.example.ui.theme.ArtworkColorExtractor
 import com.example.ui.theme.BackgroundDark
@@ -138,9 +140,17 @@ fun NowPlayingScreen(
     visualizerBands: FloatArray? = null,
     audioIntensity: Float = 0.15f,
     lyricsState: com.example.model.LyricsState = com.example.model.LyricsState(),
+    isSearchLyricsDialogOpen: Boolean = false,
+    isSearchingLyrics: Boolean = false,
+    lyricsSearchResults: List<LyricSearchResult> = emptyList(),
+    searchLyricsError: String? = null,
     onFetchOnlineLyrics: () -> Unit = {},
     onSaveCustomLyrics: (String) -> Unit = {},
     onImportLyricsUri: (android.net.Uri) -> Unit = {},
+    onOpenSearchLyrics: () -> Unit = {},
+    onCloseSearchLyrics: () -> Unit = {},
+    onSearchLyrics: (title: String, artist: String) -> Unit = { _, _ -> },
+    onSelectLyricSearchResult: (LyricSearchResult) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     BackHandler {
@@ -332,6 +342,7 @@ fun NowPlayingScreen(
                     onFetchOnlineLyrics = onFetchOnlineLyrics,
                     onSaveCustomLyrics = onSaveCustomLyrics,
                     onImportLyricsUri = onImportLyricsUri,
+                    onOpenSearchLyrics = onOpenSearchLyrics,
                     onCloseLyrics = { showLyrics = false }
                 )
             } else {
@@ -622,6 +633,20 @@ fun NowPlayingScreen(
                 onSetBalanceControlEnabled = onSetBalanceControlEnabled,
                 onSetStereoBalance = onSetStereoBalance,
                 initialTab = effectsInitialTab
+            )
+        }
+
+        // Diálogo para buscar letras personalizadas y elegir versiones con recomendación oficial
+        if (isSearchLyricsDialogOpen) {
+            SearchLyricsDialog(
+                currentTrack = currentTrack,
+                isSearching = isSearchingLyrics,
+                searchResults = lyricsSearchResults,
+                searchError = searchLyricsError,
+                accentColor = animatedPrimary,
+                onDismissRequest = onCloseSearchLyrics,
+                onSearch = onSearchLyrics,
+                onSelectResult = onSelectLyricSearchResult
             )
         }
     }

@@ -56,6 +56,7 @@ fun NowPlayingLyricsCard(
     onFetchOnlineLyrics: () -> Unit,
     onSaveCustomLyrics: (String) -> Unit,
     onImportLyricsUri: (android.net.Uri) -> Unit = {},
+    onOpenSearchLyrics: () -> Unit = {},
     onCloseLyrics: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -134,6 +135,19 @@ fun NowPlayingLyricsCard(
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Botón para buscar por nombre y elegir versión
+                    IconButton(
+                        onClick = onOpenSearchLyrics,
+                        modifier = Modifier.size(34.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "Buscar y elegir versión de letras",
+                            tint = animatedPrimary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
                     // Botón para importar archivo .LRC / .TXT desde el celular
                     IconButton(
                         onClick = {
@@ -146,12 +160,12 @@ fun NowPlayingLyricsCard(
                         Icon(
                             imageVector = Icons.Default.FileUpload,
                             contentDescription = "Importar archivo .LRC o .TXT del celular",
-                            tint = animatedPrimary,
+                            tint = TextSecondary,
                             modifier = Modifier.size(19.dp)
                         )
                     }
 
-                    // Botón para buscar en línea
+                    // Botón para buscar en línea rápido
                     IconButton(
                         onClick = onFetchOnlineLyrics,
                         enabled = !lyricsState.isLoading,
@@ -166,7 +180,7 @@ fun NowPlayingLyricsCard(
                         } else {
                             Icon(
                                 imageVector = Icons.Default.CloudDownload,
-                                contentDescription = "Buscar letras en línea",
+                                contentDescription = "Descargar automáticamente",
                                 tint = TextSecondary,
                                 modifier = Modifier.size(18.dp)
                             )
@@ -316,40 +330,46 @@ fun NowPlayingLyricsCard(
                             )
                             Spacer(modifier = Modifier.height(16.dp))
 
+                            // Botón principal: Buscar por nombre y elegir versión
                             Button(
+                                onClick = onOpenSearchLyrics,
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = animatedPrimary),
+                                modifier = Modifier.fillMaxWidth(0.92f).height(44.dp)
+                            ) {
+                                Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color.Black)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Buscar por nombre de canción", fontWeight = FontWeight.Bold, color = Color.Black)
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // Botón secundario: Importar archivo local
+                            OutlinedButton(
                                 onClick = {
                                     importLyricsFileLauncher.launch(
                                         arrayOf("text/*", "application/octet-stream", "*/*")
                                     )
                                 },
                                 shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = animatedPrimary)
+                                border = BorderStroke(1.dp, CardBorder),
+                                modifier = Modifier.fillMaxWidth(0.92f).height(40.dp)
                             ) {
-                                Icon(Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Icon(Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(18.dp), tint = animatedPrimary)
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Importar .LRC / .TXT de mi celular", fontWeight = FontWeight.Bold)
+                                Text("Importar .LRC / .TXT de mi celular", color = TextPrimary)
                             }
 
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            OutlinedButton(
-                                onClick = onFetchOnlineLyrics,
-                                shape = RoundedCornerShape(12.dp),
-                                border = BorderStroke(1.dp, CardBorder)
-                            ) {
-                                Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp), tint = animatedPrimary)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Descargar desde LRCLIB", color = TextPrimary)
-                            }
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
+                            // Botón terciario: Pegar manual
                             OutlinedButton(
                                 onClick = { showPasteDialog = true },
                                 shape = RoundedCornerShape(12.dp),
-                                border = BorderStroke(1.dp, CardBorder)
+                                border = BorderStroke(1.dp, CardBorder),
+                                modifier = Modifier.fillMaxWidth(0.92f).height(40.dp)
                             ) {
-                                Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp), tint = TextSecondary)
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text("Pegar letra manual", color = TextPrimary)
                             }

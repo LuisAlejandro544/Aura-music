@@ -101,8 +101,10 @@ Este archivo define el contexto de diseño, directrices técnicas y restriccione
     - El Mini Reproductor aplica un fondo completamente tintado y degradado con los colores extraídos de la pista activa, manteniendo consistencia visual en todas las pantallas.
     - Los atajos inferiores de Now Playing se organizan en 3 módulos equilibrados de igual proporción (`EQ FX`, `Letras`/`Carátula` y `Cola`), con área táctil superior a 48dp y texto en una sola línea sin cortes verticales.
 
-15. **Letras Sincronizadas (.LRC y .TXT) Estilo Karaoke e Importador Local**:
+15. **Letras Sincronizadas (.LRC y .TXT) Estilo Karaoke, Búsqueda Interactiva y Recomendación Oficial**:
     - Integración de analizador de marcas de tiempo `[mm:ss.xx]` con persistencia local en `Android/data/.../files/lyrics/track_{id}.lrc`.
+    - **Búsqueda Interactiva Personalizada (`SearchLyricsDialog`)**: Permite al usuario ingresar y modificar el nombre de la canción y el artista libremente, consultando LRCLIB y visualizando las distintas versiones comunitarias disponibles.
+    - **Recomendación de Lírica Oficial en Primer Puesto**: El motor prioriza la versión canónica oficial de LRCLIB (o la coincidencia más fiel con timestamps) situándola en el puesto #1 con insignia luminosa `⭐ OFICIAL / RECOMENDADA` y borde de neón.
     - **Importador Local de Letras**: Botón en la tarjeta de Karaoke y en estado vacío para importar archivos `.lrc` y `.txt` desde el celular mediante SAF.
     - **Auto-Detección y Vinculación Local**: Al importar canciones desde el almacenamiento o apps externas, detecta automáticamente archivos hermanos `.lrc` o `.txt` con el mismo nombre o metadatos incrustados, asignando la letra de inmediato sin depender de internet.
     - Descarga automática libre desde **LRCLIB** al cambiar a canciones sin letra, sin registro ni API keys.

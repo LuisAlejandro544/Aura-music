@@ -182,6 +182,10 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
     val visualizerBands by viewModel.visualizerBands.collectAsStateWithLifecycle()
     val audioIntensity by viewModel.audioIntensity.collectAsStateWithLifecycle()
     val lyricsState by viewModel.lyricsState.collectAsStateWithLifecycle()
+    val isSearchLyricsDialogOpen by viewModel.isSearchLyricsDialogOpen.collectAsStateWithLifecycle()
+    val isSearchingLyrics by viewModel.isSearchingLyrics.collectAsStateWithLifecycle()
+    val lyricsSearchResults by viewModel.lyricsSearchResults.collectAsStateWithLifecycle()
+    val searchLyricsError by viewModel.searchLyricsError.collectAsStateWithLifecycle()
     val pendingIncomingAudioUris by viewModel.pendingIncomingAudioUris.collectAsStateWithLifecycle()
     val pendingIncomingVideoUri by viewModel.pendingIncomingVideoUri.collectAsStateWithLifecycle()
     val pendingIncomingWebLink by viewModel.pendingIncomingWebLink.collectAsStateWithLifecycle()
@@ -554,9 +558,17 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                 visualizerBands = visualizerBands,
                 audioIntensity = audioIntensity,
                 lyricsState = lyricsState,
+                isSearchLyricsDialogOpen = isSearchLyricsDialogOpen,
+                isSearchingLyrics = isSearchingLyrics,
+                lyricsSearchResults = lyricsSearchResults,
+                searchLyricsError = searchLyricsError,
                 onFetchOnlineLyrics = { viewModel.fetchOnlineLyrics() },
                 onSaveCustomLyrics = { viewModel.saveCustomLyrics(it) },
-                onImportLyricsUri = { viewModel.importLyricsFromUri(it) }
+                onImportLyricsUri = { viewModel.importLyricsFromUri(it) },
+                onOpenSearchLyrics = { viewModel.openSearchLyricsDialog() },
+                onCloseSearchLyrics = { viewModel.closeSearchLyricsDialog() },
+                onSearchLyrics = { title, artist -> viewModel.searchLyricsOptions(title, artist) },
+                onSelectLyricSearchResult = { viewModel.selectLyricSearchResult(it) }
             )
         }
 

@@ -66,6 +66,7 @@ AuraMusic/
 │   │   │   │   ├── model/                      # Modelos de dominio
 │   │   │   │   │   ├── Track.kt                # Modelo de datos de canción
 │   │   │   │   │   ├── LyricsState.kt          # Modelo de letras sincronizadas (.LRC) y líneas temporizadas
+│   │   │   │   │   ├── LyricSearchResult.kt    # Modelo para resultados de búsqueda de letras y versión oficial
 │   │   │   │   │   ├── Playlist.kt             # Modelo de datos de lista
 │   │   │   │   │   ├── RepeatMode.kt           # Enum de modos de repetición
 │   │   │   │   │   ├── EqualizerConfig.kt      # Modelo de 10 bandas y presets de EQ
@@ -100,7 +101,8 @@ AuraMusic/
 │   │   │   │   │   │   ├── ProceduralArtwork.kt # Arte vectorial dinámico en tiempo real
 │   │   │   │   │   │   ├── TrackListItem.kt    # Fila de canción con marquesina en pista activa y menú contextual
 │   │   │   │   │   │   ├── VideoToMusicDialog.kt # Diálogo de conversión Video a Música con interruptor de recorte de silencios
-│   │   │   │   │   │   └── DownloadFromLinkDialog.kt # Diálogo de descarga web/TikTok/YouTube con interruptor de recorte de silencios
+│   │   │   │   │   │   ├── DownloadFromLinkDialog.kt # Diálogo de descarga web/TikTok/YouTube con interruptor de recorte de silencios
+│   │   │   │   │   │   └── SearchLyricsDialog.kt # Diálogo de búsqueda interactiva de letras, variantes y recomendación oficial
 │   │   │   │   │   ├── navigation/
 │   │   │   │   │   │   └── NavScreen.kt        # Destinos de navegación y pestañas
 │   │   │   │   │   ├── screens/                # Pantallas principales modulares
