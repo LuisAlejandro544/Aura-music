@@ -38,6 +38,8 @@ fun SettingsScreen(
     onSelectTheme: (AuraTheme) -> Unit,
     isDynamicArtworkColorEnabled: Boolean = true,
     onToggleDynamicArtworkColor: (Boolean) -> Unit = {},
+    isMiniPlayerVideoEnabled: Boolean = true,
+    onToggleMiniPlayerVideo: (Boolean) -> Unit = {},
     // Configuración de Auriculares
     headphoneConfig: HeadphoneConfig = HeadphoneConfig(),
     onUpdateHeadphoneConfig: (HeadphoneConfig) -> Unit = {},
@@ -128,7 +130,9 @@ fun SettingsScreen(
                 currentTheme = currentTheme,
                 onSelectTheme = onSelectTheme,
                 isDynamicArtworkColorEnabled = isDynamicArtworkColorEnabled,
-                onToggleDynamicArtworkColor = onToggleDynamicArtworkColor
+                onToggleDynamicArtworkColor = onToggleDynamicArtworkColor,
+                isMiniPlayerVideoEnabled = isMiniPlayerVideoEnabled,
+                onToggleMiniPlayerVideo = onToggleMiniPlayerVideo
             )
         }
 

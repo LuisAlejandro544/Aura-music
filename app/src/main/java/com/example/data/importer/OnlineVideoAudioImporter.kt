@@ -266,6 +266,71 @@ object OnlineVideoAudioImporter {
                 }
             }
 
+            // 3. Fallback inteligente de autoreparación: si el stream de WebView devolvió 403 o falló,
+            // resolvemos inmediatamente un enlace fresco con InnerTube o Invidious sin molestar al usuario
+            if (!audioReady && WebStreamExtractor.isWebVideoUrl(resolvedInfo.originalUrl)) {
+                val ytId = WebStreamExtractor.extractVideoId(resolvedInfo.originalUrl)
+                if (ytId != null) {
+                    com.example.debug.AuraDebugManager.logInfo(
+                        "OnlineImporter",
+                        "El stream de WebView requirió autoreparación. Resolviendo stream directo fresco con InnerTube/Invidious..."
+                    )
+                    val freshInfo = InnerTubeClient.resolve(ytId, resolvedInfo.originalUrl)
+                        ?: InvidiousStreamResolver.resolve(ytId, resolvedInfo.originalUrl)
+
+                    if (freshInfo != null) {
+                        if (!freshInfo.audioUrl.isNullOrBlank()) {
+                            val backupAudioSuccess = downloadUrlToFile(
+                                url = freshInfo.audioUrl,
+                                targetFile = audioFile,
+                                phase = "Descargando audio de alta fidelidad...",
+                                onProgress = onProgressUpdate
+                            )
+                            if (backupAudioSuccess && audioFile.exists() && audioFile.length() > 0L) {
+                                audioReady = true
+                            }
+                        }
+
+                        if (!audioReady && !freshInfo.videoUrl.isNullOrBlank()) {
+                            val backupVideoSuccess = downloadUrlToFile(
+                                url = freshInfo.videoUrl,
+                                targetFile = tempVideoFile,
+                                phase = "Descargando flujo multimedia...",
+                                onProgress = onProgressUpdate
+                            )
+                            if (backupVideoSuccess && tempVideoFile.exists() && tempVideoFile.length() > 0L) {
+                                try {
+                                    val videoUri = Uri.fromFile(tempVideoFile)
+                                    val dummyTrack = VideoAudioExtractor.convertVideoToTrack(
+                                        context = context,
+                                        storageManager = storageManager,
+                                        videoUri = videoUri,
+                                        title = finalTitle,
+                                        artist = finalArtist,
+                                        album = "YouTube Music",
+                                        attachAsCanvas = false,
+                                        forceLoop = forceLoop,
+                                        trimSilence = false
+                                    )
+                                    if (dummyTrack != null) {
+                                        val extractedFile = File(Uri.parse(dummyTrack.uriString).path ?: "")
+                                        if (extractedFile.exists() && extractedFile.length() > 0L) {
+                                            audioReady = true
+                                            extractedFile.copyTo(audioFile, overwrite = true)
+                                        }
+                                    }
+                                } catch (_: Throwable) {}
+
+                                if (!audioReady) {
+                                    tempVideoFile.copyTo(audioFile, overwrite = true)
+                                    audioReady = true
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             if (!audioReady || !audioFile.exists() || audioFile.length() == 0L) {
                 onProgressUpdate(DownloadProgress(isDownloading = false))
                 return@withContext Result.failure(IllegalStateException("Error al descargar el archivo de audio. Verifica tu conexión."))
@@ -332,7 +397,12 @@ object OnlineVideoAudioImporter {
             for (coverCandidate in candidateCoverUrls.distinct()) {
                 if (artworkPath != null) break
                 try {
-                    val request = Request.Builder().url(coverCandidate).build()
+                    val normalizedUrl = if (coverCandidate.startsWith("//")) "https:$coverCandidate" else coverCandidate
+                    val request = Request.Builder()
+                        .url(normalizedUrl)
+                        .header("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36")
+                        .header("Accept", "image/*,*/*")
+                        .build()
                     httpClient.newCall(request).execute().use { res ->
                         if (res.isSuccessful) {
                             val stream = res.body?.byteStream()
@@ -457,16 +527,70 @@ object OnlineVideoAudioImporter {
         phase: String,
         onProgress: (DownloadProgress) -> Unit
     ): Boolean {
+        val isYoutubeStream = url.contains("googlevideo.com") || url.contains("youtube.com")
+
+        // 1. Si la URL contiene rangos parciales (&range=0-...), probar primero sin rango para descargar el archivo completo
+        val cleanUrl = if (isYoutubeStream && url.contains("&range=")) {
+            url.replace(Regex("&range=[^&]+"), "")
+                .replace(Regex("&rn=[^&]+"), "")
+                .replace(Regex("&rbuf=[^&]+"), "")
+        } else {
+            url
+        }
+
+        val success = executeDownload(cleanUrl, targetFile, phase, isYoutubeStream, onProgress)
+        if (success && targetFile.exists() && targetFile.length() > 0L) {
+            return true
+        }
+
+        // 2. Si la URL limpia falló (ej. la firma requería el query string original), reintentar con la URL original
+        if (cleanUrl != url) {
+            val retrySuccess = executeDownload(url, targetFile, phase, isYoutubeStream, onProgress)
+            if (retrySuccess && targetFile.exists() && targetFile.length() > 0L) {
+                return true
+            }
+        }
+        return false
+    }
+
+    private fun executeDownload(
+        url: String,
+        targetFile: File,
+        phase: String,
+        isYoutubeStream: Boolean,
+        onProgress: (DownloadProgress) -> Unit
+    ): Boolean {
         return try {
-            val request = Request.Builder().url(url).build()
-            httpClient.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return false
+            val reqBuilder = Request.Builder().url(url)
+                .header("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36")
+                .header("Accept", "*/*")
+                .header("Accept-Encoding", "identity")
+
+            if (isYoutubeStream) {
+                reqBuilder.header("Referer", "https://m.youtube.com/")
+                reqBuilder.header("Origin", "https://m.youtube.com")
+                reqBuilder.header("Sec-Fetch-Mode", "no-cors")
+                reqBuilder.header("Sec-Fetch-Site", "cross-site")
+                reqBuilder.header("Sec-Fetch-Dest", "audio")
+                try {
+                    val cookies = android.webkit.CookieManager.getInstance().getCookie("https://m.youtube.com")
+                    if (!cookies.isNullOrBlank()) {
+                        reqBuilder.header("Cookie", cookies)
+                    }
+                } catch (_: Throwable) {}
+            }
+
+            httpClient.newCall(reqBuilder.build()).execute().use { response ->
+                if (!response.isSuccessful) {
+                    com.example.debug.AuraDebugManager.logWarning("Downloader", "HTTP ${response.code} al descargar: ${url.take(50)}...")
+                    return false
+                }
                 val body = response.body ?: return false
                 val totalBytes = body.contentLength()
 
                 body.byteStream().use { input ->
                     FileOutputStream(targetFile).use { output ->
-                        val buffer = ByteArray(16 * 1024)
+                        val buffer = ByteArray(32 * 1024)
                         var bytesRead: Int
                         var totalRead = 0L
                         var lastReportTime = System.currentTimeMillis()
@@ -526,8 +650,9 @@ object OnlineVideoAudioImporter {
                     }
                 }
             }
-            true
-        } catch (_: Exception) {
+            targetFile.exists() && targetFile.length() > 0L
+        } catch (e: Exception) {
+            com.example.debug.AuraDebugManager.logWarning("Downloader", "Fallo en descarga: ${e.message}")
             false
         }
     }

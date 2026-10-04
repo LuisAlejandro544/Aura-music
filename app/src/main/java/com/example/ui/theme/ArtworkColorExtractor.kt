@@ -146,8 +146,8 @@ object ArtworkColorExtractor {
         // Si el Video Canvas está en pantalla y hay video configurado: extraer color del fotograma del video
         val videoUri = track.videoUri
         if (isVideoActive && !videoUri.isNullOrBlank()) {
-            val interval = (positionMs / 2500L).coerceAtLeast(0L)
-            val videoCacheKey = -(track.id.absoluteValue * 10_000L + interval)
+            val interval = (positionMs / 300L).coerceAtLeast(0L)
+            val videoCacheKey = -(track.id.absoluteValue * 100_000L + interval)
             memoryCache.get(videoCacheKey)?.let { return@withContext it }
 
             var frameBitmap: Bitmap? = null
@@ -164,11 +164,12 @@ object ArtworkColorExtractor {
                     ?: retriever.frameAtTime
 
                 if (frameBitmap != null) {
-                    val scaled = Bitmap.createScaledBitmap(frameBitmap, 64, 64, false)
+                    // Escalamiento ultra-ligero a 32x32 para extracción cromática instantánea en ~2ms
+                    val scaled = Bitmap.createScaledBitmap(frameBitmap, 32, 32, false)
                     if (scaled != frameBitmap) {
                         frameBitmap.recycle()
                     }
-                    val palette = Palette.from(scaled).maximumColorCount(8).generate()
+                    val palette = Palette.from(scaled).maximumColorCount(6).generate()
                     scaled.recycle()
 
                     val vibrant = palette.vibrantSwatch

@@ -40,7 +40,9 @@ fun LazyListScope.appearanceSettingsTab(
     currentTheme: AuraTheme,
     onSelectTheme: (AuraTheme) -> Unit,
     isDynamicArtworkColorEnabled: Boolean,
-    onToggleDynamicArtworkColor: (Boolean) -> Unit
+    onToggleDynamicArtworkColor: (Boolean) -> Unit,
+    isMiniPlayerVideoEnabled: Boolean = true,
+    onToggleMiniPlayerVideo: (Boolean) -> Unit = {}
 ) {
     // Opción Avanzada: Aura Dinámica de Carátula
     item {
@@ -93,6 +95,64 @@ fun LazyListScope.appearanceSettingsTab(
                         checkedTrackColor = MaterialTheme.colorScheme.primary
                     ),
                     modifier = Modifier.testTag("dynamic_color_switch")
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+    }
+
+    // Opción: Video en Mini Reproductor
+    item {
+        Card(
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = SurfaceCard),
+            border = BorderStroke(1.dp, CardBorder),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("mini_player_video_card")
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(18.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.SmartDisplay,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Video en Mini Reproductor",
+                            style = MaterialTheme.typography.titleSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Reproduce el Video Canvas miniatura en el mini reproductor flotante cuando la canción tenga video.",
+                        style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Switch(
+                    checked = isMiniPlayerVideoEnabled,
+                    onCheckedChange = onToggleMiniPlayerVideo,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = MaterialTheme.colorScheme.secondary
+                    ),
+                    modifier = Modifier.testTag("mini_player_video_switch")
                 )
             }
         }

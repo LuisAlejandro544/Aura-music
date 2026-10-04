@@ -81,9 +81,19 @@
 
         <activity
             android:name=".debug.DebugMonitorActivity"
-            android:exported="false"
+            android:exported="true"
+            android:taskAffinity="com.example.debug.monitor"
+            android:launchMode="singleTask"
             android:label="@string/debug_monitor_app_name"
-            android:theme="@style/Theme.MyApplication" />
+            android:icon="@mipmap/ic_launcher"
+            android:roundIcon="@mipmap/ic_launcher_round"
+            android:theme="@style/Theme.MyApplication">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
 
         <service
             android:name=".playback.AuraMediaPlaybackService"

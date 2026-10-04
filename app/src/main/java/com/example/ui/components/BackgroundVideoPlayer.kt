@@ -57,9 +57,9 @@ fun BackgroundVideoPlayer(
     isVideoLoop: Boolean,
     isPlaying: Boolean,
     currentPositionMs: Long,
+    playbackSpeed: Float = 1.0f,
     modifier: Modifier = Modifier,
-    cornerRadius: androidx.compose.ui.unit.Dp = 24.dp,
-    showIndicator: Boolean = true
+    cornerRadius: androidx.compose.ui.unit.Dp = 24.dp
 ) {
     val context = LocalContext.current
 
@@ -75,11 +75,17 @@ fun BackgroundVideoPlayer(
                 MediaItem.fromUri(Uri.fromFile(File(videoUriString)))
             }
             setMediaItem(mediaItem)
+            setPlaybackSpeed(playbackSpeed)
             prepare()
             if (isPlaying) {
                 play()
             }
         }
+    }
+
+    // Sincronizar velocidad de reproducción en tiempo real con la velocidad de la música
+    LaunchedEffect(playbackSpeed) {
+        videoPlayer.setPlaybackSpeed(playbackSpeed)
     }
 
     // Gestionar play / pause según el estado del reproductor de música principal
@@ -145,38 +151,5 @@ fun BackgroundVideoPlayer(
                     )
                 )
         )
-
-        // Insignia descriptiva de modo Canvas o Video Sincronizado
-        if (showIndicator) {
-            Surface(
-                color = Color.Black.copy(alpha = 0.65f),
-                shape = RoundedCornerShape(8.dp),
-                border = androidx.compose.foundation.BorderStroke(0.8.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(12.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Icon(
-                        imageVector = if (isVideoLoop) Icons.Default.AllInclusive else Icons.Default.Sync,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(12.dp)
-                    )
-                    Text(
-                        text = if (isVideoLoop) "CANVAS LOOP" else "VIDEO SYNC",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 9.sp,
-                            color = Color.White
-                        )
-                    )
-                }
-            }
-        }
     }
 }

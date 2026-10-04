@@ -93,10 +93,10 @@ AuraMusic/
 │   │   │   │   │   │   │   ├── TransitionsTabContent.kt       # Repetidor A-B con ajuste fino, Crossfade 0-12s y Gapless
 │   │   │   │   │   │   │   └── BalanceAndHeadphonesTabContent.kt# Balance L/R y Crossfeed C++20 rápido
 │   │   │   │   │   │   ├── AudioVisualizer.kt  # Visualizador de ondas en tiempo real con degradado dinámico
-│   │   │   │   │   │   ├── BackgroundVideoPlayer.kt # Renderizador de video de fondo (Loops Canvas y Video Sync)
+│   │   │   │   │   │   ├── BackgroundVideoPlayer.kt # Renderizador de video de fondo sincronizado con velocidad de audio y 100% despejado
 │   │   │   │   │   │   ├── BottomNavBar.kt     # Barra de navegación limpia (4 pestañas)
 │   │   │   │   │   │   ├── EditTrackDialog.kt  # Modal con Photo Picker y edición de carátula/video
-│   │   │   │   │   │   ├── MiniPlayer.kt       # Mini reproductor tintado con marquesina y controles Anterior/Play/Siguiente
+│   │   │   │   │   │   ├── MiniPlayer.kt       # Mini reproductor tintado con marquesina, controles y soporte de Video Canvas miniatura
 │   │   │   │   │   │   ├── ProceduralArtwork.kt # Arte vectorial dinámico en tiempo real
 │   │   │   │   │   │   ├── TrackListItem.kt    # Fila de canción con marquesina en pista activa y menú contextual
 │   │   │   │   │   │   ├── VideoToMusicDialog.kt # Diálogo de conversión Video a Música con interruptor de recorte de silencios

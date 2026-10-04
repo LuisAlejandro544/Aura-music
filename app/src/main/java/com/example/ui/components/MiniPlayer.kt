@@ -28,10 +28,11 @@ import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 
 /**
- * Mini reproductor flotante inspirado en Spotify con fondo dinámico tintado.
+ * Mini reproductor flotante Aura Sound con arquitectura Dark Luxury Neo-Glass y fondo dinámico tintado.
  *
  * Características:
- * - Fondo completamente tintado y degradado con los colores extraídos de la carátula/video actual.
+ * - Soporte para carátula estática o Video Canvas miniatura configurable por el usuario.
+ * - Fondo completamente tintado y degradado con los colores extraídos de la pista/video actual.
  * - Desplazamiento horizontal automático (Marquee) para títulos y artistas largos en reproducción.
  * - Barra de progreso, botón de reproducción y acentos sincronizados con la paleta activa.
  * - Controles ergonómicos estándar: Anterior (⏮️), Play/Pausa (⏯️) y Siguiente (⏭️).
@@ -50,6 +51,8 @@ fun MiniPlayer(
     onClick: () -> Unit,
     dynamicPrimary: Color = MaterialTheme.colorScheme.primary,
     dynamicSecondary: Color = MaterialTheme.colorScheme.secondary,
+    isMiniPlayerVideoEnabled: Boolean = true,
+    playbackSpeed: Float = 1.0f,
     modifier: Modifier = Modifier
 ) {
     if (currentTrack == null) return
@@ -74,6 +77,9 @@ fun MiniPlayer(
         )
     )
 
+    val hasVideo = !currentTrack.videoUri.isNullOrEmpty()
+    val showVideoThumb = isMiniPlayerVideoEnabled && hasVideo
+
     Surface(
         modifier = modifier
             .fillMaxWidth()
@@ -97,12 +103,31 @@ fun MiniPlayer(
                     .padding(horizontal = 10.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Mini Carátula
-                ArtworkImage(
-                    track = currentTrack,
-                    modifier = Modifier.size(46.dp),
-                    cornerRadius = 10.dp
-                )
+                // Mini Carátula o Video Canvas Miniatura según preferencia del usuario
+                Box(
+                    modifier = Modifier
+                        .size(46.dp)
+                        .clip(RoundedCornerShape(10.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (showVideoThumb && currentTrack.videoUri != null) {
+                        BackgroundVideoPlayer(
+                            videoUriString = currentTrack.videoUri,
+                            isVideoLoop = currentTrack.isVideoLoop,
+                            isPlaying = isPlaying,
+                            currentPositionMs = currentPositionMs,
+                            playbackSpeed = playbackSpeed,
+                            modifier = Modifier.fillMaxSize(),
+                            cornerRadius = 10.dp
+                        )
+                    } else {
+                        ArtworkImage(
+                            track = currentTrack,
+                            modifier = Modifier.fillMaxSize(),
+                            cornerRadius = 10.dp
+                        )
+                    }
+                }
 
                 Spacer(modifier = Modifier.width(12.dp))
 

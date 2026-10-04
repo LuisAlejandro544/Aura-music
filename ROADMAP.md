@@ -7,7 +7,7 @@ Este documento traza las fases de evolución técnica y funcional para convertir
 ## 📌 Fase 1: Arquitectura Base y Motor Media3 (Completada ✅)
 
 - [x] Interfaz de usuario completa con Jetpack Compose y Material Design 3.
-- [x] Diseño estilo Spotify modernizado con 4 paletas de colores vibrantes y acentos de neón.
+- [x] Diseño estético Dark Luxury Neo-Glass con 5 paletas de colores vibrantes y acentos de neón.
 - [x] Motor de reproducción con **Jetpack Media3 (ExoPlayer)**.
 - [x] Persistencia local reactiva con **Room Database**.
 - [x] Importación selectiva basada en Storage Access Framework (SAF) respetando la privacidad.
@@ -193,6 +193,12 @@ Este documento traza las fases de evolución técnica y funcional para convertir
   - Monitoreo en vivo de RAM segmentada: Java Heap (VM), Native Heap (C++20 DSP y CMake), Gráficos/Shaders (Compose y WebP) y PSS Total.
   - Telemetría de CPU del proceso (%), núcleos activos, FPS de UI y estado térmico del procesador.
   - Inspector de hilos en vivo (`Thread.getAllStackTraces()`) con clasificación por categorías (Audio, C++ DSP, UI, Corrutinas), estado (`RUNNABLE`, `TIMED_WAITING`), trazas de pila completas y copia al portapapeles.
+- [x] **Video Canvas 100% Despejado, Sincronización de Velocidad y Armonización Cromática Instantánea**:
+  - Eliminación definitiva del badge o indicador "VIDEO SYNC" / "LOOP CANVAS" sobre la carátula para una visualización sin obstrucciones.
+  - Muestreo dinámico de fotogramas del video acelerado a intervalos de 300ms y animación ágil `tween(220)` para adaptación cromática en tiempo real sin delay.
+  - Soporte de Video Canvas miniatura en el Mini Reproductor flotante configurable por el usuario desde Ajustes.
+  - Sincronización milimétrica de velocidad de reproducción (0.50x a 2.00x) entre la música y el video de fondo.
+  - Erradicación de la fuga de memoria en `AuraMediaPlaybackService` (`ResourcesImpl.mAppContext`) detectada por LeakCanary.
 
 ---
 

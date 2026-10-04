@@ -164,6 +164,9 @@ object HeadlessWebViewExtractor {
                                                 var ogImg = document.querySelector('meta[property="og:image"]');
                                                 if (ogImg && ogImg.content) coverUrl = ogImg.content;
                                             }
+                                            if (coverUrl && coverUrl.indexOf('//') === 0) {
+                                                coverUrl = 'https:' + coverUrl;
+                                            }
 
                                             for (var i = 0; i < formats.length; i++) {
                                                 var f = formats[i];
@@ -225,14 +228,20 @@ object HeadlessWebViewExtractor {
                                         val aUrl = obj.optString("audioUrl", "")
                                         if (aUrl.isNotBlank()) {
                                             streamExtracted = true
+                                            val rawCover = obj.optString("coverUrl")
+                                            val safeCover = when {
+                                                rawCover.startsWith("//") -> "https:$rawCover"
+                                                rawCover.startsWith("http://") -> "https://" + rawCover.removePrefix("http://")
+                                                rawCover.startsWith("https://") -> rawCover
+                                                else -> "https://i.ytimg.com/vi/$videoId/hqdefault.jpg"
+                                            }
                                             val info = OnlineVideoAudioImporter.ResolvedMediaInfo(
                                                 originalUrl = originalUrl,
                                                 suggestedTitle = obj.optString("title", "Audio de YouTube"),
                                                 suggestedArtist = obj.optString("author", "Música Web"),
                                                 videoUrl = obj.optString("videoUrl", aUrl),
                                                 audioUrl = aUrl,
-                                                coverUrl = obj.optString("coverUrl").takeIf { it.isNotBlank() }
-                                                    ?: "https://img.youtube.com/vi/$videoId/hqdefault.jpg",
+                                                coverUrl = safeCover,
                                                 durationSeconds = obj.optLong("duration", 0L)
                                             )
                                             cleanup()

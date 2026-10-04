@@ -72,7 +72,7 @@ Este documento define el protocolo de trabajo para los agentes de software y des
 - [x] ¿El temporizador de apagado personalizable con atenuación de 10s (fade-out) funciona correctamente?
 - [x] ¿La modulación de velocidad (0.5x-2.0x) y tono musical cuenta con protección contra pausas accidentales?
 - [x] ¿Se eliminó el fondo negro residual y el parpadeo al cerrar o minimizar la pantalla de reproducción?
-- [x] ¿Aura Monitor está integrado y accesible directamente desde los ajustes de la aplicación (y MainActivity es la única actividad LAUNCHER para que el reproductor principal abra siempre)?
+- [x] ¿Aura Monitor está integrado como aplicación independiente con su propio icono en el cajón de aplicaciones (con taskAffinity propio y launchMode singleTask) y accesible también desde los ajustes?
 - [x] ¿LeakCanary está añadido y funcional en dependencias de depuración?
 - [x] ¿El almacenamiento estructurado (`images/`, `songs/`, `lyrics/`, `metadata/`) está activo?
 - [x] ¿Las carátulas se procesan como WebP sin pérdida en segundo plano y las faltantes se generan proceduralmente?

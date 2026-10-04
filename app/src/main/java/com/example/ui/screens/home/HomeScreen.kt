@@ -38,7 +38,7 @@ import com.example.ui.theme.TextSecondary
 import java.util.Calendar
 
 /**
- * Pantalla de Inicio inspirada en la experiencia de Spotify pero con colores vibrantes,
+ * Pantalla de Inicio Aura Sound con estética Dark Luxury OLED, acentos vibrantes de neón,
  * saludo dinámico según la hora del día, accesos rápidos de cuadrícula y colecciones recientes.
  */
 @Composable

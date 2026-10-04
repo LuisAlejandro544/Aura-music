@@ -343,6 +343,23 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val _isDynamicArtworkColorEnabled = MutableStateFlow(true)
     val isDynamicArtworkColorEnabled: StateFlow<Boolean> = _isDynamicArtworkColorEnabled.asStateFlow()
 
+    // Configuración para permitir reproducir el Video Canvas también en la miniatura del Mini Reproductor
+    private val appPrefs = getApplication<Application>().getSharedPreferences("aura_music_ui_prefs", android.content.Context.MODE_PRIVATE)
+
+    private val _isMiniPlayerVideoEnabled = MutableStateFlow(
+        appPrefs.getBoolean("pref_mini_player_video_enabled", true)
+    )
+    val isMiniPlayerVideoEnabled: StateFlow<Boolean> = _isMiniPlayerVideoEnabled.asStateFlow()
+
+    fun setMiniPlayerVideoEnabled(enabled: Boolean) {
+        _isMiniPlayerVideoEnabled.value = enabled
+        appPrefs.edit().putBoolean("pref_mini_player_video_enabled", enabled).apply()
+    }
+
+    fun toggleMiniPlayerVideoEnabled() {
+        setMiniPlayerVideoEnabled(!_isMiniPlayerVideoEnabled.value)
+    }
+
     fun setVideoDisplayMode(mode: VideoDisplayMode) {
         _videoDisplayMode.value = mode
         _isVideoCanvasActive.value = (mode != VideoDisplayMode.OFF)

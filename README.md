@@ -1,6 +1,6 @@
 # Aura Music 🎵
 
-**Aura Music** es un reproductor de música local de alta fidelidad para Android, diseñado con una estética moderna e inmersiva inspirada en Spotify, pero enriquecida con colores vibrantes, gradientes de neón, fondos oscuros OLED 100% opacos y procesamiento de audio avanzado.
+**Aura Music** es un reproductor de música local de alta fidelidad para Android, diseñado con una estética original Dark Luxury Neo-Glass, enriquecida con colores vibrantes, gradientes de neón, fondos oscuros OLED 100% opacos, Video Canvas audiovisual dinámico y procesamiento de audio profesional avanzado.
 
 Está construido con las tecnologías más modernas del ecosistema Android: **Jetpack Compose (Material 3)**, **Jetpack Media3 (ExoPlayer)**, **Room Persistence**, **Coroutines / StateFlow**, un **motor DSP nativo compilado en ISO C++20 con CMake**, almacenamiento estructurado de datos y una suite de diagnóstico autónoma (**Aura Monitor**).
 
@@ -9,7 +9,7 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
 ## 🌟 Características Principales
 
 ### 1. Interfaz Visual, Temas y Animaciones Fluidas
-- **Estética Dark Luxury OLED**: Superficies 100% opacas de alto contraste sin transparencias indeseadas ni filtraciones de fondo.
+- **Estética Dark Luxury Neo-Glass OLED**: Superficies 100% opacas de alto contraste sin transparencias indeseadas ni filtraciones de fondo, con halos luminosos reactivos al compás de la música.
 - **Transiciones y Animaciones del Sistema**:
   - Cambio entre pantallas con animación combinada de desvanecimiento y deslizamiento suave (`AnimatedContent`).
   - Despliegue elástico de la pantalla completa Now Playing desde el mini reproductor y **cierre suave con deslizamiento vertical instantáneo sin capas negras residuales**.
@@ -23,14 +23,15 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
 - **Protección Tipográfica Fija y Marquesina Automática (Cero Desbordamientos)**:
   - Escala de densidad y fuente estabilizada (`fontScale = 1.0f`) para que las configuraciones globales de tamaño de letra en Android no rompan la maquetación ni corten textos.
   - **Títulos en Movimiento (Marquee Fluido)**: Los títulos y artistas largos se desplazan horizontalmente de forma continua (`basicMarquee`) en la pantalla completa *Now Playing*, en el *Mini Reproductor* y en la canción en reproducción dentro de las listas y la cola.
-- **Mini Reproductor Flotante**:
+- **Mini Reproductor Flotante con Video Canvas Miniatura**:
   - Barra persistente con barra de progreso, controles táctiles y títulos animados en marquesina.
+  - **Soporte de Video Canvas en Miniatura**: El usuario puede configurar en Ajustes si desea visualizar el video en movimiento también en la carátula pequeña del mini reproductor.
   - **Acceso Directo al Ecualizador C++20 integrado** mediante hoja modal inferior sin abandonar la vista actual.
 - **Pantalla Completa Now Playing**:
   - Cabecera superior minimalista y despejada (sin textos redundantes que ocupen espacio).
   - Visualizador de ondas animado en tiempo real.
   - Deslizador de búsqueda interactivo con formato de tiempo `mm:ss` y **barra compacta del Repetidor de Segmento A-B**.
-  - Hoja de especificaciones de audio y modal para **editar metadatos y carátula**.
+  - Hoja de especificaciones de audio y modal para **editar metadatos, carátula y video**.
 
 ### 2. Ecualizador C++20 Integrado en Modal (Sin Apartados Aislados)
 - **10 Bandas Paramétricas ISO con Nombres Intuitivos**:
@@ -81,23 +82,26 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
   - Fundido de salida progresivo al acercarse al final de la pista y rampa de entrada suave (*fade-in*) calibrada al iniciar la siguiente canción, subiendo poco a poco hasta restaurar el 100% del volumen original sin quedarse atrapado en volumen bajo.
   - Modo Gapless para reproducción continua sin silencios intermedios.
 
-### 4. Video Canvas Multifuncional y Reacción por Intensidad Ligada a C++20 DSP 🎬⚡
+### 4. Video Canvas Multifuncional, Sincronización de Velocidad y Reacción Cromática Instantánea 🎬⚡
 - **Respiración y Pulsación Acústica Ligada a C++20 DSP**:
   - Medición RMS y envolvente espectral continua en tiempo real calculada dentro del motor nativo en C++20 (`getAudioIntensity()` y `getVisualizerBands()`).
-  - Carátula central y Video Canvas con diseño limpio y 100% despejado (sin cápsulas que obstruyan el arte) y visualización estática fija sin movimientos o distorsiones para máxima nitidez.
-  - Halo lumínico ambiental superior y visualizador de 28 bandas con degradado vertical fluido (primario superior a secundario inferior) modulando brillo y color en tiempo real según el Video Canvas.
-- **Armonización Cromática Dinámica en Video Canvas (Cada 2.5s)**:
-  - Muestreo periódico de fotogramas del video en reproducción en intervalos de 2.5 segundos con fundido suave (`tween(1200)`), adaptando la atmósfera visual al compás de los cambios de escena del video.
-- **Mini Reproductor Tintado Dinámicamente con Botón de Canción Anterior**:
-  - Superficie con fondo tintado y degradado armónico extraído de la carátula o fotograma del video activo, manteniendo coherencia estética en toda la app.
-  - Botonera ergonómica estándar: **Canción Anterior** (⏮️), **Play/Pausa** (⏯️) y **Siguiente** (⏭️), permitiendo regresar a la pista previa sin abrir Now Playing.
+  - **Carátula Central y Video Canvas 100% Despejados (Cero Insignias Invasivas)**: Se eliminó cualquier cápsula o indicador superpuesto ("VIDEO SYNC" / "LOOP CANVAS") para una apreciación visual prístina, gestionándose todo mediante el botón selector de la barra superior.
+  - Halo lumínico ambiental superior y visualizador de 28 bandas con degradado vertical fluido modulando brillo y color en tiempo real según el Video Canvas.
+- **Armonización Cromática Instantánea en Video Canvas**:
+  - Muestreo dinámico continuo de alta frecuencia (cada ~300ms) de fotogramas del video con decodificación ultra-ligera en memoria y transición ágil (`tween(220)`), eliminando el retraso previo y sincronizando la atmósfera lumínica de forma inmediata con los cambios de escena del video.
+- **Sincronización Total de Velocidad de Video y Música (0.50x a 2.00x)**:
+  - Al modular la velocidad de la música o cambiar de presets rápidos, el reproductor de Video Canvas adapta en tiempo real su velocidad de reproducción para marchar al unísono exacto con el tempo musical.
+- **Mini Reproductor Tintado Dinámicamente con Soporte de Video Canvas**:
+  - Superficie con fondo tintado y degradado armónico extraído de la pista o fotograma activo.
+  - **Soporte de Video Canvas en Miniatura**: Configurable por el usuario para alternar entre carátula estática y reproducción de Video Canvas en la miniatura de 46dp.
+  - Botonera ergonómica estándar: **Canción Anterior** (⏮️), **Play/Pausa** (⏯️) y **Siguiente** (⏭️).
 - **Colas de Reproducción Contextuales Fieles**:
   - Al reproducir desde una Playlist, Álbum o Artista, la cola activa (`queue`) se adapta estrictamente a las pistas de esa lista, permitiendo navegar ordenadamente dentro de ese contenido.
 - **Atajos Inferiores Espaciosos y Equilibrados**:
   - Botonera inferior de Now Playing distribuida uniformemente en 3 módulos compactos (`EQ FX`, `Letras`/`Carátula` y `Cola`), con área táctil superior a 48dp y texto protegido sin desbordamientos ni saltos verticales.
 - **3 Modos de Visualización Seleccionables por el Usuario**:
   - 🌌 **Fondo Completo (Full Background)**: El video se reproduce ocupando todo el fondo de pantalla de Now Playing detrás de la interfaz gráfica con un velo oscuro/gradiente para máxima legibilidad, mientras la carátula flota al frente con su aura lumínica y sombra.
-  - 🔲 **Lienzo en Carátula (Card Canvas)**: El video se reproduce dentro del marco central de la carátula (relación de aspecto 1:1 estilo Spotify Canvas).
+  - 🔲 **Lienzo en Carátula (Card Canvas)**: El video se reproduce dentro del marco central de la carátula (relación de aspecto 1:1 estilo marco cinemático).
   - 🖼️ **Solo Carátula**: Muestra únicamente la carátula estática o procedural sin video.
 - **Detección Automática y Forzado Manual**:
   - **Loop Canvas (≤ 10s - 20s)**: Bucle infinito continuo silenciado.
@@ -204,7 +208,7 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
 
 ### 13. Suite de Diagnóstico Autónoma: Aura Monitor 🛠️ & LeakCanary
 - **Aura Monitor (App Debug Propia con Navegación Modular por Pestañas)**:
-  - Accesible directamente desde **Ajustes > Arquitectura y Privacidad > Abrir Aura Monitor**, manteniendo `MainActivity` como la única actividad `LAUNCHER` principal del reproductor.
+  - Cuenta con su propio icono independiente en el cajón de aplicaciones del teléfono móvil (tarea aislada con `taskAffinity` y `singleTask`) y también es accesible desde **Ajustes > Arquitectura y Privacidad > Abrir Aura Monitor**.
   - 📋 **Pestaña 1: Incidentes & Logs**:
     - Atrapa y registra automáticamente **Crashes** no controlados mediante `UncaughtExceptionHandler`, **Errores Críticos**, **Warnings de Memoria** y eventos de Media3 / JNI.
     - Registra datos técnicos del teléfono móvil: Modelo, Fabricante, Versión de Android / SDK API, CPU ABI (64-bit / 32-bit), memoria RAM libre/total y espacio de disco disponible.
@@ -213,7 +217,9 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
     - **Desglose de Memoria RAM Segmentado**: Visualización gráfica y numérica en vivo de PSS Total, Java Heap (VM), Native Heap (C++20 DSP y CMake), Gráficos/Shaders (Compose y Coil WebP) y Código compilado (.dex y binarios nativos .so).
     - **Telemetría de Procesador**: Carga de CPU del proceso en tiempo real (%), número de núcleos activos, estado térmico del hardware (Throttling) y tasa estimada de FPS.
     - **Inspector Quirúrgico de Hilos (Thread Profiler)**: Enumeración en vivo de todos los hilos del proceso (`main`, `ExoPlayer:Playback`, `DefaultDispatcher-worker`, `AudioTrack`, `RenderThread`, etc.) con clasificación por categoría, estado coloreado (`RUNNABLE`, `TIMED_WAITING`, `BLOCKED`), búsqueda instantánea, traza de pila completa expandible y copia rápida al portapapeles.
-- **LeakCanary**: Integrado en el entorno de desarrollo para auditoría y detección en tiempo real de fugas de memoria en la JVM.
+- **LeakCanary & Blindaje contra Fugas de Memoria**:
+  - Integrado en el entorno de depuración para auditoría y detección en tiempo real de fugas de memoria en la JVM.
+  - **Fuga de `ResourcesImpl.mAppContext` en `AuraMediaPlaybackService` Erradicada**: Corrección de la retención del servicio de reproducción multimedia mediante el uso exclusivo de `applicationContext` en constructores de proveedores de notificación y neutralización por reflexión del campo estático del framework de Android al destruirse el servicio.
 
 ---
 

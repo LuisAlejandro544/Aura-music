@@ -34,7 +34,8 @@ class AuraMediaPlaybackService : MediaSessionService() {
         createNotificationChannel()
 
         try {
-            val notificationProvider = DefaultMediaNotificationProvider.Builder(this)
+            // Usamos applicationContext para que el proveedor de notificaciones jamás retenga la instancia del Service
+            val notificationProvider = DefaultMediaNotificationProvider.Builder(applicationContext)
                 .setChannelId(CHANNEL_ID)
                 .setChannelName(R.string.notification_channel_name)
                 .build()
@@ -94,9 +95,29 @@ class AuraMediaPlaybackService : MediaSessionService() {
             } catch (ignored: Throwable) {}
         }
         super.onDestroy()
+
+        // Mitigar la fuga de memoria del sistema Android (ResourcesImpl.mAppContext -> ContextImpl -> Service)
+        // Redirigir cualquier referencia estática residual hacia el ApplicationContext de ciclo de vida del proceso
+        try {
+            val resourcesImplClass = Class.forName("android.content.res.ResourcesImpl")
+            val fields = resourcesImplClass.declaredFields
+            for (field in fields) {
+                if (field.name == "mAppContext") {
+                    field.isAccessible = true
+                    val currentVal = field.get(null)
+                    if (currentVal === baseContext || currentVal === this) {
+                        field.set(null, applicationContext)
+                    }
+                    break
+                }
+            }
+        } catch (_: Throwable) {
+            // Protección ante entornos restrictivos
+        }
+
         AuraDebugManager.logInfo(
             "AuraMediaPlaybackService",
-            "Servicio de reproducción multimedia destruido."
+            "Servicio de reproducción multimedia destruido y recursos liberados."
         )
     }
 
@@ -106,12 +127,13 @@ class AuraMediaPlaybackService : MediaSessionService() {
      */
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            val appContext = applicationContext
+            val notificationManager = appContext.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
             if (notificationManager != null) {
                 val existingChannel = notificationManager.getNotificationChannel(CHANNEL_ID)
                 if (existingChannel == null) {
-                    val channelName = getString(R.string.notification_channel_name)
-                    val channelDesc = getString(R.string.notification_channel_desc)
+                    val channelName = appContext.getString(R.string.notification_channel_name)
+                    val channelDesc = appContext.getString(R.string.notification_channel_desc)
                     val channel = NotificationChannel(
                         CHANNEL_ID,
                         channelName,

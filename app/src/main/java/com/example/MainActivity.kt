@@ -177,6 +177,7 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
     val videoDisplayMode by viewModel.videoDisplayMode.collectAsStateWithLifecycle()
     val isVideoCanvasActive by viewModel.isVideoCanvasActive.collectAsStateWithLifecycle()
     val isDynamicArtworkColorEnabled by viewModel.isDynamicArtworkColorEnabled.collectAsStateWithLifecycle()
+    val isMiniPlayerVideoEnabled by viewModel.isMiniPlayerVideoEnabled.collectAsStateWithLifecycle()
     val headphoneConfig by viewModel.headphoneConfig.collectAsStateWithLifecycle()
     val visualizerBands by viewModel.visualizerBands.collectAsStateWithLifecycle()
     val audioIntensity by viewModel.audioIntensity.collectAsStateWithLifecycle()
@@ -279,7 +280,9 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                             onSkipPrevious = { viewModel.playPrevious() },
                             onClick = { viewModel.setNowPlayingExpanded(true) },
                             dynamicPrimary = animatedMiniPrimary,
-                            dynamicSecondary = animatedMiniSecondary
+                            dynamicSecondary = animatedMiniSecondary,
+                            isMiniPlayerVideoEnabled = isMiniPlayerVideoEnabled,
+                            playbackSpeed = playbackSpeed
                         )
                     }
 
@@ -432,6 +435,8 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                             onSelectTheme = { viewModel.setTheme(it) },
                             isDynamicArtworkColorEnabled = isDynamicArtworkColorEnabled,
                             onToggleDynamicArtworkColor = { viewModel.toggleDynamicArtworkColor(it) },
+                            isMiniPlayerVideoEnabled = isMiniPlayerVideoEnabled,
+                            onToggleMiniPlayerVideo = { viewModel.setMiniPlayerVideoEnabled(it) },
                             headphoneConfig = headphoneConfig,
                             onUpdateHeadphoneConfig = { viewModel.updateHeadphoneConfig(it) },
                             onSetCrossfeedEnabled = { viewModel.setCrossfeedEnabled(it) },

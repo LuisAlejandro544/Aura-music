@@ -29,6 +29,7 @@ fun NowPlayingArtworkCard(
     videoDisplayMode: VideoDisplayMode,
     animatedPrimary: Color,
     animatedSecondary: Color,
+    playbackSpeed: Float = 1.0f,
     onCycleVideoDisplayMode: () -> Unit = {},
     audioIntensity: Float = 0.15f,
     onOpenVideoMode: (() -> Unit)? = null,
@@ -55,6 +56,7 @@ fun NowPlayingArtworkCard(
                 isVideoLoop = currentTrack.isVideoLoop,
                 isPlaying = isPlaying,
                 currentPositionMs = currentPositionMs,
+                playbackSpeed = playbackSpeed,
                 modifier = Modifier.fillMaxSize(),
                 cornerRadius = 26.dp
             )

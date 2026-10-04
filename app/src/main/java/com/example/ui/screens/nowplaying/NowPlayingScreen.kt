@@ -185,9 +185,9 @@ fun NowPlayingScreen(
         )
     }
 
-    // Muestreo dinámico continuo de fotogramas del Video Canvas cada 2.5 segundos según la posición de reproducción
+    // Muestreo dinámico continuo de fotogramas del Video Canvas en tiempo casi real según la posición de reproducción
     if (isVideoVisual && isPlaying && isDynamicArtworkColorEnabled) {
-        val intervalStep = (currentPositionMs / 2500L).coerceAtLeast(0L)
+        val intervalStep = (currentPositionMs / 300L).coerceAtLeast(0L)
         LaunchedEffect(currentTrack.id, intervalStep) {
             activeColors = ArtworkColorExtractor.extractPlaybackColors(
                 context = context,
@@ -203,17 +203,17 @@ fun NowPlayingScreen(
 
     val animatedPrimary by animateColorAsState(
         targetValue = activeColors.primary,
-        animationSpec = tween(1200),
+        animationSpec = tween(220),
         label = "PrimaryAuraColor"
     )
     val animatedSecondary by animateColorAsState(
         targetValue = activeColors.secondary,
-        animationSpec = tween(1200),
+        animationSpec = tween(220),
         label = "SecondaryAuraColor"
     )
     val animatedTopGlow by animateColorAsState(
         targetValue = activeColors.ambientTopGlow,
-        animationSpec = tween(1200),
+        animationSpec = tween(220),
         label = "TopAuraGlow"
     )
 
@@ -252,9 +252,9 @@ fun NowPlayingScreen(
                 isVideoLoop = currentTrack.isVideoLoop,
                 isPlaying = isPlaying,
                 currentPositionMs = currentPositionMs,
+                playbackSpeed = playbackSpeed,
                 modifier = Modifier.fillMaxSize(),
-                cornerRadius = 0.dp,
-                showIndicator = false
+                cornerRadius = 0.dp
             )
 
             // Velo oscuro y gradiente cinematográfico para máximo contraste y legibilidad
@@ -342,6 +342,7 @@ fun NowPlayingScreen(
                     videoDisplayMode = videoDisplayMode,
                     animatedPrimary = animatedPrimary,
                     animatedSecondary = animatedSecondary,
+                    playbackSpeed = playbackSpeed,
                     onCycleVideoDisplayMode = onCycleVideoDisplayMode,
                     audioIntensity = audioIntensity,
                     onOpenVideoMode = { showVideoModeDialog = true }

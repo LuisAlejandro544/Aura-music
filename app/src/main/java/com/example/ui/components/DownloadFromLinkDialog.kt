@@ -483,6 +483,15 @@ fun DownloadFromLinkDialog(
                 } else {
                     // Vista previa del contenido resuelto
                     val currentInfo = resolvedInfo!!
+                    val ytId = WebStreamExtractor.extractVideoId(currentInfo.originalUrl)
+                    val previewCoverUrl = when {
+                        !currentInfo.coverUrl.isNullOrBlank() -> {
+                            val raw = currentInfo.coverUrl
+                            if (raw.startsWith("//")) "https:$raw" else raw
+                        }
+                        ytId != null -> "https://i.ytimg.com/vi/$ytId/hqdefault.jpg"
+                        else -> null
+                    }
 
                     Card(
                         shape = RoundedCornerShape(16.dp),
@@ -495,10 +504,10 @@ fun DownloadFromLinkDialog(
                                 .padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            if (!currentInfo.coverUrl.isNullOrBlank()) {
+                            if (!previewCoverUrl.isNullOrBlank()) {
                                 AsyncImage(
-                                    model = currentInfo.coverUrl,
-                                    contentDescription = "Carátula de TikTok",
+                                    model = previewCoverUrl,
+                                    contentDescription = "Carátula",
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier
                                         .size(56.dp)
