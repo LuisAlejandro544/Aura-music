@@ -80,7 +80,7 @@ object AudioMetadataParser {
         }
 
 
-    private fun getFileName(context: Context, uri: Uri): String? {
+    fun getFileName(context: Context, uri: Uri): String? {
         if (uri.scheme == "content") {
             try {
                 context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
@@ -92,6 +92,11 @@ object AudioMetadataParser {
             } catch (ignored: Exception) {}
         }
         return uri.lastPathSegment
+    }
+
+    fun getFileExtension(context: Context, uri: Uri): String? {
+        val name = getFileName(context, uri) ?: return null
+        return if (name.contains(".")) name.substringAfterLast(".").lowercase() else null
     }
 
     private fun getFileSizeFormatted(context: Context, uri: Uri): String {

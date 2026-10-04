@@ -100,4 +100,5 @@ Este documento define el protocolo de trabajo para los agentes de software y des
 - [x] ¿La escala tipográfica está fijada a un valor cómodo (fontScale = 1.0f) para evitar que los ajustes de texto del sistema desborden la interfaz?
 - [x] ¿La reproducción continua automática al finalizar una pista pasa fluidamente a la siguiente canción de la biblioteca sin detenerse?
 - [x] ¿El fundido de transición (fade-out) y entrada progresiva (fade-in) restauran suavemente el volumen original sin quedarse atrapados en volumen bajo?
+- [x] ¿La recepción inteligente 'Abrir con...' y 'Compartir con...' (puente para SnapTube, gestores de descarga, mensajería y navegadores) discrimina con precisión entre audio, video y enlaces web, copiando a 'songs/' y reproduciendo al instante?
 - [x] ¿Los 5 archivos Markdown (`README.md`, `ROADMAP.md`, `STRUCTURE.md`, `AI_CONTEXT.md`, `AGENTS.md`) están actualizados y en español?

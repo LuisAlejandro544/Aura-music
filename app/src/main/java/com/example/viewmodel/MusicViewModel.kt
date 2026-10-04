@@ -1,9 +1,12 @@
 package com.example.viewmodel
 
 import android.app.Application
+import android.content.Intent
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.data.importer.IncomingMedia
+import com.example.data.importer.IncomingMediaHandler
 import com.example.data.local.AppDatabase
 import com.example.data.repository.MusicRepository
 import com.example.model.*
@@ -142,6 +145,13 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     // Estado reactivo de Letras Sincronizadas (.LRC)
     private val _lyricsState = MutableStateFlow(LyricsState())
     val lyricsState: StateFlow<LyricsState> = _lyricsState.asStateFlow()
+
+    // Gestión de medios externos entrantes ("Abrir con...", "Compartir con...", SnapTube, etc.)
+    private val _pendingIncomingVideoUri = MutableStateFlow<Uri?>(null)
+    val pendingIncomingVideoUri: StateFlow<Uri?> = _pendingIncomingVideoUri.asStateFlow()
+
+    private val _pendingIncomingWebLink = MutableStateFlow<String?>(null)
+    val pendingIncomingWebLink: StateFlow<String?> = _pendingIncomingWebLink.asStateFlow()
 
     init {
         // Al iniciar por primera vez, si la biblioteca está vacía, no forzamos escaneo global,
@@ -758,6 +768,81 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.IO) {
             val state = com.example.data.importer.LyricsManager.saveLyrics(target, storageManager, content)
             _lyricsState.value = state
+        }
+    }
+
+    /**
+     * Procesa un [Intent] externo entrante de tipo "Abrir con..." o "Compartir con...".
+     * Detecta inteligentemente si se trata de un archivo de audio, un video o un enlace web.
+     */
+    fun onIncomingIntent(intent: Intent?) {
+        if (intent == null) return
+        val incoming = IncomingMediaHandler.parseIntent(getApplication(), intent) ?: return
+        when (incoming) {
+            is IncomingMedia.Audio -> {
+                handleIncomingAudioUri(incoming.uri)
+            }
+            is IncomingMedia.MultipleAudios -> {
+                handleIncomingMultipleAudioUris(incoming.uris)
+            }
+            is IncomingMedia.Video -> {
+                _pendingIncomingVideoUri.value = incoming.uri
+            }
+            is IncomingMedia.WebLink -> {
+                _pendingIncomingWebLink.value = incoming.url
+            }
+        }
+    }
+
+    fun clearPendingIncomingVideo() {
+        _pendingIncomingVideoUri.value = null
+    }
+
+    fun clearPendingIncomingWebLink() {
+        _pendingIncomingWebLink.value = null
+    }
+
+    /**
+     * Procesa y reproduce inmediatamente un archivo de audio recibido desde una app externa.
+     * Persiste la canción en la biblioteca estructurada `songs/` y en Room.
+     */
+    fun handleIncomingAudioUri(uri: Uri) {
+        viewModelScope.launch {
+            _isImporting.value = true
+            _importStatusMessage.value = "Cargando audio externo..."
+            val track = repository.importSingleAudioFromExternalUri(getApplication(), uri)
+            _isImporting.value = false
+            if (track != null) {
+                _importStatusMessage.value = "Reproduciendo: \"${track.title}\""
+                playTrack(track, listOf(track))
+                _isNowPlayingExpanded.value = true
+                fetchOnlineLyrics()
+            } else {
+                _importStatusMessage.value = "No se pudo leer el archivo de audio recibido."
+            }
+        }
+    }
+
+    /**
+     * Procesa e importa un lote de archivos de audio compartidos a la vez.
+     */
+    fun handleIncomingMultipleAudioUris(uris: List<Uri>) {
+        if (uris.isEmpty()) return
+        viewModelScope.launch {
+            _isImporting.value = true
+            _importStatusMessage.value = "Importando ${uris.size} canciones recibidas..."
+            val importedList = mutableListOf<Track>()
+            for (u in uris) {
+                val t = repository.importSingleAudioFromExternalUri(getApplication(), u)
+                if (t != null) importedList.add(t)
+            }
+            _isImporting.value = false
+            if (importedList.isNotEmpty()) {
+                _importStatusMessage.value = "Se importaron ${importedList.size} canciones."
+                playTrack(importedList.first(), importedList)
+                _isNowPlayingExpanded.value = true
+                fetchOnlineLyrics()
+            }
         }
     }
 

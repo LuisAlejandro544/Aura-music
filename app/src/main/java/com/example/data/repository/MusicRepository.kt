@@ -324,4 +324,86 @@ class MusicRepository(private val database: AppDatabase) {
         storageManager.saveMetadataJson(savedTrack)
         savedTrack
     }
+
+    /**
+     * Importa un archivo de audio proveniente de un Intent externo ("Abrir con..." o "Compartir con..."),
+     * por ejemplo desde SnapTube, navegadores, gestores de archivos o mensajería.
+     *
+     * Para asegurar que la pista no se pierda si la aplicación externa revoca permisos o borra su caché,
+     * copia el flujo a `songs/` en el almacenamiento privado estructurado de Aura Music,
+     * extrae portada WebP y genera persistencia completa en Room y `metadata/`.
+     */
+    suspend fun importSingleAudioFromExternalUri(context: Context, uri: Uri): Track? = withContext(Dispatchers.IO) {
+        try {
+            // Intentar persistir permiso si es una URI de tipo SAF
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (_: SecurityException) {}
+
+            // Si ya existe registrada con esa misma URI en Room
+            val existing = trackDao.getTrackByUri(uri.toString())
+            if (existing != null) {
+                return@withContext existing.toDomain()
+            }
+
+            val storageManager = com.example.data.storage.AppStorageManager(context)
+            val parsed = AudioMetadataParser.parseUri(context, uri, folderName = "Externo")
+            val rawName = AudioMetadataParser.getFileName(context, uri) ?: "Audio_${System.currentTimeMillis()}"
+            val title = parsed?.title ?: rawName.substringBeforeLast(".")
+            val artist = parsed?.artist ?: "Desconocido"
+            val album = parsed?.album ?: "Música Compartida"
+
+            var finalUriString = uri.toString()
+            var fileSizeFormatted = parsed?.fileSizeFormatted ?: ""
+
+            // Copia segura a la carpeta estructurada songs/ para disponibilidad sin conexión
+            try {
+                context.contentResolver.openInputStream(uri)?.use { inStream ->
+                    val ext = AudioMetadataParser.getFileExtension(context, uri) ?: "mp3"
+                    val safeTitle = title.replace(Regex("[^a-zA-Z0-9._-]"), "_").take(25)
+                    val fileName = "ext_${System.currentTimeMillis()}_$safeTitle.$ext"
+                    val copiedFile = storageManager.saveSongFile(fileName, inStream)
+                    finalUriString = Uri.fromFile(copiedFile).toString()
+                    val mb = copiedFile.length() / (1024f * 1024f)
+                    fileSizeFormatted = String.format("%.1f MB", mb)
+                }
+            } catch (_: Exception) {}
+
+            // Verificar si ya existe con la URI de destino
+            val existingWithCopiedUri = trackDao.getTrackByUri(finalUriString)
+            if (existingWithCopiedUri != null) {
+                return@withContext existingWithCopiedUri.toDomain()
+            }
+
+            val trackToSave = (parsed ?: Track(
+                id = 0,
+                title = title,
+                artist = artist,
+                album = album,
+                durationMs = 0L,
+                uriString = finalUriString,
+                albumArtPath = null,
+                mimeType = "audio/mpeg",
+                dateAdded = System.currentTimeMillis(),
+                isFavorite = false,
+                playCount = 0,
+                folderName = "Externo",
+                fileSizeFormatted = fileSizeFormatted
+            )).copy(
+                uriString = finalUriString,
+                folderName = "Externo"
+            )
+
+            val entity = TrackEntity.fromDomain(trackToSave)
+            val newId = trackDao.insertTrack(entity)
+            val saved = trackDao.getTrackById(newId)?.toDomain() ?: trackToSave.copy(id = newId)
+            storageManager.saveMetadataJson(saved)
+            saved
+        } catch (_: Exception) {
+            null
+        }
+    }
 }

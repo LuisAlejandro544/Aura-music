@@ -105,5 +105,12 @@ Este archivo define el contexto de diseño, directrices técnicas y restriccione
     - Descarga automática libre desde **LRCLIB** al cambiar a canciones sin letra, sin registro ni API keys.
     - Interfaz Karaoke interactiva con desplazamiento automático suave (*auto-scroll*), tipografía resaltada neón para el verso actual, y salto directo en la canción (*Seek-to-time*) al compás de cualquier línea pulsada.
 
-16. **Idioma de Comunicación**:
+16. **Recepción Inteligente 'Abrir con...' y 'Compartir con...' (Puente con Gestores de Descarga y Apps Externas)**:
+    - Debe responder a `ACTION_VIEW`, `ACTION_SEND` y `ACTION_SEND_MULTIPLE` mediante `IncomingMediaHandler`.
+    - Si es audio (`audio/*`), copiar inmediatamente a la subcarpeta estructurada `songs/` para garantizar persistencia sin conexión de por vida, añadir a Room e iniciar reproducción instantánea con Now Playing expandido.
+    - Si es video (`video/*`), activar automáticamente el diálogo de conversión 'Video a Música' 3 en 1 para demuxing rápido a `.m4a`, carátula WebP y Video Canvas vinculado.
+    - Si es enlace web (`text/plain` o URL), abrir el diálogo de descarga de enlaces con auto-resolución de información (título, autor y carátula).
+    - Soportar `singleTop` y `onNewIntent` sin recreación destructiva de la interfaz ni reinicio de pistas en reproducción.
+
+17. **Idioma de Comunicación**:
    - La documentación, comentarios en código, cadenas de usuario (`strings.xml`) y mensajes de commit deben redactarse en **español**.
