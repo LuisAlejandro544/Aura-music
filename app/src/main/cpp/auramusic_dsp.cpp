@@ -103,6 +103,11 @@ Java_com_example_playback_NativeAudioEngine_nativeSetStereoBalance(JNIEnv* /* en
     sDspEngine.setStereoBalance(static_cast<double>(balance));
 }
 
+JNIEXPORT void JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeSetReverbParameters(JNIEnv* /* env */, jobject /* thiz */, jboolean enabled, jfloat roomSize, jint decayMs, jfloat levelDb) {
+    sDspEngine.setReverbParameters(enabled == JNI_TRUE, static_cast<float>(roomSize), static_cast<int>(decayMs), static_cast<float>(levelDb));
+}
+
 JNIEXPORT jfloat JNICALL
 Java_com_example_playback_NativeAudioEngine_nativeGetAudioIntensity(JNIEnv* /* env */, jobject /* thiz */) {
     return sDspEngine.getAudioIntensity();

@@ -45,6 +45,7 @@ fun ImportMusicScreen(
     onSeedDemoTracks: () -> Unit,
     onClearLibrary: () -> Unit,
     onDismissStatusMessage: () -> Unit,
+    downloadProgress: com.example.model.DownloadProgress = com.example.model.DownloadProgress(),
     onImportVideoAsMusic: (videoUri: Uri, title: String, artist: String, album: String, attachAsCanvas: Boolean, forceLoop: Boolean?) -> Unit = { _, _, _, _, _, _ -> },
     onDownloadFromLink: (resolvedInfo: com.example.data.importer.OnlineVideoAudioImporter.ResolvedMediaInfo, customTitle: String, customArtist: String, attachAsCanvas: Boolean) -> Unit = { _, _, _, _ -> },
     modifier: Modifier = Modifier
@@ -434,12 +435,19 @@ fun ImportMusicScreen(
         )
     }
 
+    // Cierre automático del diálogo al finalizar la descarga exitosamente
+    LaunchedEffect(downloadProgress.isDownloading) {
+        if (!downloadProgress.isDownloading && showDownloadFromLinkDialog && isImporting) {
+            showDownloadFromLinkDialog = false
+        }
+    }
+
     if (showDownloadFromLinkDialog) {
         com.example.ui.components.DownloadFromLinkDialog(
             initialMode = downloadDialogMode,
+            downloadProgress = downloadProgress,
             onDismiss = { showDownloadFromLinkDialog = false },
             onConfirmDownload = { info, title, artist, attachCanvas ->
-                showDownloadFromLinkDialog = false
                 onDownloadFromLink(info, title, artist, attachCanvas)
             }
         )

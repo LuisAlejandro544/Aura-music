@@ -178,10 +178,28 @@ object NativeAudioEngine {
     }
 
     fun setReverbParameters(enabled: Boolean, roomSize: Float, decayMs: Int, levelDb: Float) {
+        val clampedRoom = roomSize.coerceIn(0.1f, 2.0f)
+        val clampedDecay = decayMs.coerceIn(100, 6000)
+        val clampedLevel = levelDb.coerceIn(-30.0f, 6.0f)
+
+        if (isLoaded) {
+            try {
+                nativeSetReverbParameters(enabled, clampedRoom, clampedDecay, clampedLevel)
+                return
+            } catch (_: Throwable) {}
+        }
+        if (!enabled && fallbackReverbEnabled) {
+            combBufferL1.fill(0.0)
+            combBufferL2.fill(0.0)
+            combBufferR1.fill(0.0)
+            combBufferR2.fill(0.0)
+            dampL1 = 0.0; dampL2 = 0.0; dampR1 = 0.0; dampR2 = 0.0
+            combIdxL1 = 0; combIdxL2 = 0; combIdxR1 = 0; combIdxR2 = 0
+        }
         fallbackReverbEnabled = enabled
-        fallbackReverbRoomSize = roomSize.coerceIn(0.1f, 2.0f)
-        fallbackReverbDecayMs = decayMs.coerceIn(100, 6000)
-        fallbackReverbLevelDb = levelDb.coerceIn(-30.0f, 6.0f)
+        fallbackReverbRoomSize = clampedRoom
+        fallbackReverbDecayMs = clampedDecay
+        fallbackReverbLevelDb = clampedLevel
     }
 
     /**
@@ -239,6 +257,7 @@ object NativeAudioEngine {
     private external fun nativeSetCrossfeedStrength(strengthMode: Int)
     private external fun nativeSetBalanceEnabled(enabled: Boolean)
     private external fun nativeSetStereoBalance(balance: Float)
+    private external fun nativeSetReverbParameters(enabled: Boolean, roomSize: Float, decayMs: Int, levelDb: Float)
     private external fun nativeGetAudioIntensity(): Float
     private external fun nativeGetVisualizerBands(outBands: FloatArray)
 
@@ -271,6 +290,8 @@ object NativeAudioEngine {
     private val combBufferR2 = DoubleArray(1422)
     private var combIdxL1 = 0; private var combIdxL2 = 0
     private var combIdxR1 = 0; private var combIdxR2 = 0
+    private var dampL1 = 0.0; private var dampL2 = 0.0
+    private var dampR1 = 0.0; private var dampR2 = 0.0
 
     private class BiquadCoeffs {
         var b0 = 1.0; var b1 = 0.0; var b2 = 0.0
@@ -344,7 +365,7 @@ object NativeAudioEngine {
     }
 
     private fun processFallback(byteBuffer: ByteBuffer, offset: Int, length: Int) {
-        if ((!fallbackEnabled && !fallback8DEnabled && !fallbackCrossfeedEnabled && !fallbackBalanceEnabled) || length <= 0) return
+        if ((!fallbackEnabled && !fallback8DEnabled && !fallbackCrossfeedEnabled && !fallbackBalanceEnabled && !fallbackReverbEnabled) || length <= 0) return
         try {
             val shortBuffer = byteBuffer.duplicate().order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
             val startShort = offset / 2
@@ -359,6 +380,9 @@ object NativeAudioEngine {
                 var sR = if (fallbackChannels > 1 && (i + 1) < (startShort + shortCount)) {
                     shortBuffer.get(i + 1) / 32768.0
                 } else sL
+
+                if (sL.isNaN() || sL.isInfinite()) sL = 0.0
+                if (sR.isNaN() || sR.isInfinite()) sR = 0.0
 
                 if (fallbackEnabled) {
                     if (fallbackBassBoost > 0.001f) {
@@ -394,33 +418,50 @@ object NativeAudioEngine {
                     sR *= gainR
                 }
 
-                // Reverb Ambiental en Fallback
+                // Reverb Ambiental en Fallback con Amortiguación y Protección de Resonancia
                 if (fallbackReverbEnabled) {
                     val wet = 10.0.pow(fallbackReverbLevelDb / 20.0).coerceIn(0.0, 1.2)
-                    val feedback = (0.42 + (fallbackReverbRoomSize * 0.22)).coerceIn(0.35, 0.90)
+                    val feedback = (0.45 + (fallbackReverbRoomSize * 0.18)).coerceIn(0.35, 0.82)
+                    val damping = (0.22 + (fallbackReverbRoomSize * 0.10)).coerceIn(0.15, 0.40)
 
-                    val delayedL1 = combBufferL1[combIdxL1]
-                    combBufferL1[combIdxL1] = sL + delayedL1 * feedback
+                    // Canal L - Comb 1
+                    var outL1 = combBufferL1[combIdxL1]
+                    if (outL1.isNaN() || outL1.isInfinite()) outL1 = 0.0
+                    dampL1 = (outL1 * (1.0 - damping)) + (dampL1 * damping)
+                    combBufferL1[combIdxL1] = sL + (dampL1 * feedback)
                     combIdxL1 = (combIdxL1 + 1) % combBufferL1.size
 
-                    val delayedL2 = combBufferL2[combIdxL2]
-                    combBufferL2[combIdxL2] = sL + delayedL2 * feedback
+                    // Canal L - Comb 2
+                    var outL2 = combBufferL2[combIdxL2]
+                    if (outL2.isNaN() || outL2.isInfinite()) outL2 = 0.0
+                    dampL2 = (outL2 * (1.0 - damping)) + (dampL2 * damping)
+                    combBufferL2[combIdxL2] = sL + (dampL2 * feedback)
                     combIdxL2 = (combIdxL2 + 1) % combBufferL2.size
 
-                    val delayedR1 = combBufferR1[combIdxR1]
-                    combBufferR1[combIdxR1] = sR + delayedR1 * feedback
+                    // Canal R - Comb 1
+                    var outR1 = combBufferR1[combIdxR1]
+                    if (outR1.isNaN() || outR1.isInfinite()) outR1 = 0.0
+                    dampR1 = (outR1 * (1.0 - damping)) + (dampR1 * damping)
+                    combBufferR1[combIdxR1] = sR + (dampR1 * feedback)
                     combIdxR1 = (combIdxR1 + 1) % combBufferR1.size
 
-                    val delayedR2 = combBufferR2[combIdxR2]
-                    combBufferR2[combIdxR2] = sR + delayedR2 * feedback
+                    // Canal R - Comb 2
+                    var outR2 = combBufferR2[combIdxR2]
+                    if (outR2.isNaN() || outR2.isInfinite()) outR2 = 0.0
+                    dampR2 = (outR2 * (1.0 - damping)) + (dampR2 * damping)
+                    combBufferR2[combIdxR2] = sR + (dampR2 * feedback)
                     combIdxR2 = (combIdxR2 + 1) % combBufferR2.size
 
-                    val revL = (delayedL1 + delayedL2) * 0.5
-                    val revR = (delayedR1 + delayedR2) * 0.5
+                    val revL = (outL1 + outL2) * 0.5
+                    val revR = (outR1 + outR2) * 0.5
 
-                    sL = (sL * 0.85) + (revL * wet * 0.40)
-                    sR = (sR * 0.85) + (revR * wet * 0.40)
+                    val dryGain = (1.0 - (wet * 0.30)).coerceIn(0.55, 1.0)
+                    sL = (sL * dryGain) + (revL * wet * 0.38)
+                    sR = (sR * dryGain) + (revR * wet * 0.38)
                 }
+
+                if (sL.isNaN() || sL.isInfinite()) sL = 0.0
+                if (sR.isNaN() || sR.isInfinite()) sR = 0.0
 
                 sL = (sL.coerceIn(-1.2, 1.2)).let { it - (it * it * it) / 6.0 }
                 shortBuffer.put(i, (sL * 32767.0).coerceIn(-32768.0, 32767.0).toInt().toShort())

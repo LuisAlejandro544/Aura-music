@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import com.example.data.storage.AppStorageManager
+import com.example.model.DownloadProgress
 import com.example.model.Track
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -199,7 +200,7 @@ object OnlineVideoAudioImporter {
         customArtist: String? = null,
         attachAsCanvas: Boolean = true,
         forceLoop: Boolean? = null,
-        onProgressUpdate: (String) -> Unit = {}
+        onProgressUpdate: (DownloadProgress) -> Unit = {}
     ): Result<Track> = withContext(Dispatchers.IO) {
         val timestamp = System.currentTimeMillis()
         val finalTitle = customTitle?.trim()?.ifBlank { resolvedInfo.suggestedTitle } ?: resolvedInfo.suggestedTitle
@@ -213,8 +214,12 @@ object OnlineVideoAudioImporter {
 
             // 1. Descarga prioritaria del audio de alta fidelidad si está disponible por separado (p. ej. InnerTube)
             if (!resolvedInfo.audioUrl.isNullOrBlank()) {
-                onProgressUpdate("Descargando audio de alta fidelidad...")
-                val downloadedAudio = downloadUrlToFile(resolvedInfo.audioUrl, audioFile)
+                val downloadedAudio = downloadUrlToFile(
+                    url = resolvedInfo.audioUrl,
+                    targetFile = audioFile,
+                    phase = "Descargando audio de alta fidelidad...",
+                    onProgress = onProgressUpdate
+                )
                 if (downloadedAudio && audioFile.exists() && audioFile.length() > 0L) {
                     audioReady = true
                 }
@@ -222,8 +227,12 @@ object OnlineVideoAudioImporter {
 
             // 2. Si no había audio directo o falló, descargar flujo de video y demuxear
             if (!audioReady) {
-                onProgressUpdate("Descargando flujo multimedia...")
-                val downloadVideoSuccess = downloadUrlToFile(resolvedInfo.videoUrl, tempVideoFile)
+                val downloadVideoSuccess = downloadUrlToFile(
+                    url = resolvedInfo.videoUrl,
+                    targetFile = tempVideoFile,
+                    phase = "Descargando flujo multimedia...",
+                    onProgress = onProgressUpdate
+                )
                 if (downloadVideoSuccess && tempVideoFile.exists() && tempVideoFile.length() > 0L) {
                     // Intentar demuxing sin recodificación a través de VideoAudioExtractor
                     try {
@@ -256,6 +265,7 @@ object OnlineVideoAudioImporter {
             }
 
             if (!audioReady || !audioFile.exists() || audioFile.length() == 0L) {
+                onProgressUpdate(DownloadProgress(isDownloading = false))
                 return@withContext Result.failure(IllegalStateException("Error al descargar el archivo de audio. Verifica tu conexión."))
             }
 
@@ -270,7 +280,15 @@ object OnlineVideoAudioImporter {
                 try { retriever.release() } catch (_: Throwable) {}
             }
 
-            onProgressUpdate("Generando carátula en WebP sin pérdida...")
+            onProgressUpdate(
+                DownloadProgress(
+                    isDownloading = true,
+                    phase = "Generando carátula en WebP sin pérdida...",
+                    bytesDownloaded = audioFile.length(),
+                    totalBytes = audioFile.length(),
+                    progressFraction = 0.90f
+                )
+            )
             var artworkPath: String? = null
 
             // 1. Intentar descargar portada oficial
@@ -329,7 +347,6 @@ object OnlineVideoAudioImporter {
                 }
             }
 
-            onProgressUpdate("Configurando Video Canvas...")
             var videoCanvasPath: String? = null
             val isLoop = forceLoop ?: (durationMs in 1..20500L)
 
@@ -339,8 +356,12 @@ object OnlineVideoAudioImporter {
                     !resolvedInfo.videoUrl.isNullOrBlank() &&
                     resolvedInfo.videoUrl != resolvedInfo.audioUrl
                 ) {
-                    onProgressUpdate("Descargando Video Canvas...")
-                    downloadUrlToFile(resolvedInfo.videoUrl, tempVideoFile)
+                    downloadUrlToFile(
+                        url = resolvedInfo.videoUrl,
+                        targetFile = tempVideoFile,
+                        phase = "Descargando Video Canvas de fondo...",
+                        onProgress = onProgressUpdate
+                    )
                 }
                 if (tempVideoFile.exists() && tempVideoFile.length() > 0L) {
                     videoCanvasPath = tempVideoFile.absolutePath
@@ -351,6 +372,16 @@ object OnlineVideoAudioImporter {
                     tempVideoFile.delete()
                 }
             }
+
+            onProgressUpdate(
+                DownloadProgress(
+                    isDownloading = true,
+                    phase = "¡Canción preparada exitosamente!",
+                    bytesDownloaded = audioFile.length(),
+                    totalBytes = audioFile.length(),
+                    progressFraction = 1.0f
+                )
+            )
 
             val isYoutubeSource = resolvedInfo.originalUrl.contains("youtu", ignoreCase = true)
             val finalAlbum = if (isYoutubeSource) "YouTube Music & Canvas" else "TikTok Music & Canvas"
@@ -375,22 +406,86 @@ object OnlineVideoAudioImporter {
                 fileSizeFormatted = fileSizeFormatted
             )
 
-            onProgressUpdate("¡Canción lista!")
+            onProgressUpdate(DownloadProgress(isDownloading = false))
             Result.success(createdTrack)
         } catch (e: Exception) {
+            onProgressUpdate(DownloadProgress(isDownloading = false))
             Result.failure(e)
         }
     }
 
-    private fun downloadUrlToFile(url: String, targetFile: File): Boolean {
+    private fun downloadUrlToFile(
+        url: String,
+        targetFile: File,
+        phase: String,
+        onProgress: (DownloadProgress) -> Unit
+    ): Boolean {
         return try {
             val request = Request.Builder().url(url).build()
             httpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return false
                 val body = response.body ?: return false
+                val totalBytes = body.contentLength()
+
                 body.byteStream().use { input ->
                     FileOutputStream(targetFile).use { output ->
-                        input.copyTo(output)
+                        val buffer = ByteArray(16 * 1024)
+                        var bytesRead: Int
+                        var totalRead = 0L
+                        var lastReportTime = System.currentTimeMillis()
+                        var bytesSinceLastReport = 0L
+                        var currentSpeed = 0L
+
+                        onProgress(
+                            DownloadProgress(
+                                isDownloading = true,
+                                phase = phase,
+                                bytesDownloaded = 0L,
+                                totalBytes = totalBytes,
+                                bytesPerSecond = 0L,
+                                progressFraction = 0f
+                            )
+                        )
+
+                        while (input.read(buffer).also { bytesRead = it } != -1) {
+                            output.write(buffer, 0, bytesRead)
+                            totalRead += bytesRead
+                            bytesSinceLastReport += bytesRead
+
+                            val now = System.currentTimeMillis()
+                            val elapsed = now - lastReportTime
+                            if (elapsed >= 200) {
+                                currentSpeed = (bytesSinceLastReport * 1000L) / elapsed
+                                val fraction = if (totalBytes > 0) {
+                                    (totalRead.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
+                                } else 0f
+
+                                onProgress(
+                                    DownloadProgress(
+                                        isDownloading = true,
+                                        phase = phase,
+                                        bytesDownloaded = totalRead,
+                                        totalBytes = totalBytes,
+                                        bytesPerSecond = currentSpeed,
+                                        progressFraction = fraction
+                                    )
+                                )
+                                lastReportTime = now
+                                bytesSinceLastReport = 0L
+                            }
+                        }
+
+                        val finalFraction = if (totalBytes > 0) 1f else 0f
+                        onProgress(
+                            DownloadProgress(
+                                isDownloading = true,
+                                phase = phase,
+                                bytesDownloaded = totalRead,
+                                totalBytes = if (totalBytes > 0) totalBytes else totalRead,
+                                bytesPerSecond = currentSpeed,
+                                progressFraction = finalFraction
+                            )
+                        )
                     }
                 }
             }
