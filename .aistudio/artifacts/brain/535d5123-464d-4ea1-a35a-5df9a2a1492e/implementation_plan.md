@@ -1,109 +1,84 @@
-# Mejoras de Reproducción Inteligente, Recorte de Silencios, Bucle A-B y Ergonomía Visual en Aura Music
+# Aura Music — Modal Deslizable, Corrección de Reverb C++20 y Control 2.0x en Música y Voz
 
-Este plan detalla la incorporación de un sistema inteligente de eliminación de silencios iniciales y finales al importar música desde cualquier fuente, un repetidor interactivo de segmento A-B, el desplazamiento automático tipo marquesina para títulos largos en reproducción y la optimización espacial de la barra superior en la pantalla Now Playing.
+Esta actualización hace que el modal de descarga de YouTube y TikTok sea completamente deslizable verticalmente para que ningún botón quede cortado en pantallas compactas, corrige de raíz la pérdida de audio al activar el Reverb procesándolo íntegramente en el motor nativo C++20 sin interferencia del hardware LVREV de Android, y amplía tanto la velocidad de reproducción como el tono/velocidad de voz hasta **2.0x** con botones rápidos dedicados.
 
-### Revisión del Usuario y Decisiones Confirmadas
+## User Review & Critical Decisions
 
 > [!IMPORTANT]
-> Todas las decisiones clave han sido alineadas según tus preferencias confirmadas y respetan las reglas arquitectónicas de Aura Music (`minSdk = 26`, almacenamiento estructurado y compatibilidad de 32 y 64 bits).
+> Se han incorporado tus decisiones confirmadas para garantizar que la experiencia sea cómoda y directa en teléfono móvil:
 
-- **Decisión Confirmada 1 (Eliminación Inteligente de Silencios)**: Se mostrará siempre un interruptor interactivo antes de cada importación (en descargas de TikTok/YouTube, conversión de Video a Música, importación de archivos/carpetas y recepción externa mediante "Abrir con..." / "Compartir con...") para que decidas cuándo recortar los silencios al inicio y al final de la canción.
-- **Decisión Confirmada 2 (Repetidor de Segmento A-B)**: Se integrará como una barra compacta e intuitiva junto a la barra de progreso en la pantalla completa Now Playing (con resaltado visual del tramo A-B en la barra de tiempo) y contará además con controles detallados dentro del modal de Efectos de Audio.
-- **Decisión Confirmada 3 (Títulos Largos en Movimiento)**: Los títulos largos se desplazarán automáticamente de forma horizontal y fluida (efecto marquesina continuo) en la pantalla principal Now Playing, en el Mini Reproductor flotante y en la fila de la canción activa dentro de las listas de reproducción.
-- **Decisión Confirmada 4 (Limpieza de la Barra Superior de Now Playing)**: Se eliminará por completo el bloque de texto superior izquierdo/central ("REPRODUCIENDO AURA / TikTok Music...") marcado en tu captura, liberando espacio visual y dejando una barra superior limpia y despejada.
+- **Decisión Confirmada 1 (Desplazamiento del Modal de Descarga)**: Todo el contenido del modal de descarga (`TikTok` y `YouTube / Web`) será completamente deslizable de arriba a abajo mediante scroll vertical fluido con altura máxima adaptativa, garantizando acceso total a los interruptores y a los botones **Cambiar** y **Descargar y Reproducir**.
+- **Decisión Confirmada 2 (Velocidad y Tono/Voz hasta 2.0x)**: Tanto **Velocidad de Reproducción** como **Tono / Velocidad de Voz (Pitch Shift)** tendrán deslizadores de `0.50x` a `2.00x` y una fila de botones rápidos (`0.8x`, `1.0x`, `1.25x`, `1.5x`, `2.0x`) en ambos controles.
+- **Decisión Técnica (Solución definitiva al corte de sonido en Reverb)**: Se desactiva la vinculación de `PresetReverb` y `EnvironmentalReverb` de Android (`android.media.audiofx`) sobre la sesión de audio porque en el driver nativo LVREV de Android silencian la señal directa (*dry*) y retienen el buffer durante el tiempo de decaimiento (*decayTime*) al apagarse. El Reverb funcionará al 100% sobre el procesador estereofónico **C++20 (`ReverbProcessor`)** en tiempo real, con buffers estáticos preasignados libres de bloqueos y preservación de estado al cambiar frecuencia de muestreo.
 
 ---
 
-### 1. Concepto General y Valor Principal
+## 1. Overview & Core Concept
 
 - **Qué Hace**:
-  1. **Recorte Inteligente de Silencios (Inicio y Final)**: Analiza la energía acústica de las pistas al importarlas o descargarlas para detectar y suprimir silencios muertos al principio y al final de la canción.
-  2. **Repetidor de Segmento A-B (A-B Loop)**: Permite fijar al vuelo un punto de inicio `A` y un punto final `B` durante cualquier canción para repetir ese fragmento en bucle ininterrumpido.
-  3. **Títulos Dinámicos en Movimiento (Marquee)**: Anima horizontalmente los títulos extensos de la canción en curso para que puedan leerse completos sin cortarse con puntos suspensivos.
-  4. **Barra Superior Despejada**: Suprime las etiquetas redundantes de reproducción y álbum en la cabecera de Now Playing para dar aire y protagonismo a los controles.
-- **Público Objetivo**: Usuarios móviles que descargan y gestionan su colección musical directamente en su teléfono (desde TikTok, YouTube, videos de galería o gestores externos) y buscan una escucha continua sin silencios molestos ni textos truncados.
-- **Valor Clave**: Transiciones musicales instantáneas desde el primer segundo de cada canción, control de repetición de fragmentos favoritos con precisión milimétrica y una interfaz más limpia y legible.
+  1. **Modal de Descarga Deslizable**: Permite desplazarse libremente por todas las opciones del diálogo de descarga (selector de fuente, motor de extracción de YouTube, enlace, vista previa, edición de título/artista, interruptores de Video Canvas y recorte de silencios, y botones de acción) sin cortes visuales.
+  2. **Reverb Acústico C++20 sin Pérdida de Audio**: Mantiene la música sonando de forma ininterrumpida al activar o desactivar el Reverb y al cambiar entre *Estudio*, *Sala Mediana*, *Club en Vivo*, *Gran Hall*, *Catedral* o *Eco Espacial*.
+  3. **Modulación 2.0x para Música y Voz**: Permite acelerar tanto el tempo musical como el tono vocal hasta el doble (`2.00x`), con chips interactivos de un toque.
+- **Valor Clave**: Elimina bloqueos de interfaz en pantallas verticales al descargar de YouTube y garantiza un procesamiento acústico instantáneo y sin silencios indeseados.
 
 ---
 
-### 2. Experiencia de Usuario y Diseño Visual
+## 2. User Experience & Visual Design
 
-- **Flujos de Usuario Principales**:
-  1. **Flujo de Importación con Interruptor de Silencios**:
-     - *Desde TikTok / YouTube / Web y Video a Música*: En el diálogo de previsualización, justo debajo de la opción de Video Canvas, verás el interruptor **"Eliminar silencios al inicio y final"** con icono de onda recortada.
-     - *Desde Archivos Locales, Carpetas y "Abrir con..."*: Antes de procesar los archivos seleccionados o compartidos desde otra aplicación, un diálogo o panel de confirmación con el interruptor **"Eliminar silencios al inicio y final"** te permitirá activar o desactivar la limpieza acústica con un toque.
-  2. **Flujo del Repetidor A-B**:
-     - En Now Playing, justo debajo de las marcas de tiempo de la barra de progreso, una cápsula compacta ofrece los botones **`[A]`**, **`[B]`** y **`[Limpiar]`** (cuando está activo).
-     - Al pulsar **`[A]`**, se fija el inicio del segmento en el segundo actual; al pulsar **`[B]`**, se cierra el tramo y el reproductor cicla automáticamente entre `A` y `B`, iluminando visualmente ese rango sobre la barra de progreso con el color de acento de la canción.
-     - En la hoja modal de Efectos de Audio (pestaña de Transiciones / Bucle), podrás ajustar finamente los tiempos `A` y `B` en incrementos de `±1s` o desactivar el bucle.
-  3. **Flujo de Títulos en Movimiento y Cabecera Limpia**:
-     - Al abrir Now Playing, la cabecera superior muestra únicamente el botón de plegar a la izquierda y los botones de acción a la derecha, sin el texto comprimido intermedio.
-     - Si el título de la canción supera el ancho de una línea en Now Playing, en el Mini Reproductor o en la canción activa de cualquier lista, el texto se deslizará suavemente de forma horizontal con una breve pausa entre ciclos.
-
-- **Identidad Visual y Tema**:
-  - *Dirección Estética*: **Dark Luxury OLED** con acentos neón reactivos armonizados con la carátula o el Video Canvas en reproducción.
-  - *Paleta de Colores*: Superficies 100% opacas (`#08080C` / `#12131A`), indicadores activos sincronizados con el color primario dinámico de la pista y alertas de estado claras.
-  - *Tipografía y Jerarquía*: Escala tipográfica protegida (`fontScale = 1.0f`), títulos en negrita con desplazamiento horizontal fluido y etiquetas de tiempo en formato `mm:ss`.
-  - *Composición de Componentes*: Controles con áreas táctiles cómodas (mínimo `48.dp` en acciones principales) y cápsulas translúcidas de alto contraste para los marcadores `A` y `B`.
+- **Flujos de Usuario Clave**:
+  1. **Descarga desde YouTube / TikTok**: El usuario pega un enlace de YouTube, pulsa *Inspeccionar Video* y desliza suavemente hacia abajo dentro de la tarjeta modal para editar metadatos, activar/desactivar *Video Canvas* o *Eliminar silencios*, y pulsar *Descargar y Reproducir*.
+  2. **Activación en Caliente del Reverb**: Desde la hoja modal de efectos (*Reverb*), el usuario activa el interruptor o elige cualquier preset ambiental escuchando de inmediato la mezcla de la canción original (*dry*) con la reverberación espacial (*wet*) sin cortes ni esperas al apagarlo.
+  3. **Ajuste Rápido a 2.0x**: En la pestaña *Velocidad* de la hoja de efectos, el usuario puede deslizar hasta `2.00x` o tocar directamente el botón rápido `2.0x` tanto en *Velocidad de Reproducción* como en *Tono / Velocidad de Voz*.
+- **Identidad Visual y Maquetación**:
+  - **Estética**: Oscura de alto contraste (*Luxury Dark*), conservando intactos los colores, bordes translúcidos y degradados de Aura Music.
+  - **Ergonomía Táctil**: Todos los chips rápidos (`0.8x`, `1.0x`, `1.25x`, `1.5x`, `2.0x`) y botones de acción respetan áreas táctiles cómodas y legibilidad con escala tipográfica controlada.
 
 ---
 
-### 3. Decisiones de Producto y Compromisos Técnicos
+## 3. Key Product Decisions & Trade-Offs
 
-- **Decisión 1: Estrategia Híbrida de Detección y Eliminación de Silencios**
-  - *Enfoque Elegido*: Análisis acústico rápido en segundo plano (`Dispatchers.IO`) del umbral de energía RMS (en decibelios) en los extremos del audio para localizar el primer y último instante con sonido real, realizando recorte sin pérdida por *Direct Stream Copy* (`MediaExtractor` + `MediaMuxer` ajustado a keyframes de audio) en contenedores `.m4a`/`.mp4`/`.wav`, y respaldado universalmente por límites de recorte nativos (`ClippingConfiguration` en Media3) para cualquier otro formato (`.mp3`, `.flac`, `.ogg`, `.opus`).
-  - *Por Qué*: Garantiza que el recorte sea ultrarrápido (menos de 1 segundo sin recodificar toda la canción), preserve el 100% de la calidad original y funcione con absolutamente cualquier formato de audio en Android 8.0+.
-  - *Alternativas Descartadas*: Recodificar toda la pista completa con un codificador por software, lo cual tardaría varios segundos por canción, consumiría batería y degradaría la calidad de formatos comprimidos.
-
-- **Decisión 2: Sincronización Reactiva del Bucle A-B en el Motor de Reproducción**
-  - *Enfoque Elegido*: Gestionar el estado `ABLoopState(pointAMs, pointBMs, isEnabled)` directamente en el motor de reproducción (`AuraAudioPlayer`) con verificación de alta precisión que reposiciona el cursor a `pointAMs` en cuanto alcanza `pointBMs`, reiniciándose automáticamente al cambiar de canción.
-  - *Por Qué*: Permite que el bucle A-B siga funcionando con exactitud incluso si el usuario minimiza Now Playing, navega por la biblioteca o apaga la pantalla del teléfono.
+- **Decisión 1: Procesamiento Reverb 100% en C++20 NDK en lugar de `android.media.audiofx` Reverb**
+  - *Enfoque Elegido*: Ejecutar la red acústica *Freeverb* (8 filtros peine amortiguados + 4 filtros pasa-todo Schroeder en doble precisión) exclusivamente en nuestro motor C++20 integrado en el pipeline PCM de ExoPlayer.
+  - *Por Qué*: Las clases `EnvironmentalReverb` y `PresetReverb` del sistema Android están diseñadas como efectos auxiliares de hardware con nivel húmedo inicial en `-9000 mB` (silencio total) cuando se insertan directamente sobre un `audioSessionId`, y al desactivarse mantienen ocupado el canal durante varios segundos mientras vacían su cola de decaimiento. Nuestro motor C++20 mezcla en tiempo real la señal original (`dryGain` ≥ 65%) con la señal reverberada sin latencia ni silencios.
+- **Decisión 2: Preservación de Parámetros DSP en Reconfiguración de Pista**
+  - *Enfoque Elegido*: Conservar las ganancias de ecualización, Bass Boost y parámetros de Reverb cuando `NativeAudioProcessor` notifica la frecuencia de muestreo de una nueva pista a C++20, y asegurar que funcione tanto en pistas estéreo como mono.
+  - *Por Qué*: Evita que al cambiar de canción o reiniciar el flujo PCM se pierdan o reinicien abruptamente los efectos activos.
 
 ---
 
-### 4. Arquitectura Técnica y Flujo de Datos
+## 4. Technical Architecture & Data Strategy
 
-- **Diagrama de Arquitectura y Componentes**:
+### Arquitectura y Flujo de Componentes
 
 ```
-┌───────────────────────────────────────────────────────────────────────────────┐
-│                         CAPA DE INTERFAZ (JETPACK COMPOSE)                    │
-├───────────────────────────┬───────────────────────────┬───────────────────────┤
-│   Flujos de Importación   │   Pantalla Now Playing    │  MiniPlayer y Listas  │
-│  ┌─────────────────────┐  │  ┌─────────────────────┐  │  ┌─────────────────┐  │
-│  │ Interruptor Previo  │  │  │  NowPlayingTopBar   │  │  │  Título Activo  │  │
-│  │ "Eliminar Silencios"│  │  │ (Cabecera Despejada)│  │  │ con Marquesina  │  │
-│  └──────────┬──────────┘  │  └─────────────────────┘  │  └─────────────────┘  │
-│             │             │  ┌─────────────────────┐  │                       │
-│             │             │  │ Barra Progreso +    │  │                       │
-│             │             │  │ Barra Compacta A-B  │  │                       │
-│             │             │  └──────────┬──────────┘  │                       │
-└─────────────┼─────────────┴─────────────┼─────────────┴───────────────────────┘
-              │                           │
-              ▼                           ▼
-┌─────────────────────────────────────────┴─────────────────────────────────────┐
-│                        VIEWMODEL CENTRAL (MusicViewModel)                     │
-│  • Coordina la opción trimSilence en Archivos, Carpetas, Video, Web y Externo │
-│  • Expone abLoopState (Punto A, Punto B, Activo) hacia NowPlaying y Efectos   │
-└─────────────┬───────────────────────────────────────────┬─────────────────────┘
-              │                                           │
-              ▼                                           ▼
-┌─────────────────────────────────────┐     ┌───────────────────────────────────┐
-│    ANALIZADOR Y RECORTE DE AUDIO    │     │   MOTOR MEDIA3 (AuraAudioPlayer)  │
-│       (AudioSilenceTrimmer)         │     │  • Vigilancia de ciclo A -> B     │
-│  • Escaneo RMS de bordes en IO      │     │  • Recorte y salto de silencios   │
-│  • Demuxing / Clipping sin pérdida  │     │  • Sincronización con VideoCanvas │
-└─────────────────────────────────────┘     └───────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        INTERFAZ JETPACK COMPOSE                         │
+├───────────────────────────┬──────────────────────────┬──────────────────┤
+│   Modal Descarga Enlace   │   Pestaña Velocidad/Voz  │  Pestaña Reverb  │
+│  (Scroll Vertical Total)  │  (Sliders + Chips 2.0x)  │ (Switch/Presets) │
+└─────────────┬─────────────┴────────────┬─────────────┴────────┬─────────┘
+              │                          │                      │
+              ▼                          ▼                      ▼
+┌───────────────────────────┐ ┌──────────────────────┐ ┌──────────────────┐
+│  OnlineVideoAudioImporter │ │   AuraAudioPlayer    │ │AudioEffectManager│
+│ (YouTube / TikTok / Web)  │ │ (Speed & Pitch 2.0x) │ │ (Sin HW LVREV)   │
+└───────────────────────────┘ └──────────┬───────────┘ └────────┬─────────┘
+                                         │                      │
+                                         ▼                      ▼
+                              ┌───────────────────────────────────────────┐
+                              │     MOTOR NATIVO C++20 (auramusic_dsp)    │
+                              │  • Red Reverb Freeverb (Dry + Wet Mix)    │
+                              │  • Soporte Mono/Estéreo sin silencios     │
+                              │  • EQ 10 Bandas + 8D + Crossfeed          │
+                              └───────────────────────────────────────────┘
 ```
 
-- **Modelo de Datos y Estado**:
-  - `ABLoopState`: Contiene `pointAMs: Long?`, `pointBMs: Long?` e `isActive: Boolean` (activo automáticamente cuando `pointAMs != null && pointBMs != null && pointBMs > pointAMs`).
-  - `SilenceTrimResult`: Contiene `startOffsetMs: Long`, `endOffsetMs: Long`, `trimmedDurationMs: Long` y el archivo optimizado en `songs/` cuando aplica recorte directo de contenedor.
+### Mapeo de Estado e Interacciones
 
-- **Mapeo de Componentes Interactivos y Manejo de Estado**:
-  - **Interruptor de Eliminación de Silencios**: Presente en el diálogo de descarga de enlaces (`DownloadFromLinkDialog`), en el conversor de galería (`VideoToMusicDialog`), en la confirmación previa al importar archivos/carpetas en `ImportMusicScreen` y en la recepción de audios externos (`Abrir con...`). Cuando está activo, invoca el analizador de silencios en `Dispatchers.IO` antes de guardar la pista en Room y `songs/`.
-  - **Controles del Repetidor A-B**:
-    - Pulsar `Marcar A` guarda la posición actual (`currentPositionMs`) como inicio. Si `B` ya existía y es menor o igual al nuevo `A`, se reinicia `B`.
-    - Pulsar `Marcar B` (disponible cuando `currentPositionMs > pointAMs + 500ms`) activa el bucle inmediato entre `A` y `B`.
-    - Pulsar `Limpiar A-B` desactiva el bucle y borra ambos marcadores.
-  - **Desplazamiento de Títulos (Marquee)**: Aplicado con `basicMarquee` sobre el título en `NowPlayingPlaybackControls`, en `MiniPlayer` y condicionalmente en `TrackListItem` cuando `isCurrentTrack` es verdadero.
+1. **Contenedor Deslizable del Modal de Descarga**:
+   - El contenedor `Column` principal del `Card` dentro del `Dialog` incorpora `rememberScrollState()` y `Modifier.verticalScroll(...)` junto con `heightIn(max = ...)` para adaptarse a cualquier pantalla móvil sin recortar el bloque inferior de botones.
+2. **Motor Reverb C++20 (`ReverbProcessor` y `AudioEffectManager`)**:
+   - Se elimina la instanciación y activación de `PresetReverb` y `EnvironmentalReverb` de hardware en `AudioEffectManager` para impedir que AudioFlinger silencie la pista.
+   - En el motor C++20 (`auramusic_dsp.h`), `ReverbProcessor` procesa tanto pistas estéreo como mono, mantiene buffers preasignados seguros durante el cambio de parámetros en caliente y conserva la configuración activa cuando `init(sampleRate, channels)` ajusta la frecuencia de muestreo.
+3. **Controles de Velocidad y Tono/Voz hasta 2.0x**:
+   - `PlaybackParametersTabContent` amplía el rango del deslizador de Tono/Voz a `0.5f..2.0f` (`steps = 29`, incrementos de `0.05x`) e incorpora la fila de botones rápidos `0.8x`, `1.0x`, `1.25x`, `1.5x` y `2.0x` tanto en Velocidad de Reproducción como en Tono/Velocidad de Voz.

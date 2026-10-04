@@ -105,4 +105,7 @@ Este documento define el protocolo de trabajo para los agentes de software y des
 - [x] ¿El repetidor de segmento A-B está integrado como barra compacta junto al progreso en Now Playing y con ajuste fino (±1s) en la hoja modal de efectos?
 - [x] ¿Se eliminó el texto redundante 'REPRODUCIENDO AURA / álbum' de la barra superior de Now Playing para liberar espacio visual?
 - [x] ¿Los títulos largos se desplazan automáticamente con marquesina fluida (basicMarquee) en Now Playing, Mini Reproductor y en la canción activa dentro de listas y cola?
+- [x] ¿El modal de descarga de enlaces (YouTube / TikTok) es completamente deslizable verticalmente para no cortar botones en pantallas compactas?
+- [x] ¿El Reverb se procesa 100% en C++20 (`ReverbProcessor`) sin silencios ni demoras al activarse o desactivarse?
+- [x] ¿Tanto la Velocidad de la Música como la Velocidad de Voz / Tono (`Pitch`) llegan hasta 2.0x e incluyen botones rápidos con `2.0x`?
 - [x] ¿Los 5 archivos Markdown (`README.md`, `ROADMAP.md`, `STRUCTURE.md`, `AI_CONTEXT.md`, `AGENTS.md`) están actualizados y en español?

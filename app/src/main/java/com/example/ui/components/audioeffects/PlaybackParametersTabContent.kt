@@ -17,12 +17,12 @@ import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 
 /**
- * Pestaña 3 de Efectos de Audio: Control de Velocidad (Speed) y Tono (Pitch).
+ * Pestaña 3 de Efectos de Audio: Control de Velocidad de Música (Speed) y Velocidad/Tono de Voz (Pitch).
  * Arquitectura: Componente modular de UI que presenta:
  * - Botón de restablecimiento instantáneo a 1.0x.
  * - Deslizador fluido de velocidad de reproducción (0.50x a 2.00x) con throttling en ViewModel.
- * - Chips rápidos de velocidad (0.8x, 1.0x, 1.25x, 1.5x).
- * - Deslizador de modulación de tono musical (Pitch Shift de 0.50x a 1.50x).
+ * - Chips rápidos de velocidad (0.8x, 1.0x, 1.25x, 1.5x, 2.0x).
+ * - Deslizador de modulación de tono / velocidad de voz (Pitch Shift de 0.50x a 2.00x) con chips rápidos hasta 2.0x.
  */
 @Composable
 fun PlaybackParametersTabContent(
@@ -35,6 +35,7 @@ fun PlaybackParametersTabContent(
 ) {
     var localSpeed by remember(speed) { mutableFloatStateOf(speed) }
     var localPitch by remember(pitch) { mutableFloatStateOf(pitch) }
+    val quickValues = remember { listOf(0.8f, 1.0f, 1.25f, 1.5f, 2.0f) }
 
     Surface(
         shape = RoundedCornerShape(16.dp),
@@ -48,7 +49,7 @@ fun PlaybackParametersTabContent(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Velocidad y Tono Musical",
+                    text = "Velocidad de Música y Voz",
                     style = MaterialTheme.typography.titleSmall.copy(
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary
@@ -65,12 +66,12 @@ fun PlaybackParametersTabContent(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Slider de Velocidad
+            // 1. Slider de Velocidad de la Música
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text("Velocidad de Reproducción", style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary))
+                Text("Velocidad de la Música", style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary))
                 Text(
                     text = "%.2fx".format(localSpeed),
                     style = MaterialTheme.typography.bodySmall.copy(
@@ -95,13 +96,14 @@ fun PlaybackParametersTabContent(
                     .testTag("playback_speed_slider")
             )
 
-            // Chips rápidos de velocidad
+            // Chips rápidos de velocidad de música (incluye 2.0x)
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                listOf(0.8f, 1.0f, 1.25f, 1.5f).forEach { s ->
+                quickValues.forEach { s ->
                     val isSelected = (localSpeed - s).let { it > -0.02f && it < 0.02f }
+                    val labelText = if (s == 1.0f || s == 2.0f || s == 0.8f || s == 1.5f) "${s}x" else "${s}x"
                     Surface(
                         shape = RoundedCornerShape(8.dp),
                         color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
@@ -113,10 +115,11 @@ fun PlaybackParametersTabContent(
                                 localSpeed = s
                                 onSpeedChange(s)
                             }
+                            .testTag("speed_chip_${s}")
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Text(
-                                text = "${s}x",
+                                text = labelText,
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontWeight = FontWeight.Bold,
                                     color = if (isSelected) Color.White else TextPrimary
@@ -129,12 +132,12 @@ fun PlaybackParametersTabContent(
 
             Spacer(modifier = Modifier.height(18.dp))
 
-            // Slider de Tono (Pitch)
+            // 2. Slider de Velocidad de Voz / Tono (Pitch Shift hasta 2.0x)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text("Tono (Pitch Shift)", style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary))
+                Text("Velocidad de Voz / Tono (Pitch)", style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary))
                 Text(
                     text = "%.2fx".format(localPitch),
                     style = MaterialTheme.typography.bodySmall.copy(
@@ -152,12 +155,45 @@ fun PlaybackParametersTabContent(
                 onValueChangeFinished = {
                     onPitchChange(localPitch)
                 },
-                valueRange = 0.5f..1.5f,
-                steps = 19,
+                valueRange = 0.5f..2.0f,
+                steps = 29, // Incrementos de 0.05 hasta 2.00x
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("playback_pitch_slider")
             )
+
+            // Chips rápidos de velocidad de voz / tono (incluye 2.0x)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                quickValues.forEach { p ->
+                    val isSelected = (localPitch - p).let { it > -0.02f && it < 0.02f }
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (isSelected) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surfaceVariant,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(36.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable {
+                                localPitch = p
+                                onPitchChange(p)
+                            }
+                            .testTag("pitch_chip_${p}")
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                text = "${p}x",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isSelected) Color.White else TextPrimary
+                                )
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }

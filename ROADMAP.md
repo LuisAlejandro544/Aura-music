@@ -177,6 +177,9 @@ Este documento traza las fases de evolución técnica y funcional para convertir
   - Panel detallado en la hoja modal de efectos con ajuste fino de ±1 segundo (`-1s` / `+1s`) e interruptor de bucle.
   - Limpieza de la barra superior de *Now Playing* eliminando el texto redundante "REPRODUCIENDO AURA / álbum" para dar mayor amplitud a los iconos de acción.
   - Desplazamiento horizontal continuo tipo marquesina (`basicMarquee`) para títulos largos en *Now Playing*, *Mini Reproductor* y canción activa en listas y cola.
+  - Modal de descarga (`DownloadFromLinkDialog`) completamente deslizable verticalmente (`verticalScroll`) para acceso total en pantallas compactas al descargar desde YouTube o TikTok.
+  - Corrección definitiva del Reverb procesándolo 100% en el motor nativo C++20 (`ReverbProcessor`) sin bloqueo ni silenciamiento del driver LVREV de Android.
+  - Ampliación de Velocidad de Música y Velocidad de Voz / Tono (`Pitch`) hasta `2.0x` con botones rápidos (`0.8x`, `1.0x`, `1.25x`, `1.5x`, `2.0x`) en ambos controles.
 
 ---
 

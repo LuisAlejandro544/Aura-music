@@ -59,20 +59,19 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
 - **Repetidor de Segmento A-B (A-B Loop)**:
   - **Barra Compacta en Now Playing**: Botones rápidos `[A]`, `[B]` y limpiar (`×`) situados junto al indicador de progreso, con franja luminosa sobre el deslizador que demarca el fragmento activo.
   - **Panel Detallado en Efectos de Audio**: Ajuste fino de ±1 segundo para los puntos A y B (`A -1s`, `A +1s`, `B -1s`, `B +1s`), interruptor de activación y reinicio automático al cambiar de pista.
-- **Suite Reverb Híbrida & Filtros Acústicos Ambientales (Corregido y Optimizado)**:
+- **Suite Reverb Híbrida & Filtros Acústicos Ambientales (100% C++20 en Tiempo Real, Cero Silencios)**:
   - Simulación de espacios físicos reales mediante presets de alta fidelidad: *Estudio*, *Sala Mediana*, *Club En Vivo*, *Gran Hall / Teatro*, *Catedral* y *Eco Espacial*.
-  - **Motor Acústico Blindado en C++20**: Corregido el problema de silencio al activar la reverberación mediante la adición de filtros peine con amortiguación paso-bajos activa (*Low-Pass Feedback Comb Filters - LBCF*), pasa-todo Schroeder de ganancia unitaria, desacoplamiento de presets inactivos y protección contra valores NaN/Inf en el limitador suave *softClip*.
+  - **Motor Acústico Blindado en C++20 Libre de Bloqueo LVREV**: Desacoplado del efecto auxiliar `EnvironmentalReverb`/`PresetReverb` de Android que silenciaba la señal directa (*dry*) y retenía el canal durante segundos al apagarse. Todo el procesamiento se ejecuta en tiempo real dentro de `ReverbProcessor` (C++20) con filtros peine amortiguados (*LBCF*), filtros pasa-todo Schroeder, soporte mono/estéreo y reinicio atómico sin condiciones de carrera.
   - Personalización acústica libre para ajuste milimétrico:
     - *Tamaño de Sala / Espacio* (0.1x a 2.0x).
     - *Tiempo de Decaimiento / Resonancia* (100 ms a 6000 ms).
     - *Nivel de Reverberación / Mezcla Húmeda* (-30 dB a +6 dB).
-  - Algoritmo de filtrado comb nativo y vinculación complementaria a sesiones de audio por hardware.
 - **Audio Espacial 8D Binaural para Auriculares**:
   - Paneo orbital tridimensional continuo en tiempo real (4s a 30s por rotación completa).
   - Simulación acústica de sombra de cabeza (*Head Shadow Filtering*) y reverberación espacial ambiental.
-- **Control Estable de Velocidad y Tono (Pitch & Speed)**:
-  - Modulación fluida de 0.50x a 2.00x protegida con *throttling* y amortiguación de llamadas a ExoPlayer.
-  - Recuperación automática ante anomalías de audio para evitar que la canción se pause accidentalmente.
+- **Control Estable de Velocidad de Música y Velocidad de Voz / Tono hasta 2.0x (Pitch & Speed)**:
+  - Modulación fluida de **0.50x a 2.00x** tanto en **Velocidad de la Música** como en **Velocidad de Voz / Tono (Pitch Shift)**, con botones rápidos de un toque (`0.8x`, `1.0x`, `1.25x`, `1.5x`, `2.0x`) en ambos controles.
+  - Protegida con *throttling* y recuperación automática ante anomalías de audio para evitar que la canción se pause accidentalmente.
 - **Temporizador de Apagado (Sleep Timer)**:
   - Minutos personalizados o chips rápidos (15m, 30m, 45m, 60m).
   - Contador regresivo en tiempo real con opción de añadir +5 minutos.

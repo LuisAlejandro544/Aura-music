@@ -25,8 +25,6 @@ class AudioEffectManager {
 
     private var hardwareEqualizer: Equalizer? = null
     private var hardwareBassBoost: BassBoost? = null
-    private var hardwarePresetReverb: PresetReverb? = null
-    private var hardwareEnvReverb: EnvironmentalReverb? = null
     private var currentSessionId: Int = 0
 
     private val _isEnabled = MutableStateFlow(true)
@@ -55,7 +53,10 @@ class AudioEffectManager {
 
     /**
      * Vincula la sesión de audio de hardware si el dispositivo la soporta
-     * para acompañamiento de aceleración acústica.
+     * para acompañamiento de ecualización y refuerzo de graves.
+     * Nota: El Reverb se procesa exclusivamente en el motor C++20 (ReverbProcessor)
+     * para evitar que el driver LVREV (EnvironmentalReverb/PresetReverb) de Android
+     * silencie la señal directa (dry) o retenga el canal al desactivarse.
      */
     fun attachToSession(audioSessionId: Int) {
         if (audioSessionId <= 0 || audioSessionId == currentSessionId) return
@@ -72,12 +73,6 @@ class AudioEffectManager {
                     setStrength(_bassBoostLevel.value.toShort())
                 }
             }
-            try {
-                hardwarePresetReverb = PresetReverb(0, audioSessionId)
-            } catch (_: Exception) {}
-            try {
-                hardwareEnvReverb = EnvironmentalReverb(0, audioSessionId)
-            } catch (_: Exception) {}
         } catch (ignored: Exception) {}
 
         syncWithNativeEngine()
@@ -156,7 +151,7 @@ class AudioEffectManager {
         NativeAudioEngine.setEightDRoomDepth(clamped)
     }
 
-    // --- Control de Suite Reverb Acústica ---
+    // --- Control de Suite Reverb Acústica (100% C++20 en tiempo real, sin bloqueo LVREV) ---
     fun setReverbEnabled(enabled: Boolean) {
         val currentPreset = if (enabled && _reverbConfig.value.preset == ReverbPreset.OFF) {
             ReverbPreset.ROOM
@@ -177,7 +172,6 @@ class AudioEffectManager {
             reverbLevelDb = targetLevelDb
         )
         _reverbConfig.value = cfg
-        applyReverbToHardware(cfg)
         NativeAudioEngine.setReverbParameters(enabled, cfg.roomSize, cfg.decayMs, cfg.reverbLevelDb)
     }
 
@@ -191,7 +185,6 @@ class AudioEffectManager {
             reverbLevelDb = preset.defaultLevelDb
         )
         _reverbConfig.value = cfg
-        applyReverbToHardware(cfg)
         NativeAudioEngine.setReverbParameters(isEnabled, cfg.roomSize, cfg.decayMs, cfg.reverbLevelDb)
     }
 
@@ -202,25 +195,7 @@ class AudioEffectManager {
             reverbLevelDb = levelDb.coerceIn(-24.0f, 6.0f)
         )
         _reverbConfig.value = cfg
-        applyReverbToHardware(cfg)
         NativeAudioEngine.setReverbParameters(cfg.isEnabled, cfg.roomSize, cfg.decayMs, cfg.reverbLevelDb)
-    }
-
-    private fun applyReverbToHardware(cfg: ReverbConfig) {
-        try {
-            hardwarePresetReverb?.enabled = cfg.isEnabled
-            if (cfg.isEnabled && cfg.preset != ReverbPreset.OFF) {
-                hardwarePresetReverb?.preset = cfg.preset.androidPreset
-            }
-        } catch (_: Exception) {}
-
-        try {
-            hardwareEnvReverb?.enabled = cfg.isEnabled
-            if (cfg.isEnabled) {
-                hardwareEnvReverb?.decayTime = cfg.decayMs
-                hardwareEnvReverb?.roomLevel = (cfg.reverbLevelDb * 100).toInt().coerceIn(-9000, 0).toShort()
-            }
-        } catch (_: Exception) {}
     }
 
     fun setCrossfeedEnabled(enabled: Boolean) {
@@ -262,13 +237,9 @@ class AudioEffectManager {
         try {
             hardwareEqualizer?.release()
             hardwareBassBoost?.release()
-            hardwarePresetReverb?.release()
-            hardwareEnvReverb?.release()
         } catch (ignored: Exception) {}
         hardwareEqualizer = null
         hardwareBassBoost = null
-        hardwarePresetReverb = null
-        hardwareEnvReverb = null
         currentSessionId = 0
     }
 

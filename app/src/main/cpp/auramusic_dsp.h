@@ -357,7 +357,9 @@ public:
 
     void setParameters(bool enabled, float roomSize, int decayMs, float levelDb) {
         if (!enabled && mEnabled) {
-            resetBuffers();
+            mPendingReset = true;
+        } else if (enabled && !mEnabled) {
+            mPendingReset = true;
         }
         mEnabled = enabled;
         mRoomSize = std::clamp(static_cast<double>(roomSize), 0.1, 2.0);
@@ -377,6 +379,11 @@ public:
 
     inline void processSample(double& sampleL, double& sampleR) {
         if (!mEnabled) return;
+
+        if (mPendingReset) {
+            mPendingReset = false;
+            resetBuffers();
+        }
 
         // Protección anti-denormal y anti-NaN en entrada
         if (std::isnan(sampleL) || std::isinf(sampleL)) sampleL = 0.0;
@@ -404,14 +411,15 @@ public:
         sumCombR = processAllpass(sumCombR, mAllpassR1, mAllpassIdxR1);
         sumCombR = processAllpass(sumCombR, mAllpassR2, mAllpassIdxR2);
 
-        double dryGain = std::clamp(1.0 - (mWet * 0.30), 0.55, 1.0);
-        sampleL = (sampleL * dryGain) + (sumCombL * mWet * 0.40);
-        sampleR = (sampleR * dryGain) + (sumCombR * mWet * 0.40);
+        double dryGain = std::clamp(1.0 - (mWet * 0.18), 0.72, 1.0);
+        sampleL = (sampleL * dryGain) + (sumCombL * mWet * 0.45);
+        sampleR = (sampleR * dryGain) + (sumCombR * mWet * 0.45);
     }
 
 private:
     int mSampleRate{44100};
     bool mEnabled{false};
+    bool mPendingReset{false};
     double mRoomSize{0.5};
     int mDecayMs{1500};
     double mLevelDb{-4.0};
@@ -461,23 +469,31 @@ public:
     }
 
     void init(int sampleRate, int channels) {
-        mSampleRate = (sampleRate > 0) ? sampleRate : 44100;
-        mChannels = (channels > 0) ? channels : 2;
+        int newSampleRate = (sampleRate > 0) ? sampleRate : 44100;
+        int newChannels = (channels > 0) ? channels : 2;
+        bool rateChanged = (newSampleRate != mSampleRate) || !mInitialized;
+
+        mSampleRate = newSampleRate;
+        mChannels = newChannels;
 
         for (int i = 0; i < 10; ++i) {
-            mBandGainsDb[i] = 0.0;
-            mFiltersL[i].configurePeaking(mSampleRate, EQ_FREQUENCIES_HZ[i], 0.0);
-            mFiltersR[i].configurePeaking(mSampleRate, EQ_FREQUENCIES_HZ[i], 0.0);
+            mFiltersL[i].configurePeaking(mSampleRate, EQ_FREQUENCIES_HZ[i], mBandGainsDb[i]);
+            mFiltersR[i].configurePeaking(mSampleRate, EQ_FREQUENCIES_HZ[i], mBandGainsDb[i]);
             mFiltersL[i].reset();
             mFiltersR[i].reset();
         }
-        mBassBoostStrength = 0.0;
-        mBassBoostFilterL.configurePeaking(mSampleRate, 60.0, 0.0, 1.2);
-        mBassBoostFilterR.configurePeaking(mSampleRate, 60.0, 0.0, 1.2);
+        double boostDb = mBassBoostStrength * 12.0;
+        mBassBoostFilterL.configurePeaking(mSampleRate, 60.0, boostDb, 1.2);
+        mBassBoostFilterR.configurePeaking(mSampleRate, 60.0, boostDb, 1.2);
+        mBassBoostFilterL.reset();
+        mBassBoostFilterR.reset();
 
-        mEightDProcessor.init(mSampleRate);
-        mCrossfeedProcessor.init(mSampleRate);
-        mReverbProcessor.init(mSampleRate);
+        if (rateChanged) {
+            mEightDProcessor.init(mSampleRate);
+            mCrossfeedProcessor.init(mSampleRate);
+            mReverbProcessor.init(mSampleRate);
+            mInitialized = true;
+        }
     }
 
     void setReverbParameters(bool enabled, float roomSize, int decayMs, float levelDb) {
@@ -642,8 +658,8 @@ public:
                 sampleR *= mGainR;
             }
 
-            // Procesamiento de Reverb Acústico en C++20
-            if (mReverbProcessor.isEnabled() && mChannels > 1) {
+            // Procesamiento de Reverb Acústico en C++20 (soporta mono y estéreo)
+            if (mReverbProcessor.isEnabled()) {
                 mReverbProcessor.processSample(sampleL, sampleR);
             }
 
@@ -687,6 +703,7 @@ public:
 private:
     int mSampleRate{44100};
     int mChannels{2};
+    bool mInitialized{false};
     bool mEnabled{true};
     double mBassBoostStrength{0.0};
     std::array<double, 10> mBandGainsDb{};

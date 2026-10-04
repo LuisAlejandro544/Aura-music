@@ -112,8 +112,11 @@ Este archivo define el contexto de diseño, directrices técnicas y restriccione
     - Si es enlace web (`text/plain` o URL), abrir el diálogo de descarga de enlaces con auto-resolución de información (título, autor y carátula).
     - Soportar `singleTop` y `onNewIntent` sin recreación destructiva de la interfaz ni reinicio de pistas en reproducción.
 
-17. **Eliminación Inteligente de Silencios, Repetidor A-B y Marquesina**:
+17. **Eliminación Inteligente de Silencios, Repetidor A-B, Marquesina, Reverb C++20 y Velocidad 2.0x**:
     - Antes de cada importación (SAF archivos/carpetas, Video a Música, descargas TikTok/YouTube y 'Abrir con...'), el usuario dispone de un interruptor interactivo para eliminar automáticamente los silencios iniciales y finales (`AudioSilenceTrimmer`, umbral `-42 dB` RMS).
+    - El modal `DownloadFromLinkDialog` debe ser completamente deslizable verticalmente (`verticalScroll`) para que todos los controles e interruptores de YouTube y TikTok sean accesibles en cualquier tamaño de pantalla.
+    - El Reverb debe ejecutarse exclusivamente en el motor nativo C++20 (`ReverbProcessor`) sobre el flujo PCM sin activar `EnvironmentalReverb`/`PresetReverb` de Android (`android.media.audiofx`), evitando que el driver LVREV silencie la señal directa o retenga el canal al desactivarse.
+    - Tanto **Velocidad de la Música** como **Velocidad de Voz / Tono (`Pitch`)** permiten ajuste de `0.50x` a `2.00x` con botones rápidos (`0.8x`, `1.0x`, `1.25x`, `1.5x`, `2.0x`) en ambos controles.
     - El repetidor de segmento A-B (`ABLoopState`) se controla tanto desde la barra compacta junto al progreso en *Now Playing* como desde la pestaña de transiciones/bucle en la hoja modal de efectos (con ajuste fino de ±1s).
     - La barra superior `NowPlayingTopBar` debe mantenerse despejada sin el texto redundante "REPRODUCIENDO AURA / álbum".
     - Los títulos largos deben desplazarse suavemente con `basicMarquee` en *Now Playing*, *Mini Reproductor* y en la canción en reproducción dentro de las listas y la cola.
