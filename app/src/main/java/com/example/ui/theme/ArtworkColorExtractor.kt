@@ -40,10 +40,17 @@ object ArtworkColorExtractor {
     // Caché en memoria para almacenar las paletas de carátulas y videos recientes
     private val memoryCache = LruCache<Long, ExtractedArtworkColors>(50)
 
-    // Retriever persistente para reutilizar el descriptor de video y evitar sobrecarga I/O cada 250ms
+    // Retriever persistente para reutilizar el descriptor de video y evitar sobrecarga I/O
     private val retrieverLock = Any()
     private var cachedVideoUri: String? = null
     private var cachedRetriever: MediaMetadataRetriever? = null
+    private var cachedVideoDurationMs: Long = 0L
+
+    // Memoria persistente del último color extraído de video para evitar parpadeos con la carátula
+    @Volatile
+    private var lastVideoTrackId: Long? = null
+    @Volatile
+    private var lastVideoColors: ExtractedArtworkColors? = null
 
     private fun getOrCreateRetriever(context: Context, videoUri: String): MediaMetadataRetriever? {
         synchronized(retrieverLock) {
@@ -55,6 +62,7 @@ object ArtworkColorExtractor {
             } catch (_: Throwable) {}
             cachedRetriever = null
             cachedVideoUri = null
+            cachedVideoDurationMs = 0L
 
             return try {
                 val retriever = MediaMetadataRetriever()
@@ -63,6 +71,8 @@ object ArtworkColorExtractor {
                 } else {
                     retriever.setDataSource(videoUri)
                 }
+                val durStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                cachedVideoDurationMs = durStr?.toLongOrNull() ?: 0L
                 cachedVideoUri = videoUri
                 cachedRetriever = retriever
                 retriever
@@ -178,28 +188,46 @@ object ArtworkColorExtractor {
         // Si el Video Canvas está en pantalla y hay video configurado: extraer color del fotograma del video
         val videoUri = track.videoUri
         if (isVideoActive && !videoUri.isNullOrBlank()) {
-            val interval = (positionMs / 250L).coerceAtLeast(0L)
+            val retriever = getOrCreateRetriever(context, videoUri)
+            val durationMs = cachedVideoDurationMs
+
+            // 1. Normalización de tiempo: En loops continuos (Canvas corto), mapear con módulo para no sobrepasar el final del video (EOF)
+            val effectivePosMs = if (durationMs > 0L) {
+                (positionMs % durationMs).coerceAtLeast(0L)
+            } else {
+                positionMs.coerceAtLeast(0L)
+            }
+
+            // Muestreo optimizado en intervalos de 1 segundo (1000ms) para cero saturación de CPU y máxima fluidez
+            val interval = (effectivePosMs / 1000L).coerceAtLeast(0L)
             val videoCacheKey = -(track.id.absoluteValue * 100_000L + interval)
-            memoryCache.get(videoCacheKey)?.let { return@withContext it }
+            memoryCache.get(videoCacheKey)?.let { cachedResult ->
+                lastVideoTrackId = track.id
+                lastVideoColors = cachedResult
+                return@withContext cachedResult
+            }
 
             var frameBitmap: Bitmap? = null
             try {
-                val retriever = getOrCreateRetriever(context, videoUri)
                 if (retriever != null) {
-                    val timeUs = (positionMs * 1000L).coerceAtLeast(0L)
-                    // OPTION_CLOSEST extrae el fotograma exacto del milisegundo actual (sin esperar al keyframe cada 2.5s)
+                    val timeUs = effectivePosMs * 1000L
+                    // 2. Extracción ultra-rápida: OPTION_CLOSEST_SYNC salta instantáneamente (~10ms) al fotograma clave más cercano
+                    // con auto-fallback a OPTION_CLOSEST si fuera necesario
                     frameBitmap = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
                         try {
-                            retriever.getScaledFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST, 32, 32)
+                            retriever.getScaledFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, 32, 32)
+                                ?: retriever.getScaledFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST, 32, 32)
                         } catch (_: Throwable) {
-                            retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST)
+                            retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                                ?: retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST)
                         }
                     } else {
-                        retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST)
+                        retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                            ?: retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST)
                     } ?: retriever.frameAtTime
 
                     if (frameBitmap != null) {
-                        // Si no se usó escalamiento nativo por hardware, reescalar a 32x32
+                        // Si no se usó escalamiento nativo por hardware, reescalar a 32x32 para procesamiento ultra-liviano
                         val scaled = if (frameBitmap.width > 32 || frameBitmap.height > 32) {
                             Bitmap.createScaledBitmap(frameBitmap, 32, 32, false).also {
                                 if (it != frameBitmap) frameBitmap.recycle()
@@ -232,11 +260,19 @@ object ArtworkColorExtractor {
                             ambientTopGlow = primaryColor.copy(alpha = 0.35f)
                         )
                         memoryCache.put(videoCacheKey, result)
+                        lastVideoTrackId = track.id
+                        lastVideoColors = result
                         return@withContext result
                     }
                 }
             } catch (_: Throwable) {
-                // Si falla la lectura del fotograma de video, continuar al fallback
+                // Si falla la extracción puntual de este fotograma, retener la memoria de color del video
+            }
+
+            // 3. MEMORIA ANTI-PARPADEO (Anti-Flicker): Si un fotograma específico no se pudo decodificar temporalmente,
+            // mantener el último color extraído de este mismo video en lugar de retroceder abruptamente a la carátula estática
+            if (lastVideoTrackId == track.id && lastVideoColors != null) {
+                return@withContext lastVideoColors!!
             }
         }
 
@@ -278,12 +314,15 @@ object ArtworkColorExtractor {
 
     fun clearCache() {
         memoryCache.evictAll()
+        lastVideoTrackId = null
+        lastVideoColors = null
         synchronized(retrieverLock) {
             try {
                 cachedRetriever?.release()
             } catch (_: Throwable) {}
             cachedRetriever = null
             cachedVideoUri = null
+            cachedVideoDurationMs = 0L
         }
     }
 }

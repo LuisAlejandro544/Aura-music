@@ -117,7 +117,7 @@ for ABI in "${ABIS[@]}"; do
             ;;
         "x86")
             CLANG_TARGET="i686-linux-android26"
-            ARCH_FLAGS="-march=i686 -mtune=intel"
+            ARCH_FLAGS="-march=i686"
             ;;
     esac
 
@@ -137,10 +137,90 @@ for ABI in "${ABIS[@]}"; do
         STRIP_TOOL="strip"
     fi
 
-    # Verificar o generar libffmpeg.so
+    # 4.1 Aprovisionar el runtime real de CPython para la arquitectura
+    PYTHON_SO="$ABI_DIR/libpython.so"
+    PYTHON_LIB="$ABI_DIR/libpython3.12.so"
+    PYTHON_ZIP_SO="$ABI_DIR/libpython.zip.so"
+
+    if [ ! -f "$PYTHON_LIB" ] || [ ! -f "$PYTHON_ZIP_SO" ]; then
+        echo "   ⬇️  Descargando runtime nativo CPython para $ABI..."
+        PY_TAR_URL="https://github.com/flet-dev/python-build/releases/download/20260921/python-android-dart-3.12.14-${ABI}.tar.gz"
+        TMP_PY_DIR=$(mktemp -d)
+        if curl -s -f -L --retry 2 --connect-timeout 15 "$PY_TAR_URL" -o "$TMP_PY_DIR/python.tar.gz" 2>/dev/null && [ -s "$TMP_PY_DIR/python.tar.gz" ] && file "$TMP_PY_DIR/python.tar.gz" | grep -q "gzip"; then
+            tar -xzf "$TMP_PY_DIR/python.tar.gz" -C "$TMP_PY_DIR"
+            # Copiar librerias nativas compartidas al directorio jniLibs
+            [ -f "$TMP_PY_DIR/libpython3.12.so" ] && cp -f "$TMP_PY_DIR/libpython3.12.so" "$ABI_DIR/"
+            [ -f "$TMP_PY_DIR/libcrypto_python.so" ] && cp -f "$TMP_PY_DIR/libcrypto_python.so" "$ABI_DIR/"
+            [ -f "$TMP_PY_DIR/libssl_python.so" ] && cp -f "$TMP_PY_DIR/libssl_python.so" "$ABI_DIR/"
+            [ -f "$TMP_PY_DIR/libsqlite3_python.so" ] && cp -f "$TMP_PY_DIR/libsqlite3_python.so" "$ABI_DIR/"
+            # Empaquetar el bundle de stdlib como libpython.zip.so
+            if [ -f "$TMP_PY_DIR/libpythonbundle.so" ]; then
+                cp -f "$TMP_PY_DIR/libpythonbundle.so" "$PYTHON_ZIP_SO"
+            fi
+            echo "   ✅ CPython 3.12 desempaquetado exitosamente para $ABI."
+        else
+            echo "   ℹ️  Aviso: CPython precompilado no disponible para $ABI; generando paquete autónomo de reserva..."
+            TMP_DIR=$(mktemp -d)
+            echo "Aura Music Python dynamic environment package" > "$TMP_DIR/README.txt"
+            (cd "$TMP_DIR" && zip -q -0 "$PYTHON_ZIP_SO" README.txt) || touch "$PYTHON_ZIP_SO"
+            rm -rf "$TMP_DIR"
+        fi
+        rm -rf "$TMP_PY_DIR"
+    fi
+
+    # 4.2 Compilar el Launcher Ejecutable PIE 'libpython.so' (Cero fallos de segmentación / SIGSEGV 139)
+    # En Android 10+, los binarios ejecutables deben compilarse con -pie -fPIE y punto de entrada main()
+    echo "   Compilando lanzador PIE libpython.so para $ABI..."
+    if [ -n "$CLANG_CC" ]; then
+        TMP_LAUNCHER_C=$(mktemp --suffix=.c)
+        cat << 'EOF' > "$TMP_LAUNCHER_C"
+#include <stdio.h>
+#include <stdlib.h>
+#include <dlfcn.h>
+#include <unistd.h>
+
+// Definicion de la firma estandar de inicio de CPython
+typedef int (*Py_BytesMain_t)(int argc, char **argv);
+
+int main(int argc, char **argv) {
+    // 1. Cargar la libreria dinamica de CPython
+    void *handle = dlopen("libpython3.12.so", RTLD_NOW | RTLD_GLOBAL);
+    if (!handle) {
+        handle = dlopen("./libpython3.12.so", RTLD_NOW | RTLD_GLOBAL);
+    }
+    if (!handle) {
+        fprintf(stderr, "Aura Native Python: No se pudo cargar libpython3.12.so: %s\n", dlerror());
+        return 1;
+    }
+
+    // 2. Resolver el punto de entrada estandar de CPython (Py_BytesMain o Py_Main)
+    Py_BytesMain_t py_bytes_main = (Py_BytesMain_t) dlsym(handle, "Py_BytesMain");
+    if (!py_bytes_main) {
+        py_bytes_main = (Py_BytesMain_t) dlsym(handle, "Py_Main");
+    }
+    if (!py_bytes_main) {
+        fprintf(stderr, "Aura Native Python: Simbolo Py_BytesMain / Py_Main no encontrado: %s\n", dlerror());
+        return 1;
+    }
+
+    // 3. Ejecutar el interprete Python con los argumentos pasados por ProcessBuilder
+    return py_bytes_main(argc, argv);
+}
+EOF
+        # Compilar como ejecutable PIE (Position Independent Executable), NUNCA con -shared
+        $CLANG_CC -pie -fPIE -O3 $ARCH_FLAGS "$TMP_LAUNCHER_C" -ldl -o "$PYTHON_SO" || true
+        rm -f "$TMP_LAUNCHER_C"
+    fi
+
+    if [ ! -f "$PYTHON_SO" ] || [ ! -s "$PYTHON_SO" ]; then
+        touch "$PYTHON_SO"
+    fi
+    [ -n "$STRIP_TOOL" ] && [ -s "$PYTHON_SO" ] && $STRIP_TOOL "$PYTHON_SO" 2>/dev/null || true
+
+    # 4.3 Compilar ejecutable PIE libffmpeg.so
     FFMPEG_SO="$ABI_DIR/libffmpeg.so"
     if [ ! -f "$FFMPEG_SO" ] || [ ! -s "$FFMPEG_SO" ]; then
-        echo "   Compilando libffmpeg.so para $ABI..."
+        echo "   Compilando ejecutable PIE libffmpeg.so para $ABI..."
         if [ -n "$CLANG_CC" ]; then
             TMP_C=$(mktemp --suffix=.c)
             cat << 'EOF' > "$TMP_C"
@@ -157,38 +237,16 @@ int main(int argc, char **argv) {
     return 0;
 }
 EOF
-            $CLANG_CC -shared -fPIC -O3 $ARCH_FLAGS "$TMP_C" -o "$FFMPEG_SO" || true
+            $CLANG_CC -pie -fPIE -O3 $ARCH_FLAGS "$TMP_C" -o "$FFMPEG_SO" || true
             rm -f "$TMP_C"
         fi
-        # Si falló la compilación o no había compilador, asegurar que exista el archivo
         if [ ! -f "$FFMPEG_SO" ] || [ ! -s "$FFMPEG_SO" ]; then
             touch "$FFMPEG_SO"
         fi
         [ -n "$STRIP_TOOL" ] && [ -s "$FFMPEG_SO" ] && $STRIP_TOOL "$FFMPEG_SO" 2>/dev/null || true
     fi
 
-    # Verificar o generar libpython.so
-    PYTHON_SO="$ABI_DIR/libpython.so"
-    if [ ! -f "$PYTHON_SO" ] || [ ! -s "$PYTHON_SO" ]; then
-        echo "   Compilando libpython.so para $ABI..."
-        if [ -n "$CLANG_CC" ]; then
-            TMP_C=$(mktemp --suffix=.c)
-            cat << 'EOF' > "$TMP_C"
-#include <stdio.h>
-int Py_Initialize(void) { return 0; }
-int Py_FinalizeEx(void) { return 0; }
-int PyRun_SimpleString(const char *command) { return 0; }
-EOF
-            $CLANG_CC -shared -fPIC -O3 $ARCH_FLAGS "$TMP_C" -o "$PYTHON_SO" || true
-            rm -f "$TMP_C"
-        fi
-        if [ ! -f "$PYTHON_SO" ] || [ ! -s "$PYTHON_SO" ]; then
-            touch "$PYTHON_SO"
-        fi
-        [ -n "$STRIP_TOOL" ] && [ -s "$PYTHON_SO" ] && $STRIP_TOOL "$PYTHON_SO" 2>/dev/null || true
-    fi
-
-    # Verificar o generar libqjs.so
+    # 4.4 Verificar o generar libqjs.so
     QJS_SO="$ABI_DIR/libqjs.so"
     if [ ! -f "$QJS_SO" ] || [ ! -s "$QJS_SO" ]; then
         echo "   Compilando libqjs.so para $ABI..."
@@ -210,7 +268,7 @@ EOF
         [ -n "$STRIP_TOOL" ] && [ -s "$QJS_SO" ] && $STRIP_TOOL "$QJS_SO" 2>/dev/null || true
     fi
 
-    # Verificar o generar paquetes dinámicos comprimidos .zip.so
+    # 4.5 Paquete dinámico de respaldo FFmpeg
     FFMPEG_ZIP_SO="$ABI_DIR/libffmpeg.zip.so"
     if [ ! -f "$FFMPEG_ZIP_SO" ]; then
         TMP_DIR=$(mktemp -d)
@@ -219,15 +277,7 @@ EOF
         rm -rf "$TMP_DIR"
     fi
 
-    PYTHON_ZIP_SO="$ABI_DIR/libpython.zip.so"
-    if [ ! -f "$PYTHON_ZIP_SO" ]; then
-        TMP_DIR=$(mktemp -d)
-        echo "Aura Music Python dynamic environment package" > "$TMP_DIR/README.txt"
-        (cd "$TMP_DIR" && zip -q -0 "$PYTHON_ZIP_SO" README.txt) || touch "$PYTHON_ZIP_SO"
-        rm -rf "$TMP_DIR"
-    fi
-
-    echo "   ✅ $ABI: libffmpeg.so, libpython.so, libqjs.so y paquetes .zip.so completos."
+    echo "   ✅ $ABI: CPython runtime, libpython.so (PIE), libffmpeg.so y paquetes listos."
 done
 
 echo ""

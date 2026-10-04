@@ -104,10 +104,16 @@ object YtDlpNativeEngine {
     fun getPythonExecutable(context: Context): File? {
         val nativeDir = File(context.applicationInfo.nativeLibraryDir)
         val pythonInNative = File(nativeDir, "libpython.so")
-        if (pythonInNative.exists() && pythonInNative.canExecute()) return pythonInNative
+        // En Android 10+, los ejecutables nativos empaquetados en APK residen en nativeLibraryDir
+        // y deben ser binarios PIE con longitud mayor a un stub de texto (> 1KB)
+        if (pythonInNative.exists() && pythonInNative.length() > 1000L && pythonInNative.canExecute()) {
+            return pythonInNative
+        }
 
         val python3InNative = File(nativeDir, "libpython3.so")
-        if (python3InNative.exists() && python3InNative.canExecute()) return python3InNative
+        if (python3InNative.exists() && python3InNative.length() > 1000L && python3InNative.canExecute()) {
+            return python3InNative
+        }
 
         val binDir = File(context.filesDir, "bin")
         val candidateInBin = File(binDir, "python3")
@@ -190,13 +196,16 @@ object YtDlpNativeEngine {
                 .redirectErrorStream(false)
 
             val pythonEnvDir = File(context.filesDir, "env/python")
+            val stdlibDir = File(pythonEnvDir, "stdlib")
+            val modulesDir = File(pythonEnvDir, "modules")
             val ffmpegEnvDir = File(context.filesDir, "env/ffmpeg")
             val nativeDir = context.applicationInfo.nativeLibraryDir
 
             processBuilder.environment().apply {
-                this["PYTHONHOME"] = "${pythonEnvDir.absolutePath}/usr"
-                this["HOME"] = "${pythonEnvDir.absolutePath}/usr"
-                this["LD_LIBRARY_PATH"] = "${pythonEnvDir.absolutePath}/usr/lib:${ffmpegEnvDir.absolutePath}/usr/lib:$nativeDir"
+                this["PYTHONHOME"] = pythonEnvDir.absolutePath
+                this["PYTHONPATH"] = "${stdlibDir.absolutePath}:${modulesDir.absolutePath}:${pythonEnvDir.absolutePath}:${pythonEnvDir.absolutePath}/usr/lib/python3.12:${context.filesDir.absolutePath}/bin"
+                this["HOME"] = pythonEnvDir.absolutePath
+                this["LD_LIBRARY_PATH"] = "$nativeDir:${modulesDir.absolutePath}:${pythonEnvDir.absolutePath}/usr/lib:${ffmpegEnvDir.absolutePath}/usr/lib"
                 this["SSL_CERT_FILE"] = "${pythonEnvDir.absolutePath}/usr/etc/tls/cert.pem"
                 this["PATH"] = "$nativeDir:${context.filesDir.absolutePath}/bin:${System.getenv("PATH") ?: ""}"
                 this["TMPDIR"] = context.cacheDir.absolutePath
