@@ -8,12 +8,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -26,6 +28,8 @@ import com.example.model.EqualizerBand
 import com.example.model.EqualizerPreset
 import com.example.model.HeadphoneConfig
 import com.example.model.RepeatMode
+import com.example.model.ReverbConfig
+import com.example.model.ReverbPreset
 import com.example.model.SleepTimerState
 import com.example.model.Spatial8DConfig
 import com.example.model.Track
@@ -92,6 +96,11 @@ fun NowPlayingScreen(
     onSet8DOrbitSpeed: (Float) -> Unit = {},
     onSet8DSpatialIntensity: (Float) -> Unit = {},
     onSet8DRoomDepth: (Float) -> Unit = {},
+    // Suite Reverb & Filtros Acústicos
+    reverbConfig: ReverbConfig = ReverbConfig(),
+    onSetReverbEnabled: (Boolean) -> Unit = {},
+    onSetReverbPreset: (ReverbPreset) -> Unit = {},
+    onSetReverbCustomParameters: (roomSize: Float, decayMs: Int, levelDb: Float) -> Unit = { _, _, _ -> },
     playbackSpeed: Float = 1.0f,
     onSetPlaybackSpeed: (Float) -> Unit = {},
     playbackPitch: Float = 1.0f,
@@ -145,6 +154,8 @@ fun NowPlayingScreen(
         )
     }
 
+    val isVideoVisual = (videoDisplayMode != VideoDisplayMode.OFF) && !currentTrack.videoUri.isNullOrEmpty()
+
     // Extracción dinámica de color: si Video Canvas está activo, extrae del video para armonizar la UI
     LaunchedEffect(
         currentTrack.id,
@@ -153,30 +164,46 @@ fun NowPlayingScreen(
         videoDisplayMode,
         isDynamicArtworkColorEnabled
     ) {
-        val isVideoVisual = (videoDisplayMode != VideoDisplayMode.OFF) && !currentTrack.videoUri.isNullOrEmpty()
         activeColors = ArtworkColorExtractor.extractPlaybackColors(
             context = context,
             track = currentTrack,
             isVideoActive = isVideoVisual,
             isDynamicEnabled = isDynamicArtworkColorEnabled,
             fallbackPrimary = fallbackPrimary,
-            fallbackSecondary = fallbackSecondary
+            fallbackSecondary = fallbackSecondary,
+            positionMs = currentPositionMs
         )
+    }
+
+    // Muestreo dinámico continuo de fotogramas del Video Canvas cada 2.5 segundos según la posición de reproducción
+    if (isVideoVisual && isPlaying && isDynamicArtworkColorEnabled) {
+        val intervalStep = (currentPositionMs / 2500L).coerceAtLeast(0L)
+        LaunchedEffect(currentTrack.id, intervalStep) {
+            activeColors = ArtworkColorExtractor.extractPlaybackColors(
+                context = context,
+                track = currentTrack,
+                isVideoActive = true,
+                isDynamicEnabled = true,
+                fallbackPrimary = fallbackPrimary,
+                fallbackSecondary = fallbackSecondary,
+                positionMs = currentPositionMs
+            )
+        }
     }
 
     val animatedPrimary by animateColorAsState(
         targetValue = activeColors.primary,
-        animationSpec = tween(400),
+        animationSpec = tween(1200),
         label = "PrimaryAuraColor"
     )
     val animatedSecondary by animateColorAsState(
         targetValue = activeColors.secondary,
-        animationSpec = tween(400),
+        animationSpec = tween(1200),
         label = "SecondaryAuraColor"
     )
     val animatedTopGlow by animateColorAsState(
         targetValue = activeColors.ambientTopGlow,
-        animationSpec = tween(400),
+        animationSpec = tween(1200),
         label = "TopAuraGlow"
     )
 
@@ -318,7 +345,8 @@ fun NowPlayingScreen(
                 modifier = Modifier.fillMaxWidth(0.9f),
                 barCount = 28,
                 barHeight = 40.dp,
-                customColor = animatedPrimary
+                customPrimaryColor = animatedPrimary,
+                customSecondaryColor = animatedSecondary
             )
 
             Spacer(modifier = Modifier.height(18.dp))
@@ -354,46 +382,116 @@ fun NowPlayingScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                    .padding(horizontal = 4.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                TextButton(
-                    onClick = {
-                        effectsInitialTab = 0
-                        showEffectsSheet = true
-                    },
-                    modifier = Modifier.testTag("now_playing_eq_shortcut")
+                // Ecualizador
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = Color.White.copy(alpha = 0.05f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(44.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .clickable {
+                            effectsInitialTab = 0
+                            showEffectsSheet = true
+                        }
+                        .testTag("now_playing_eq_shortcut")
                 ) {
-                    Icon(Icons.Default.Tune, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Ecualizador FX", color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.Bold)
+                    Row(
+                        modifier = Modifier.fillMaxSize().padding(horizontal = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Tune,
+                            contentDescription = null,
+                            tint = animatedSecondary,
+                            modifier = Modifier.size(17.dp)
+                        )
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text(
+                            text = "EQ FX",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = animatedSecondary,
+                                fontSize = 12.sp
+                            ),
+                            maxLines = 1
+                        )
+                    }
                 }
 
-                TextButton(
-                    onClick = { showLyrics = !showLyrics },
-                    modifier = Modifier.testTag("now_playing_lyrics_shortcut")
+                // Letras / Carátula
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = Color.White.copy(alpha = 0.05f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(44.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .clickable { showLyrics = !showLyrics }
+                        .testTag("now_playing_lyrics_shortcut")
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Mic,
-                        contentDescription = null,
-                        tint = if (showLyrics) animatedPrimary else TextSecondary
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = if (showLyrics) "Carátula" else "Letras",
-                        color = if (showLyrics) animatedPrimary else TextSecondary,
-                        fontWeight = if (showLyrics) FontWeight.Bold else FontWeight.Normal
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxSize().padding(horizontal = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = if (showLyrics) Icons.Default.Album else Icons.Default.Mic,
+                            contentDescription = null,
+                            tint = if (showLyrics) animatedPrimary else TextSecondary,
+                            modifier = Modifier.size(17.dp)
+                        )
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text(
+                            text = if (showLyrics) "Carátula" else "Letras",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = if (showLyrics) FontWeight.Bold else FontWeight.Medium,
+                                color = if (showLyrics) animatedPrimary else TextSecondary,
+                                fontSize = 12.sp
+                            ),
+                            maxLines = 1
+                        )
+                    }
                 }
 
-                TextButton(
-                    onClick = { showQueueSheet = true },
-                    modifier = Modifier.testTag("now_playing_queue_btn")
+                // Cola de Reproducción
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = Color.White.copy(alpha = 0.05f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(44.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .clickable { showQueueSheet = true }
+                        .testTag("now_playing_queue_btn")
                 ) {
-                    Icon(Icons.Default.QueueMusic, contentDescription = null, tint = TextSecondary)
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Cola (${queue.size})", color = TextSecondary)
+                    Row(
+                        modifier = Modifier.fillMaxSize().padding(horizontal = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.QueueMusic,
+                            contentDescription = null,
+                            tint = TextSecondary,
+                            modifier = Modifier.size(17.dp)
+                        )
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text(
+                            text = "Cola (${queue.size})",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.Medium,
+                                color = TextSecondary,
+                                fontSize = 12.sp
+                            ),
+                            maxLines = 1
+                        )
+                    }
                 }
             }
 
@@ -481,6 +579,10 @@ fun NowPlayingScreen(
                 onSet8DOrbitSpeed = onSet8DOrbitSpeed,
                 onSet8DSpatialIntensity = onSet8DSpatialIntensity,
                 onSet8DRoomDepth = onSet8DRoomDepth,
+                reverbConfig = reverbConfig,
+                onSetReverbEnabled = onSetReverbEnabled,
+                onSetReverbPreset = onSetReverbPreset,
+                onSetReverbCustomParameters = onSetReverbCustomParameters,
                 playbackSpeed = playbackSpeed,
                 onSetPlaybackSpeed = onSetPlaybackSpeed,
                 playbackPitch = playbackPitch,

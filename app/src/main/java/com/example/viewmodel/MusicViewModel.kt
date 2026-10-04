@@ -86,6 +86,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val currentPreset = effectManager.currentPreset
     val isEqEnabled = effectManager.isEnabled
     val spatial8DConfig = effectManager.spatial8DConfig
+    val reverbConfig = effectManager.reverbConfig
 
     // Estados de velocidad, tono, crossfade y gapless
     val playbackSpeed = audioPlayer.playbackSpeed
@@ -263,12 +264,13 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         _currentTheme.value = theme
     }
 
-    // Acciones de Reproducción
+    // Acciones de Reproducción con Cola Contextual Fiel
     fun playTrack(track: Track, fromList: List<Track>? = null) {
         viewModelScope.launch {
             repository.incrementPlayCount(track.id)
             val fullList = allTracks.value
-            val list = if (fromList != null && fromList.size > 1) {
+            val list = if (!fromList.isNullOrEmpty()) {
+                // Respeta estrictamente la lista contextual seleccionada (playlist, álbum, artista o búsqueda)
                 fromList
             } else if (fullList.isNotEmpty()) {
                 if (fullList.any { it.id == track.id }) fullList
@@ -572,6 +574,12 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     fun set8DSpatialIntensity(intensity: Float) = effectManager.set8DSpatialIntensity(intensity)
 
     fun set8DRoomDepth(depth: Float) = effectManager.set8DRoomDepth(depth)
+
+    // Acciones de Suite Reverb Acústica (Presets + Personalización Libre)
+    fun setReverbEnabled(enabled: Boolean) = effectManager.setReverbEnabled(enabled)
+    fun setReverbPreset(preset: com.example.model.ReverbPreset) = effectManager.setReverbPreset(preset)
+    fun setReverbCustomParameters(roomSize: Float, decayMs: Int, levelDb: Float) =
+        effectManager.setReverbCustomParameters(roomSize, decayMs, levelDb)
 
     // Acciones de Velocidad y Tono (Playback Parameters)
     fun setPlaybackSpeed(speed: Float) = audioPlayer.setPlaybackSpeed(speed)

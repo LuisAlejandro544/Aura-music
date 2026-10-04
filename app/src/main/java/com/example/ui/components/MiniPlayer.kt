@@ -5,10 +5,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -21,15 +21,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.model.Track
-import com.example.ui.theme.CardBorder
 import com.example.ui.theme.SurfaceElevatedDark
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 
 /**
- * Mini reproductor flotante inspirado en Spotify.
- * Permanece visible sobre la barra de navegación inferior permitiendo control continuo,
- * acceso directo al ecualizador C++20 y expandir la vista completa al tocarlo.
+ * Mini reproductor flotante inspirado en Spotify con fondo dinámico tintado.
+ *
+ * Características:
+ * - Fondo completamente tintado y degradado con los colores extraídos de la carátula/video actual.
+ * - Barra de progreso, botón de reproducción y acentos sincronizados con la paleta activa.
+ * - Controles ergonómicos estándar: Anterior (⏮️), Play/Pausa (⏯️) y Siguiente (⏭️).
+ * - Permanece visible sobre la barra de navegación inferior con acceso instantáneo a Now Playing.
  */
 @Composable
 fun MiniPlayer(
@@ -39,8 +42,10 @@ fun MiniPlayer(
     durationMs: Long,
     onTogglePlayPause: () -> Unit,
     onSkipNext: () -> Unit,
-    onOpenEqualizer: () -> Unit,
+    onSkipPrevious: () -> Unit,
     onClick: () -> Unit,
+    dynamicPrimary: Color = MaterialTheme.colorScheme.primary,
+    dynamicSecondary: Color = MaterialTheme.colorScheme.secondary,
     modifier: Modifier = Modifier
 ) {
     if (currentTrack == null) return
@@ -51,8 +56,17 @@ fun MiniPlayer(
 
     val gradientBorder = Brush.horizontalGradient(
         listOf(
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
-            MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f)
+            dynamicPrimary.copy(alpha = 0.85f),
+            dynamicSecondary.copy(alpha = 0.65f)
+        )
+    )
+
+    // Fondo del mini reproductor completamente tintado con el color dinámico extraído
+    val tintedBackgroundBrush = Brush.horizontalGradient(
+        listOf(
+            dynamicPrimary.copy(alpha = 0.35f),
+            dynamicSecondary.copy(alpha = 0.22f),
+            SurfaceElevatedDark.copy(alpha = 0.95f)
         )
     )
 
@@ -65,11 +79,13 @@ fun MiniPlayer(
             .testTag("mini_player"),
         color = SurfaceElevatedDark,
         tonalElevation = 8.dp,
-        shadowElevation = 8.dp,
-        border = CardBorder.let { androidx.compose.foundation.BorderStroke(1.dp, gradientBorder) }
+        shadowElevation = 10.dp,
+        border = androidx.compose.foundation.BorderStroke(1.dp, gradientBorder)
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(tintedBackgroundBrush)
         ) {
             Row(
                 modifier = Modifier
@@ -108,22 +124,22 @@ fun MiniPlayer(
                     )
                 }
 
-                // Botón Acceso Rápido al Ecualizador C++
+                // Botón Canción Anterior
                 IconButton(
-                    onClick = onOpenEqualizer,
+                    onClick = onSkipPrevious,
                     modifier = Modifier
                         .size(44.dp)
-                        .testTag("mini_player_equalizer")
+                        .testTag("mini_player_skip_previous")
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Equalizer,
-                        contentDescription = "Abrir Ecualizador C++",
-                        tint = MaterialTheme.colorScheme.secondary,
-                        modifier = Modifier.size(22.dp)
+                        imageVector = Icons.Default.SkipPrevious,
+                        contentDescription = "Pista anterior",
+                        tint = TextPrimary,
+                        modifier = Modifier.size(24.dp)
                     )
                 }
 
-                // Botón Play/Pause
+                // Botón Play/Pause Tintado
                 IconButton(
                     onClick = onTogglePlayPause,
                     modifier = Modifier
@@ -132,7 +148,7 @@ fun MiniPlayer(
                 ) {
                     Surface(
                         shape = RoundedCornerShape(24.dp),
-                        color = MaterialTheme.colorScheme.primary,
+                        color = dynamicPrimary,
                         modifier = Modifier.size(36.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
@@ -161,14 +177,14 @@ fun MiniPlayer(
                 }
             }
 
-            // Barra delgada de progreso en la parte inferior
+            // Barra delgada de progreso en la parte inferior tintada
             LinearProgressIndicator(
                 progress = { progress },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(3.dp),
-                color = MaterialTheme.colorScheme.secondary,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant
+                color = dynamicPrimary,
+                trackColor = dynamicPrimary.copy(alpha = 0.20f)
             )
         }
     }

@@ -74,10 +74,11 @@ Este archivo define el contexto de diseño, directrices técnicas y restriccione
 
 11. **Descarga Directa desde TikTok, YouTube y Enlaces Web**:
     - Permite a los usuarios descargar cualquier canción completa, parodia o audio de cualquier duración pegando un enlace de TikTok, YouTube o URL web.
-    - **Arquitectura de Extracción con Selector de Motor (InnerTube vs WebView)**:
-      - *Motor InnerTube*: API nativa directa de YouTube Music (`ANDROID_MUSIC` y `WEB_REMIX`). 100% gratuita, ultrarrápida (<300ms) y ejecutada directamente desde la IP móvil/residencial del usuario, evitando bloqueos por IP de centro de datos.
-      - *Motor WebView Reparado*: Navegador efímero en segundo plano configurado con `mediaPlaybackRequiresUserGesture = false` y modo embebido nocookie para evitar muros de consentimiento, interceptando el stream de red de `googlevideo.com` y evaluando `ytInitialPlayerResponse`.
-      - *Selector Interactivo*: Permite al usuario escoger entre InnerTube y WebView directamente en el diálogo con auto-fallback cruzado.
+    - **Arquitectura de Extracción Resiliente de 3 Niveles (InnerTube + Invidious Bypass + WebView Móvil)**:
+      - *Motor InnerTube*: API nativa directa de YouTube mediante clientes de baja fricción (`ANDROID_VR` y `VISIONOS`). 100% gratuita, ultrarrápida (<300ms) y libre de restricciones de inicio de sesión (`LOGIN_REQUIRED`) o firmas cifradas (`n-sig`).
+      - *Bypass de Respaldo Invidious*: Instancias públicas libres para resolución inmediata de canciones oficiales con restricciones de derechos estrictas.
+      - *Motor WebView Reparado*: Navegador efímero en segundo plano cargado sobre `m.youtube.com` (sin bloqueos de inserción ni error 150) con timeout de 22s e intercepción del stream en memoria.
+      - *Selector Interactivo*: Permite al usuario alternar entre InnerTube y WebView en el diálogo con auto-fallback cruzado de 3 capas.
     - Almacenamiento organizado: audio `.m4a`/`.mp3` en `songs/`, carátula oficial en WebP sin pérdida en `images/`, y video vinculado en `videos/` para reproducir el Video Canvas de fondo.
     - Interfaz adaptativa: Degradados visuales reactivos (Cyan/Magenta para TikTok, Rojo Carmesí/Naranja para YouTube/Web) y reproducción inmediata en Now Playing tras descargar.
 
@@ -93,9 +94,11 @@ Este archivo define el contexto de diseño, directrices técnicas y restriccione
     - El canal de notificación debe ser silencioso (`IMPORTANCE_LOW`) para evitar pitidos en cada cambio de canción.
     - En Android 13+ (API 33+) se debe solicitar el permiso en tiempo de ejecución `POST_NOTIFICATIONS`.
 
-14. **Reacción Acústica por Intensidad Ligada a C++20 DSP y Cápsula Ergonómica de Video Canvas**:
-    - La respiración física (`scale`), elevación de sombra y halo ambiental de Now Playing están directamente sincronizados con la intensidad RMS calculada dentro del motor nativo en C++20 (`getAudioIntensity()`), complementando las 28 bandas de `getVisualizerBands()`.
-    - El selector para alternar modos de Video Canvas debe presentarse como una cápsula flotante ergonómica de alto contraste (`Color.Black.copy(alpha = 0.88f)`) con área táctil superior a **48.dp**, visible en los 3 modos siempre que haya video, permitiendo alternar con un toque o abrir el selector modal al mantener presionado.
+14. **Carátula Limpia y Estática, Armonización Dinámica de Video Canvas y Mini Reproductor Tintado**:
+    - La carátula central y el Video Canvas se muestran con visibilidad completa del 100% sin cápsulas superpuestas que obstruyan la ilustración. Su escala se mantiene fija en 1.0f para garantizar máxima nitidez sin movimientos no deseados por la música.
+    - Durante la reproducción de Video Canvas, se muestrean fotogramas del video en intervalos de ~2.5 segundos adaptando de forma suave y continua (`tween(1200)`) los tonos del halo lumínico y visualizador según las escenas del video.
+    - El Mini Reproductor aplica un fondo completamente tintado y degradado con los colores extraídos de la pista activa, manteniendo consistencia visual en todas las pantallas.
+    - Los atajos inferiores de Now Playing se organizan en 3 módulos equilibrados de igual proporción (`EQ FX`, `Letras`/`Carátula` y `Cola`), con área táctil superior a 48dp y texto en una sola línea sin cortes verticales.
 
 15. **Letras Sincronizadas (.LRC) Estilo Karaoke**:
     - Integración de analizador de marcas de tiempo `[mm:ss.xx]` con persistencia local en `Android/data/.../files/lyrics/track_{id}.lrc`.

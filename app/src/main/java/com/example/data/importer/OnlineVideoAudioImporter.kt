@@ -161,13 +161,18 @@ object OnlineVideoAudioImporter {
                         }
 
                         if (videoPlayUrl.isNotBlank()) {
+                            // En TikTok, los enlaces en music_info.play están limitados a 60 segundos por su biblioteca de sonidos.
+                            // Para admitir videos de cualquier duración (5 min, 10 min, 30 min o hasta 1 hora),
+                            // dejamos audioUrl = null para forzar la extracción directa y sin recodificación
+                            // desde el flujo de video original mediante MediaExtractor/MediaMuxer.
+                            val resolvedVideo = if (videoPlayUrl.startsWith("//")) "https:$videoPlayUrl" else videoPlayUrl
                             return Result.success(
                                 ResolvedMediaInfo(
                                     originalUrl = tikTokUrl,
                                     suggestedTitle = title,
                                     suggestedArtist = artist,
-                                    videoUrl = if (videoPlayUrl.startsWith("//")) "https:$videoPlayUrl" else videoPlayUrl,
-                                    audioUrl = if (musicUrl.startsWith("//")) "https:$musicUrl" else musicUrl.ifBlank { null },
+                                    videoUrl = resolvedVideo,
+                                    audioUrl = null,
                                     coverUrl = if (coverUrl.startsWith("//")) "https:$coverUrl" else coverUrl.ifBlank { null },
                                     durationSeconds = duration
                                 )

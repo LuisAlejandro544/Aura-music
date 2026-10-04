@@ -125,8 +125,8 @@ object ArtworkColorExtractor {
     /**
      * Extrae los colores armónicos para la reproducción activa en pantalla Now Playing.
      * Si Video Canvas está activo y la pista cuenta con video, extrae la paleta cromática
-     * directamente de un fotograma clave del video en segundo plano mediante MediaMetadataRetriever,
-     * garantizando que el color de la carátula estática NO interfiera ni choque con el video.
+     * dinámicamente de los fotogramas del video en intervalos de ~2.5 segundos según la posición de reproducción,
+     * permitiendo que la atmósfera lumínica evolucione con el ritmo y las escenas del video.
      * Si Video Canvas está desactivado o la pista no tiene video, extrae los colores de la carátula.
      * Si el usuario desactivó la opción en Ajustes, retorna la paleta predeterminada del tema.
      */
@@ -136,7 +136,8 @@ object ArtworkColorExtractor {
         isVideoActive: Boolean,
         isDynamicEnabled: Boolean,
         fallbackPrimary: Color,
-        fallbackSecondary: Color
+        fallbackSecondary: Color,
+        positionMs: Long = 1000L
     ): ExtractedArtworkColors = withContext(Dispatchers.Default) {
         if (!isDynamicEnabled || track == null) {
             return@withContext createFallback(fallbackPrimary, fallbackSecondary)
@@ -145,7 +146,8 @@ object ArtworkColorExtractor {
         // Si el Video Canvas está en pantalla y hay video configurado: extraer color del fotograma del video
         val videoUri = track.videoUri
         if (isVideoActive && !videoUri.isNullOrBlank()) {
-            val videoCacheKey = -(track.id.absoluteValue + 100_000L)
+            val interval = (positionMs / 2500L).coerceAtLeast(0L)
+            val videoCacheKey = -(track.id.absoluteValue * 10_000L + interval)
             memoryCache.get(videoCacheKey)?.let { return@withContext it }
 
             var frameBitmap: Bitmap? = null
@@ -157,16 +159,16 @@ object ArtworkColorExtractor {
                 } else {
                     retriever.setDataSource(videoUri)
                 }
-                // Obtener fotograma a 1 segundo o primer fotograma disponible
-                frameBitmap = retriever.getFrameAtTime(1_000_000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                val timeUs = (positionMs * 1000L).coerceAtLeast(0L)
+                frameBitmap = retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
                     ?: retriever.frameAtTime
 
                 if (frameBitmap != null) {
-                    val scaled = Bitmap.createScaledBitmap(frameBitmap, 96, 96, false)
+                    val scaled = Bitmap.createScaledBitmap(frameBitmap, 64, 64, false)
                     if (scaled != frameBitmap) {
                         frameBitmap.recycle()
                     }
-                    val palette = Palette.from(scaled).maximumColorCount(16).generate()
+                    val palette = Palette.from(scaled).maximumColorCount(8).generate()
                     scaled.recycle()
 
                     val vibrant = palette.vibrantSwatch
