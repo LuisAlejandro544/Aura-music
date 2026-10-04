@@ -27,6 +27,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.MainActivity
 import com.example.debug.ui.*
@@ -77,6 +78,7 @@ fun DebugMonitorScreen(
 ) {
     val context = LocalContext.current
     val allLogs by AuraDebugManager.logs.collectAsStateWithLifecycle()
+    var selectedTab by remember { mutableIntStateOf(0) }
     var selectedFilter by remember { mutableStateOf<DebugSeverity?>(null) }
     var selectedEntryForDetail by remember { mutableStateOf<DebugLogEntry?>(null) }
     var showTestMenu by remember { mutableStateOf(false) }
@@ -99,79 +101,115 @@ fun DebugMonitorScreen(
             .background(BackgroundDark),
         containerColor = BackgroundDark,
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column {
+                TopAppBar(
+                    title = {
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "Aura Monitor",
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = TextPrimary
+                                    )
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Surface(
+                                    shape = CircleShape,
+                                    color = if (crashCount > 0 || criticalCount > 0) Color(0xFFFF3B30) else Color(0xFF00E676),
+                                    modifier = Modifier.size(8.dp)
+                                ) {}
+                            }
                             Text(
-                                text = "Aura Monitor",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = TextPrimary
+                                text = if (crashCount > 0) "$crashCount fallos críticos detectados" else "Sistema estable (${allLogs.size} eventos)",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    color = if (crashCount > 0) Color(0xFFFF8A80) else TextSecondary
                                 )
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Surface(
-                                shape = CircleShape,
-                                color = if (crashCount > 0 || criticalCount > 0) Color(0xFFFF3B30) else Color(0xFF00E676),
-                                modifier = Modifier.size(8.dp)
-                            ) {}
                         }
-                        Text(
-                            text = if (crashCount > 0) "$crashCount fallos críticos detectados" else "Sistema estable (${allLogs.size} eventos)",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                color = if (crashCount > 0) Color(0xFFFF8A80) else TextSecondary
-                            )
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onFinish) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = TextPrimary)
-                    }
-                },
-                actions = {
-                    // Botón para generar eventos de prueba
-                    IconButton(
-                        onClick = { showTestMenu = true },
-                        modifier = Modifier.testTag("debug_test_events_btn")
-                    ) {
-                        Icon(Icons.Default.BugReport, contentDescription = "Eventos de Prueba", tint = MaterialTheme.colorScheme.primary)
-                    }
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onFinish) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = TextPrimary)
+                        }
+                    },
+                    actions = {
+                        // Botón para generar eventos de prueba
+                        IconButton(
+                            onClick = { showTestMenu = true },
+                            modifier = Modifier.testTag("debug_test_events_btn")
+                        ) {
+                            Icon(Icons.Default.BugReport, contentDescription = "Eventos de Prueba", tint = MaterialTheme.colorScheme.primary)
+                        }
 
-                    // Botón para copiar reporte completo
-                    IconButton(
-                        onClick = {
-                            val report = AuraDebugManager.generateFullReportText(context)
-                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-                            clipboard?.setPrimaryClip(ClipData.newPlainText("Aura Music Diagnostic Report", report))
-                            Toast.makeText(context, "Reporte completo copiado al portapapeles", Toast.LENGTH_SHORT).show()
-                        },
-                        modifier = Modifier.testTag("debug_copy_report_btn")
-                    ) {
-                        Icon(Icons.Default.ContentCopy, contentDescription = "Copiar Reporte", tint = TextPrimary)
-                    }
+                        // Botón para copiar reporte completo
+                        IconButton(
+                            onClick = {
+                                val report = AuraDebugManager.generateFullReportText(context)
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                                clipboard?.setPrimaryClip(ClipData.newPlainText("Aura Music Diagnostic Report", report))
+                                Toast.makeText(context, "Reporte completo copiado al portapapeles", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.testTag("debug_copy_report_btn")
+                        ) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = "Copiar Reporte", tint = TextPrimary)
+                        }
 
-                    // Botón para abrir la app de música
-                    IconButton(
-                        onClick = onOpenMusicApp,
-                        modifier = Modifier.testTag("debug_open_music_btn")
-                    ) {
-                        Icon(Icons.Default.MusicNote, contentDescription = "Abrir Reproductor", tint = MaterialTheme.colorScheme.secondary)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
-            )
+                        // Botón para abrir la app de música
+                        IconButton(
+                            onClick = onOpenMusicApp,
+                            modifier = Modifier.testTag("debug_open_music_btn")
+                        ) {
+                            Icon(Icons.Default.MusicNote, contentDescription = "Abrir Reproductor", tint = MaterialTheme.colorScheme.secondary)
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
+                )
+
+                // Barra de navegación entre Pestaña 1 (Incidentes & Logs) y Pestaña 2 (Rendimiento & Hilos)
+                PrimaryTabRow(
+                    selectedTabIndex = selectedTab,
+                    containerColor = BackgroundDark,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    divider = { HorizontalDivider(color = Color.White.copy(alpha = 0.08f)) }
+                ) {
+                    Tab(
+                        selected = selectedTab == 0,
+                        onClick = { selectedTab = 0 },
+                        text = { Text("Incidentes & Logs (${allLogs.size})", fontWeight = FontWeight.Bold, fontSize = 13.sp) },
+                        icon = { Icon(Icons.Default.ListAlt, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                        selectedContentColor = MaterialTheme.colorScheme.primary,
+                        unselectedContentColor = TextSecondary
+                    )
+                    Tab(
+                        selected = selectedTab == 1,
+                        onClick = { selectedTab = 1 },
+                        text = { Text("Rendimiento & Hilos", fontWeight = FontWeight.Bold, fontSize = 13.sp) },
+                        icon = { Icon(Icons.Default.Speed, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                        selectedContentColor = MaterialTheme.colorScheme.primary,
+                        unselectedContentColor = TextSecondary
+                    )
+                }
+            }
         }
     ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(bottom = 32.dp)
-        ) {
+        if (selectedTab == 1) {
+            // Pestaña 2: Rendimiento, RAM segmentada e Inspector de Hilos
+            PerformanceTelemetryTabContent(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+            )
+        } else {
+            // Pestaña 1: Registro de Incidentes y Hardware
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(top = 10.dp, bottom = 32.dp)
+            ) {
             // Tarjeta de Hardware y Entorno del Teléfono
             item {
                 HardwareTelemetryCard(deviceInfo = deviceInfo)
@@ -256,6 +294,7 @@ fun DebugMonitorScreen(
             }
         }
     }
+}
 
     // Modal de Detalle Completo de Stack Trace en crudo
     if (selectedEntryForDetail != null) {

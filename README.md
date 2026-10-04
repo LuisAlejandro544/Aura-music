@@ -106,14 +106,17 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
 - **Sincronización Instantánea de Favoritos**: El botón de corazón en Now Playing y en la Biblioteca refleja reactivamente el estado en tiempo real (icono relleno en rojo `Color(0xFFEF4444)` al marcar favorito).
 - **Lista de Inicio Estable**: La sección "Populares en tu biblioteca" permanece fija y nunca elimina otras canciones al marcar un favorito.
 
-### 5. Letras Sincronizadas (.LRC) Estilo Karaoke con Descarga Automática 🎤📜
+### 5. Letras Sincronizadas (.LRC y .TXT) Estilo Karaoke con Importador Local y Descarga Automática 🎤📜
 - **Descarga Automática 100% Gratuita**: Al iniciar la reproducción de cualquier canción sin letra, consulta automáticamente el servicio público libre LRCLIB mediante metadatos y búsqueda inteligente (sanitizando sufijos como *official*, *video*, *remastered* o *feat.*) sin requerir registro ni API keys.
-- **Persistencia en Almacenamiento Estructurado**: Almacena las letras en archivos `.lrc` locales organizados en `Android/data/.../files/lyrics/track_{id}.lrc` para consulta sin conexión a internet.
+- **Importador de Archivos de Letras (.LRC y .TXT) desde el Celular**: Botón directo en la barra superior y en el estado vacío de la tarjeta de Karaoke para importar archivos de letras descargados en el teléfono mediante el selector de documentos nativo. Soporta tanto letras sincronizadas `.lrc` como letras en texto plano `.txt`.
+- **Detección y Vinculación Automática al Importar Música**: Al importar canciones desde el almacenamiento (SAF, carpetas o 'Abrir con...'), detecta automáticamente archivos hermanos `.lrc` o `.txt` con el mismo nombre en la carpeta o metadatos incrustados, asignando la letra al instante sin requerir internet.
+- **Persistencia en Almacenamiento Estructurado**: Almacena las letras en archivos `.lrc` locales organizados en `Android/data/.../files/lyrics/track_{id}.lrc` para consulta sin conexión a internet de por vida.
 - **Experiencia Karaoke Fluida**:
   - Resaltado lumínico neón con tipografía ampliada (`19.sp`, negrita extra) para la frase que se está cantando.
   - Desplazamiento automático (*auto-scroll*) continuo y suave para mantener la frase activa centrada en pantalla.
   - Atenuación de frases anteriores y estilo neutro para los versos venideros.
   - Salto táctil instantáneo (*Seek-to-time*): Tocar cualquier verso rebobina o avanza la canción exactamente a esa marca de tiempo `[mm:ss.xx]`.
+  - Visualizador de letras planas `.txt` con desplazamiento vertical continuo y tipografía cómoda.
 - **Edición y Carga Manual**: Diálogo modal para ingresar o pegar letras `.lrc` personalizadas o texto plano en cualquier momento.
 - **Acceso Rápido**: Botón de micrófono en la barra superior de Now Playing y botón alternador en los atajos inferiores para alternar entre carátula/canvas y vista karaoke con un solo toque.
 
@@ -125,16 +128,16 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
   - 🎬 **Video Canvas Vinculado**: Vincula el video como Canvas de fondo sincronizado en `NowPlayingScreen`.
 - **Reproducción Inmediata**: Al finalizar la conversión, la pista recién creada se reproduce de inmediato con su Video Canvas y atmósfera lumínica armonizada.
 
-### 7. Descarga Directa desde TikTok, YouTube y Enlaces Web (Música, Carátula y Video Canvas) 🎬🔗🎵
+### 7. Descarga Directa desde TikTok, YouTube y Enlaces Web (Música, Carátula Oficial y Video Canvas) 🎬🔗🎵
 - **Descargas sin Límite de Duración**: Permite pegar enlaces de **TikTok**, **YouTube** y videos web para descargar música completa, directos, sesiones o parodias de cualquier duración.
-- **Arquitectura de Extracción Resiliente de 3 Niveles (InnerTube + Invidious Bypass + WebView Móvil)**:
+- **Arquitectura de Extracción Resiliente de 3 Niveles con Carátula Garantizada**:
   - ⚡ **Motor InnerTube Nativo (`InnerTubeClient`)**: Consulta directa ultrarrápida al endpoint oficial de YouTube mediante clientes de baja fricción (`ANDROID_VR` y `VISIONOS`). Entrega flujos de audio y video directos sin cifrado de firma (`n-sig`) ni bloqueos de `LOGIN_REQUIRED` en menos de ~300ms.
   - 🛡️ **Bypass de Respaldo Invidious (`InvidiousStreamResolver`)**: Para pistas con restricciones estrictas de derechos de autor (VEVO, discográficas) que exigen inicio de sesión en clientes anónimos, consulta en milisegundos instancias públicas de alta disponibilidad que descifran los enlaces directos a `googlevideo.com`.
-  - 🌐 **Motor Headless WebView Reparado (`HeadlessWebViewExtractor`)**: Navegador efímero en segundo plano cargado sobre `m.youtube.com` (evitando el error 150 de reproductores embebidos) con `mediaPlaybackRequiresUserGesture = false`, timeout ampliado a 22s e intercepción del stream en memoria.
+  - 🌐 **Motor Headless WebView Reparado con Garantía de Carátula (`HeadlessWebViewExtractor`)**: Navegador efímero en segundo plano cargado sobre `m.youtube.com` (evitando el error 150) con timeout de 22s, extracción de miniaturas oficiales en el DOM y **descarga en cascada resiliente** (`maxresdefault.jpg` -> `hqdefault.jpg` -> `mqdefault.jpg` -> `i.ytimg.com` -> fotograma clave de video). ¡Garantiza que ningún video descargado se quede jamás sin carátula!
   - 🎛️ **Selector Interactivo en el Diálogo**: El usuario puede alternar entre ambos motores en el diálogo de descarga con auto-fallback cruzado de 3 capas.
 - **Extracción Automática 3 en 1**:
   - 🎵 **Audio de Alta Fidelidad**: Extrae la pista de audio pura en formato `.m4a` o `.mp3` directamente a `songs/`.
-  - 🖼️ **Carátula Oficial en WebP**: Descarga la portada en alta resolución (o extrae fotograma clave) y la procesa a WebP sin pérdida en `images/`.
+  - 🖼️ **Carátula Oficial en WebP**: Descarga la portada oficial en alta resolución y la procesa a WebP sin pérdida en `images/`.
   - 🎬 **Video Canvas Vinculado**: Almacena el video en `videos/` para reproducirlo de fondo continuo o sincronizado en *Now Playing*.
 - **Previsualización y Edición Rápida**: Muestra título, autor/creador, duración y portada antes de confirmar con temas visuales adaptativos (Cyan/Magenta para TikTok, Rojo Carmesí/Naranja para YouTube/Web).
 - **Reproducción al Instante**: Una vez descargada, inicia la reproducción automáticamente abriendo Now Playing.
@@ -200,11 +203,16 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
   - 📁 `videos/`: Videos de fondo y loops de Canvas (.mp4/.webm).
 
 ### 13. Suite de Diagnóstico Autónoma: Aura Monitor 🛠️ & LeakCanary
-- **Aura Monitor (App Debug Propia en el Cajón de Aplicaciones)**:
+- **Aura Monitor (App Debug Propia con Navegación Modular por Pestañas)**:
   - Cuenta con su propio icono de acceso directo en el cajón de apps del teléfono móvil.
-  - Atrapa y registra automáticamente **Crashes** no controlados mediante `UncaughtExceptionHandler`, **Errores Críticos**, **Warnings de Memoria** y eventos de Media3 / JNI.
-  - Registra datos técnicos del teléfono móvil: Modelo, Fabricante, Versión de Android / SDK API, CPU ABI (64-bit / 32-bit), memoria RAM libre/total y espacio de disco disponible.
-  - Visualizador de **Stack Trace en crudo** completo con copia rápida al portapapeles y generación de informe diagnóstico integral para compartir sin necesidad de PC.
+  - 📋 **Pestaña 1: Incidentes & Logs**:
+    - Atrapa y registra automáticamente **Crashes** no controlados mediante `UncaughtExceptionHandler`, **Errores Críticos**, **Warnings de Memoria** y eventos de Media3 / JNI.
+    - Registra datos técnicos del teléfono móvil: Modelo, Fabricante, Versión de Android / SDK API, CPU ABI (64-bit / 32-bit), memoria RAM libre/total y espacio de disco disponible.
+    - Visualizador de **Stack Trace en crudo** completo con copia rápida al portapapeles y generación de informe diagnóstico integral para compartir sin necesidad de PC.
+  - ⚡ **Pestaña 2: Rendimiento, RAM Detallada e Inspector de Hilos (En Vivo)**:
+    - **Desglose de Memoria RAM Segmentado**: Visualización gráfica y numérica en vivo de PSS Total, Java Heap (VM), Native Heap (C++20 DSP y CMake), Gráficos/Shaders (Compose y Coil WebP) y Código compilado (.dex y binarios nativos .so).
+    - **Telemetría de Procesador**: Carga de CPU del proceso en tiempo real (%), número de núcleos activos, estado térmico del hardware (Throttling) y tasa estimada de FPS.
+    - **Inspector Quirúrgico de Hilos (Thread Profiler)**: Enumeración en vivo de todos los hilos del proceso (`main`, `ExoPlayer:Playback`, `DefaultDispatcher-worker`, `AudioTrack`, `RenderThread`, etc.) con clasificación por categoría, estado coloreado (`RUNNABLE`, `TIMED_WAITING`, `BLOCKED`), búsqueda instantánea, traza de pila completa expandible y copia rápida al portapapeles.
 - **LeakCanary**: Integrado en el entorno de desarrollo para auditoría y detección en tiempo real de fugas de memoria en la JVM.
 
 ---

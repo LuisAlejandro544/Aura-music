@@ -140,6 +140,7 @@ fun NowPlayingScreen(
     lyricsState: com.example.model.LyricsState = com.example.model.LyricsState(),
     onFetchOnlineLyrics: () -> Unit = {},
     onSaveCustomLyrics: (String) -> Unit = {},
+    onImportLyricsUri: (android.net.Uri) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     BackHandler {
@@ -330,6 +331,7 @@ fun NowPlayingScreen(
                     onSeekTo = onSeekTo,
                     onFetchOnlineLyrics = onFetchOnlineLyrics,
                     onSaveCustomLyrics = onSaveCustomLyrics,
+                    onImportLyricsUri = onImportLyricsUri,
                     onCloseLyrics = { showLyrics = false }
                 )
             } else {

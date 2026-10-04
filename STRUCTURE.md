@@ -25,14 +25,17 @@ AuraMusic/
 │   │   │   │   │   ├── DebugSeverity.kt        # Enum de severidades (CRASH, CRÍTICO, ERROR, WARNING, INFO)
 │   │   │   │   │   ├── DeviceDiagnosticInfo.kt # Ficha técnica de hardware del teléfono
 │   │   │   │   │   ├── DebugLogEntry.kt        # Modelo de eventos con stacktrace en crudo y hora
+│   │   │   │   │   ├── PerformanceDiagnosticModels.kt # Modelos para RAM segmentada (Java/Native/Gfx), CPU e Hilos
+│   │   │   │   │   ├── PerformanceTelemetryManager.kt # Gestor de telemetría de memoria, procesador e inspector de hilos
 │   │   │   │   │   ├── AuraDebugManager.kt     # Gestor central de logs, persistencia JSON y UncaughtHandler
-│   │   │   │   │   ├── DebugMonitorActivity.kt # Actividad accesible desde el cajón de apps (Aura Monitor)
+│   │   │   │   │   ├── DebugMonitorActivity.kt # Actividad con pestañas (Incidentes & Logs vs Rendimiento & Hilos)
 │   │   │   │   │   └── ui/                     # Componentes modulares de Aura Monitor
 │   │   │   │   │       ├── HardwareTelemetryCard.kt   # Ficha técnica de hardware, RAM y CPU ABI
 │   │   │   │   │       ├── DebugLogEntryCard.kt       # Tarjeta individual para logs con severidad
 │   │   │   │   │       ├── DebugFilterChips.kt        # Filtros por severidad con contadores en vivo
 │   │   │   │   │       ├── DebugLogDetailDialog.kt    # Modal de visualización de Stack Trace en crudo
-│   │   │   │   │       └── DebugSyntheticTestDialog.kt# Menú para simulación sintética de incidencias
+│   │   │   │   │       ├── DebugSyntheticTestDialog.kt# Menú para simulación sintética de incidencias
+│   │   │   │   │       └── PerformanceTelemetryTabContent.kt # Panel en vivo de RAM segmentada, CPU e Inspector de Hilos
 │   │   │   │   ├── data/
 │   │   │   │   │   ├── importer/               # Módulos de importación y análisis
 │   │   │   │   │   │   ├── AudioMetadataParser.kt # Extractor ID3 y conversor a WebP

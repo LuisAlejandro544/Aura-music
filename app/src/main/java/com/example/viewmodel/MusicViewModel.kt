@@ -797,9 +797,34 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             if (local != null) {
                 _lyricsState.value = local
             } else {
-                _lyricsState.value = com.example.model.LyricsState(trackId = track.id)
-                // Intento automático de descarga para canciones sin letras
-                fetchOnlineLyrics(track)
+                // 1. Detección automática en el celular (.lrc o .txt hermano en misma carpeta o tags)
+                val autoDetected = com.example.data.importer.LyricsManager.autoDetectAndAssociateLyrics(
+                    getApplication(),
+                    track,
+                    storageManager
+                )
+                if (autoDetected != null) {
+                    _lyricsState.value = autoDetected
+                } else {
+                    _lyricsState.value = com.example.model.LyricsState(trackId = track.id)
+                    // 2. Intento de descarga en línea desde LRCLIB para canciones sin letras
+                    fetchOnlineLyrics(track)
+                }
+            }
+        }
+    }
+
+    fun importLyricsFromUri(uri: Uri) {
+        val target = currentTrack.value ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            val imported = com.example.data.importer.LyricsManager.importLyricsFromUri(
+                getApplication(),
+                target,
+                uri,
+                storageManager
+            )
+            if (imported != null) {
+                _lyricsState.value = imported
             }
         }
     }

@@ -208,7 +208,11 @@ class MusicRepository(private val database: AppDatabase) {
             val insertedIds = trackDao.insertTracks(entities)
             val storageManager = com.example.data.storage.AppStorageManager(context)
             insertedIds.forEach { id ->
-                trackDao.getTrackById(id)?.let { storageManager.saveMetadataJson(it.toDomain()) }
+                trackDao.getTrackById(id)?.let {
+                    val domainTrack = it.toDomain()
+                    storageManager.saveMetadataJson(domainTrack)
+                    com.example.data.importer.LyricsManager.autoDetectAndAssociateLyrics(context, domainTrack, storageManager)
+                }
             }
         }
         importedCount
@@ -257,7 +261,11 @@ class MusicRepository(private val database: AppDatabase) {
                     val insertedIds = trackDao.insertTracks(entities)
                     val storageManager = com.example.data.storage.AppStorageManager(context)
                     insertedIds.forEach { id ->
-                        trackDao.getTrackById(id)?.let { storageManager.saveMetadataJson(it.toDomain()) }
+                        trackDao.getTrackById(id)?.let {
+                            val domainTrack = it.toDomain()
+                            storageManager.saveMetadataJson(domainTrack)
+                            com.example.data.importer.LyricsManager.autoDetectAndAssociateLyrics(context, domainTrack, storageManager)
+                        }
                     }
                 }
             }
@@ -458,6 +466,7 @@ class MusicRepository(private val database: AppDatabase) {
             val newId = trackDao.insertTrack(entity)
             val saved = trackDao.getTrackById(newId)?.toDomain() ?: trackToSave.copy(id = newId)
             storageManager.saveMetadataJson(saved)
+            com.example.data.importer.LyricsManager.autoDetectAndAssociateLyrics(context, saved, storageManager)
             saved
         } catch (_: Exception) {
             null

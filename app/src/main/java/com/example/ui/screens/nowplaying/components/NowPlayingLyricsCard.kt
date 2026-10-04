@@ -1,5 +1,7 @@
 package com.example.ui.screens.nowplaying.components
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -41,6 +43,7 @@ import kotlinx.coroutines.launch
  * - Resaltado dinámico con color primario/neón y tipografía ampliada para la frase actual.
  * - Salto en la canción al tocar cualquier frase (Seek al timestamp).
  * - Búsqueda y descarga automática desde la base de datos libre LRCLIB.
+ * - Importador de archivos de letras (.lrc y .txt) directamente desde el almacenamiento del celular.
  * - Diálogo para ingresar o editar letras manualmente.
  */
 @Composable
@@ -52,12 +55,22 @@ fun NowPlayingLyricsCard(
     onSeekTo: (Long) -> Unit,
     onFetchOnlineLyrics: () -> Unit,
     onSaveCustomLyrics: (String) -> Unit,
+    onImportLyricsUri: (android.net.Uri) -> Unit = {},
     onCloseLyrics: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     var showPasteDialog by remember { mutableStateOf(false) }
+
+    // Launcher del sistema para seleccionar archivos .lrc o .txt locales
+    val importLyricsFileLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: android.net.Uri? ->
+        if (uri != null) {
+            onImportLyricsUri(uri)
+        }
+    }
 
     // Determinar la línea activa en función de la posición actual de reproducción
     val activeIndex = remember(currentPositionMs, lyricsState.lines) {
@@ -121,6 +134,23 @@ fun NowPlayingLyricsCard(
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Botón para importar archivo .LRC / .TXT desde el celular
+                    IconButton(
+                        onClick = {
+                            importLyricsFileLauncher.launch(
+                                arrayOf("text/*", "application/octet-stream", "*/*")
+                            )
+                        },
+                        modifier = Modifier.size(34.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.FileUpload,
+                            contentDescription = "Importar archivo .LRC o .TXT del celular",
+                            tint = animatedPrimary,
+                            modifier = Modifier.size(19.dp)
+                        )
+                    }
+
                     // Botón para buscar en línea
                     IconButton(
                         onClick = onFetchOnlineLyrics,
@@ -287,13 +317,29 @@ fun NowPlayingLyricsCard(
                             Spacer(modifier = Modifier.height(16.dp))
 
                             Button(
-                                onClick = onFetchOnlineLyrics,
+                                onClick = {
+                                    importLyricsFileLauncher.launch(
+                                        arrayOf("text/*", "application/octet-stream", "*/*")
+                                    )
+                                },
                                 shape = RoundedCornerShape(12.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = animatedPrimary)
                             ) {
-                                Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Icon(Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Descargar desde LRCLIB", fontWeight = FontWeight.Bold)
+                                Text("Importar .LRC / .TXT de mi celular", fontWeight = FontWeight.Bold)
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            OutlinedButton(
+                                onClick = onFetchOnlineLyrics,
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, CardBorder)
+                            ) {
+                                Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp), tint = animatedPrimary)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Descargar desde LRCLIB", color = TextPrimary)
                             }
 
                             Spacer(modifier = Modifier.height(8.dp))

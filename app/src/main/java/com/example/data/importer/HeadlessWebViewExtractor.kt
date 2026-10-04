@@ -103,7 +103,7 @@ object HeadlessWebViewExtractor {
                                                 suggestedArtist = "YouTube Music",
                                                 videoUrl = capturedVideoUrl ?: capturedAudioUrl!!,
                                                 audioUrl = capturedAudioUrl,
-                                                coverUrl = "https://img.youtube.com/vi/$videoId/maxresdefault.jpg",
+                                                coverUrl = "https://img.youtube.com/vi/$videoId/hqdefault.jpg",
                                                 durationSeconds = 0L
                                             )
                                             cleanup()
@@ -152,7 +152,19 @@ object HeadlessWebViewExtractor {
                                             var formats = (pr.streamingData.adaptiveFormats || []).concat(pr.streamingData.formats || []);
                                             var audioUrl = "";
                                             var videoUrl = "";
+                                            var coverUrl = "";
                                             var maxBr = 0;
+                                            
+                                            // 1. Extraer la miniatura de mayor resolución disponible desde videoDetails
+                                            var thumbs = (pr.videoDetails && pr.videoDetails.thumbnail && pr.videoDetails.thumbnail.thumbnails) || [];
+                                            if (thumbs.length > 0) {
+                                                coverUrl = thumbs[thumbs.length - 1].url || "";
+                                            }
+                                            if (!coverUrl) {
+                                                var ogImg = document.querySelector('meta[property="og:image"]');
+                                                if (ogImg && ogImg.content) coverUrl = ogImg.content;
+                                            }
+
                                             for (var i = 0; i < formats.length; i++) {
                                                 var f = formats[i];
                                                 if (f.url && f.mimeType && f.mimeType.indexOf("audio/") === 0) {
@@ -176,7 +188,8 @@ object HeadlessWebViewExtractor {
                                                     author: author,
                                                     duration: duration,
                                                     audioUrl: audioUrl,
-                                                    videoUrl: videoUrl || audioUrl
+                                                    videoUrl: videoUrl || audioUrl,
+                                                    coverUrl: coverUrl
                                                 });
                                             }
                                         }
@@ -218,7 +231,8 @@ object HeadlessWebViewExtractor {
                                                 suggestedArtist = obj.optString("author", "Música Web"),
                                                 videoUrl = obj.optString("videoUrl", aUrl),
                                                 audioUrl = aUrl,
-                                                coverUrl = "https://img.youtube.com/vi/$videoId/maxresdefault.jpg",
+                                                coverUrl = obj.optString("coverUrl").takeIf { it.isNotBlank() }
+                                                    ?: "https://img.youtube.com/vi/$videoId/hqdefault.jpg",
                                                 durationSeconds = obj.optLong("duration", 0L)
                                             )
                                             cleanup()

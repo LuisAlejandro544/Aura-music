@@ -550,7 +550,8 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                 audioIntensity = audioIntensity,
                 lyricsState = lyricsState,
                 onFetchOnlineLyrics = { viewModel.fetchOnlineLyrics() },
-                onSaveCustomLyrics = { viewModel.saveCustomLyrics(it) }
+                onSaveCustomLyrics = { viewModel.saveCustomLyrics(it) },
+                onImportLyricsUri = { viewModel.importLyricsFromUri(it) }
             )
         }
 

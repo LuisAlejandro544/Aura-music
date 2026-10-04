@@ -181,6 +181,19 @@ Este documento traza las fases de evolución técnica y funcional para convertir
   - Corrección definitiva del Reverb procesándolo 100% en el motor nativo C++20 (`ReverbProcessor`) sin bloqueo ni silenciamiento del driver LVREV de Android.
   - Ampliación de Velocidad de Música y Velocidad de Voz / Tono (`Pitch`) hasta `2.0x` con botones rápidos (`0.8x`, `1.0x`, `1.25x`, `1.5x`, `2.0x`) en ambos controles.
 
+- [x] **Garantía de Carátulas Oficiales en Descarga WebView y Fallback en Cascada**:
+  - Corrección de miniaturas en el motor WebView mediante extracción de metadatos en el DOM y descarga en cascada multinivel (`maxresdefault.jpg` -> `hqdefault.jpg` -> `mqdefault.jpg` -> `i.ytimg.com` -> fotograma clave de video).
+  - Elimina al 100% las canciones sin carátula al descargar mediante el motor WebView en YouTube.
+- [x] **Importador de Letras (.LRC y .TXT) desde el Celular y Auto-Detección Local**:
+  - Botón integrado en la tarjeta Karaoke y en estado vacío para importar archivos `.lrc` y `.txt` descargados en el teléfono mediante SAF (`OpenDocument`).
+  - Detección y asociación automática de archivos de letras hermanos (`.lrc`/`.txt` con el mismo nombre) al importar música o carpetas desde el teléfono.
+  - Soporte de visualización para texto plano `.txt` con desplazamiento continuo y adaptación tipográfica.
+- [x] **Suite de Rendimiento, RAM Detallada e Inspector de Hilos en Aura Monitor**:
+  - Navegación modular por pestañas: *Incidentes & Logs* y *Rendimiento & Hilos*.
+  - Monitoreo en vivo de RAM segmentada: Java Heap (VM), Native Heap (C++20 DSP y CMake), Gráficos/Shaders (Compose y WebP) y PSS Total.
+  - Telemetría de CPU del proceso (%), núcleos activos, FPS de UI y estado térmico del procesador.
+  - Inspector de hilos en vivo (`Thread.getAllStackTraces()`) con clasificación por categorías (Audio, C++ DSP, UI, Corrutinas), estado (`RUNNABLE`, `TIMED_WAITING`), trazas de pila completas y copia al portapapeles.
+
 ---
 
 ## 🔊 Fase 7: Modo Bit-Perfect y Salida de Ultra-Baja Latencia (Siguiente Paso 🔄)

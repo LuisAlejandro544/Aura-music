@@ -314,17 +314,31 @@ object OnlineVideoAudioImporter {
             )
             var artworkPath: String? = null
 
-            // 1. Intentar descargar portada oficial
+            // 1. Intentar descargar portada oficial con soporte en cascada para YouTube
+            val candidateCoverUrls = mutableListOf<String>()
             if (!resolvedInfo.coverUrl.isNullOrBlank()) {
-                val artFile = File(storageManager.imagesDir, "art_online_${timestamp}.webp")
+                candidateCoverUrls.add(resolvedInfo.coverUrl)
+            }
+            // Si es un video de YouTube, agregar variantes oficiales de miniatura
+            val ytVideoId = WebStreamExtractor.extractVideoId(resolvedInfo.originalUrl)
+            if (ytVideoId != null) {
+                candidateCoverUrls.add("https://img.youtube.com/vi/$ytVideoId/maxresdefault.jpg")
+                candidateCoverUrls.add("https://img.youtube.com/vi/$ytVideoId/hqdefault.jpg")
+                candidateCoverUrls.add("https://img.youtube.com/vi/$ytVideoId/mqdefault.jpg")
+                candidateCoverUrls.add("https://i.ytimg.com/vi/$ytVideoId/hqdefault.jpg")
+            }
+
+            val artFile = File(storageManager.imagesDir, "art_online_${timestamp}.webp")
+            for (coverCandidate in candidateCoverUrls.distinct()) {
+                if (artworkPath != null) break
                 try {
-                    val request = Request.Builder().url(resolvedInfo.coverUrl).build()
+                    val request = Request.Builder().url(coverCandidate).build()
                     httpClient.newCall(request).execute().use { res ->
                         if (res.isSuccessful) {
                             val stream = res.body?.byteStream()
                             if (stream != null) {
                                 val bitmap = BitmapFactory.decodeStream(stream)
-                                if (bitmap != null) {
+                                if (bitmap != null && bitmap.width > 30 && bitmap.height > 30) {
                                     FileOutputStream(artFile).use { out ->
                                         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
                                             bitmap.compress(Bitmap.CompressFormat.WEBP_LOSSLESS, 100, out)
@@ -339,7 +353,7 @@ object OnlineVideoAudioImporter {
                         }
                     }
                 } catch (_: Throwable) {
-                    artworkPath = null
+                    // Continuar al siguiente candidato de portada
                 }
             }
 

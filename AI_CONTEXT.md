@@ -51,9 +51,10 @@ Este archivo define el contexto de diseño, directrices técnicas y restriccione
    - **Soporte Material You**: Permitir seleccionar tema dinámico Material You en Android 12+ (API 31+) armonizado con el wallpaper del sistema sin perder las superficies oscuras puras OLED.
    - **Protección Tipográfica Fija**: La escala tipográfica del sistema se fija mediante `LocalDensity` con `fontScale = 1.0f` para garantizar que la configuración global de tamaño de texto del usuario en Android no altere ni rompa la composición visual ni corte títulos o etiquetas en la app.
 
-8. **Suite de Diagnóstico Propia & LeakCanary**:
-   - La actividad `DebugMonitorActivity` ("Aura Monitor") debe mantenerse accesible desde el cajón de aplicaciones con su propio icono independiente.
+8. **Suite de Diagnóstico Propia, Telemetría de Rendimiento & LeakCanary**:
+   - La actividad `DebugMonitorActivity` ("Aura Monitor") debe mantenerse accesible desde el cajón de aplicaciones con su propio icono independiente y navegación por pestañas (*Incidentes & Logs* y *Rendimiento & Hilos*).
    - Debe interceptar excepciones no controladas a nivel de proceso (`Thread.setDefaultUncaughtExceptionHandler`) y registrar datos del teléfono (modelo, CPU ABI, RAM, almacenamiento, versión de Android) junto con el stacktrace en crudo.
+   - Pestaña de rendimiento: Monitorea en vivo el consumo de RAM segmentado (Java Heap, Native C++20 Heap, Gráficos y PSS), carga de CPU (%), hilos concurrentes activos (`Thread.getAllStackTraces()`) con trazas de pila completas y estado térmico del dispositivo sin necesidad de PC.
    - LeakCanary debe estar configurado en `debugImplementation` para auditar fugas de memoria en la JVM.
 
 9. **Video de Fondo Multifuncional (Fondo Completo, Lienzo o Desactivado)**:
@@ -77,7 +78,7 @@ Este archivo define el contexto de diseño, directrices técnicas y restriccione
     - **Arquitectura de Extracción Resiliente de 3 Niveles (InnerTube + Invidious Bypass + WebView Móvil)**:
       - *Motor InnerTube*: API nativa directa de YouTube mediante clientes de baja fricción (`ANDROID_VR` y `VISIONOS`). 100% gratuita, ultrarrápida (<300ms) y libre de restricciones de inicio de sesión (`LOGIN_REQUIRED`) o firmas cifradas (`n-sig`).
       - *Bypass de Respaldo Invidious*: Instancias públicas libres para resolución inmediata de canciones oficiales con restricciones de derechos estrictas.
-      - *Motor WebView Reparado*: Navegador efímero en segundo plano cargado sobre `m.youtube.com` (sin bloqueos de inserción ni error 150) con timeout de 22s e intercepción del stream en memoria.
+      - *Motor WebView Reparado con Garantía de Carátula*: Navegador efímero en segundo plano cargado sobre `m.youtube.com` (sin bloqueos de inserción ni error 150) con timeout de 22s, extracción de miniatura en DOM y **descarga en cascada multinivel** (`maxresdefault.jpg` -> `hqdefault.jpg` -> `mqdefault.jpg` -> `i.ytimg.com` -> fotograma clave de video).
       - *Selector Interactivo*: Permite al usuario alternar entre InnerTube y WebView en el diálogo con auto-fallback cruzado de 3 capas.
     - Almacenamiento organizado: audio `.m4a`/`.mp3` en `songs/`, carátula oficial en WebP sin pérdida en `images/`, y video vinculado en `videos/` para reproducir el Video Canvas de fondo.
     - Interfaz adaptativa: Degradados visuales reactivos (Cyan/Magenta para TikTok, Rojo Carmesí/Naranja para YouTube/Web) y reproducción inmediata en Now Playing tras descargar.
@@ -100,10 +101,12 @@ Este archivo define el contexto de diseño, directrices técnicas y restriccione
     - El Mini Reproductor aplica un fondo completamente tintado y degradado con los colores extraídos de la pista activa, manteniendo consistencia visual en todas las pantallas.
     - Los atajos inferiores de Now Playing se organizan en 3 módulos equilibrados de igual proporción (`EQ FX`, `Letras`/`Carátula` y `Cola`), con área táctil superior a 48dp y texto en una sola línea sin cortes verticales.
 
-15. **Letras Sincronizadas (.LRC) Estilo Karaoke**:
+15. **Letras Sincronizadas (.LRC y .TXT) Estilo Karaoke e Importador Local**:
     - Integración de analizador de marcas de tiempo `[mm:ss.xx]` con persistencia local en `Android/data/.../files/lyrics/track_{id}.lrc`.
+    - **Importador Local de Letras**: Botón en la tarjeta de Karaoke y en estado vacío para importar archivos `.lrc` y `.txt` desde el celular mediante SAF.
+    - **Auto-Detección y Vinculación Local**: Al importar canciones desde el almacenamiento o apps externas, detecta automáticamente archivos hermanos `.lrc` o `.txt` con el mismo nombre o metadatos incrustados, asignando la letra de inmediato sin depender de internet.
     - Descarga automática libre desde **LRCLIB** al cambiar a canciones sin letra, sin registro ni API keys.
-    - Interfaz Karaoke interactiva con desplazamiento automático suave (*auto-scroll*), tipografía resaltada neón para el verso actual, y salto directo en la canción (*Seek-to-time*) al compás de cualquier línea pulsada.
+    - Interfaz Karaoke interactiva con desplazamiento automático suave (*auto-scroll*), tipografía resaltada neón para el verso actual, y salto directo en la canción (*Seek-to-time*) al compás de cualquier línea pulsada. Soporte para visualización de letras planas en `.txt`.
 
 16. **Recepción Inteligente 'Abrir con...' y 'Compartir con...' (Puente con Gestores de Descarga y Apps Externas)**:
     - Debe responder a `ACTION_VIEW`, `ACTION_SEND` y `ACTION_SEND_MULTIPLE` mediante `IncomingMediaHandler`.
