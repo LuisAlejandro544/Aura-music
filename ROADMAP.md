@@ -56,8 +56,9 @@ Este documento traza las fases de evolución técnica y funcional para convertir
 - [x] **Control de Velocidad y Tono (Playback Parameters)**:
   - Modulación en tiempo real de velocidad (0.50x a 2.00x) y tono musical (Pitch Shift).
   - Botón de restablecimiento rápido a 1.0x.
-- [x] **Transiciones Suaves (Crossfade) y Reproducción Gapless**:
-  - Fundido cruzado ajustable de 0 a 12 segundos con desvanecimiento de entrada y salida entre pistas.
+- [x] **Reproducción Continua Automática, Transiciones y Fade-In de Volumen**:
+  - Salto automático a la siguiente canción al terminar la pista actual sin pausas no deseadas.
+  - Fundido cruzado ajustable con rampa de entrada suave (*fade-in*) que restaura fielmente el volumen original al pasar de pista.
   - Conmutador de reproducción Gapless continua sin silencios intermedios.
 - [x] **Hoja Modal de Efectos en Now Playing (`AudioEffectsBottomSheet`)**:
   - Componente accesible desde la barra superior de Now Playing con indicador de insignia activa.
@@ -141,17 +142,28 @@ Este documento traza las fases de evolución técnica y funcional para convertir
 
 ---
 
-## 🌈 Fase 6: Visualizador FFT en Tiempo Real y Letras Sincronizadas (Siguiente Paso 🔄)
+## 🎤 Fase 6: Visualizador Espectral, Intensidad Acústica C++20 y Letras Karaoke (Completada ✅)
 
-- [ ] **Transformada Rápida de Fourier (FFT)**:
-  - Cálculo espectral de 512 / 1024 puntos en C++ a 60/120 FPS sin consumo de Garbage Collector en la JVM.
-  - Visualizadores de barras, medidores VU analógicos y espectrograma circular.
-- [ ] **Visor de Letras Sincronizadas (.LRC)**:
-  - Desplazamiento automático interactivo estilo karaoke leyendo desde `lyrics/`.
+- [x] **Reacción Dinámica por Intensidad Acústica Ligada a C++20 DSP**:
+  - Medición RMS en tiempo real y cálculo de envolvente espectral de 28 bandas directamente en el motor nativo (`getAudioIntensity()` y `getVisualizerBands()`).
+  - Respiración física de la carátula y el Video Canvas (`scale` elástico de 1.00x a 1.04x) sincronizado con el compás musical.
+  - Sombra dinámica y halo lumínico ambiental superior con modulación de opacidad y elevación al ritmo de la música.
+  - Visualizador de ondas sonoras `AudioVisualizer` alimentado por las bandas de frecuencia calculadas en C++.
+- [x] **Cápsula Ergonómica Flotante de Alto Contraste para Video Canvas**:
+  - Sustitución de selectores pequeños o apretados por una cápsula flotante visible y ergonómica al pie de la carátula con área táctil superior a **48.dp**.
+  - Fondo negro cinematográfico de alto contraste, borde neón reactivo y feedback táctil claro.
+  - Alternado con un toque entre los 3 modos (*Fondo Completo*, *En Carátula* y *Desactivado*) y apertura del selector modal con pulsación prolongada.
+- [x] **Letras Sincronizadas (.LRC) Estilo Karaoke con Descarga Automática**:
+  - Descarga automática libre desde el servicio público **LRCLIB** al iniciar canciones sin letra, sin registro ni claves externas.
+  - Persistencia local en la subcarpeta estructurada `lyrics/track_{id}.lrc`.
+  - Tarjeta interactiva `NowPlayingLyricsCard` con desplazamiento suave automático (*auto-scroll*) para centrar la frase activa.
+  - Resaltado neón de alta visibilidad con tipografía ampliada (`19.sp`, negrita extra) para el verso actual y atenuación de líneas pasadas.
+  - Salto interactivo a la marca de tiempo (*Seek*) al tocar cualquier verso.
+  - Diálogo para carga o edición manual de letras en formato `.lrc` o texto plano.
 
 ---
 
-## 🔊 Fase 7: Modo Bit-Perfect y Salida de Ultra-Baja Latencia
+## 🔊 Fase 7: Modo Bit-Perfect y Salida de Ultra-Baja Latencia (Siguiente Paso 🔄)
 
 - [ ] **Integración con Google Oboe / AAudio**:
   - Modo exclusivo para saltarse el mezclador del sistema Android (*AudioFlinger*).

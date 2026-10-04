@@ -421,15 +421,41 @@ public:
         return mStereoBalance;
     }
 
+    [[nodiscard]] float getAudioIntensity() const {
+        return mCurrentIntensity;
+    }
+
+    void getVisualizerBands(std::span<float> outBands) const {
+        const size_t count = std::min(outBands.size(), mVisualizerBands.size());
+        for (size_t i = 0; i < count; ++i) {
+            outBands[i] = mVisualizerBands[i];
+        }
+    }
+
     // Procesa un buffer de audio PCM de 16 bits estéreo entrelazado (L, R, L, R)
     void processPcm16(std::span<int16_t> samples) {
-        if (!mEnabled && !mEightDProcessor.isEnabled() && !mCrossfeedProcessor.isEnabled() && !mBalanceEnabled) return;
-
         const size_t totalSamples = samples.size();
+        if (totalSamples == 0) return;
+
+        // Medición acústica en tiempo real (C++20) para el visualizador
+        constexpr size_t NUM_BANDS = 28;
+        std::array<double, NUM_BANDS> bandEnergy{};
+        const size_t frames = totalSamples / mChannels;
+        const size_t samplesPerBand = std::max<size_t>(1, frames / NUM_BANDS);
+        double sumSquares = 0.0;
+
         for (size_t i = 0; i < totalSamples; i += mChannels) {
             double sampleL = samples[i] / 32768.0;
             double sampleR = (mChannels > 1 && (i + 1) < totalSamples) ? (samples[i + 1] / 32768.0) : sampleL;
 
+            double monoSample = (sampleL + sampleR) * 0.5;
+            sumSquares += (monoSample * monoSample);
+
+            size_t frameIdx = i / mChannels;
+            size_t bandIdx = std::min(NUM_BANDS - 1, frameIdx / samplesPerBand);
+            bandEnergy[bandIdx] += std::abs(monoSample);
+
+            // Modificaciones DSP si están activas
             if (mEnabled) {
                 if (mBassBoostStrength > 0.001) {
                     sampleL = mBassBoostFilterL.process(sampleL);
@@ -459,13 +485,35 @@ public:
                 sampleR *= mGainR;
             }
 
-            // Limitador suave anti-clipping
-            sampleL = softClip(sampleL);
-            samples[i] = static_cast<int16_t>(std::clamp(sampleL * 32767.0, -32768.0, 32767.0));
+            // Si hubo procesamiento acústico activo, aplicar limitador suave y reescribir muestras
+            if (mEnabled || mEightDProcessor.isEnabled() || 
+                (mCrossfeedProcessor.isEnabled() && mCrossfeedProcessor.isHeadphonesConnected()) || 
+                mBalanceEnabled) {
+                sampleL = softClip(sampleL);
+                samples[i] = static_cast<int16_t>(std::clamp(sampleL * 32767.0, -32768.0, 32767.0));
 
-            if (mChannels > 1 && (i + 1) < totalSamples) {
-                sampleR = softClip(sampleR);
-                samples[i + 1] = static_cast<int16_t>(std::clamp(sampleR * 32767.0, -32768.0, 32767.0));
+                if (mChannels > 1 && (i + 1) < totalSamples) {
+                    sampleR = softClip(sampleR);
+                    samples[i + 1] = static_cast<int16_t>(std::clamp(sampleR * 32767.0, -32768.0, 32767.0));
+                }
+            }
+        }
+
+        // Actualizar intensidad global RMS y envolvente espectral de las 28 bandas
+        if (frames > 0) {
+            double rms = std::sqrt(sumSquares / static_cast<double>(frames));
+            float targetIntensity = std::clamp(static_cast<float>(rms * 3.4), 0.06f, 1.0f);
+            mCurrentIntensity = (mCurrentIntensity * 0.60f) + (targetIntensity * 0.40f);
+
+            for (size_t b = 0; b < NUM_BANDS; ++b) {
+                float avgBand = static_cast<float>(bandEnergy[b] / static_cast<double>(samplesPerBand));
+                float weight = 1.0f + 0.35f * std::sin((static_cast<float>(b) / NUM_BANDS) * std::numbers::pi_v<float>);
+                float targetH = std::clamp(avgBand * 3.8f * weight, 0.08f, 1.0f);
+                if (targetH > mVisualizerBands[b]) {
+                    mVisualizerBands[b] = (mVisualizerBands[b] * 0.35f) + (targetH * 0.65f); // Ataque dinámico rápido
+                } else {
+                    mVisualizerBands[b] = (mVisualizerBands[b] * 0.82f) + (targetH * 0.18f); // Decaimiento suave
+                }
             }
         }
     }
@@ -493,6 +541,14 @@ private:
     double mStereoBalance{0.0};
     double mGainL{1.0};
     double mGainR{1.0};
+
+    float mCurrentIntensity{0.15f};
+    std::array<float, 28> mVisualizerBands{
+        0.12f, 0.15f, 0.18f, 0.22f, 0.28f, 0.35f, 0.42f, 0.48f,
+        0.52f, 0.55f, 0.58f, 0.60f, 0.58f, 0.55f, 0.52f, 0.48f,
+        0.44f, 0.40f, 0.36f, 0.32f, 0.28f, 0.24f, 0.20f, 0.18f,
+        0.15f, 0.13f, 0.11f, 0.09f
+    };
 
     static inline double softClip(double x) {
         if (x > 1.2) return 1.0;
@@ -554,6 +610,12 @@ Java_com_example_playback_NativeAudioEngine_nativeSetBalanceEnabled(JNIEnv* env,
 
 JNIEXPORT void JNICALL
 Java_com_example_playback_NativeAudioEngine_nativeSetStereoBalance(JNIEnv* env, jobject thiz, jfloat balance);
+
+JNIEXPORT jfloat JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeGetAudioIntensity(JNIEnv* env, jobject thiz);
+
+JNIEXPORT void JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeGetVisualizerBands(JNIEnv* env, jobject thiz, jfloatArray outBands);
 
 #ifdef __cplusplus
 }

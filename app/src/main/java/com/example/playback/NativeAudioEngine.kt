@@ -177,6 +177,34 @@ object NativeAudioEngine {
         fallbackStereoBalance = clamped
     }
 
+    /**
+     * Retorna la intensidad acústica RMS en tiempo real calculada en C++20 (0.0 a 1.0).
+     */
+    fun getAudioIntensity(): Float {
+        if (isLoaded) {
+            try {
+                return nativeGetAudioIntensity()
+            } catch (ignored: Throwable) {}
+        }
+        return fallbackIntensity
+    }
+
+    /**
+     * Llena el arreglo con las 28 bandas espectrales calculadas en tiempo real en C++20.
+     */
+    fun getVisualizerBands(outBands: FloatArray) {
+        if (isLoaded) {
+            try {
+                nativeGetVisualizerBands(outBands)
+                return
+            } catch (ignored: Throwable) {}
+        }
+        val count = minOf(outBands.size, fallbackVisualizerBands.size)
+        for (i in 0 until count) {
+            outBands[i] = fallbackVisualizerBands[i]
+        }
+    }
+
     fun processPcmBuffer(byteBuffer: ByteBuffer, offset: Int, length: Int) {
         if (isLoaded) {
             try {
@@ -204,6 +232,8 @@ object NativeAudioEngine {
     private external fun nativeSetCrossfeedStrength(strengthMode: Int)
     private external fun nativeSetBalanceEnabled(enabled: Boolean)
     private external fun nativeSetStereoBalance(balance: Float)
+    private external fun nativeGetAudioIntensity(): Float
+    private external fun nativeGetVisualizerBands(outBands: FloatArray)
 
     // --- Implementación de Respaldo Matemático Idéntico (Filtros Bi-cuadráticos 64-bit y 8D) ---
     private var fallbackSampleRate = 44100
@@ -221,6 +251,8 @@ object NativeAudioEngine {
     private var fallbackCrossfeedStrength = 1
     private var fallbackBalanceEnabled = false
     private var fallbackStereoBalance = 0.0f
+    private var fallbackIntensity = 0.20f
+    private val fallbackVisualizerBands = FloatArray(28) { 0.25f }
 
     private class BiquadCoeffs {
         var b0 = 1.0; var b1 = 0.0; var b2 = 0.0

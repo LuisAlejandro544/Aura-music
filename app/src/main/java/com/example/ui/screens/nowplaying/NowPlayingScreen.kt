@@ -116,6 +116,12 @@ fun NowPlayingScreen(
     onSetCrossfeedStrength: (Int) -> Unit = {},
     onSetBalanceControlEnabled: (Boolean) -> Unit = {},
     onSetStereoBalance: (Float) -> Unit = {},
+    // Visualizador espectral C++20, intensidad acústica y Letras Sincronizadas
+    visualizerBands: FloatArray? = null,
+    audioIntensity: Float = 0.15f,
+    lyricsState: com.example.model.LyricsState = com.example.model.LyricsState(),
+    onFetchOnlineLyrics: () -> Unit = {},
+    onSaveCustomLyrics: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     BackHandler {
@@ -180,6 +186,7 @@ fun NowPlayingScreen(
     var showDetailsDialog by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
     var showVideoModeDialog by remember { mutableStateOf(false) }
+    var showLyrics by remember { mutableStateOf(false) }
 
     val hasVideo = !currentTrack.videoUri.isNullOrEmpty()
     val isFullscreenVideo = hasVideo && (videoDisplayMode == VideoDisplayMode.FULLSCREEN_BACKGROUND)
@@ -229,14 +236,18 @@ fun NowPlayingScreen(
             )
         }
 
-        // Halo de luz ambiental decorativo sobre fondo sincronizado con video o carátula
+        // Halo de luz ambiental decorativo sobre fondo sincronizado con video o carátula,
+        // respirando en tiempo real con la intensidad acústica procesada en C++20
+        val dynamicAuraGlow = animatedTopGlow.copy(
+            alpha = (0.24f + (audioIntensity.coerceIn(0f, 1f) * 0.32f)).coerceIn(0.18f, 0.75f)
+        )
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
-                            animatedTopGlow,
+                            dynamicAuraGlow,
                             Color.Transparent,
                             if (isFullscreenVideo) Color.Transparent else BackgroundDark
                         )
@@ -265,29 +276,47 @@ fun NowPlayingScreen(
                     showEffectsSheet = true
                 },
                 onOpenDetails = { showDetailsDialog = true },
-                onOpenVideoMode = { showVideoModeDialog = true }
+                onOpenVideoMode = { showVideoModeDialog = true },
+                isLyricsActive = showLyrics,
+                onToggleLyrics = { showLyrics = !showLyrics }
             )
 
             Spacer(modifier = Modifier.weight(0.5f))
 
-            // Carátula o Video Canvas con aura luminosa y sombra flotante
-            NowPlayingArtworkCard(
-                currentTrack = currentTrack,
-                isPlaying = isPlaying,
-                currentPositionMs = currentPositionMs,
-                videoDisplayMode = videoDisplayMode,
-                animatedPrimary = animatedPrimary,
-                animatedSecondary = animatedSecondary,
-                onCycleVideoDisplayMode = onCycleVideoDisplayMode
-            )
+            // Carátula / Video Canvas O Letras Sincronizadas (.LRC) Karaoke
+            if (showLyrics) {
+                NowPlayingLyricsCard(
+                    currentTrack = currentTrack,
+                    lyricsState = lyricsState,
+                    currentPositionMs = currentPositionMs,
+                    animatedPrimary = animatedPrimary,
+                    onSeekTo = onSeekTo,
+                    onFetchOnlineLyrics = onFetchOnlineLyrics,
+                    onSaveCustomLyrics = onSaveCustomLyrics,
+                    onCloseLyrics = { showLyrics = false }
+                )
+            } else {
+                NowPlayingArtworkCard(
+                    currentTrack = currentTrack,
+                    isPlaying = isPlaying,
+                    currentPositionMs = currentPositionMs,
+                    videoDisplayMode = videoDisplayMode,
+                    animatedPrimary = animatedPrimary,
+                    animatedSecondary = animatedSecondary,
+                    onCycleVideoDisplayMode = onCycleVideoDisplayMode,
+                    audioIntensity = audioIntensity,
+                    onOpenVideoMode = { showVideoModeDialog = true }
+                )
+            }
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Visualizador dinámico de audio en tiempo real
+            // Visualizador dinámico de audio en tiempo real ligado directamente a C++20 DSP
             AudioVisualizer(
                 isPlaying = isPlaying,
+                realBands = visualizerBands,
                 modifier = Modifier.fillMaxWidth(0.9f),
-                barCount = 32,
+                barCount = 28,
                 barHeight = 40.dp,
                 customColor = animatedPrimary
             )
@@ -321,7 +350,7 @@ fun NowPlayingScreen(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Atajos Inferiores: Ecualizador y Cola de Reproducción
+            // Atajos Inferiores: Ecualizador, Letras Karaoke y Cola de Reproducción
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -339,6 +368,23 @@ fun NowPlayingScreen(
                     Icon(Icons.Default.Tune, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("Ecualizador FX", color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.Bold)
+                }
+
+                TextButton(
+                    onClick = { showLyrics = !showLyrics },
+                    modifier = Modifier.testTag("now_playing_lyrics_shortcut")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Mic,
+                        contentDescription = null,
+                        tint = if (showLyrics) animatedPrimary else TextSecondary
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = if (showLyrics) "Carátula" else "Letras",
+                        color = if (showLyrics) animatedPrimary else TextSecondary,
+                        fontWeight = if (showLyrics) FontWeight.Bold else FontWeight.Normal
+                    )
                 }
 
                 TextButton(

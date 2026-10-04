@@ -90,10 +90,14 @@ Este documento define el protocolo de trabajo para los agentes de software y des
 - [x] ¿La memoria de volumen dedicada y el control avanzado por botones de audífonos son configurables?
 - [x] ¿La notificación nativa del reproductor de Android (System Media Controls con MediaSessionService, ForwardingPlayer completo con Anterior/Play/Siguiente y MediaStyle retrocompatible) está integrada y funcional?
 - [x] ¿Las 10 bandas del ecualizador cuentan con etiquetas acústicas intuitivas (Subgraves, Bajos, Graves, Voces, Claridad, Brillo, Aire) junto a los Hz?
-- [x] ¿El botón de modo de video en Now Playing tiene formato de cápsula elevada visible y ergonómica de alto contraste?
+- [x] ¿El botón de modo de video en Now Playing tiene formato de cápsula flotante elevada visible y ergonómica de alto contraste (área táctil >= 48dp) al pie de la carátula sin elementos pequeños o apretados?
+- [x] ¿La reacción dinámica por intensidad de la música está ligada directamente al motor en C++20 (cálculo RMS y envolvente espectral) haciendo respirar la carátula, halo ambiental y visualizador?
+- [x] ¿Las letras sincronizadas (.LRC) estilo Karaoke con descarga automática libre desde LRCLIB, auto-scroll y salto táctil están integradas y persistidas en `lyrics/`?
 - [x] ¿El temporizador de apagado ejecuta su atenuación suave y pausa en el hilo principal (Main Thread) previniendo excepciones de ExoPlayer?
 - [x] ¿La función de descarga desde TikTok y enlaces web extrae la música de cualquier duración, genera carátula en WebP y vincula el Video Canvas de fondo automáticamente?
 - [x] ¿La descarga desde YouTube / Video Web con arquitectura dual (Motor nativo InnerTube + Headless WebView reparado con bypass de gestos) y selector interactivo está integrada y operativa?
 - [x] ¿La opción de paleta dinámica 'Material You' está disponible y operativa en ajustes para Android 12+?
 - [x] ¿La escala tipográfica está fijada a un valor cómodo (fontScale = 1.0f) para evitar que los ajustes de texto del sistema desborden la interfaz?
+- [x] ¿La reproducción continua automática al finalizar una pista pasa fluidamente a la siguiente canción de la biblioteca sin detenerse?
+- [x] ¿El fundido de transición (fade-out) y entrada progresiva (fade-in) restauran suavemente el volumen original sin quedarse atrapados en volumen bajo?
 - [x] ¿Los 5 archivos Markdown (`README.md`, `ROADMAP.md`, `STRUCTURE.md`, `AI_CONTEXT.md`, `AGENTS.md`) están actualizados y en español?
