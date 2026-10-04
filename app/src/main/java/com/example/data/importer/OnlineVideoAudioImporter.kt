@@ -560,18 +560,19 @@ object OnlineVideoAudioImporter {
         isYoutubeStream: Boolean,
         onProgress: (DownloadProgress) -> Unit
     ): Boolean {
+        val cleanUrl = if (url.contains("googlevideo.com")) {
+            url.replace(Regex("""&range=\d+-\d+"""), "")
+                .replace(Regex("""\?range=\d+-\d+&"""), "?")
+        } else url
+
         return try {
-            val reqBuilder = Request.Builder().url(url)
+            val reqBuilder = Request.Builder().url(cleanUrl)
                 .header("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36")
                 .header("Accept", "*/*")
                 .header("Accept-Encoding", "identity")
 
-            if (isYoutubeStream) {
+            if (isYoutubeStream || cleanUrl.contains("googlevideo.com")) {
                 reqBuilder.header("Referer", "https://m.youtube.com/")
-                reqBuilder.header("Origin", "https://m.youtube.com")
-                reqBuilder.header("Sec-Fetch-Mode", "no-cors")
-                reqBuilder.header("Sec-Fetch-Site", "cross-site")
-                reqBuilder.header("Sec-Fetch-Dest", "audio")
                 try {
                     val cookies = android.webkit.CookieManager.getInstance().getCookie("https://m.youtube.com")
                     if (!cookies.isNullOrBlank()) {
@@ -580,12 +581,25 @@ object OnlineVideoAudioImporter {
                 } catch (_: Throwable) {}
             }
 
-            httpClient.newCall(reqBuilder.build()).execute().use { response ->
-                if (!response.isSuccessful) {
-                    com.example.debug.AuraDebugManager.logWarning("Downloader", "HTTP ${response.code} al descargar: ${url.take(50)}...")
+            var response = httpClient.newCall(reqBuilder.build()).execute()
+            
+            // Reintento limpio en caso de rechazo 403 Forbidden
+            if (response.code == 403 && (isYoutubeStream || cleanUrl.contains("googlevideo.com"))) {
+                response.close()
+                val fallbackReq = Request.Builder()
+                    .url(cleanUrl)
+                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                    .header("Accept", "*/*")
+                    .build()
+                response = httpClient.newCall(fallbackReq).execute()
+            }
+
+            response.use { res ->
+                if (!res.isSuccessful) {
+                    com.example.debug.AuraDebugManager.logWarning("Downloader", "HTTP ${res.code} al descargar: ${cleanUrl.take(50)}...")
                     return false
                 }
-                val body = response.body ?: return false
+                val body = res.body ?: return false
                 val totalBytes = body.contentLength()
 
                 body.byteStream().use { input ->

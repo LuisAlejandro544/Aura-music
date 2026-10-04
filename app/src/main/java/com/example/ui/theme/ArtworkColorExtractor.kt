@@ -40,6 +40,38 @@ object ArtworkColorExtractor {
     // Caché en memoria para almacenar las paletas de carátulas y videos recientes
     private val memoryCache = LruCache<Long, ExtractedArtworkColors>(50)
 
+    // Retriever persistente para reutilizar el descriptor de video y evitar sobrecarga I/O cada 250ms
+    private val retrieverLock = Any()
+    private var cachedVideoUri: String? = null
+    private var cachedRetriever: MediaMetadataRetriever? = null
+
+    private fun getOrCreateRetriever(context: Context, videoUri: String): MediaMetadataRetriever? {
+        synchronized(retrieverLock) {
+            if (cachedVideoUri == videoUri && cachedRetriever != null) {
+                return cachedRetriever
+            }
+            try {
+                cachedRetriever?.release()
+            } catch (_: Throwable) {}
+            cachedRetriever = null
+            cachedVideoUri = null
+
+            return try {
+                val retriever = MediaMetadataRetriever()
+                if (videoUri.startsWith("content://")) {
+                    retriever.setDataSource(context, Uri.parse(videoUri))
+                } else {
+                    retriever.setDataSource(videoUri)
+                }
+                cachedVideoUri = videoUri
+                cachedRetriever = retriever
+                retriever
+            } catch (_: Throwable) {
+                null
+            }
+        }
+    }
+
     /**
      * Extrae los colores de la carátula estática o genera una paleta armónica si no existe.
      */
@@ -146,61 +178,65 @@ object ArtworkColorExtractor {
         // Si el Video Canvas está en pantalla y hay video configurado: extraer color del fotograma del video
         val videoUri = track.videoUri
         if (isVideoActive && !videoUri.isNullOrBlank()) {
-            val interval = (positionMs / 300L).coerceAtLeast(0L)
+            val interval = (positionMs / 250L).coerceAtLeast(0L)
             val videoCacheKey = -(track.id.absoluteValue * 100_000L + interval)
             memoryCache.get(videoCacheKey)?.let { return@withContext it }
 
             var frameBitmap: Bitmap? = null
-            var retriever: MediaMetadataRetriever? = null
             try {
-                retriever = MediaMetadataRetriever()
-                if (videoUri.startsWith("content://")) {
-                    retriever.setDataSource(context, Uri.parse(videoUri))
-                } else {
-                    retriever.setDataSource(videoUri)
-                }
-                val timeUs = (positionMs * 1000L).coerceAtLeast(0L)
-                frameBitmap = retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-                    ?: retriever.frameAtTime
+                val retriever = getOrCreateRetriever(context, videoUri)
+                if (retriever != null) {
+                    val timeUs = (positionMs * 1000L).coerceAtLeast(0L)
+                    // OPTION_CLOSEST extrae el fotograma exacto del milisegundo actual (sin esperar al keyframe cada 2.5s)
+                    frameBitmap = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
+                        try {
+                            retriever.getScaledFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST, 32, 32)
+                        } catch (_: Throwable) {
+                            retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST)
+                        }
+                    } else {
+                        retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST)
+                    } ?: retriever.frameAtTime
 
-                if (frameBitmap != null) {
-                    // Escalamiento ultra-ligero a 32x32 para extracción cromática instantánea en ~2ms
-                    val scaled = Bitmap.createScaledBitmap(frameBitmap, 32, 32, false)
-                    if (scaled != frameBitmap) {
-                        frameBitmap.recycle()
+                    if (frameBitmap != null) {
+                        // Si no se usó escalamiento nativo por hardware, reescalar a 32x32
+                        val scaled = if (frameBitmap.width > 32 || frameBitmap.height > 32) {
+                            Bitmap.createScaledBitmap(frameBitmap, 32, 32, false).also {
+                                if (it != frameBitmap) frameBitmap.recycle()
+                            }
+                        } else {
+                            frameBitmap
+                        }
+
+                        val palette = Palette.from(scaled).maximumColorCount(6).generate()
+                        scaled.recycle()
+
+                        val vibrant = palette.vibrantSwatch
+                        val dominant = palette.dominantSwatch
+                        val lightVibrant = palette.lightVibrantSwatch
+                        val darkVibrant = palette.darkVibrantSwatch
+                        val muted = palette.mutedSwatch
+
+                        val primaryInt = vibrant?.rgb ?: dominant?.rgb ?: lightVibrant?.rgb ?: fallbackPrimary.hashCode()
+                        val secondaryInt = lightVibrant?.rgb ?: muted?.rgb ?: vibrant?.rgb ?: fallbackSecondary.hashCode()
+                        val accentInt = darkVibrant?.rgb ?: dominant?.rgb ?: primaryInt
+
+                        val primaryColor = Color(primaryInt)
+                        val secondaryColor = Color(secondaryInt)
+                        val accentColor = Color(accentInt)
+
+                        val result = ExtractedArtworkColors(
+                            primary = primaryColor,
+                            secondary = secondaryColor,
+                            accent = accentColor,
+                            ambientTopGlow = primaryColor.copy(alpha = 0.35f)
+                        )
+                        memoryCache.put(videoCacheKey, result)
+                        return@withContext result
                     }
-                    val palette = Palette.from(scaled).maximumColorCount(6).generate()
-                    scaled.recycle()
-
-                    val vibrant = palette.vibrantSwatch
-                    val dominant = palette.dominantSwatch
-                    val lightVibrant = palette.lightVibrantSwatch
-                    val darkVibrant = palette.darkVibrantSwatch
-                    val muted = palette.mutedSwatch
-
-                    val primaryInt = vibrant?.rgb ?: dominant?.rgb ?: lightVibrant?.rgb ?: fallbackPrimary.hashCode()
-                    val secondaryInt = lightVibrant?.rgb ?: muted?.rgb ?: vibrant?.rgb ?: fallbackSecondary.hashCode()
-                    val accentInt = darkVibrant?.rgb ?: dominant?.rgb ?: primaryInt
-
-                    val primaryColor = Color(primaryInt)
-                    val secondaryColor = Color(secondaryInt)
-                    val accentColor = Color(accentInt)
-
-                    val result = ExtractedArtworkColors(
-                        primary = primaryColor,
-                        secondary = secondaryColor,
-                        accent = accentColor,
-                        ambientTopGlow = primaryColor.copy(alpha = 0.35f)
-                    )
-                    memoryCache.put(videoCacheKey, result)
-                    return@withContext result
                 }
             } catch (_: Throwable) {
-                // Si falla la lectura del fotograma de video, no colapsar la app
-            } finally {
-                try {
-                    retriever?.release()
-                } catch (_: Throwable) {}
+                // Si falla la lectura del fotograma de video, continuar al fallback
             }
         }
 
@@ -242,5 +278,12 @@ object ArtworkColorExtractor {
 
     fun clearCache() {
         memoryCache.evictAll()
+        synchronized(retrieverLock) {
+            try {
+                cachedRetriever?.release()
+            } catch (_: Throwable) {}
+            cachedRetriever = null
+            cachedVideoUri = null
+        }
     }
 }

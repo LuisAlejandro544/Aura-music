@@ -60,8 +60,8 @@ object HeadlessWebViewExtractor {
                         domStorageEnabled = true
                         databaseEnabled = true
                         mediaPlaybackRequiresUserGesture = false
-                        loadsImagesAutomatically = false
-                        blockNetworkImage = true
+                        loadsImagesAutomatically = true
+                        blockNetworkImage = false
                         cacheMode = WebSettings.LOAD_NO_CACHE
                         userAgentString = "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
                     }
@@ -86,11 +86,16 @@ object HeadlessWebViewExtractor {
                                         reqUrl.contains("itag=249") ||
                                         reqUrl.contains("itag=250")
 
+                                // Limpiar el parámetro de rango (&range=0-...) para descargar el stream completo
+                                val cleanStreamUrl = reqUrl
+                                    .replace(Regex("""&range=\d+-\d+"""), "")
+                                    .replace(Regex("""\?range=\d+-\d+&"""), "?")
+
                                 if (isAudio) {
-                                    capturedAudioUrl = reqUrl
-                                    if (capturedVideoUrl == null) capturedVideoUrl = reqUrl
+                                    capturedAudioUrl = cleanStreamUrl
+                                    if (capturedVideoUrl == null) capturedVideoUrl = cleanStreamUrl
                                 } else if (reqUrl.contains("mime=video")) {
-                                    capturedVideoUrl = reqUrl
+                                    capturedVideoUrl = cleanStreamUrl
                                 }
 
                                 if (!streamExtracted && capturedAudioUrl != null) {
@@ -103,7 +108,7 @@ object HeadlessWebViewExtractor {
                                                 suggestedArtist = "YouTube Music",
                                                 videoUrl = capturedVideoUrl ?: capturedAudioUrl!!,
                                                 audioUrl = capturedAudioUrl,
-                                                coverUrl = "https://img.youtube.com/vi/$videoId/hqdefault.jpg",
+                                                coverUrl = "https://i.ytimg.com/vi/$videoId/maxresdefault.jpg",
                                                 durationSeconds = 0L
                                             )
                                             cleanup()
@@ -113,12 +118,11 @@ object HeadlessWebViewExtractor {
                                 }
                             }
 
-                            // 2. Bloqueo de publicidad e imágenes pesadas
+                            // 2. Bloqueo exclusivo de redes publicitarias pesadas (permitiendo sprites y assets esenciales)
                             if (reqUrl.contains("googleads") ||
                                 reqUrl.contains("doubleclick") ||
-                                reqUrl.contains("analytics") ||
-                                reqUrl.endsWith(".png") ||
-                                reqUrl.endsWith(".jpg")
+                                reqUrl.contains("adservice.google") ||
+                                reqUrl.contains("analytics")
                             ) {
                                 return WebResourceResponse("text/plain", "UTF-8", ByteArrayInputStream(ByteArray(0)))
                             }

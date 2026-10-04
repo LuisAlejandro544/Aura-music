@@ -901,16 +901,16 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
      * Realiza la búsqueda de letras en LRCLIB permitiendo que el usuario personalice el nombre de la canción.
      */
     fun searchLyricsOptions(title: String, artist: String = "") {
-        val target = currentTrack.value
-        val durationSec = (target?.durationMs ?: 0L) / 1000L
         viewModelScope.launch(Dispatchers.IO) {
             _isSearchingLyrics.value = true
             _searchLyricsError.value = null
             try {
+                // Al buscar interactivamente por nombre, durationSec se fija en 0L
+                // para que el catálogo de letras no descarte canciones si el audio local está recortado (ej. 39s)
                 val results = com.example.data.importer.LyricsManager.searchLyricsOptions(
                     trackTitle = title,
                     artistName = artist,
-                    durationSec = durationSec
+                    durationSec = 0L
                 )
                 _lyricsSearchResults.value = results
                 if (results.isEmpty()) {

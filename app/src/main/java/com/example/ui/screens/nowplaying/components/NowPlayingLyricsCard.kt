@@ -12,7 +12,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -297,81 +299,143 @@ fun NowPlayingLyricsCard(
                 }
 
                 else -> {
-                    // Estado vacío con botones de acción directa
+                    // Estado vacío compacto, armónico y con desplazamiento suave sin recortes ni desbordamientos
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.padding(16.dp)
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .verticalScroll(rememberScrollState())
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Lyrics,
-                                contentDescription = null,
-                                tint = TextSecondary.copy(alpha = 0.6f),
-                                modifier = Modifier.size(44.dp)
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = animatedPrimary.copy(alpha = 0.12f),
+                                modifier = Modifier.size(40.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.Lyrics,
+                                        contentDescription = null,
+                                        tint = animatedPrimary,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
                             Text(
                                 text = "Sin letras para esta canción",
                                 style = MaterialTheme.typography.titleSmall.copy(
                                     fontWeight = FontWeight.Bold,
-                                    color = TextPrimary
-                                )
+                                    color = TextPrimary,
+                                    fontSize = 14.sp
+                                ),
+                                maxLines = 1
                             )
-                            Spacer(modifier = Modifier.height(6.dp))
+
+                            Spacer(modifier = Modifier.height(3.dp))
+
                             Text(
-                                text = "Descarga la letra sincronizada en un toque o escribe tu versión.",
+                                text = "Descarga la letra sincronizada o escribe tu versión.",
                                 style = MaterialTheme.typography.bodySmall.copy(
                                     color = TextSecondary,
-                                    textAlign = TextAlign.Center
-                                )
+                                    textAlign = TextAlign.Center,
+                                    fontSize = 11.sp
+                                ),
+                                maxLines = 1
                             )
-                            Spacer(modifier = Modifier.height(16.dp))
+
+                            Spacer(modifier = Modifier.height(12.dp))
 
                             // Botón principal: Buscar por nombre y elegir versión
                             Button(
                                 onClick = onOpenSearchLyrics,
                                 shape = RoundedCornerShape(12.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = animatedPrimary),
-                                modifier = Modifier.fillMaxWidth(0.92f).height(44.dp)
+                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth(0.95f)
+                                    .height(42.dp)
                             ) {
-                                Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color.Black)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Buscar por nombre de canción", fontWeight = FontWeight.Bold, color = Color.Black)
-                            }
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            // Botón secundario: Importar archivo local
-                            OutlinedButton(
-                                onClick = {
-                                    importLyricsFileLauncher.launch(
-                                        arrayOf("text/*", "application/octet-stream", "*/*")
-                                    )
-                                },
-                                shape = RoundedCornerShape(12.dp),
-                                border = BorderStroke(1.dp, CardBorder),
-                                modifier = Modifier.fillMaxWidth(0.92f).height(40.dp)
-                            ) {
-                                Icon(Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(18.dp), tint = animatedPrimary)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Importar .LRC / .TXT de mi celular", color = TextPrimary)
-                            }
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            // Botón terciario: Pegar manual
-                            OutlinedButton(
-                                onClick = { showPasteDialog = true },
-                                shape = RoundedCornerShape(12.dp),
-                                border = BorderStroke(1.dp, CardBorder),
-                                modifier = Modifier.fillMaxWidth(0.92f).height(40.dp)
-                            ) {
-                                Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp), tint = TextSecondary)
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(17.dp),
+                                    tint = Color.Black
+                                )
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Pegar letra manual", color = TextPrimary)
+                                Text(
+                                    text = "Buscar Letras en Línea",
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.Black,
+                                    fontSize = 13.sp,
+                                    maxLines = 1
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // Fila horizontal equilibrada: Importar archivo y Pegar manual (sin ocupar espacio vertical excesivo)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(0.95f),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = {
+                                        importLyricsFileLauncher.launch(
+                                            arrayOf("text/*", "application/octet-stream", "*/*")
+                                        )
+                                    },
+                                    shape = RoundedCornerShape(12.dp),
+                                    border = BorderStroke(1.dp, CardBorder),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(38.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.FileUpload,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(15.dp),
+                                        tint = animatedPrimary
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "Importar",
+                                        color = TextPrimary,
+                                        fontSize = 12.sp,
+                                        maxLines = 1
+                                    )
+                                }
+
+                                OutlinedButton(
+                                    onClick = { showPasteDialog = true },
+                                    shape = RoundedCornerShape(12.dp),
+                                    border = BorderStroke(1.dp, CardBorder),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(38.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(15.dp),
+                                        tint = TextSecondary
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "Escribir",
+                                        color = TextPrimary,
+                                        fontSize = 12.sp,
+                                        maxLines = 1
+                                    )
+                                }
                             }
                         }
                     }

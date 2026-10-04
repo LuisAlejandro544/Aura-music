@@ -91,7 +91,7 @@ Este documento define el protocolo de trabajo para los agentes de software y des
 - [x] ¿La notificación nativa del reproductor de Android (System Media Controls con MediaSessionService, ForwardingPlayer completo con Anterior/Play/Siguiente y MediaStyle retrocompatible) está integrada y funcional?
 - [x] ¿Las 10 bandas del ecualizador cuentan con etiquetas acústicas intuitivas (Subgraves, Bajos, Graves, Voces, Claridad, Brillo, Aire) junto a los Hz?
 - [x] ¿La carátula y Video Canvas se muestran despejados al 100% sin cápsulas superpuestas y con escala fija 1.0f para máxima nitidez, manteniendo el selector de video en la barra superior?
-- [x] ¿La armonización cromática dinámica en Video Canvas (cada 2.5s) y el fondo tintado del Mini Reproductor están integrados con transiciones fluidas?
+- [x] ¿La armonización cromática dinámica en Video Canvas es instantánea y exacta (con OPTION_CLOSEST y sin retraso de 2.5s) y se eliminaron por completo las pantallas negras y parpadeos al abrir Now Playing o el Mini Reproductor?
 - [x] ¿Las letras sincronizadas (.LRC) estilo Karaoke con descarga automática libre desde LRCLIB, auto-scroll y salto táctil están integradas y persistidas en `lyrics/`?
 - [x] ¿El temporizador de apagado ejecuta su atenuación suave y pausa en el hilo principal (Main Thread) previniendo excepciones de ExoPlayer?
 - [x] ¿La función de descarga desde TikTok y enlaces web extrae la música de cualquier duración, genera carátula en WebP y vincula el Video Canvas de fondo automáticamente?
@@ -110,6 +110,6 @@ Este documento define el protocolo de trabajo para los agentes de software y des
 - [x] ¿Tanto la Velocidad de la Música como la Velocidad de Voz / Tono (`Pitch`) llegan hasta 2.0x e incluyen botones rápidos con `2.0x`?
 - [x] ¿Las descargas de YouTube por WebView garantizan carátula oficial en WebP sin pérdida mediante descarga en cascada (maxresdefault, hqdefault, mqdefault, i.ytimg.com y fotograma clave)?
 - [x] ¿El importador de archivos de letras (.lrc y .txt) desde el celular y la auto-detección/vinculación de letras locales (.lrc/.txt hermanos o tags) están integrados y funcionales?
-- [x] ¿La búsqueda interactiva de letras con edición libre de título/artista, selección entre versiones y recomendación de la lírica oficial canónica en primera posición (#1) está integrada y operativa?
+- [x] ¿La búsqueda interactiva de letras con edición libre de título/artista, búsqueda multidimensional (`track_name` y `q` sin restricción de duración local), tarjeta vacía sin desbordamientos y recomendación oficial canónica (#1) está integrada y operativa?
 - [x] ¿Aura Monitor cuenta con navegación por pestañas (*Incidentes & Logs* y *Rendimiento & Hilos*), desglose de RAM segmentada (Java/Native C++/Gráficos/PSS), carga de CPU e Inspector Quirúrgico de Hilos con trazas de pila completas?
 - [x] ¿Los 5 archivos Markdown (`README.md`, `ROADMAP.md`, `STRUCTURE.md`, `AI_CONTEXT.md`, `AGENTS.md`) están actualizados y en español?

@@ -95,9 +95,10 @@ Este archivo define el contexto de diseño, directrices técnicas y restriccione
     - El canal de notificación debe ser silencioso (`IMPORTANCE_LOW`) para evitar pitidos en cada cambio de canción.
     - En Android 13+ (API 33+) se debe solicitar el permiso en tiempo de ejecución `POST_NOTIFICATIONS`.
 
-14. **Carátula Limpia y Estática, Armonización Dinámica de Video Canvas y Mini Reproductor Tintado**:
+14. **Carátula Limpia y Estática, Armonización Dinámica de Video Canvas y Cero Pantallas Negras**:
     - La carátula central y el Video Canvas se muestran con visibilidad completa del 100% sin cápsulas superpuestas que obstruyan la ilustración. Su escala se mantiene fija en 1.0f para garantizar máxima nitidez sin movimientos no deseados por la música.
-    - Durante la reproducción de Video Canvas, se muestrean fotogramas del video en intervalos de ~2.5 segundos adaptando de forma suave y continua (`tween(1200)`) los tonos del halo lumínico y visualizador según las escenas del video.
+    - Durante la reproducción de Video Canvas, se muestrean fotogramas del video en tiempo real exacto mediante `MediaMetadataRetriever.OPTION_CLOSEST` y retriever persistente, adaptando de forma inmediata (`tween(180)`) los tonos del halo lumínico y visualizador según las escenas del video sin el retraso de 2.5s de los keyframes.
+    - Eliminación de fondos negros temporales o parpadeos al abrir Now Playing o el Mini Reproductor: `BackgroundVideoPlayer` desactiva el shutter negro, sincroniza la posición antes de `prepare()`, coloca la carátula oficial como placeholder y efectúa un fundido suave al emitirse `onRenderedFirstFrame()`.
     - El Mini Reproductor aplica un fondo completamente tintado y degradado con los colores extraídos de la pista activa, manteniendo consistencia visual en todas las pantallas.
     - Los atajos inferiores de Now Playing se organizan en 3 módulos equilibrados de igual proporción (`EQ FX`, `Letras`/`Carátula` y `Cola`), con área táctil superior a 48dp y texto en una sola línea sin cortes verticales.
 

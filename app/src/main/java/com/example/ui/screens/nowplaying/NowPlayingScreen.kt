@@ -195,9 +195,9 @@ fun NowPlayingScreen(
         )
     }
 
-    // Muestreo dinámico continuo de fotogramas del Video Canvas en tiempo casi real según la posición de reproducción
+    // Muestreo dinámico continuo de fotogramas del Video Canvas en tiempo real exacto según la posición de reproducción
     if (isVideoVisual && isPlaying && isDynamicArtworkColorEnabled) {
-        val intervalStep = (currentPositionMs / 300L).coerceAtLeast(0L)
+        val intervalStep = (currentPositionMs / 250L).coerceAtLeast(0L)
         LaunchedEffect(currentTrack.id, intervalStep) {
             activeColors = ArtworkColorExtractor.extractPlaybackColors(
                 context = context,
@@ -213,17 +213,17 @@ fun NowPlayingScreen(
 
     val animatedPrimary by animateColorAsState(
         targetValue = activeColors.primary,
-        animationSpec = tween(220),
+        animationSpec = tween(180),
         label = "PrimaryAuraColor"
     )
     val animatedSecondary by animateColorAsState(
         targetValue = activeColors.secondary,
-        animationSpec = tween(220),
+        animationSpec = tween(180),
         label = "SecondaryAuraColor"
     )
     val animatedTopGlow by animateColorAsState(
         targetValue = activeColors.ambientTopGlow,
-        animationSpec = tween(220),
+        animationSpec = tween(180),
         label = "TopAuraGlow"
     )
 
@@ -263,6 +263,7 @@ fun NowPlayingScreen(
                 isPlaying = isPlaying,
                 currentPositionMs = currentPositionMs,
                 playbackSpeed = playbackSpeed,
+                placeholderTrack = currentTrack,
                 modifier = Modifier.fillMaxSize(),
                 cornerRadius = 0.dp
             )

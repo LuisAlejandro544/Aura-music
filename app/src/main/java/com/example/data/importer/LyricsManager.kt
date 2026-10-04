@@ -36,9 +36,11 @@ import java.util.regex.Pattern
 object LyricsManager {
 
     private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(8, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.SECONDS)
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(20, TimeUnit.SECONDS)
         .build()
+
+    private const val APP_USER_AGENT = "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36 (AuraMusic/1.0)"
 
     private val LRC_LINE_PATTERN = Pattern.compile(
         """\[(\d{1,2}):(\d{2})(?:[.:](\d{1,3}))?\](.*)"""
@@ -172,7 +174,9 @@ object LyricsManager {
 
             val request = Request.Builder()
                 .url(url)
-                .header("User-Agent", "AuraMusic/1.0 (Android; Offline HiFi Player)")
+                .header("User-Agent", APP_USER_AGENT)
+                .header("Accept", "application/json, text/plain, */*")
+                .header("Accept-Language", "es-ES,es;q=0.9,en;q=0.8")
                 .build()
 
             httpClient.newCall(request).execute().use { response ->
@@ -199,7 +203,9 @@ object LyricsManager {
 
             val request = Request.Builder()
                 .url(url)
-                .header("User-Agent", "AuraMusic/1.0 (Android; Offline HiFi Player)")
+                .header("User-Agent", APP_USER_AGENT)
+                .header("Accept", "application/json, text/plain, */*")
+                .header("Accept-Language", "es-ES,es;q=0.9,en;q=0.8")
                 .build()
 
             httpClient.newCall(request).execute().use { response ->
@@ -253,18 +259,18 @@ object LyricsManager {
 
         if (cleanTitle.isBlank()) return@withContext emptyList()
 
-        // 1. Intento canónico directo (/api/get) para la Lírica Oficial
-        val officialResult = tryFetchOfficial(cleanTitle, cleanArtist, durationSec)
-        if (officialResult != null) {
-            results.add(officialResult)
+        // 1. Búsqueda prioritaria directa por track_name (la más precisa en LRCLIB)
+        val trackSearchResults = trySearchByTrackAndArtist(cleanTitle, cleanArtist)
+        for (item in trackSearchResults) {
+            if (results.none { it.id == item.id }) {
+                results.add(item)
+            }
         }
 
-        // 2. Búsqueda amplia (/api/search)
+        // 2. Búsqueda amplia por texto completo (q=query)
         val query = if (cleanArtist.isNotBlank()) "$cleanTitle $cleanArtist" else cleanTitle
-        val searchResults = trySearchOptions(query)
-
-        // 3. Fusionar evitando duplicados
-        for (item in searchResults) {
+        val broadResults = trySearchOptions(query)
+        for (item in broadResults) {
             val isDuplicate = results.any { existing ->
                 (existing.id != 0L && existing.id == item.id) ||
                 (existing.trackName.equals(item.trackName, ignoreCase = true) &&
@@ -276,8 +282,13 @@ object LyricsManager {
             }
         }
 
-        // 4. Si la consulta directa no arrojó oficial pero tenemos resultados de búsqueda,
-        // promover como oficial/recomendada la mejor coincidencia que tenga syncedLyrics y coincida con el título/artista
+        // 3. Intento canónico directo (/api/get)
+        val officialResult = tryFetchOfficial(cleanTitle, cleanArtist, durationSec)
+        if (officialResult != null && results.none { it.id == officialResult.id }) {
+            results.add(0, officialResult)
+        }
+
+        // 4. Si la consulta directa no arrojó oficial pero tenemos resultados, promover la mejor opción sincronizada
         if (results.none { it.isOfficialRecommended } && results.isNotEmpty()) {
             val bestCandidateIndex = results.indexOfFirst {
                 it.isSynced && (cleanArtist.isBlank() || it.artistName.contains(cleanArtist, ignoreCase = true))
@@ -311,6 +322,42 @@ object LyricsManager {
         return saveLyrics(track, storageManager, contentToSave)
     }
 
+    private fun trySearchByTrackAndArtist(title: String, artist: String): List<LyricSearchResult> {
+        val list = mutableListOf<LyricSearchResult>()
+        try {
+            val encodedTitle = URLEncoder.encode(title, "UTF-8")
+            var url = "https://lrclib.net/api/search?track_name=$encodedTitle"
+            if (artist.isNotBlank()) {
+                val encodedArtist = URLEncoder.encode(artist, "UTF-8")
+                url += "&artist_name=$encodedArtist"
+            }
+
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", APP_USER_AGENT)
+                .header("Accept", "application/json, text/plain, */*")
+                .header("Accept-Language", "es-ES,es;q=0.9,en;q=0.8")
+                .build()
+
+            httpClient.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    val body = response.body?.string() ?: return emptyList()
+                    val array = JSONArray(body)
+                    for (i in 0 until array.length()) {
+                        val item = array.getJSONObject(i)
+                        val parsed = parseLyricSearchResult(item, isOfficial = (i == 0))
+                        if (parsed != null) {
+                            list.add(parsed)
+                        }
+                    }
+                }
+            }
+        } catch (t: Throwable) {
+            AuraDebugManager.logWarning("LyricsManager", "Fallo al buscar por track_name en LRCLIB: ${t.message}")
+        }
+        return list
+    }
+
     private fun tryFetchOfficial(title: String, artist: String, durationSec: Long): LyricSearchResult? {
         if (title.isBlank()) return null
         try {
@@ -326,7 +373,9 @@ object LyricsManager {
 
             val request = Request.Builder()
                 .url(url)
-                .header("User-Agent", "AuraMusic/1.0 (Android; Offline HiFi Player)")
+                .header("User-Agent", APP_USER_AGENT)
+                .header("Accept", "application/json, text/plain, */*")
+                .header("Accept-Language", "es-ES,es;q=0.9,en;q=0.8")
                 .build()
 
             httpClient.newCall(request).execute().use { response ->
@@ -350,7 +399,9 @@ object LyricsManager {
 
             val request = Request.Builder()
                 .url(url)
-                .header("User-Agent", "AuraMusic/1.0 (Android; Offline HiFi Player)")
+                .header("User-Agent", APP_USER_AGENT)
+                .header("Accept", "application/json, text/plain, */*")
+                .header("Accept-Language", "es-ES,es;q=0.9,en;q=0.8")
                 .build()
 
             httpClient.newCall(request).execute().use { response ->

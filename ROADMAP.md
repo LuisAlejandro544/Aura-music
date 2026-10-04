@@ -195,7 +195,8 @@ Este documento traza las fases de evolución técnica y funcional para convertir
   - Inspector de hilos en vivo (`Thread.getAllStackTraces()`) con clasificación por categorías (Audio, C++ DSP, UI, Corrutinas), estado (`RUNNABLE`, `TIMED_WAITING`), trazas de pila completas y copia al portapapeles.
 - [x] **Video Canvas 100% Despejado, Sincronización de Velocidad y Armonización Cromática Instantánea**:
   - Eliminación definitiva del badge o indicador "VIDEO SYNC" / "LOOP CANVAS" sobre la carátula para una visualización sin obstrucciones.
-  - Muestreo dinámico de fotogramas del video acelerado a intervalos de 300ms y animación ágil `tween(220)` para adaptación cromática en tiempo real sin delay.
+  - Extracción cromática exacta con `MediaMetadataRetriever.OPTION_CLOSEST` y `MediaMetadataRetriever` persistente, erradicando el retraso de 2.5s de los Keyframes y respondiendo de inmediato a cada escena con `tween(180)`.
+  - Eliminación total de fondos negros y parpadeos al abrir Now Playing o el Mini Reproductor mediante `seekTo` previo a `prepare()`, obturador transparente y placeholder de carátula (`placeholderTrack`) con fundido en `onRenderedFirstFrame()`.
   - Soporte de Video Canvas miniatura en el Mini Reproductor flotante configurable por el usuario desde Ajustes.
   - Sincronización milimétrica de velocidad de reproducción (0.50x a 2.00x) entre la música y el video de fondo.
   - Erradicación de la fuga de memoria en `AuraMediaPlaybackService` (`ResourcesImpl.mAppContext`) detectada por LeakCanary.

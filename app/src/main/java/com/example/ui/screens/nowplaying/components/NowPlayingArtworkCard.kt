@@ -57,6 +57,7 @@ fun NowPlayingArtworkCard(
                 isPlaying = isPlaying,
                 currentPositionMs = currentPositionMs,
                 playbackSpeed = playbackSpeed,
+                placeholderTrack = currentTrack,
                 modifier = Modifier.fillMaxSize(),
                 cornerRadius = 26.dp
             )

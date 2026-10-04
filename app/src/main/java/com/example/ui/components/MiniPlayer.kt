@@ -117,6 +117,7 @@ fun MiniPlayer(
                             isPlaying = isPlaying,
                             currentPositionMs = currentPositionMs,
                             playbackSpeed = playbackSpeed,
+                            placeholderTrack = currentTrack,
                             modifier = Modifier.fillMaxSize(),
                             cornerRadius = 10.dp
                         )
