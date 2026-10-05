@@ -127,5 +127,11 @@ Java_com_example_playback_NativeAudioEngine_nativeGetVisualizerBands(JNIEnv* env
     }
 }
 
+JNIEXPORT void JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeFlushDspBuffers(JNIEnv* /* env */, jobject /* thiz */) {
+    sDspEngine.flushDspBuffers();
 }
+
+}
+
 

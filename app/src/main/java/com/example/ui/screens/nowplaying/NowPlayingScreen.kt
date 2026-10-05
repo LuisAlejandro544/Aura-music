@@ -258,16 +258,18 @@ fun NowPlayingScreen(
     ) {
         // Modo FONDO COMPLETO: Renderiza el video de fondo detrás de toda la pantalla completa
         if (isFullscreenVideo && currentTrack.videoUri != null) {
-            BackgroundVideoPlayer(
-                videoUriString = currentTrack.videoUri,
-                isVideoLoop = currentTrack.isVideoLoop,
-                isPlaying = isPlaying,
-                currentPositionMs = currentPositionMs,
-                playbackSpeed = playbackSpeed,
-                placeholderTrack = currentTrack,
-                modifier = Modifier.fillMaxSize(),
-                cornerRadius = 0.dp
-            )
+            key(currentTrack.id, currentTrack.videoUri) {
+                BackgroundVideoPlayer(
+                    videoUriString = currentTrack.videoUri,
+                    isVideoLoop = currentTrack.isVideoLoop,
+                    isPlaying = isPlaying,
+                    currentPositionMs = currentPositionMs,
+                    playbackSpeed = playbackSpeed,
+                    placeholderTrack = currentTrack,
+                    modifier = Modifier.fillMaxSize(),
+                    cornerRadius = 0.dp
+                )
+            }
 
             // Velo oscuro y gradiente cinematográfico para máximo contraste y legibilidad
             Box(

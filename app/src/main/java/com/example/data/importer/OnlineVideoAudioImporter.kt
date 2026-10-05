@@ -1,43 +1,31 @@
 package com.example.data.importer
 
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import com.example.data.importer.download.ChunkedStreamDownloader
+import com.example.data.importer.tiktok.TikTokMediaResolver
 import com.example.data.storage.AppStorageManager
+import com.example.debug.AuraDebugManager
 import com.example.model.DownloadProgress
 import com.example.model.Track
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import org.json.JSONObject
 import java.io.File
-import java.io.FileOutputStream
-import java.io.InputStream
-import java.net.URLEncoder
-import java.util.concurrent.TimeUnit
 
 /**
- * Importador y descargador de audio y video desde enlaces web (compatible con TikTok y videos online).
+ * Aura Music - Importador y Descargador de Audio y Video desde Enlaces Web (TikTok, YouTube y Web)
  *
- * Arquitectura y Principio de Operación:
- * 1. Resuelve enlaces de video mediante servicios de extracción directa sin marcas de agua.
- * 2. Descarga el flujo de video en alta definición y lo almacena en `videos/` para el Video Canvas.
- * 3. Extrae o descarga el audio de alta fidelidad guardándolo en `songs/` (.m4a/.mp3).
- * 4. Obtiene la carátula oficial o extrae un fotograma clave en alta resolución, comprimiéndola a WebP
- *    sin pérdida en `images/`.
- * 5. Soporta videos de cualquier duración (tanto loops cortos de Canvas como videos largos sincronizados).
+ * Arquitectura y Principio de Operación Modular:
+ * 1. Resuelve enlaces de video mediante servicios especializados ([TikTokMediaResolver], [WebStreamExtractor]).
+ * 2. Acelera descargas mediante bloques HTTP Range con [ChunkedStreamDownloader] (eliminando el límite de 63 KB/s).
+ * 3. Procesa carátulas en WebP sin pérdida y Video Canvas optimizado (480p, Seamless Loop / Boomerang) con [MediaAssetProcessor].
+ * 4. Extrae o demuxea el audio de alta fidelidad sin recodificación innecesaria guardándolo en `songs/` (.m4a/.mp3).
+ * 5. Garantiza compatibilidad sin cortes para videos de cualquier duración (desde loops cortos de 5s hasta mixes de 1 hora).
  */
 object OnlineVideoAudioImporter {
 
-    private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(60, TimeUnit.SECONDS)
-        .followRedirects(true)
-        .followSslRedirects(true)
-        .build()
+    private val httpClient = ChunkedStreamDownloader.defaultHttpClient
 
     data class ResolvedMediaInfo(
         val originalUrl: String,
@@ -73,7 +61,7 @@ object OnlineVideoAudioImporter {
 
             // Caso 2: Enlace de TikTok (tiktok.com, vt.tiktok.com, vm.tiktok.com)
             if (cleanUrl.contains("tiktok.com", ignoreCase = true)) {
-                return@withContext resolveTikTokMedia(cleanUrl)
+                return@withContext TikTokMediaResolver.resolve(cleanUrl, httpClient)
             }
 
             // Caso 3: Enlace directo a archivo multimedia (.mp4, .m4a, .mp3, .webm)
@@ -105,89 +93,10 @@ object OnlineVideoAudioImporter {
             }
 
             // Intento por defecto con el resolver de TikTok
-            return@withContext resolveTikTokMedia(cleanUrl)
+            return@withContext TikTokMediaResolver.resolve(cleanUrl, httpClient)
         } catch (e: Exception) {
             Result.failure(e)
         }
-    }
-
-    /**
-     * Resuelve videos de TikTok utilizando el endpoint público de alta fidelidad TikWM sin marca de agua.
-     */
-    private fun resolveTikTokMedia(tikTokUrl: String): Result<ResolvedMediaInfo> {
-        val encodedUrl = URLEncoder.encode(tikTokUrl, "UTF-8")
-        val apiEndpoints = listOf(
-            "https://www.tikwm.com/api/?url=$encodedUrl&hd=1",
-            "https://api.tiklydown.eu.org/api/download?url=$encodedUrl"
-        )
-
-        for (endpoint in apiEndpoints) {
-            try {
-                val request = Request.Builder()
-                    .url(endpoint)
-                    .header("User-Agent", "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36")
-                    .get()
-                    .build()
-
-                httpClient.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) return@use
-                    val bodyString = response.body?.string() ?: return@use
-                    val json = JSONObject(bodyString)
-
-                    // Formato TikWM
-                    if (json.has("code") && json.getInt("code") == 0 && json.has("data")) {
-                        val data = json.getJSONObject("data")
-                        val videoPlayUrl = data.optString("play").ifBlank { data.optString("wmplay") }
-                        val rawTitle = data.optString("title").trim()
-                        val duration = data.optLong("duration", 0L)
-                        val coverUrl = data.optString("cover").ifBlank { data.optString("origin_cover") }
-
-                        // Información de audio y artista
-                        val musicInfo = data.optJSONObject("music_info")
-                        val musicUrl = musicInfo?.optString("play") ?: data.optString("music")
-                        val musicTitle = musicInfo?.optString("title")
-                        val musicAuthor = musicInfo?.optString("author")
-                        val authorObj = data.optJSONObject("author")
-                        val authorNickname = authorObj?.optString("nickname") ?: authorObj?.optString("unique_id")
-
-                        val title = when {
-                            !musicTitle.isNullOrBlank() && !musicTitle.contains("original sound", ignoreCase = true) -> musicTitle
-                            rawTitle.isNotBlank() -> cleanCaptionAsTitle(rawTitle)
-                            else -> "TikTok Music ${System.currentTimeMillis() % 1000}"
-                        }
-
-                        val artist = when {
-                            !musicAuthor.isNullOrBlank() -> musicAuthor
-                            !authorNickname.isNullOrBlank() -> "@$authorNickname"
-                            else -> "TikTok Creator"
-                        }
-
-                        if (videoPlayUrl.isNotBlank()) {
-                            // En TikTok, los enlaces en music_info.play están limitados a 60 segundos por su biblioteca de sonidos.
-                            // Para admitir videos de cualquier duración (5 min, 10 min, 30 min o hasta 1 hora),
-                            // dejamos audioUrl = null para forzar la extracción directa y sin recodificación
-                            // desde el flujo de video original mediante MediaExtractor/MediaMuxer.
-                            val resolvedVideo = if (videoPlayUrl.startsWith("//")) "https:$videoPlayUrl" else videoPlayUrl
-                            return Result.success(
-                                ResolvedMediaInfo(
-                                    originalUrl = tikTokUrl,
-                                    suggestedTitle = title,
-                                    suggestedArtist = artist,
-                                    videoUrl = resolvedVideo,
-                                    audioUrl = null,
-                                    coverUrl = if (coverUrl.startsWith("//")) "https:$coverUrl" else coverUrl.ifBlank { null },
-                                    durationSeconds = duration
-                                )
-                            )
-                        }
-                    }
-                }
-            } catch (_: Exception) {
-                // Continuar al siguiente endpoint si hubo algún error transitorio
-            }
-        }
-
-        return Result.failure(IllegalStateException("No se pudo obtener el video desde el enlace provisto. Verifica que el enlace sea válido."))
     }
 
     /**
@@ -215,13 +124,14 @@ object OnlineVideoAudioImporter {
             var audioReady = false
             var durationMs = resolvedInfo.durationSeconds * 1000L
 
-            // 1. Descarga prioritaria del audio de alta fidelidad si está disponible por separado (p. ej. InnerTube)
+            // 1. Descarga prioritaria del audio de alta fidelidad si está disponible por separado
             if (!resolvedInfo.audioUrl.isNullOrBlank()) {
-                val downloadedAudio = downloadUrlToFile(
+                val downloadedAudio = ChunkedStreamDownloader.downloadUrlToFile(
                     url = resolvedInfo.audioUrl,
                     targetFile = audioFile,
                     phase = "Descargando audio de alta fidelidad...",
                     customHeaders = resolvedInfo.httpHeaders,
+                    httpClient = httpClient,
                     onProgress = onProgressUpdate
                 )
                 if (downloadedAudio && audioFile.exists() && audioFile.length() > 0L) {
@@ -231,15 +141,15 @@ object OnlineVideoAudioImporter {
 
             // 2. Si no había audio directo o falló, descargar flujo de video y demuxear
             if (!audioReady) {
-                val downloadVideoSuccess = downloadUrlToFile(
+                val downloadVideoSuccess = ChunkedStreamDownloader.downloadUrlToFile(
                     url = resolvedInfo.videoUrl,
                     targetFile = tempVideoFile,
                     phase = "Descargando flujo multimedia...",
                     customHeaders = resolvedInfo.httpHeaders,
+                    httpClient = httpClient,
                     onProgress = onProgressUpdate
                 )
                 if (downloadVideoSuccess && tempVideoFile.exists() && tempVideoFile.length() > 0L) {
-                    // Intentar demuxing sin recodificación a través de VideoAudioExtractor
                     try {
                         val videoUri = Uri.fromFile(tempVideoFile)
                         val isYoutube = resolvedInfo.originalUrl.contains("youtu", ignoreCase = true)
@@ -284,12 +194,11 @@ object OnlineVideoAudioImporter {
                 }
             }
 
-            // 3. Fallback inteligente de autoreparación: si el stream de WebView devolvió 403 o falló,
-            // resolvemos inmediatamente un enlace fresco con InnerTube o Invidious sin molestar al usuario
+            // 3. Fallback inteligente de autoreparación: si el stream de WebView devolvió 403 o falló
             if (!audioReady && WebStreamExtractor.isWebVideoUrl(resolvedInfo.originalUrl)) {
                 val ytId = WebStreamExtractor.extractVideoId(resolvedInfo.originalUrl)
                 if (ytId != null) {
-                    com.example.debug.AuraDebugManager.logInfo(
+                    AuraDebugManager.logInfo(
                         "OnlineImporter",
                         "El stream de WebView requirió autoreparación. Resolviendo stream directo fresco con InnerTube/Invidious..."
                     )
@@ -298,11 +207,12 @@ object OnlineVideoAudioImporter {
 
                     if (freshInfo != null) {
                         if (!freshInfo.audioUrl.isNullOrBlank()) {
-                            val backupAudioSuccess = downloadUrlToFile(
+                            val backupAudioSuccess = ChunkedStreamDownloader.downloadUrlToFile(
                                 url = freshInfo.audioUrl,
                                 targetFile = audioFile,
                                 phase = "Descargando audio de alta fidelidad...",
                                 customHeaders = freshInfo.httpHeaders,
+                                httpClient = httpClient,
                                 onProgress = onProgressUpdate
                             )
                             if (backupAudioSuccess && audioFile.exists() && audioFile.length() > 0L) {
@@ -311,11 +221,12 @@ object OnlineVideoAudioImporter {
                         }
 
                         if (!audioReady && !freshInfo.videoUrl.isNullOrBlank()) {
-                            val backupVideoSuccess = downloadUrlToFile(
+                            val backupVideoSuccess = ChunkedStreamDownloader.downloadUrlToFile(
                                 url = freshInfo.videoUrl,
                                 targetFile = tempVideoFile,
                                 phase = "Descargando flujo multimedia...",
                                 customHeaders = freshInfo.httpHeaders,
+                                httpClient = httpClient,
                                 onProgress = onProgressUpdate
                             )
                             if (backupVideoSuccess && tempVideoFile.exists() && tempVideoFile.length() > 0L) {
@@ -367,7 +278,7 @@ object OnlineVideoAudioImporter {
                 try { retriever.release() } catch (_: Throwable) {}
             }
 
-            // Si el usuario activó el interruptor para eliminar silencios al inicio y al final
+            // Si el usuario activó la eliminación inteligente de silencios al inicio y al final
             if (trimSilence) {
                 onProgressUpdate(
                     DownloadProgress(
@@ -388,6 +299,7 @@ object OnlineVideoAudioImporter {
                 }
             }
 
+            // Generación de carátula WebP
             onProgressUpdate(
                 DownloadProgress(
                     isDownloading = true,
@@ -397,211 +309,41 @@ object OnlineVideoAudioImporter {
                     progressFraction = 0.90f
                 )
             )
-            var artworkPath: String? = null
+            val artworkPath = MediaAssetProcessor.processArtwork(
+                storageManager = storageManager,
+                resolvedInfo = resolvedInfo,
+                tempVideoFile = tempVideoFile,
+                timestamp = timestamp,
+                httpClient = httpClient
+            )
 
-            // 1. Intentar descargar portada oficial con soporte en cascada para YouTube
-            val candidateCoverUrls = mutableListOf<String>()
-            if (!resolvedInfo.coverUrl.isNullOrBlank()) {
-                candidateCoverUrls.add(resolvedInfo.coverUrl)
-            }
-            // Si es un video de YouTube, agregar variantes oficiales de miniatura
-            val ytVideoId = WebStreamExtractor.extractVideoId(resolvedInfo.originalUrl)
-            if (ytVideoId != null) {
-                candidateCoverUrls.add("https://img.youtube.com/vi/$ytVideoId/maxresdefault.jpg")
-                candidateCoverUrls.add("https://img.youtube.com/vi/$ytVideoId/hqdefault.jpg")
-                candidateCoverUrls.add("https://img.youtube.com/vi/$ytVideoId/mqdefault.jpg")
-                candidateCoverUrls.add("https://i.ytimg.com/vi/$ytVideoId/hqdefault.jpg")
-            }
-
-            val artFile = File(storageManager.imagesDir, "art_online_${timestamp}.webp")
-            for (coverCandidate in candidateCoverUrls.distinct()) {
-                if (artworkPath != null) break
-                try {
-                    val normalizedUrl = if (coverCandidate.startsWith("//")) "https:$coverCandidate" else coverCandidate
-                    val request = Request.Builder()
-                        .url(normalizedUrl)
-                        .header("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36")
-                        .header("Accept", "image/*,*/*")
-                        .build()
-                    httpClient.newCall(request).execute().use { res ->
-                        if (res.isSuccessful) {
-                            val stream = res.body?.byteStream()
-                            if (stream != null) {
-                                val bitmap = BitmapFactory.decodeStream(stream)
-                                if (bitmap != null && bitmap.width > 30 && bitmap.height > 30) {
-                                    FileOutputStream(artFile).use { out ->
-                                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                                            bitmap.compress(Bitmap.CompressFormat.WEBP_LOSSLESS, 100, out)
-                                        } else {
-                                            bitmap.compress(Bitmap.CompressFormat.WEBP, 95, out)
-                                        }
-                                    }
-                                    artworkPath = artFile.absolutePath
-                                    bitmap.recycle()
-                                }
-                            }
-                        }
-                    }
-                } catch (_: Throwable) {
-                    // Continuar al siguiente candidato de portada
-                }
-            }
-
-            // 2. Si no hubo portada o falló y tenemos video, extraer fotograma clave del video descargado
-            if (artworkPath == null && tempVideoFile.exists() && tempVideoFile.length() > 0L) {
-                val frameRetriever = MediaMetadataRetriever()
-                try {
-                    frameRetriever.setDataSource(tempVideoFile.absolutePath)
-                    val frame = frameRetriever.getFrameAtTime(
-                        1_000_000L,
-                        MediaMetadataRetriever.OPTION_CLOSEST_SYNC
-                    ) ?: frameRetriever.frameAtTime
-                    if (frame != null) {
-                        val artFile = File(storageManager.imagesDir, "art_online_${timestamp}.webp")
-                        FileOutputStream(artFile).use { out ->
-                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                                frame.compress(Bitmap.CompressFormat.WEBP_LOSSLESS, 100, out)
-                            } else {
-                                frame.compress(Bitmap.CompressFormat.WEBP, 95, out)
-                            }
-                        }
-                        artworkPath = artFile.absolutePath
-                        frame.recycle()
-                    }
-                } catch (_: Throwable) {
-                } finally {
-                    try { frameRetriever.release() } catch (_: Throwable) {}
-                }
-            }
-
+            // Procesamiento de Video Canvas de fondo
             var videoCanvasPath: String? = null
             val isLoop = forceLoop ?: (loopStyle == FFmpegNativeEngine.CanvasLoopStyle.BOOMERANG || durationMs in 1..20500L)
 
             if (attachAsCanvas) {
-                // Función auxiliar para validar que el archivo descargado contiene una pista de video real decodificable
-                fun isValidVideoFile(file: File): Boolean {
-                    if (!file.exists() || file.length() < 4096L) return false
-                    return try {
-                        val vRetriever = MediaMetadataRetriever()
-                        vRetriever.setDataSource(file.absolutePath)
-                        val hasVid = vRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_HAS_VIDEO)
-                        val width = vRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 0
-                        vRetriever.release()
-                        hasVid == "yes" || width > 0
-                    } catch (_: Throwable) {
-                        false
-                    }
-                }
-
-                // 1. Si aún no tenemos tempVideoFile y videoUrl es distinto de audioUrl, descargarlo directamente
-                if (!isValidVideoFile(tempVideoFile) &&
-                    !resolvedInfo.videoUrl.isNullOrBlank() &&
-                    resolvedInfo.videoUrl != resolvedInfo.audioUrl
-                ) {
-                    downloadUrlToFile(
-                        url = resolvedInfo.videoUrl,
-                        targetFile = tempVideoFile,
-                        phase = "Descargando Video Canvas de fondo (480p)...",
-                        customHeaders = resolvedInfo.httpHeaders,
-                        onProgress = onProgressUpdate
-                    )
-                }
-
-                // 2. Si videoUrl == audioUrl, verificar si audioFile era un contenedor combinado (video + audio)
-                if (!isValidVideoFile(tempVideoFile) && resolvedInfo.videoUrl == resolvedInfo.audioUrl) {
-                    if (isValidVideoFile(audioFile)) {
-                        audioFile.copyTo(tempVideoFile, overwrite = true)
-                    }
-                }
-
-                // 3. Si videoUrl == audioUrl (ej. porque el extractor inicial solo obtuvo audio) o la primera descarga falló,
-                // resolver activamente un flujo de video MP4 480p dedicado desde InnerTube / Invidious / yt-dlp sin omitir el video
-                if (!isValidVideoFile(tempVideoFile) && WebStreamExtractor.isWebVideoUrl(resolvedInfo.originalUrl)) {
-                    val ytId = WebStreamExtractor.extractVideoId(resolvedInfo.originalUrl)
-                    if (ytId != null) {
-                        com.example.debug.AuraDebugManager.logInfo(
-                            "OnlineImporter",
-                            "Resolviendo flujo de Video Canvas 480p dedicado para $ytId..."
+                videoCanvasPath = MediaAssetProcessor.processVideoCanvas(
+                    context = context,
+                    storageManager = storageManager,
+                    resolvedInfo = resolvedInfo,
+                    tempVideoFile = tempVideoFile,
+                    audioFile = audioFile,
+                    timestamp = timestamp,
+                    isLoop = isLoop,
+                    loopStyle = loopStyle,
+                    onProgressUpdate = onProgressUpdate,
+                    downloadFunction = { url, target, phase, headers ->
+                        ChunkedStreamDownloader.downloadUrlToFile(
+                            url = url,
+                            targetFile = target,
+                            phase = phase,
+                            customHeaders = headers,
+                            httpClient = httpClient,
+                            onProgress = onProgressUpdate
                         )
-                        val videoCandidates = mutableListOf<Pair<String, Map<String, String>>>()
-
-                        val innerTubeFallback = InnerTubeClient.resolve(ytId, resolvedInfo.originalUrl)
-                        if (innerTubeFallback != null &&
-                            innerTubeFallback.videoUrl.isNotBlank() &&
-                            innerTubeFallback.videoUrl != innerTubeFallback.audioUrl
-                        ) {
-                            videoCandidates.add(innerTubeFallback.videoUrl to innerTubeFallback.httpHeaders)
-                        }
-
-                        val invidiousFallback = InvidiousStreamResolver.resolve(ytId, resolvedInfo.originalUrl)
-                        if (invidiousFallback != null &&
-                            invidiousFallback.videoUrl.isNotBlank() &&
-                            invidiousFallback.videoUrl != invidiousFallback.audioUrl
-                        ) {
-                            videoCandidates.add(invidiousFallback.videoUrl to invidiousFallback.httpHeaders)
-                        }
-
-                        if (YtDlpNativeEngine.isAvailable(context)) {
-                            val ytdlpFallback = YtDlpNativeEngine.resolveStream(context, resolvedInfo.originalUrl).getOrNull()
-                            if (ytdlpFallback != null &&
-                                ytdlpFallback.videoUrl.isNotBlank() &&
-                                ytdlpFallback.videoUrl != ytdlpFallback.audioUrl
-                            ) {
-                                videoCandidates.add(ytdlpFallback.videoUrl to ytdlpFallback.httpHeaders)
-                            }
-                        }
-
-                        for ((candidateVideoUrl, candidateHeaders) in videoCandidates) {
-                            if (tempVideoFile.exists()) tempVideoFile.delete()
-                            val downloaded = downloadUrlToFile(
-                                url = candidateVideoUrl,
-                                targetFile = tempVideoFile,
-                                phase = "Descargando Video Canvas de fondo (480p)...",
-                                customHeaders = candidateHeaders,
-                                onProgress = onProgressUpdate
-                            )
-                            if (downloaded && isValidVideoFile(tempVideoFile)) {
-                                break
-                            }
-                        }
                     }
-                }
-
-                if (tempVideoFile.exists() && tempVideoFile.length() > 0L) {
-                    onProgressUpdate(
-                        DownloadProgress(
-                            isDownloading = true,
-                            phase = when {
-                                isLoop && loopStyle == FFmpegNativeEngine.CanvasLoopStyle.BOOMERANG ->
-                                    "Generando bucle infinito Boomerang / Ping-Pong (reverse + concat)..."
-                                isLoop ->
-                                    "Perfeccionando bucle infinito continuo (Seamless Loop)..."
-                                else ->
-                                    "Optimizando fluidez de video y fotogramas clave (480p)..."
-                            },
-                            bytesDownloaded = tempVideoFile.length(),
-                            totalBytes = tempVideoFile.length(),
-                            progressFraction = 0.94f
-                        )
-                    )
-                    val optimizedVideoFile = File(storageManager.videosDir, "canvas_opt_${timestamp}.mp4")
-                    val canvasResult = FFmpegNativeEngine.processVideoForCanvas(
-                        context = context,
-                        inputFile = tempVideoFile,
-                        outputFile = optimizedVideoFile,
-                        isLoop = isLoop,
-                        loopStyle = loopStyle
-                    )
-                    if (canvasResult.success && isValidVideoFile(optimizedVideoFile)) {
-                        tempVideoFile.delete()
-                        videoCanvasPath = optimizedVideoFile.absolutePath
-                    } else {
-                        if (optimizedVideoFile.exists()) optimizedVideoFile.delete()
-                        videoCanvasPath = tempVideoFile.absolutePath
-                    }
-                }
+                )
             } else {
-                // Si el usuario no quería video de fondo, eliminamos el archivo de video para no gastar espacio
                 if (tempVideoFile.exists() && audioFile.absolutePath != tempVideoFile.absolutePath) {
                     tempVideoFile.delete()
                 }
@@ -620,7 +362,7 @@ object OnlineVideoAudioImporter {
             val isYoutubeSource = resolvedInfo.originalUrl.contains("youtu", ignoreCase = true)
             val finalAlbum = if (isYoutubeSource) "YouTube Music & Canvas" else "TikTok Music & Canvas"
             val finalFolder = if (isYoutubeSource) "YouTube & Web" else "TikTok & Web"
-            val fileSizeFormatted = formatFileSize(audioFile.length())
+            val fileSizeFormatted = MediaAssetProcessor.formatFileSize(audioFile.length())
 
             val createdTrack = Track(
                 id = 0L,
@@ -646,321 +388,5 @@ object OnlineVideoAudioImporter {
             onProgressUpdate(DownloadProgress(isDownloading = false))
             Result.failure(e)
         }
-    }
-
-    private fun downloadUrlToFile(
-        url: String,
-        targetFile: File,
-        phase: String,
-        customHeaders: Map<String, String> = emptyMap(),
-        onProgress: (DownloadProgress) -> Unit
-    ): Boolean {
-        val isYoutubeStream = url.contains("googlevideo.com") || url.contains("youtube.com")
-
-        // 1. Si la URL contiene rangos parciales (&range=0-...), probar primero sin rango para descargar el archivo completo
-        val cleanUrl = if (isYoutubeStream && url.contains("&range=")) {
-            url.replace(Regex("&range=[^&]+"), "")
-                .replace(Regex("&rn=[^&]+"), "")
-                .replace(Regex("&rbuf=[^&]+"), "")
-        } else {
-            url
-        }
-
-        val success = executeDownload(cleanUrl, targetFile, phase, isYoutubeStream, customHeaders, onProgress)
-        if (success && targetFile.exists() && targetFile.length() > 0L) {
-            return true
-        }
-
-        // 2. Si la URL limpia falló (ej. la firma requería el query string original), reintentar con la URL original
-        if (cleanUrl != url) {
-            val retrySuccess = executeDownload(url, targetFile, phase, isYoutubeStream, customHeaders, onProgress)
-            if (retrySuccess && targetFile.exists() && targetFile.length() > 0L) {
-                return true
-            }
-        }
-        return false
-    }
-
-    private fun executeDownload(
-        url: String,
-        targetFile: File,
-        phase: String,
-        isYoutubeStream: Boolean,
-        customHeaders: Map<String, String>,
-        onProgress: (DownloadProgress) -> Unit
-    ): Boolean {
-        val cleanUrl = if (url.contains("googlevideo.com")) {
-            url.replace(Regex("""&range=\d+-\d+"""), "")
-                .replace(Regex("""\?range=\d+-\d+&"""), "?")
-        } else url
-
-        // 1. Acelerador de descarga por bloques HTTP Range (evita el estrangulamiento de 63 KB/s de YouTube)
-        if (cleanUrl.contains("googlevideo.com")) {
-            val chunkedSuccess = executeChunkedDownload(cleanUrl, targetFile, phase, customHeaders, onProgress)
-            if (chunkedSuccess && targetFile.exists() && targetFile.length() > 0L) {
-                return true
-            }
-        }
-
-        // 2. Descarga lineal estándar de respaldo
-        return try {
-            val defaultUa = customHeaders["User-Agent"]
-                ?: customHeaders["user-agent"]
-                ?: "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
-
-            val reqBuilder = Request.Builder().url(cleanUrl)
-                .header("User-Agent", defaultUa)
-                .header("Accept", "*/*")
-                .header("Accept-Encoding", "identity")
-
-            for ((k, v) in customHeaders) {
-                if (!k.equals("Range", ignoreCase = true) && !k.equals("Accept-Encoding", ignoreCase = true)) {
-                    reqBuilder.header(k, v)
-                }
-            }
-
-            if (isYoutubeStream || cleanUrl.contains("googlevideo.com")) {
-                if (customHeaders.isEmpty()) {
-                    reqBuilder.header("Referer", "https://m.youtube.com/")
-                }
-                try {
-                    val cookies = android.webkit.CookieManager.getInstance().getCookie("https://m.youtube.com")
-                    if (!cookies.isNullOrBlank() && !customHeaders.containsKey("Cookie")) {
-                        reqBuilder.header("Cookie", cookies)
-                    }
-                } catch (_: Throwable) {}
-            }
-
-            var response = httpClient.newCall(reqBuilder.build()).execute()
-            
-            // Reintento limpio en caso de rechazo 403 Forbidden
-            if (response.code == 403 && (isYoutubeStream || cleanUrl.contains("googlevideo.com"))) {
-                response.close()
-                val fallbackReq = Request.Builder()
-                    .url(cleanUrl)
-                    .header("User-Agent", defaultUa)
-                    .header("Accept", "*/*")
-                    .build()
-                response = httpClient.newCall(fallbackReq).execute()
-            }
-
-            response.use { res ->
-                if (!res.isSuccessful) {
-                    com.example.debug.AuraDebugManager.logWarning("Downloader", "HTTP ${res.code} al descargar: ${cleanUrl.take(50)}...")
-                    return false
-                }
-                val body = res.body ?: return false
-                val totalBytes = body.contentLength()
-
-                body.byteStream().use { input ->
-                    FileOutputStream(targetFile).use { output ->
-                        val buffer = ByteArray(64 * 1024)
-                        var bytesRead: Int
-                        var totalRead = 0L
-                        var lastReportTime = System.currentTimeMillis()
-                        var bytesSinceLastReport = 0L
-                        var currentSpeed = 0L
-
-                        onProgress(
-                            DownloadProgress(
-                                isDownloading = true,
-                                phase = phase,
-                                bytesDownloaded = 0L,
-                                totalBytes = totalBytes,
-                                bytesPerSecond = 0L,
-                                progressFraction = 0f
-                            )
-                        )
-
-                        while (input.read(buffer).also { bytesRead = it } != -1) {
-                            output.write(buffer, 0, bytesRead)
-                            totalRead += bytesRead
-                            bytesSinceLastReport += bytesRead
-
-                            val now = System.currentTimeMillis()
-                            val elapsed = now - lastReportTime
-                            if (elapsed >= 150) {
-                                currentSpeed = (bytesSinceLastReport * 1000L) / elapsed
-                                val fraction = if (totalBytes > 0) {
-                                    (totalRead.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
-                                } else 0f
-
-                                onProgress(
-                                    DownloadProgress(
-                                        isDownloading = true,
-                                        phase = phase,
-                                        bytesDownloaded = totalRead,
-                                        totalBytes = totalBytes,
-                                        bytesPerSecond = currentSpeed,
-                                        progressFraction = fraction
-                                    )
-                                )
-                                lastReportTime = now
-                                bytesSinceLastReport = 0L
-                            }
-                        }
-
-                        val finalFraction = if (totalBytes > 0) 1f else 0f
-                        onProgress(
-                            DownloadProgress(
-                                isDownloading = true,
-                                phase = phase,
-                                bytesDownloaded = totalRead,
-                                totalBytes = if (totalBytes > 0) totalBytes else totalRead,
-                                bytesPerSecond = currentSpeed,
-                                progressFraction = finalFraction
-                            )
-                        )
-                    }
-                }
-            }
-            targetFile.exists() && targetFile.length() > 0L
-        } catch (e: Exception) {
-            com.example.debug.AuraDebugManager.logWarning("Downloader", "Fallo en descarga: ${e.message}")
-            false
-        }
-    }
-
-    /**
-     * Descarga de alta velocidad mediante fragmentación por rangos HTTP (Chunked Range Download).
-     * Burlar radicalmente el estrangulamiento de ~63 KB/s impuesto por los CDNs de YouTube para
-     * conexiones continuas, descargando a la velocidad real de la red (10 - 40 MB/s).
-     */
-    private fun executeChunkedDownload(
-        url: String,
-        targetFile: File,
-        phase: String,
-        customHeaders: Map<String, String>,
-        onProgress: (DownloadProgress) -> Unit
-    ): Boolean {
-        return try {
-            val signedUa = customHeaders["User-Agent"]
-                ?: customHeaders["user-agent"]
-                ?: "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
-
-            // Sonda inicial ligera para determinar Content-Range y tamaño total exacto
-            val probeBuilder = Request.Builder()
-                .url(url)
-                .header("User-Agent", signedUa)
-                .header("Accept", "*/*")
-
-            for ((k, v) in customHeaders) {
-                if (!k.equals("Range", ignoreCase = true) && !k.equals("Accept-Encoding", ignoreCase = true)) {
-                    probeBuilder.header(k, v)
-                }
-            }
-            probeBuilder.header("Range", "bytes=0-0")
-
-            var totalBytes = -1L
-            httpClient.newCall(probeBuilder.build()).execute().use { probeRes ->
-                if (probeRes.code == 206) {
-                    val crHeader = probeRes.header("Content-Range")
-                    totalBytes = crHeader?.substringAfterLast("/")?.trim()?.toLongOrNull() ?: -1L
-                } else if (probeRes.isSuccessful) {
-                    totalBytes = probeRes.body?.contentLength() ?: -1L
-                }
-            }
-
-            if (totalBytes <= 0L) {
-                return false
-            }
-
-            // Descarga por bloques concurrentes/secuenciales de 2.5 MB sin estrangulamiento
-            val CHUNK_SIZE = 2_621_440L // 2.5 MB por fragmento
-            var currentByte = 0L
-            val buffer = ByteArray(64 * 1024)
-            var lastReportTime = System.currentTimeMillis()
-            var bytesSinceLastReport = 0L
-            var currentSpeed = 0L
-
-            if (targetFile.exists()) {
-                targetFile.delete()
-            }
-
-            FileOutputStream(targetFile, true).use { fileOut ->
-                while (currentByte < totalBytes) {
-                    val endByte = minOf(currentByte + CHUNK_SIZE - 1, totalBytes - 1)
-                    val chunkBuilder = Request.Builder()
-                        .url(url)
-                        .header("User-Agent", signedUa)
-                        .header("Accept", "*/*")
-
-                    for ((k, v) in customHeaders) {
-                        if (!k.equals("Range", ignoreCase = true) && !k.equals("Accept-Encoding", ignoreCase = true)) {
-                            chunkBuilder.header(k, v)
-                        }
-                    }
-                    chunkBuilder.header("Range", "bytes=$currentByte-$endByte")
-
-                    val chunkRes = httpClient.newCall(chunkBuilder.build()).execute()
-                    if (!chunkRes.isSuccessful && chunkRes.code != 206) {
-                        chunkRes.close()
-                        com.example.debug.AuraDebugManager.logWarning("Downloader", "Bloque rechazado con código ${chunkRes.code}. Recurriendo a descarga lineal.")
-                        return false
-                    }
-
-                    chunkRes.body?.byteStream()?.use { chunkStream ->
-                        var r: Int
-                        while (chunkStream.read(buffer).also { r = it } != -1) {
-                            fileOut.write(buffer, 0, r)
-                            currentByte += r
-                            bytesSinceLastReport += r
-
-                            val now = System.currentTimeMillis()
-                            val elapsed = now - lastReportTime
-                            if (elapsed >= 150) {
-                                currentSpeed = (bytesSinceLastReport * 1000L) / elapsed
-                                val fraction = (currentByte.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
-                                onProgress(
-                                    DownloadProgress(
-                                        isDownloading = true,
-                                        phase = phase,
-                                        bytesDownloaded = currentByte,
-                                        totalBytes = totalBytes,
-                                        bytesPerSecond = currentSpeed,
-                                        progressFraction = fraction
-                                    )
-                                )
-                                lastReportTime = now
-                                bytesSinceLastReport = 0L
-                            }
-                        }
-                    }
-                    chunkRes.close()
-                }
-            }
-
-            onProgress(
-                DownloadProgress(
-                    isDownloading = true,
-                    phase = phase,
-                    bytesDownloaded = currentByte,
-                    totalBytes = totalBytes,
-                    bytesPerSecond = currentSpeed,
-                    progressFraction = 1f
-                )
-            )
-
-            targetFile.exists() && targetFile.length() > 0L
-        } catch (e: Exception) {
-            com.example.debug.AuraDebugManager.logWarning("Downloader", "Descarga por bloques omitida por excepción: ${e.message}")
-            false
-        }
-    }
-
-    private fun cleanCaptionAsTitle(rawCaption: String): String {
-        return rawCaption
-            .replace(Regex("#\\S+"), "") // Eliminar hashtags (#fyp, #music, etc.)
-            .replace(Regex("@\\S+"), "") // Eliminar menciones (@usuario)
-            .replace(Regex("\n+"), " ")
-            .trim()
-            .take(60)
-            .ifBlank { "TikTok Music" }
-    }
-
-    private fun formatFileSize(bytes: Long): String {
-        if (bytes <= 0) return "0 MB"
-        val mb = bytes.toDouble() / (1024 * 1024)
-        return String.format(java.util.Locale.US, "%.1f MB", mb)
     }
 }

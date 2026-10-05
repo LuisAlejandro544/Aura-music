@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -110,23 +111,25 @@ fun MiniPlayer(
                         .clip(RoundedCornerShape(10.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (showVideoThumb && currentTrack.videoUri != null) {
-                        BackgroundVideoPlayer(
-                            videoUriString = currentTrack.videoUri,
-                            isVideoLoop = currentTrack.isVideoLoop,
-                            isPlaying = isPlaying,
-                            currentPositionMs = currentPositionMs,
-                            playbackSpeed = playbackSpeed,
-                            placeholderTrack = currentTrack,
-                            modifier = Modifier.fillMaxSize(),
-                            cornerRadius = 10.dp
-                        )
-                    } else {
-                        ArtworkImage(
-                            track = currentTrack,
-                            modifier = Modifier.fillMaxSize(),
-                            cornerRadius = 10.dp
-                        )
+                    key(currentTrack.id, currentTrack.videoUri) {
+                        if (showVideoThumb && currentTrack.videoUri != null) {
+                            BackgroundVideoPlayer(
+                                videoUriString = currentTrack.videoUri,
+                                isVideoLoop = currentTrack.isVideoLoop,
+                                isPlaying = isPlaying,
+                                currentPositionMs = currentPositionMs,
+                                playbackSpeed = playbackSpeed,
+                                placeholderTrack = currentTrack,
+                                modifier = Modifier.fillMaxSize(),
+                                cornerRadius = 10.dp
+                            )
+                        } else {
+                            ArtworkImage(
+                                track = currentTrack,
+                                modifier = Modifier.fillMaxSize(),
+                                cornerRadius = 10.dp
+                            )
+                        }
                     }
                 }
 

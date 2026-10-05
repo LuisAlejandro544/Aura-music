@@ -3,6 +3,7 @@ package com.example.ui.screens.nowplaying.components
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
@@ -50,23 +51,25 @@ fun NowPlayingArtworkCard(
             ),
         contentAlignment = Alignment.Center
     ) {
-        if (isCardVideo && currentTrack.videoUri != null) {
-            BackgroundVideoPlayer(
-                videoUriString = currentTrack.videoUri,
-                isVideoLoop = currentTrack.isVideoLoop,
-                isPlaying = isPlaying,
-                currentPositionMs = currentPositionMs,
-                playbackSpeed = playbackSpeed,
-                placeholderTrack = currentTrack,
-                modifier = Modifier.fillMaxSize(),
-                cornerRadius = 26.dp
-            )
-        } else {
-            ArtworkImage(
-                track = currentTrack,
-                modifier = Modifier.fillMaxSize(),
-                cornerRadius = 26.dp
-            )
+        key(currentTrack.id, currentTrack.videoUri) {
+            if (isCardVideo && currentTrack.videoUri != null) {
+                BackgroundVideoPlayer(
+                    videoUriString = currentTrack.videoUri,
+                    isVideoLoop = currentTrack.isVideoLoop,
+                    isPlaying = isPlaying,
+                    currentPositionMs = currentPositionMs,
+                    playbackSpeed = playbackSpeed,
+                    placeholderTrack = currentTrack,
+                    modifier = Modifier.fillMaxSize(),
+                    cornerRadius = 26.dp
+                )
+            } else {
+                ArtworkImage(
+                    track = currentTrack,
+                    modifier = Modifier.fillMaxSize(),
+                    cornerRadius = 26.dp
+                )
+            }
         }
     }
 }

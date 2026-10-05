@@ -15,10 +15,14 @@ AuraMusic/
 ├── app/
 │   ├── src/
 │   │   ├── main/
-│   │   │   ├── cpp/                            # Código Nativo C++20 (DSP y Audio Avanzado)
+│   │   │   ├── cpp/                            # Código Nativo C++20 (DSP y Audio Avanzado Modular)
 │   │   │   │   ├── CMakeLists.txt              # Configuración CMake integrada en Gradle (C++20)
-│   │   │   │   ├── auramusic_dsp.h             # Ecualizador 10 bandas biquad, limiter y buffers
-│   │   │   │   └── auramusic_dsp.cpp           # Implementación JNI del motor nativo
+│   │   │   │   ├── dsp_filters.h               # Módulo C++20: Filtros Biquad IIR, EQ 10 bandas y limitador con reset()
+│   │   │   │   ├── dsp_spatial.h               # Módulo C++20: Motor Audio Espacial 8D Binaural orbital con reset()
+│   │   │   │   ├── dsp_crossfeed.h             # Módulo C++20: Filtro acústico Crossfeed Bauer / Chu Moy con reset()
+│   │   │   │   ├── dsp_reverb.h                # Módulo C++20: Suite Reverb acústica híbrida con resetBuffers()
+│   │   │   │   ├── auramusic_dsp.h             # Orquestador nativo C++20 con limpieza atómica de buffers (flushDspBuffers)
+│   │   │   │   └── auramusic_dsp.cpp           # Implementación JNI del motor nativo con nativeFlushDspBuffers
 │   │   │   ├── jniLibs/                        # Estructura ABI protegida por .gitkeep e ignorada en Git (*.so en CI/CD)
 │   │   │   │   ├── arm64-v8a/.gitkeep          # 64-bit ARM
 │   │   │   │   ├── armeabi-v7a/.gitkeep        # 32-bit ARM
@@ -45,22 +49,27 @@ AuraMusic/
 │   │   │   │   │       ├── DebugSyntheticTestDialog.kt# Menú para simulación sintética de incidencias
 │   │   │   │   │       └── PerformanceTelemetryTabContent.kt # Panel en vivo de RAM segmentada, CPU e Inspector de Hilos
 │   │   │   │   ├── data/
-│   │   │   │   │   ├── importer/               # Módulos de importación y análisis
+│   │   │   │   │   ├── importer/               # Módulos de importación y análisis modularizados
 │   │   │   │   │   │   ├── AudioMetadataParser.kt # Extractor ID3 y conversor a WebP
-│   │   │   │   │   │   ├── AudioSilenceTrimmer.kt # Detector y recortador inteligente de silencios al inicio y final (-42 dB RMS)
-│   │   │   │   │   │   ├── IncomingMediaHandler.kt # Detector y clasificador inteligente de Intents externos (Audio, Video, Link)
+│   │   │   │   │   │   ├── AudioSilenceTrimmer.kt # Detector y recortador inteligente de silencios (-42 dB RMS)
+│   │   │   │   │   │   ├── IncomingMediaHandler.kt # Detector y clasificador de Intents externos (Audio, Video, Link)
 │   │   │   │   │   │   ├── LyricsManager.kt        # Analizador de .LRC, descarga de LRCLIB y persistencia local
-│   │   │   │   │   │   ├── OnlineVideoAudioImporter.kt # Descargador acelerado por bloques (Chunked Range) de audio, carátula y Video Canvas (480p) desde TikTok y web
+│   │   │   │   │   │   ├── MediaAssetProcessor.kt  # Procesador modular de carátulas WebP y Video Canvas (480p, loops)
+│   │   │   │   │   │   ├── OnlineVideoAudioImporter.kt # Orquestador modular de descargas y extracción multimedia
 │   │   │   │   │   │   ├── ProceduralArtworkGenerator.kt # Generador procedural de carátulas
 │   │   │   │   │   │   ├── SampleMusicGenerator.kt # Sintetizador de audio WAV para demos
 │   │   │   │   │   │   ├── VideoAudioExtractor.kt  # Extractor de audio nativo y generador 3 en 1 de Video a Música
-│   │   │   │   │   │   ├── FFmpegNativeEngine.kt   # Motor nativo FFmpeg puro (CLI/JNI): Seamless Loop con xfade, Efecto Boomerang (reverse + concat), GOP corto y faststart
-│   │   │   │   │   │   ├── YtDlpAutoUpdater.kt     # Gestor de actualización en caliente OTA para yt-dlp desde GitHub Releases
+│   │   │   │   │   │   ├── FFmpegNativeEngine.kt   # Motor nativo FFmpeg puro (CLI/JNI): Canvas 9:16, xfade, boomerang
+│   │   │   │   │   │   ├── YtDlpAutoUpdater.kt     # Gestor de actualización en caliente OTA para yt-dlp
 │   │   │   │   │   │   ├── YtDlpNativeEngine.kt    # Extractor nativo local basado en yt-dlp y FFmpeg
-│   │   │   │   │   │   ├── InnerTubeClient.kt      # Cliente InnerTube multi-cliente sin fricción (ANDROID_VR, VISIONOS)
-│   │   │   │   │   │   ├── InvidiousStreamResolver.kt # Resolvedor de respaldo para canciones con restricción de derechos
+│   │   │   │   │   │   ├── InnerTubeClient.kt      # Cliente InnerTube multi-cliente sin fricción
+│   │   │   │   │   │   ├── InvidiousStreamResolver.kt # Resolvedor de respaldo para restricciones de derechos
 │   │   │   │   │   │   ├── HeadlessWebViewExtractor.kt # Extractor móvil en segundo plano sobre m.youtube.com
-│   │   │   │   │   │   └── WebStreamExtractor.kt   # Orquestador híbrido de 3 niveles con fallback automático
+│   │   │   │   │   │   ├── WebStreamExtractor.kt   # Orquestador híbrido de 3 niveles con fallback automático
+│   │   │   │   │   │   ├── download/
+│   │   │   │   │   │   │   └── ChunkedStreamDownloader.kt # Acelerador HTTP Range Chunked (sin límite de 63 KB/s)
+│   │   │   │   │   │   └── tiktok/
+│   │   │   │   │   │       └── TikTokMediaResolver.kt # Resolvedor especializado de videos sin marca de agua
 │   │   │   │   │   ├── local/                  # Capa de persistencia local Room SQLite
 │   │   │   │   │   │   ├── AppDatabase.kt      # Base de datos Room
 │   │   │   │   │   │   ├── dao/
@@ -71,7 +80,9 @@ AuraMusic/
 │   │   │   │   │   │       ├── PlaylistEntity.kt # Entidad de lista en Room
 │   │   │   │   │   │       └── PlaylistTrackCrossRef.kt # Relación muchos a muchos
 │   │   │   │   │   ├── repository/
-│   │   │   │   │   │   └── MusicRepository.kt  # Repositorio central de datos, SAF y Playlists
+│   │   │   │   │   │   ├── MusicRepository.kt  # Repositorio fachada central modularizado
+│   │   │   │   │   │   ├── PlaylistRepository.kt # Repositorio modular de listas de reproducción y relaciones
+│   │   │   │   │   │   └── SafTrackImporter.kt # Importador modular SAF (archivos, árbol, videos e intents)
 │   │   │   │   │   └── storage/
 │   │   │   │   │       └── AppStorageManager.kt # Almacenamiento estructurado y carátulas WebP
 │   │   │   │   ├── model/                      # Modelos de dominio
@@ -85,13 +96,18 @@ AuraMusic/
 │   │   │   │   │   ├── HeadphoneConfig.kt      # Configuración de Crossfeed C++20, Balance L/R y gestos
 │   │   │   │   │   ├── VideoDisplayMode.kt     # Enum de modos de visualización de video (Fondo Completo, Carátula, Off)
 │   │   │   │   │   └── ThemePalette.kt         # Enum de temas de color vibrantes
-│   │   │   │   ├── playback/                   # Capa de reproducción de audio
-│   │   │   │   │   ├── AuraAudioPlayer.kt      # Motor Media3 ExoPlayer, bucle A-B, recorte de silencios, cola y recuperación
-│   │   │   │   │   ├── AuraMediaPlaybackService.kt # Servicio MediaSessionService en primer plano y notificación nativa
+│   │   │   │   ├── playback/                   # Capa de reproducción de audio modularizada
+│   │   │   │   │   ├── AuraAudioPlayer.kt      # Orquestador Media3 ExoPlayer y Buffer Flushing
+│   │   │   │   │   ├── AuraMediaPlaybackService.kt # Servicio MediaSessionService y notificación nativa
 │   │   │   │   │   ├── AudioEffectManager.kt   # Gestor de EQ 10 bandas, BassBoost y Audio 8D
 │   │   │   │   │   ├── HeadphoneController.kt  # Gestor de auriculares, Becoming Noisy y botones físicos
 │   │   │   │   │   ├── NativeAudioEngine.kt    # Puente JNI hacia C++20 (EQ 10 bandas, 8D, Crossfeed y Balance)
-│   │   │   │   │   └── NativeAudioProcessor.kt # Procesador Media3 para buffers PCM
+│   │   │   │   │   ├── NativeAudioProcessor.kt # Procesador Media3 para buffers PCM con onFlush()
+│   │   │   │   │   └── controllers/            # Controladores modulares desacoplados de reproducción
+│   │   │   │   │       ├── ABLoopController.kt     # Repetidor A-B con ajuste fino y marcado de puntos
+│   │   │   │   │       ├── AudioFadeController.kt  # Control de fundidos suaves (Fade-In y Fade-Out)
+│   │   │   │   │       ├── PlayerQueueController.kt# Cola de reproducción, modos Shuffle y Repetición
+│   │   │   │   │       └── MediaSessionBridge.kt   # Puente Media3 MediaSession y System Media Controls
 │   │   │   │   ├── ui/
 │   │   │   │   │   ├── components/             # Componentes visuales reutilizables
 │   │   │   │   │   │   ├── ArtworkImage.kt     # Renderizador de carátulas (WebP + Procedural)
@@ -106,15 +122,15 @@ AuraMusic/
 │   │   │   │   │   │   │   ├── TransitionsTabContent.kt       # Repetidor A-B con ajuste fino, Crossfade 0-12s y Gapless
 │   │   │   │   │   │   │   └── BalanceAndHeadphonesTabContent.kt# Balance L/R y Crossfeed C++20 rápido
 │   │   │   │   │   │   ├── AudioVisualizer.kt  # Visualizador de ondas en tiempo real con degradado dinámico
-│   │   │   │   │   │   ├── BackgroundVideoPlayer.kt # Renderizador de video de fondo sincronizado con velocidad de audio y 100% despejado
+│   │   │   │   │   │   ├── BackgroundVideoPlayer.kt # Renderizador de video de fondo sincronizado y 100% despejado
 │   │   │   │   │   │   ├── BottomNavBar.kt     # Barra de navegación limpia (4 pestañas)
 │   │   │   │   │   │   ├── EditTrackDialog.kt  # Modal con Photo Picker y edición de carátula/video
-│   │   │   │   │   │   ├── MiniPlayer.kt       # Mini reproductor tintado con marquesina, controles y soporte de Video Canvas miniatura
+│   │   │   │   │   │   ├── MiniPlayer.kt       # Mini reproductor tintado con marquesina y Video Canvas miniatura
 │   │   │   │   │   │   ├── ProceduralArtwork.kt # Arte vectorial dinámico en tiempo real
 │   │   │   │   │   │   ├── TrackListItem.kt    # Fila de canción con marquesina en pista activa y menú contextual
 │   │   │   │   │   │   ├── VideoToMusicDialog.kt # Diálogo de conversión Video a Música con interruptor de recorte de silencios
-│   │   │   │   │   │   ├── DownloadFromLinkDialog.kt # Diálogo de descarga web/TikTok/YouTube con interruptor de recorte de silencios
-│   │   │   │   │   │   └── SearchLyricsDialog.kt # Diálogo de búsqueda interactiva de letras, variantes y recomendación oficial
+│   │   │   │   │   │   ├── DownloadFromLinkDialog.kt # Diálogo de descarga web/TikTok/YouTube con recorte de silencios
+│   │   │   │   │   │   └── SearchLyricsDialog.kt # Diálogo de búsqueda interactiva de letras y recomendación oficial
 │   │   │   │   │   ├── navigation/
 │   │   │   │   │   │   └── NavScreen.kt        # Destinos de navegación y pestañas
 │   │   │   │   │   ├── screens/                # Pantallas principales modulares
@@ -132,11 +148,11 @@ AuraMusic/
 │   │   │   │   │   │   │   ├── NowPlayingScreen.kt # Vista completa de reproducción
 │   │   │   │   │   │   │   └── components/     # Componentes modulares de reproducción
 │   │   │   │   │   │   │       ├── NowPlayingTopBar.kt            # Barra superior con botones de acción
-│   │   │   │   │   │   │       ├── NowPlayingArtworkCard.kt       # Carátula y Video Canvas con aura, respiración C++ y cápsula ergonómica
-│   │   │   │   │   │   │       ├── NowPlayingLyricsCard.kt        # Tarjeta Karaoke interactiva con auto-scroll y resaltado neón
+│   │   │   │   │   │   │       ├── NowPlayingArtworkCard.kt       # Carátula y Video Canvas con aura y respiración C++
+│   │   │   │   │   │   │       ├── NowPlayingLyricsCard.kt        # Tarjeta Karaoke interactiva con auto-scroll y resaltado
 │   │   │   │   │   │   │       ├── NowPlayingPlaybackControls.kt  # Info de pista, seekbar y botonera de control
 │   │   │   │   │   │   │       ├── NowPlayingBalanceBar.kt        # Barra de balance estéreo L/R en vivo
-│   │   │   │   │   │   │       ├── NowPlayingQueueSheet.kt        # Hoja modal de cola de reproducción ("Up Next") con carátulas y marquesina
+│   │   │   │   │   │   │       ├── NowPlayingQueueSheet.kt        # Hoja modal de cola ("Up Next") con carátulas y marquesina
 │   │   │   │   │   │   │       ├── AudioSpecsDialog.kt            # Diálogo con ficha técnica del archivo
 │   │   │   │   │   │   │       └── VideoDisplayModeDialog.kt      # Diálogo selector de los 3 modos de video
 │   │   │   │   │   │   ├── equalizer/EqualizerScreen.kt # Referencia de ecualizador (integrado en modal)
@@ -144,7 +160,7 @@ AuraMusic/
 │   │   │   │   │   │   │   ├── SettingsScreen.kt # Pantalla de ajustes y selector de pestañas
 │   │   │   │   │   │   │   └── components/     # Componentes modulares de configuración
 │   │   │   │   │   │   │       ├── AppearanceSettingsTab.kt       # Pestaña de temas OLED, paletas y privacidad
-│   │   │   │   │   │   │       ├── StoredMediaSettingsTab.kt      # Pestaña de transparencia y gestor de carátulas WebP y videos con borrado
+│   │   │   │   │   │   │       ├── StoredMediaSettingsTab.kt      # Pestaña de inspección de carátulas WebP y videos
 │   │   │   │   │   │   │       ├── HeadphoneStatusCard.kt         # Tarjeta de estado de auriculares en tiempo real
 │   │   │   │   │   │   │       ├── HeadphonesAcousticsSection.kt  # Crossfeed C++20 y balance estéreo fino
 │   │   │   │   │   │   │       ├── HeadphonesSecuritySection.kt   # Becoming Noisy, Fade-In y memoria volumen
@@ -153,17 +169,21 @@ AuraMusic/
 │   │   │   │   │   │   │       └── SettingDetailRow.kt            # Fila de datos clave-valor reutilizable
 │   │   │   │   │   │   └── playlist/PlaylistDetailScreen.kt # Detalle de lista sincronizada
 │   │   │   │   │   └── theme/
-│   │   │   │   │       ├── ArtworkColorExtractor.kt # Extractor reactivo de paleta para carátulas y fotogramas de video
+│   │   │   │   │       ├── ArtworkColorExtractor.kt # Extractor reactivo de paleta para carátulas y videos
 │   │   │   │   │       ├── Color.kt            # Paleta de colores Dark Luxury y Neón
 │   │   │   │   │       ├── Theme.kt            # Configuración de MaterialTheme M3
 │   │   │   │   │       └── Type.kt             # Tipografía M3
 │   │   │   │   └── viewmodel/
-│   │   │   │       └── MusicViewModel.kt       # ViewModel central reactivo
+│   │   │   │       ├── MusicViewModel.kt       # ViewModel central reactivo modularizado
+│   │   │   │       └── delegates/              # Coordinadores modulares especializados
+│   │   │   │           ├── LyricsCoordinator.kt           # Gestión de letras LRC, LRCLIB y búsqueda
+│   │   │   │           ├── IncomingMediaCoordinator.kt    # Intents "Abrir con..." y recorte de silencios
+│   │   │   │           └── HeadphoneSettingsCoordinator.kt# Parámetros DSP y gestos de auriculares
 │   │   │   └── res/                            # Recursos gráficos, iconos y strings
 │   │   └── test/                               # Pruebas unitarias y Robolectric
 │   └── build.gradle.kts                        # Configuración Gradle con CMake, NDK y LeakCanary
 ├── scripts/
-│   ├── compile_native_deps.sh          # Script de compilación y aprovisionamiento NDK multi-ABI que asegura el binario real de FFmpeg (CLI estático/PIE o puente dlopen a libffmpegkit/libavcodec/libavfilter), Python, QuickJS y yt-dlp
+│   ├── compile_native_deps.sh          # Script de compilación y aprovisionamiento NDK multi-ABI (FFmpeg, Python, QuickJS, yt-dlp)
 │   └── generate_keystore_and_build.sh  # Script ejecutable de generación de firma y build local
 ├── gradle/
 │   └── libs.versions.toml                      # Catálogo de versiones centralizado (incluye LeakCanary)
@@ -185,3 +205,52 @@ El almacenamiento estructurado en `Android/data/com.aistudio.musicplayer.aurasou
 - `metadata/`: Archivos `.json` individuales con metadatos descriptivos de cada canción.
 - `videos/`: Videos de fondo vinculados y loops de Canvas (.mp4 / .webm).
 - Directorio de aplicación interno (`filesDir`): Almacena `aura_debug_logs.json` con el historial persistente de incidencias capturadas por **Aura Monitor**.
+
+---
+
+## 🧹 Limpieza Atómica de Buffer (Buffer Flushing) en C++20 y Media3
+
+Para erradicar definitivamente chasquidos acústicos ("pops"), clics digitales y colas de eco residuales entre pistas, el sistema implementa una canalización de vaciado atómico:
+
+1. **Gatillos de Ejecución:**
+   - **Cambio de Canción (`playTrack`):** Vaciado inmediato antes de decodificar la nueva pista.
+   - **Saltos de Progreso (`seekTo`):** Vaciado antes de que el motor de renderizado aplique el nuevo timestamp.
+   - **Pausa / Detención (`pause` y `release`):** Vaciado para cortar colas de reverb y acumuladores IIR.
+   - **Media3 AudioProcessor (`onFlush`):** Sincronización automática a nivel de tubería interna de ExoPlayer.
+
+2. **Componentes Nativos C++20 purgados a cero:**
+   - `BiquadPeakingFilter::reset()`: Variables de estado `x1, x2, y1, y2` en las 10 bandas del ecualizador.
+   - `BassBoostFilter::reset()`: Acumuladores del filtro paso-bajos a 60 Hz.
+   - `CrossfeedProcessor::reset()`: Líneas de retardo ITD (~2ms) y filtros paso-bajos Bauer / Chu Moy.
+   - `ReverbProcessor::resetBuffers()`: Líneas de retardo de peines amortiguados (`mCombL1-4`, `mCombR1-4`) y filtros pasa-todo (`mAllpassL1-2`, `mAllpassR1-2`).
+   - `EightDProcessor::reset()`: Paneo orbital y buffer estéreo.
+
+---
+
+## 🧩 Estado de Modularización y Desarrollo Modular Completado
+
+Siguiendo el principio de **desarrollo modular** para evitar el colapso de la aplicación y mantener los archivos por debajo de 500 líneas:
+
+### 1. Archivos Modularizados con Éxito:
+- **`AuraAudioPlayer.kt`** (de 664 líneas a 409 líneas):
+  - Desacoplado mediante controladores especializados en `playback/controllers/`:
+    - `PlayerQueueController.kt` (138 líneas): Gestión atómica de cola de reproducción, modo aleatorio (Shuffle), repetición (OFF/ALL/ONE) y sincronización reactiva de metadatos.
+    - `AudioFadeController.kt` (93 líneas): Atenuación progresiva (fade-out), rampa suave de entrada (fade-in) y memoria de volumen original.
+    - `ABLoopController.kt` (76 líneas): Repetidor de segmento A-B, ajuste fino interactivo y marcado seguro de timestamps.
+    - `MediaSessionBridge.kt` (118 líneas): Puente con Media3 MediaSession, ForwardingPlayer y System Media Controls.
+- **`OnlineVideoAudioImporter.kt`** (de 967 líneas a 345 líneas):
+  - Desacoplado en componentes de red, resolución y procesamiento multimedia:
+    - `ChunkedStreamDownloader.kt` (190 líneas): Acelerador de descarga por bloques HTTP Range (evita estrangulamiento de 63 KB/s) y descarga lineal con reintentos limpios en HTTP 403.
+    - `TikTokMediaResolver.kt` (95 líneas): Resolvedor de endpoints TikWM y Tiklydown sin marcas de agua y limpieza de títulos.
+    - `MediaAssetProcessor.kt` (215 líneas): Descarga oficial de carátulas en cascada, extracción de fotogramas clave en WebP sin pérdida y generación de Canvas 480p (Seamless Loop y Boomerang en FFmpeg).
+- **`MusicRepository.kt`** (de 548 líneas a 210 líneas):
+  - Desacoplado en repositorios especializados e importadores:
+    - `PlaylistRepository.kt` (102 líneas): Gestión de listas de reproducción, referencias cruzadas (Room) y carátulas personalizadas/collage dinámico.
+    - `SafTrackImporter.kt` (228 líneas): Importación selectiva SAF, escaneo recursivo de directorios, recorte de silencios, conversión de video a música e importación desde Intents externos.
+- **`auramusic_dsp.h`** (de 808 líneas a 393 líneas):
+  - Dividido en `dsp_filters.h` (91 líneas), `dsp_spatial.h` (121 líneas), `dsp_crossfeed.h` (133 líneas) y `dsp_reverb.h` (171 líneas).
+- **`MusicViewModel.kt`** (de 1,185 líneas a 935 líneas):
+  - Desacoplado mediante el patrón de Coordinadores en `viewmodel/delegates/`:
+    - `LyricsCoordinator.kt` (160 líneas): Carga, sincronización, LRCLIB y búsqueda de letras.
+    - `IncomingMediaCoordinator.kt` (120 líneas): Gestión de Intents externos ("Abrir con..."), discriminación y recorte de silencios.
+    - `HeadphoneSettingsCoordinator.kt` (75 líneas): Configuración de acústica, botones y gestos de audífonos.

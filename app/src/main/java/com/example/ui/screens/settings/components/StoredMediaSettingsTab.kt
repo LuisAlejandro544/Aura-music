@@ -525,6 +525,25 @@ private fun StoredMediaTrackCard(
         } ?: ""
     }
 
+    val videoAspectTag = remember(track.videoUri) {
+        track.videoUri?.let { uriStr ->
+            try {
+                val path = if (uriStr.startsWith("file://")) uriStr.removePrefix("file://") else uriStr
+                val f = File(path)
+                if (f.exists()) {
+                    val retriever = android.media.MediaMetadataRetriever()
+                    retriever.setDataSource(f.absolutePath)
+                    val w = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 0
+                    val h = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 0
+                    val rot = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull() ?: 0
+                    retriever.release()
+                    val isHoriz = if (rot == 90 || rot == 270) h > (w * 1.15f) else w > (h * 1.15f)
+                    if (isHoriz) "16:9 Panorámico" else "9:16 Vertical"
+                } else null
+            } catch (_: Exception) { null }
+        }
+    }
+
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = SurfaceCard),
@@ -705,6 +724,23 @@ private fun StoredMediaTrackCard(
                                         ),
                                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
                                     )
+                                }
+                                if (videoAspectTag != null) {
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                                    ) {
+                                        Text(
+                                            text = videoAspectTag,
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.primary
+                                            ),
+                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                        )
+                                    }
                                 }
                             }
                             Text(

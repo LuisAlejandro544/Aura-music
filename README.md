@@ -82,6 +82,9 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
   - Al terminar cualquier canción, avanza y reproduce automáticamente la siguiente pista de la cola o biblioteca de forma ininterrumpida.
   - Fundido de salida progresivo al acercarse al final de la pista y rampa de entrada suave (*fade-in*) calibrada al iniciar la siguiente canción, subiendo poco a poco hasta restaurar el 100% del volumen original sin quedarse atrapado en volumen bajo.
   - Modo Gapless para reproducción continua sin silencios intermedios.
+- **Limpieza Atómica de Buffer (Buffer Flushing) en C++20 y Media3**:
+  - Purgado atómico a cero de acumuladores IIR en las 10 bandas del ecualizador, filtros de graves, líneas de retardo de Crossfeed y colas de Reverb en `playTrack`, `seekTo`, `pause`, `release` y `onFlush()`.
+  - Erradica de forma absoluta cualquier "pop" o chasquido digital residual y colas de reverberación al saltar en la pista o cambiar de canción.
 
 ### 4. Video Canvas Multifuncional, Sincronización de Velocidad y Reacción Cromática Instantánea 🎬⚡
 - **Respiración y Pulsación Acústica Ligada a C++20 DSP**:
@@ -90,10 +93,16 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
   - Halo lumínico ambiental superior y visualizador de 28 bandas con degradado vertical fluido modulando brillo y color en tiempo real según el Video Canvas.
 - **Armonización Cromática Instantánea y sin Retrasos (Extracción Exacta con `OPTION_CLOSEST`)**:
   - Eliminación definitiva del retraso de ~2.5 segundos causado por fotogramas clave (*Keyframes*): ahora utiliza `MediaMetadataRetriever.OPTION_CLOSEST` con escalado nativo por hardware a 32x32 y reutilización persistente del descriptor de video (`getOrCreateRetriever`), respondiendo al cambio de color de las escenas de forma inmediata con transición fluida (`tween(180)`).
-- **Cero Pantallas Negras ni Parpadeos al Ingresar al Reproductor o Mini Reproductor**:
+- **Cero Pantallas Negras ni Parpadeos y Transición de Fundido Suave sin Residuos entre Canciones**:
   - El componente `BackgroundVideoPlayer` sincroniza la posición exacta (`seekTo`) antes de inicializar el buffer (`prepare()`) evitando pausas de re-buffering.
   - El obturador negro de ExoPlayer se desactiva (`setShutterBackgroundColor(TRANSPARENT)`) y se muestra la carátula oficial de la pista como capa base de respaldo (`placeholderTrack`) mientras el decodificador prepara el primer cuadro.
-  - Al renderizarse el primer fotograma (`onRenderedFirstFrame`), el video se desvanece suavemente sobre la carátula sin un solo milisegundo de fondo negro en Now Playing ni en el Mini Reproductor.
+  - **Erradicación Total de Videos Residuales al Cambiar de Canción**: Se eliminó de raíz el problema donde el video de la canción anterior se quedaba congelado en Now Playing y en el Mini Reproductor. Mediante claves reactivas de composición (`key(currentTrack.id, currentTrack.videoUri)`), actualización de player en `AndroidView` y reseteo de `isFirstFrameRendered`, la pista previa se detiene y libera de inmediato, efectuando una transición con fundido suave (*crossfade*) sobre la carátula oficial de la pista entrante.
+  - Si la siguiente pista no tiene video, el reproductor de video se desmonta limpiamente mostrando de inmediato la carátula oficial sin retrasos ni imágenes residuales.
+- **Encuadre Inteligente de Videos Horizontales (16:9) y Verticales (9:16) sin Recorte de Rostros (FFmpeg + Runtime)**:
+  - Resuelve el problema donde los videos horizontales (16:9 de YouTube) sufrían cortes laterales severos de hasta el 70% perdiendo rostros y detalles al estirarse en pantallas verticales de móvil (20:9).
+  - **Lienzo Vertical Cinemático 9:16 en FFmpeg (`createVerticalCanvasFromHorizontalVideo`)**: Al procesar videos horizontales, genera automáticamente un lienzo 9:16 vertical donde el video horizontal original se superpone en el centro al 100% de nitidez sin recortar los bordes ni las caras (`scale=480:-2`, `overlay`), con un fondo ambiental difuminado (`boxblur=16:2`) y ligeramente oscurecido.
+  - **Adaptación en Tiempo Real en `BackgroundVideoPlayer`**: Detecta dinámicamente la proporción del video (`onVideoSizeChanged`); en Modo Fondo Completo, si el video es horizontal aplica `RESIZE_MODE_FIT` para exhibir el cuadro completo sin mutilar detalles ni rostros.
+  - **Inspección de Proporción en Ajustes (`StoredMediaSettingsTab`)**: Cada video guardado muestra su etiqueta de orientación (*9:16 Vertical* o *16:9 Panorámico*).
 - **Bucle Infinito sin Cortes (Seamless Loop con Crossfade) & Efecto Boomerang / Ping-Pong (`reverse` + `concat`) en FFmpeg**:
   - **Modo Crossfade (`xfade`)**: Para loops cortos de Canvas (≤ 20s), el motor nativo `FFmpegNativeEngine` aplica una transición de fundido cruzado (*crossfade* continuo con `xfade`) entre el final y el inicio del video.
   - **Modo Boomerang / Ping-Pong (`reverse` + `concat`)**: El usuario puede elegir el **Efecto Boomerang** en los diálogos de *Editar Canción*, *Video a Música* y *Descargar desde Enlace*. El motor **FFmpeg** invierte una copia del clip y la concatena (`[0:v]split[f][r];[r]reverse[rev];[f][rev]concat=n=2:v=1:a=0`), creando un ciclo continuo de ida y vuelta matemáticamente perfecto donde el último fotograma coincide exactamente con el primero sin ningún corte brusco en ExoPlayer.

@@ -36,4 +36,10 @@ class NativeAudioProcessor : BaseAudioProcessor() {
         // Procesar en el buffer de salida mediante el motor DSP nativo
         NativeAudioEngine.processPcmBuffer(outputBuffer, 0, remaining)
     }
+
+    override fun onFlush() {
+        super.onFlush()
+        NativeAudioEngine.flushBuffers()
+    }
 }
+

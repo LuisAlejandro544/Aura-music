@@ -232,6 +232,19 @@ Este documento traza las fases de evolución técnica y funcional para convertir
   - Generador automático de collage adaptativo cuando la Playlist no tiene imagen propia: 1 foto (1 canción), collage de 2 fotos (2 canciones), collage de 3 fotos (3 canciones) y cuadrícula 2x2 de 4 fotos (4 o más canciones).
 - [x] **Navegación a Vista de Canciones en Artistas y Álbumes**:
   - Al pulsar sobre un Artista o un Álbum en la Biblioteca, se abre la vista detallada con todas sus canciones listadas (igual que en las Playlists) en lugar de reproducir la primera pista de inmediato.
+- [x] **Transición Fluida entre Videos sin Residuos y Reencuadre Inteligente 16:9 / 9:16 con FFmpeg**:
+  - Erradicación definitiva de la persistencia del video anterior al terminar la canción o avanzar de pista en Now Playing y Mini Reproductor mediante aislamiento con claves `key(track.id, track.videoUri)`, bloque `update` en `AndroidView` y reseteo reactivo de primer fotograma.
+  - Transición suave de fundido cruzado (*crossfade*) entre pistas sobre la carátula oficial de respaldo, garantizando cero retrasos o imágenes congeladas.
+  - Detección de relación de aspecto de video (`probeVideoDimensions` / `onVideoSizeChanged`) para videos horizontales (16:9) vs verticales (9:16).
+  - Generación de lienzo vertical cinemático 9:16 en FFmpeg (`createVerticalCanvasFromHorizontalVideo`) con video original centrado sin recortes de rostros y fondo ambiental difuminado (`boxblur=16:2`).
+  - Adaptación visual en tiempo real en `BackgroundVideoPlayer` con `RESIZE_MODE_FIT` para videos horizontales en Fondo Completo, e indicador de aspecto en Ajustes > Medios.
+- [x] **Limpieza Atómica de Buffer (Buffer Flushing) en C++20 y Media3**:
+  - Purgado atómico de acumuladores y líneas de retardo (`flushDspBuffers`) en cambios de canción (`playTrack`), saltos de barra (`seekTo`), pausas (`pause`), fin de pista y cierre del reproductor (`release`).
+  - Erradica de forma definitiva ruidos transitorios, "pops" o chasquidos digitales y colas de eco residuales de reverb de la pista previa.
+  - Sincronización transparente con el ciclo de vida de Media3 mediante `onFlush()` en `NativeAudioProcessor`.
+- [x] **Modularización y Partición de Archivos Gigantes**:
+  - Reestructuración del núcleo C++20 (`auramusic_dsp.h`) en cabeceras modulares especializadas: `dsp_filters.h`, `dsp_spatial.h`, `dsp_crossfeed.h` y `dsp_reverb.h`.
+  - Desacoplamiento de `MusicViewModel.kt` mediante el patrón de Coordinadores en `viewmodel/delegates/`: `LyricsCoordinator`, `IncomingMediaCoordinator` y `HeadphoneSettingsCoordinator`, reduciendo la complejidad ciclomática y manteniendo intacta la API pública.
 
 ---
 

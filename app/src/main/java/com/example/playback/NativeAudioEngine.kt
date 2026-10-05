@@ -240,6 +240,22 @@ object NativeAudioEngine {
         processFallback(byteBuffer, offset, length)
     }
 
+    /**
+     * Limpieza de Buffer (Buffer Flushing):
+     * Pone a cero los acumuladores de muestras previas en el ecualizador, filtros de bajos,
+     * líneas de retardo del filtro Crossfeed y colas de Reverb en C++20 (o en el motor de respaldo).
+     * Erradica pops digitales, clics y colas de reverberación al pausar, cambiar de canción o saltar en la pista.
+     */
+    fun flushBuffers() {
+        if (isLoaded) {
+            try {
+                nativeFlushDspBuffers()
+                return
+            } catch (ignored: Throwable) {}
+        }
+        flushFallbackBuffers()
+    }
+
     // --- Declaraciones de Métodos Nativos C++20 JNI ---
     private external fun getNativeEngineInfo(): String
     private external fun isDspActive(): Boolean
@@ -260,6 +276,7 @@ object NativeAudioEngine {
     private external fun nativeSetReverbParameters(enabled: Boolean, roomSize: Float, decayMs: Int, levelDb: Float)
     private external fun nativeGetAudioIntensity(): Float
     private external fun nativeGetVisualizerBands(outBands: FloatArray)
+    private external fun nativeFlushDspBuffers()
 
     // --- Implementación de Respaldo Matemático Idéntico (Filtros Bi-cuadráticos 64-bit y 8D) ---
     private var fallbackSampleRate = 44100
@@ -362,6 +379,22 @@ object NativeAudioEngine {
         val boostDb = (fallbackBassBoost * 12f).toDouble()
         bassFilterL.configurePeaking(fallbackSampleRate.toDouble(), 60.0, boostDb, 1.2)
         bassFilterR.configurePeaking(fallbackSampleRate.toDouble(), 60.0, boostDb, 1.2)
+    }
+
+    private fun flushFallbackBuffers() {
+        for (i in 0 until 10) {
+            filtersL[i].reset()
+            filtersR[i].reset()
+        }
+        bassFilterL.reset()
+        bassFilterR.reset()
+        combBufferL1.fill(0.0)
+        combBufferL2.fill(0.0)
+        combBufferR1.fill(0.0)
+        combBufferR2.fill(0.0)
+        dampL1 = 0.0; dampL2 = 0.0; dampR1 = 0.0; dampR2 = 0.0
+        combIdxL1 = 0; combIdxL2 = 0; combIdxR1 = 0; combIdxR2 = 0
+        fallbackIntensity = 0.08f
     }
 
     private fun processFallback(byteBuffer: ByteBuffer, offset: Int, length: Int) {

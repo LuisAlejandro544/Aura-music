@@ -218,6 +218,16 @@ class AudioEffectManager {
         NativeAudioEngine.setStereoBalance(balance)
     }
 
+    /**
+     * Limpieza Atómica de Buffers (Buffer Flushing):
+     * Pone a cero los acumuladores de los filtros IIR Bi-cuadráticos (10 bandas),
+     * filtros de graves, líneas de retardo de Crossfeed y colas de Reverb en C++20.
+     * Erradica de forma definitiva cualquier pop o chasquido digital residual y colas de eco.
+     */
+    fun flushBuffers() {
+        NativeAudioEngine.flushBuffers()
+    }
+
     private fun syncWithNativeEngine() {
         NativeAudioEngine.setDspEnabled(_isEnabled.value)
         _bands.value.forEach { band ->

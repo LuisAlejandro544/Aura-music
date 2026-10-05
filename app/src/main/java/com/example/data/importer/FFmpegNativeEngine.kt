@@ -1,6 +1,7 @@
 package com.example.data.importer
 
 import android.content.Context
+import android.media.MediaMetadataRetriever
 import com.example.debug.AuraDebugManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -457,11 +458,101 @@ object FFmpegNativeEngine {
     }
 
     /**
+     * Inspecciona las dimensiones de ancho y alto de un archivo de video local,
+     * considerando la rotación (90/270 grados).
+     */
+    fun probeVideoDimensions(videoFile: File): Pair<Int, Int>? {
+        if (!videoFile.exists() || videoFile.length() < 1024L) return null
+        return try {
+            val retriever = MediaMetadataRetriever()
+            retriever.setDataSource(videoFile.absolutePath)
+            val w = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 0
+            val h = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 0
+            val rot = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull() ?: 0
+            retriever.release()
+            if (w <= 0 || h <= 0) return null
+            if (rot == 90 || rot == 270) {
+                Pair(h, w)
+            } else {
+                Pair(w, h)
+            }
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    /**
+     * Convierte un video horizontal (16:9 / panorámico) en un lienzo vertical cinemático 9:16 estilo Spotify/TikTok Canvas.
+     *
+     * Composición:
+     * - Capa de fondo: El video escalado para cubrir verticalmente 9:16 (ej. 480x854), con desenfoque 'boxblur=16:2' y leve oscurecimiento para contraste.
+     * - Capa frontal: El video horizontal 16:9 original centrado en el medio sin recortar los bordes, garantizando que el 100% de los rostros y la acción sean visibles.
+     * - Salida optimizada con GOP corto (30) y faststart para seek instantáneo (0ms).
+     */
+    suspend fun createVerticalCanvasFromHorizontalVideo(
+        context: Context,
+        inputFile: File,
+        outputFile: File,
+        targetWidth: Int = 480,
+        targetHeight: Int = 854,
+        targetFps: Int = 30
+    ): ExecutionResult = withContext(Dispatchers.IO) {
+        init(context)
+        val ffmpegBin = getBinaryFile(context)
+        if (ffmpegBin == null) {
+            return@withContext ExecutionResult(false, -1, "FFmpeg no disponible", null)
+        }
+
+        if (outputFile.exists()) outputFile.delete()
+
+        // Filtro complejo:
+        // 1. Divide el video en [fg] (primer plano) y [bg] (fondo).
+        // 2. [bg] se escala para rellenar 480x854 (9:16), se recorta exactamente a esas dimensiones, se difumina y oscurece.
+        // 3. [fg] se escala al ancho exacto manteniendo su relación de aspecto (-2 para paridad de píxeles H.264).
+        // 4. Se superpone [fg] en el centro vertical de [bg].
+        val filterComplex = "[0:v]split=2[fg][bg];" +
+                "[bg]scale=${targetWidth}:${targetHeight}:force_original_aspect_ratio=increase,crop=${targetWidth}:${targetHeight},boxblur=16:2,eq=brightness=-0.12[bg_blur];" +
+                "[fg]scale=${targetWidth}:-2[fg_scaled];" +
+                "[bg_blur][fg_scaled]overlay=(W-w)/2:(H-h)/2[v_out]"
+
+        val args = arrayOf(
+            ffmpegBin.absolutePath,
+            "-y",
+            "-i", inputFile.absolutePath,
+            "-filter_complex", filterComplex,
+            "-map", "[v_out]",
+            "-c:v", "libx264",
+            "-preset", "veryfast",
+            "-crf", "24",
+            "-r", targetFps.toString(),
+            "-g", targetFps.toString(),
+            "-keyint_min", (targetFps / 2).toString(),
+            "-sc_threshold", "0",
+            "-an",
+            "-movflags", "+faststart",
+            outputFile.absolutePath
+        )
+
+        val result = executeCommand(context, args, 0L, null)
+        if (result.success) {
+            AuraDebugManager.logInfo(TAG, "Lienzo vertical 9:16 generado exitosamente para video horizontal (${outputFile.name}).")
+            result
+        } else {
+            AuraDebugManager.logWarning(TAG, "Filtro de lienzo 9:16 falló, aplicando fallback de sincronización GOP...")
+            optimizeVideoForInstantSync(context, inputFile, outputFile, gopSize = targetFps, targetFps = targetFps)
+        }
+    }
+
+    /**
      * Orquestador inteligente de procesamiento para Video Canvas:
-     * Si es bucle (isLoop = true, <= 20s):
-     *   - Si loopStyle == BOOMERANG: aplica Efecto Boomerang / Ping-Pong (reverse + concat).
-     *   - Si loopStyle == CROSSFADE: aplica Seamless Loop con Crossfade (xfade).
-     * Si es video largo sincronizado (isLoop = false, > 20s), aplica optimización de Keyframes (GOP Corto).
+     * 1. Detecta la relación de aspecto del video (horizontal 16:9 vs vertical 9:16).
+     *    - Si es horizontal (ancho > alto * 1.15): genera automáticamente un lienzo vertical cinemático 9:16
+     *      con video frontal nítido centrado y fondo difuminado, evitando recortes de rostros en pantallas de móvil.
+     * 2. Si ya es vertical o cuadrado:
+     *    - Si es bucle (isLoop = true, <= 20s):
+     *        - Si loopStyle == BOOMERANG: aplica Efecto Boomerang / Ping-Pong (reverse + concat).
+     *        - Si loopStyle == CROSSFADE: aplica Seamless Loop con Crossfade (xfade).
+     *    - Si es video largo sincronizado (isLoop = false, > 20s), aplica optimización de Keyframes (GOP Corto).
      */
     suspend fun processVideoForCanvas(
         context: Context,
@@ -479,13 +570,26 @@ object FFmpegNativeEngine {
             }
         }
 
-        val res = if (isLoop) {
-            when (loopStyle) {
-                CanvasLoopStyle.BOOMERANG -> createBoomerangLoopVideo(context, inputFile, outputFile)
-                CanvasLoopStyle.CROSSFADE -> createSeamlessLoopVideo(context, inputFile, outputFile)
+        val dimensions = probeVideoDimensions(inputFile)
+        val isHorizontal = dimensions != null && (dimensions.first > dimensions.second * 1.15f)
+
+        val res = when {
+            // Caso 1: Video horizontal que requiere adaptación a lienzo 9:16 para evitar corte de rostros
+            isHorizontal -> {
+                AuraDebugManager.logInfo(TAG, "Detectado video horizontal (${dimensions?.first}x${dimensions?.second}). Adaptando a lienzo 9:16...")
+                createVerticalCanvasFromHorizontalVideo(context, inputFile, outputFile)
             }
-        } else {
-            optimizeVideoForInstantSync(context, inputFile, outputFile)
+            // Caso 2: Video vertical o cuadrado con repetición en bucle
+            isLoop -> {
+                when (loopStyle) {
+                    CanvasLoopStyle.BOOMERANG -> createBoomerangLoopVideo(context, inputFile, outputFile)
+                    CanvasLoopStyle.CROSSFADE -> createSeamlessLoopVideo(context, inputFile, outputFile)
+                }
+            }
+            // Caso 3: Video vertical largo sincronizado
+            else -> {
+                optimizeVideoForInstantSync(context, inputFile, outputFile)
+            }
         }
 
         if (res.success && outputFile.exists() && outputFile.length() > 4096L) {

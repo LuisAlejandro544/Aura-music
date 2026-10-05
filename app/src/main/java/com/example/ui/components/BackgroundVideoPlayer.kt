@@ -55,9 +55,25 @@ fun BackgroundVideoPlayer(
     cornerRadius: androidx.compose.ui.unit.Dp = 24.dp
 ) {
     val context = LocalContext.current
-    var isFirstFrameRendered by remember { mutableStateOf(false) }
+    var isFirstFrameRendered by remember(videoUriString) { mutableStateOf(false) }
+    var videoDimensions by remember(videoUriString) { mutableStateOf<Pair<Int, Int>?>(null) }
 
-    // Instancia de ExoPlayer dedicada a renderizado visual silenciado
+    // Detección reactiva de si el video es horizontal (16:9 / panorámico) o vertical (9:16)
+    val isHorizontalVideo = remember(videoDimensions) {
+        val (w, h) = videoDimensions ?: return@remember false
+        w > (h * 1.15f)
+    }
+
+    // Modo de redimensionado inteligente:
+    // - En Fondo Completo (cornerRadius == 0.dp) con video horizontal: se usa RESIZE_MODE_FIT para
+    //   mostrar el 100% del cuadro sin recortar caras, rostros ni laterales.
+    // - En lienzo de carátula o videos verticales: se usa RESIZE_MODE_ZOOM para relleno armónico.
+    val targetResizeMode = when {
+        cornerRadius == 0.dp && isHorizontalVideo -> AspectRatioFrameLayout.RESIZE_MODE_FIT
+        else -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+    }
+
+    // Instancia de ExoPlayer dedicada a renderizado visual silenciado por videoUriString
     val videoPlayer = remember(videoUriString) {
         ExoPlayer.Builder(context).build().apply {
             volume = 0f // Silenciado: el audio proviene exclusivamente del motor DSP principal
@@ -80,6 +96,12 @@ fun BackgroundVideoPlayer(
                 override fun onRenderedFirstFrame() {
                     isFirstFrameRendered = true
                 }
+
+                override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
+                    if (videoSize.width > 0 && videoSize.height > 0) {
+                        videoDimensions = Pair(videoSize.width, videoSize.height)
+                    }
+                }
             })
 
             prepare()
@@ -90,12 +112,12 @@ fun BackgroundVideoPlayer(
     }
 
     // Sincronizar velocidad de reproducción en tiempo real con la velocidad de la música
-    LaunchedEffect(playbackSpeed) {
+    LaunchedEffect(playbackSpeed, videoPlayer) {
         videoPlayer.setPlaybackSpeed(playbackSpeed)
     }
 
     // Gestionar play / pause según el estado del reproductor de música principal
-    LaunchedEffect(isPlaying) {
+    LaunchedEffect(isPlaying, videoPlayer) {
         if (isPlaying) {
             videoPlayer.play()
         } else {
@@ -104,37 +126,39 @@ fun BackgroundVideoPlayer(
     }
 
     // Gestionar sincronización temporal para videos largos (> 10s)
-    LaunchedEffect(currentPositionMs, isVideoLoop) {
+    LaunchedEffect(currentPositionMs, isVideoLoop, videoPlayer) {
         if (!isVideoLoop) {
             val playerPos = videoPlayer.currentPosition
-            // Si hay un desfase superior a 800ms (ej. seek manual o rebobinado), resincronizar
+            // Si hay un desfase superior a 850ms (ej. seek manual o rebobinado), resincronizar
             if (abs(playerPos - currentPositionMs) > 850L) {
                 videoPlayer.seekTo(currentPositionMs)
             }
         }
     }
 
-    // Liberación estricta de recursos de códec y hardware al desmontar el Composable
+    // Liberación estricta de recursos de códec y hardware al cambiar de video o desmontar
     DisposableEffect(videoPlayer) {
         onDispose {
             videoPlayer.stop()
+            videoPlayer.clearMediaItems()
             videoPlayer.release()
         }
     }
 
     val videoAlpha by animateFloatAsState(
         targetValue = if (isFirstFrameRendered) 1f else 0f,
-        animationSpec = tween(220),
+        animationSpec = tween(280),
         label = "VideoFadeInAlpha"
     )
 
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(cornerRadius))
-            .border(1.dp, CardBorder, RoundedCornerShape(cornerRadius)),
+            .border(if (cornerRadius > 0.dp) 1.dp else 0.dp, CardBorder, RoundedCornerShape(cornerRadius)),
         contentAlignment = Alignment.Center
     ) {
         // Capa 1: Carátula o fondo estético que se muestra mientras el decodificador prepara el primer cuadro
+        // o durante la transición suave entre canciones
         if (placeholderTrack != null) {
             ArtworkImage(
                 track = placeholderTrack,
@@ -149,19 +173,26 @@ fun BackgroundVideoPlayer(
             )
         }
 
-        // Capa 2: Reproductor de video con obturador transparente y fade-in suave al renderizar
+        // Capa 2: Reproductor de video con obturador transparente, actualización reactiva y fade-in suave
         AndroidView(
             factory = { ctx ->
                 PlayerView(ctx).apply {
                     player = videoPlayer
                     useController = false
-                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-                    // Desactivar el obturador negro que ExoPlayer muestra por defecto al cargar
+                    resizeMode = targetResizeMode
                     setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
                     layoutParams = FrameLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.MATCH_PARENT
                     )
+                }
+            },
+            update = { playerView ->
+                if (playerView.player != videoPlayer) {
+                    playerView.player = videoPlayer
+                }
+                if (playerView.resizeMode != targetResizeMode) {
+                    playerView.resizeMode = targetResizeMode
                 }
             },
             modifier = Modifier
@@ -176,9 +207,9 @@ fun BackgroundVideoPlayer(
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
-                            Color.Black.copy(alpha = 0.25f),
+                            Color.Black.copy(alpha = if (cornerRadius == 0.dp && isHorizontalVideo) 0.55f else 0.25f),
                             Color.Transparent,
-                            Color.Black.copy(alpha = 0.45f)
+                            Color.Black.copy(alpha = if (cornerRadius == 0.dp) 0.65f else 0.45f)
                         )
                     )
                 )

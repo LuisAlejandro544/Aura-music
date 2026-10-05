@@ -14,6 +14,9 @@ import com.example.playback.AudioEffectManager
 import com.example.playback.AuraAudioPlayer
 import com.example.ui.navigation.LibraryTab
 import com.example.ui.navigation.NavScreen
+import com.example.viewmodel.delegates.HeadphoneSettingsCoordinator
+import com.example.viewmodel.delegates.IncomingMediaCoordinator
+import com.example.viewmodel.delegates.LyricsCoordinator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -54,7 +57,12 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         getCurrentVolume = { audioPlayer.getVolume() }
     )
 
-    val headphoneConfig: StateFlow<HeadphoneConfig> = headphoneController.config
+    val headphoneCoordinator = HeadphoneSettingsCoordinator(
+        headphoneController = headphoneController,
+        audioPlayer = audioPlayer
+    )
+
+    val headphoneConfig: StateFlow<HeadphoneConfig> = headphoneCoordinator.headphoneConfig
 
     // Datos reactivos de Room
     val allTracks: StateFlow<List<Track>> = repository.allTracks
@@ -156,32 +164,35 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val _audioIntensity = MutableStateFlow(0.15f)
     val audioIntensity: StateFlow<Float> = _audioIntensity.asStateFlow()
 
-    // Estado reactivo de Letras Sincronizadas (.LRC)
-    private val _lyricsState = MutableStateFlow(LyricsState())
-    val lyricsState: StateFlow<LyricsState> = _lyricsState.asStateFlow()
+    // Coordinador Modular de Letras Sincronizadas (.LRC y Karaoke)
+    val lyricsCoordinator = LyricsCoordinator(
+        context = application,
+        storageManager = storageManager,
+        scope = viewModelScope,
+        getCurrentTrack = { audioPlayer.currentTrack.value }
+    )
+    val lyricsState: StateFlow<LyricsState> = lyricsCoordinator.lyricsState
+    val isSearchLyricsDialogOpen: StateFlow<Boolean> = lyricsCoordinator.isSearchLyricsDialogOpen
+    val isSearchingLyrics: StateFlow<Boolean> = lyricsCoordinator.isSearchingLyrics
+    val lyricsSearchResults: StateFlow<List<com.example.model.LyricSearchResult>> = lyricsCoordinator.lyricsSearchResults
+    val searchLyricsError: StateFlow<String?> = lyricsCoordinator.searchLyricsError
 
-    // Búsqueda interactiva de letras con selección de versiones y recomendación oficial
-    private val _isSearchLyricsDialogOpen = MutableStateFlow(false)
-    val isSearchLyricsDialogOpen: StateFlow<Boolean> = _isSearchLyricsDialogOpen.asStateFlow()
-
-    private val _isSearchingLyrics = MutableStateFlow(false)
-    val isSearchingLyrics: StateFlow<Boolean> = _isSearchingLyrics.asStateFlow()
-
-    private val _lyricsSearchResults = MutableStateFlow<List<com.example.model.LyricSearchResult>>(emptyList())
-    val lyricsSearchResults: StateFlow<List<com.example.model.LyricSearchResult>> = _lyricsSearchResults.asStateFlow()
-
-    private val _searchLyricsError = MutableStateFlow<String?>(null)
-    val searchLyricsError: StateFlow<String?> = _searchLyricsError.asStateFlow()
-
-    // Gestión de medios externos entrantes ("Abrir con...", "Compartir con...", SnapTube, etc.)
-    private val _pendingIncomingAudioUris = MutableStateFlow<List<Uri>>(emptyList())
-    val pendingIncomingAudioUris: StateFlow<List<Uri>> = _pendingIncomingAudioUris.asStateFlow()
-
-    private val _pendingIncomingVideoUri = MutableStateFlow<Uri?>(null)
-    val pendingIncomingVideoUri: StateFlow<Uri?> = _pendingIncomingVideoUri.asStateFlow()
-
-    private val _pendingIncomingWebLink = MutableStateFlow<String?>(null)
-    val pendingIncomingWebLink: StateFlow<String?> = _pendingIncomingWebLink.asStateFlow()
+    // Coordinador Modular de Medios Externos Entrantes ("Abrir con..." y "Compartir con...")
+    val incomingMediaCoordinator = IncomingMediaCoordinator(
+        context = application,
+        repository = repository,
+        scope = viewModelScope,
+        onPlayTrack = { track, list -> playTrack(track, list) },
+        onExpandNowPlaying = { _isNowPlayingExpanded.value = true },
+        onFetchOnlineLyrics = { lyricsCoordinator.fetchOnlineLyrics() },
+        setImportingStatus = { isImporting, message ->
+            _isImporting.value = isImporting
+            _importStatusMessage.value = message
+        }
+    )
+    val pendingIncomingAudioUris: StateFlow<List<Uri>> = incomingMediaCoordinator.pendingIncomingAudioUris
+    val pendingIncomingVideoUri: StateFlow<Uri?> = incomingMediaCoordinator.pendingIncomingVideoUri
+    val pendingIncomingWebLink: StateFlow<String?> = incomingMediaCoordinator.pendingIncomingWebLink
 
     // Estado en tiempo real del progreso de descarga de video/audio web (bytes, total, velocidad)
     private val _downloadProgress = MutableStateFlow(DownloadProgress())
@@ -876,298 +887,48 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         audioPlayer.setVolume(1.0f)
     }
 
-    // --- Métodos de Control para Auriculares / Audífonos ---
+    // --- Métodos de Control para Auriculares / Audífonos (Delegados en HeadphoneSettingsCoordinator) ---
 
-    fun updateHeadphoneConfig(newConfig: HeadphoneConfig) {
-        headphoneController.updateConfig(newConfig)
-        audioPlayer.setFadeInOnResumeEnabled(newConfig.isFadeInOnResumeEnabled)
-    }
+    fun updateHeadphoneConfig(newConfig: HeadphoneConfig) = headphoneCoordinator.updateHeadphoneConfig(newConfig)
+    fun setCrossfeedEnabled(enabled: Boolean) = headphoneCoordinator.setCrossfeedEnabled(enabled)
+    fun setCrossfeedStrength(strengthMode: Int) = headphoneCoordinator.setCrossfeedStrength(strengthMode)
+    fun setBalanceControlEnabled(enabled: Boolean) = headphoneCoordinator.setBalanceControlEnabled(enabled)
+    fun setStereoBalance(balance: Float) = headphoneCoordinator.setStereoBalance(balance)
+    fun setBecomingNoisyGuardEnabled(enabled: Boolean) = headphoneCoordinator.setBecomingNoisyGuardEnabled(enabled)
+    fun setFadeInOnResumeEnabled(enabled: Boolean) = headphoneCoordinator.setFadeInOnResumeEnabled(enabled)
+    fun setDedicatedVolumeMemoryEnabled(enabled: Boolean) = headphoneCoordinator.setDedicatedVolumeMemoryEnabled(enabled)
+    fun setHeadsetControlsEnabled(enabled: Boolean) = headphoneCoordinator.setHeadsetControlsEnabled(enabled)
+    fun setHeadsetSingleClickAction(action: HeadsetButtonAction) = headphoneCoordinator.setHeadsetSingleClickAction(action)
+    fun setHeadsetDoubleClickAction(action: HeadsetButtonAction) = headphoneCoordinator.setHeadsetDoubleClickAction(action)
+    fun setHeadsetTripleClickAction(action: HeadsetButtonAction) = headphoneCoordinator.setHeadsetTripleClickAction(action)
+    fun setHeadsetLongClickAction(action: HeadsetButtonAction) = headphoneCoordinator.setHeadsetLongClickAction(action)
+    fun setHeadsetAction(type: Int, action: HeadsetButtonAction) = headphoneCoordinator.setHeadsetAction(type, action)
 
-    fun setCrossfeedEnabled(enabled: Boolean) {
-        headphoneController.setCrossfeedEnabled(enabled)
-    }
+    // --- Métodos de Gestión de Letras Sincronizadas (Delegados en LyricsCoordinator) ---
 
-    fun setCrossfeedStrength(strengthMode: Int) {
-        headphoneController.setCrossfeedStrength(strengthMode)
-    }
+    fun loadLyrics(track: Track?) = lyricsCoordinator.loadLyrics(track)
+    fun importLyricsFromUri(uri: Uri) = lyricsCoordinator.importLyricsFromUri(uri)
+    fun fetchOnlineLyrics(track: Track? = null) = lyricsCoordinator.fetchOnlineLyrics(track)
+    fun saveCustomLyrics(content: String, track: Track? = null) = lyricsCoordinator.saveCustomLyrics(content, track)
+    fun openSearchLyricsDialog() = lyricsCoordinator.openSearchLyricsDialog()
+    fun closeSearchLyricsDialog() = lyricsCoordinator.closeSearchLyricsDialog()
+    fun searchLyricsOptions(title: String, artist: String = "") = lyricsCoordinator.searchLyricsOptions(title, artist)
+    fun selectLyricSearchResult(result: com.example.model.LyricSearchResult) = lyricsCoordinator.selectLyricSearchResult(result)
 
-    fun setBalanceControlEnabled(enabled: Boolean) {
-        headphoneController.setBalanceControlEnabled(enabled)
-    }
+    // --- Métodos de Medios Externos Entrantes (Delegados en IncomingMediaCoordinator) ---
 
-    fun setStereoBalance(balance: Float) {
-        headphoneController.setStereoBalance(balance)
-    }
-
-    fun setBecomingNoisyGuardEnabled(enabled: Boolean) {
-        headphoneController.setBecomingNoisyGuardEnabled(enabled)
-    }
-
-    fun setFadeInOnResumeEnabled(enabled: Boolean) {
-        headphoneController.setFadeInOnResumeEnabled(enabled)
-        audioPlayer.setFadeInOnResumeEnabled(enabled)
-    }
-
-    fun setDedicatedVolumeMemoryEnabled(enabled: Boolean) {
-        headphoneController.setDedicatedVolumeMemoryEnabled(enabled)
-    }
-
-    fun setHeadsetControlsEnabled(enabled: Boolean) {
-        headphoneController.setHeadsetControlsEnabled(enabled)
-    }
-
-    fun setHeadsetSingleClickAction(action: HeadsetButtonAction) {
-        headphoneController.setSingleClickAction(action)
-    }
-
-    fun setHeadsetDoubleClickAction(action: HeadsetButtonAction) {
-        headphoneController.setDoubleClickAction(action)
-    }
-
-    fun setHeadsetTripleClickAction(action: HeadsetButtonAction) {
-        headphoneController.setTripleClickAction(action)
-    }
-
-    fun setHeadsetLongClickAction(action: HeadsetButtonAction) {
-        headphoneController.setLongClickAction(action)
-    }
-
-    fun setHeadsetAction(type: Int, action: HeadsetButtonAction) {
-        when (type) {
-            1 -> headphoneController.setSingleClickAction(action)
-            2 -> headphoneController.setDoubleClickAction(action)
-            3 -> headphoneController.setTripleClickAction(action)
-            4 -> headphoneController.setLongClickAction(action)
-        }
-    }
-
-    // --- Métodos de Gestión de Letras Sincronizadas (.LRC) ---
-
-    fun loadLyrics(track: Track?) {
-        if (track == null) {
-            _lyricsState.value = com.example.model.LyricsState()
-            return
-        }
-        viewModelScope.launch(Dispatchers.IO) {
-            val local = com.example.data.importer.LyricsManager.loadLocalLyrics(track, storageManager)
-            if (local != null) {
-                _lyricsState.value = local
-            } else {
-                // 1. Detección automática en el celular (.lrc o .txt hermano en misma carpeta o tags)
-                val autoDetected = com.example.data.importer.LyricsManager.autoDetectAndAssociateLyrics(
-                    getApplication(),
-                    track,
-                    storageManager
-                )
-                if (autoDetected != null) {
-                    _lyricsState.value = autoDetected
-                } else {
-                    _lyricsState.value = com.example.model.LyricsState(trackId = track.id)
-                    // 2. Intento de descarga en línea desde LRCLIB para canciones sin letras
-                    fetchOnlineLyrics(track)
-                }
-            }
-        }
-    }
-
-    fun importLyricsFromUri(uri: Uri) {
-        val target = currentTrack.value ?: return
-        viewModelScope.launch(Dispatchers.IO) {
-            val imported = com.example.data.importer.LyricsManager.importLyricsFromUri(
-                getApplication(),
-                target,
-                uri,
-                storageManager
-            )
-            if (imported != null) {
-                _lyricsState.value = imported
-            }
-        }
-    }
-
-    fun fetchOnlineLyrics(track: Track? = null) {
-        val target = track ?: currentTrack.value ?: return
-        viewModelScope.launch(Dispatchers.IO) {
-            _lyricsState.value = _lyricsState.value.copy(isLoading = true, error = null)
-            val result = com.example.data.importer.LyricsManager.fetchLyricsOnline(target, storageManager)
-            result.onSuccess { state ->
-                _lyricsState.value = state
-            }.onFailure { err ->
-                _lyricsState.value = _lyricsState.value.copy(isLoading = false, error = err.message)
-            }
-        }
-    }
-
-    fun saveCustomLyrics(content: String, track: Track? = null) {
-        val target = track ?: currentTrack.value ?: return
-        viewModelScope.launch(Dispatchers.IO) {
-            val state = com.example.data.importer.LyricsManager.saveLyrics(target, storageManager, content)
-            _lyricsState.value = state
-        }
-    }
-
-    /**
-     * Abre el diálogo interactivo de búsqueda de letras con el nombre y artista de la pista actual.
-     */
-    fun openSearchLyricsDialog() {
-        val target = currentTrack.value
-        _lyricsSearchResults.value = emptyList()
-        _searchLyricsError.value = null
-        _isSearchLyricsDialogOpen.value = true
-        if (target != null) {
-            searchLyricsOptions(target.title, target.artist)
-        }
-    }
-
-    fun closeSearchLyricsDialog() {
-        _isSearchLyricsDialogOpen.value = false
-    }
-
-    /**
-     * Realiza la búsqueda de letras en LRCLIB permitiendo que el usuario personalice el nombre de la canción.
-     */
-    fun searchLyricsOptions(title: String, artist: String = "") {
-        viewModelScope.launch(Dispatchers.IO) {
-            _isSearchingLyrics.value = true
-            _searchLyricsError.value = null
-            try {
-                // Al buscar interactivamente por nombre, durationSec se fija en 0L
-                // para que el catálogo de letras no descarte canciones si el audio local está recortado (ej. 39s)
-                val results = com.example.data.importer.LyricsManager.searchLyricsOptions(
-                    trackTitle = title,
-                    artistName = artist,
-                    durationSec = 0L
-                )
-                _lyricsSearchResults.value = results
-                if (results.isEmpty()) {
-                    _searchLyricsError.value = "No se encontraron letras para \"$title\". Prueba simplificando el nombre de la canción o borrando el artista."
-                }
-            } catch (e: Throwable) {
-                _searchLyricsError.value = "Error al consultar catálogo de letras: ${e.message}"
-            } finally {
-                _isSearchingLyrics.value = false
-            }
-        }
-    }
-
-    /**
-     * Aplica la opción de letra seleccionada por el usuario (oficial o alternativa) a la pista activa.
-     */
-    fun selectLyricSearchResult(result: com.example.model.LyricSearchResult) {
-        val target = currentTrack.value ?: return
-        viewModelScope.launch(Dispatchers.IO) {
-            val state = com.example.data.importer.LyricsManager.applySearchResult(target, storageManager, result)
-            _lyricsState.value = state
-            _isSearchLyricsDialogOpen.value = false
-        }
-    }
-
-    /**
-     * Procesa un [Intent] externo entrante de tipo "Abrir con..." o "Compartir con...".
-     * Detecta inteligentemente si se trata de un archivo de audio, un video o un enlace web.
-     */
-    fun onIncomingIntent(intent: Intent?) {
-        if (intent == null) return
-        val incoming = IncomingMediaHandler.parseIntent(getApplication(), intent) ?: return
-        when (incoming) {
-            is IncomingMedia.Audio -> {
-                _pendingIncomingAudioUris.value = listOf(incoming.uri)
-            }
-            is IncomingMedia.MultipleAudios -> {
-                _pendingIncomingAudioUris.value = incoming.uris
-            }
-            is IncomingMedia.Video -> {
-                _pendingIncomingVideoUri.value = incoming.uri
-            }
-            is IncomingMedia.WebLink -> {
-                _pendingIncomingWebLink.value = incoming.url
-            }
-        }
-    }
-
-    fun clearPendingIncomingAudio() {
-        _pendingIncomingAudioUris.value = emptyList()
-    }
-
-    /**
-     * Confirma la importación de los archivos de audio externos pendientes aplicando o no
-     * el recorte inteligente de silencios elegido en el interruptor del diálogo.
-     */
-    fun confirmIncomingAudioImport(trimSilence: Boolean) {
-        val uris = _pendingIncomingAudioUris.value
-        _pendingIncomingAudioUris.value = emptyList()
-        if (uris.isEmpty()) return
-        if (uris.size == 1) {
-            handleIncomingAudioUri(uris.first(), trimSilence)
-        } else {
-            handleIncomingMultipleAudioUris(uris, trimSilence)
-        }
-    }
-
-    fun clearPendingIncomingVideo() {
-        _pendingIncomingVideoUri.value = null
-    }
-
-    fun clearPendingIncomingWebLink() {
-        _pendingIncomingWebLink.value = null
-    }
-
-    /**
-     * Procesa y reproduce inmediatamente un archivo de audio recibido desde una app externa.
-     * Persiste la canción en la biblioteca estructurada `songs/` y en Room.
-     */
-    fun handleIncomingAudioUri(uri: Uri, trimSilence: Boolean = false) {
-        viewModelScope.launch {
-            _isImporting.value = true
-            _importStatusMessage.value = if (trimSilence) {
-                "Cargando audio externo y eliminando silencios..."
-            } else {
-                "Cargando audio externo..."
-            }
-            val track = repository.importSingleAudioFromExternalUri(getApplication(), uri, trimSilence = trimSilence)
-            _isImporting.value = false
-            if (track != null) {
-                _importStatusMessage.value = "Reproduciendo: \"${track.title}\""
-                playTrack(track, listOf(track))
-                _isNowPlayingExpanded.value = true
-                fetchOnlineLyrics()
-            } else {
-                _importStatusMessage.value = "No se pudo leer el archivo de audio recibido."
-            }
-        }
-    }
-
-    /**
-     * Procesa e importa un lote de archivos de audio compartidos a la vez.
-     */
-    fun handleIncomingMultipleAudioUris(uris: List<Uri>, trimSilence: Boolean = false) {
-        if (uris.isEmpty()) return
-        viewModelScope.launch {
-            _isImporting.value = true
-            _importStatusMessage.value = if (trimSilence) {
-                "Importando ${uris.size} canciones y eliminando silencios..."
-            } else {
-                "Importando ${uris.size} canciones recibidas..."
-            }
-            val importedList = mutableListOf<Track>()
-            for (u in uris) {
-                val t = repository.importSingleAudioFromExternalUri(getApplication(), u, trimSilence = trimSilence)
-                if (t != null) importedList.add(t)
-            }
-            _isImporting.value = false
-            if (importedList.isNotEmpty()) {
-                _importStatusMessage.value = "Se importaron ${importedList.size} canciones."
-                playTrack(importedList.first(), importedList)
-                _isNowPlayingExpanded.value = true
-                fetchOnlineLyrics()
-            }
-        }
-    }
+    fun onIncomingIntent(intent: Intent?) = incomingMediaCoordinator.onIncomingIntent(intent)
+    fun clearPendingIncomingAudio() = incomingMediaCoordinator.clearPendingIncomingAudio()
+    fun confirmIncomingAudioImport(trimSilence: Boolean) = incomingMediaCoordinator.confirmIncomingAudioImport(trimSilence)
+    fun clearPendingIncomingVideo() = incomingMediaCoordinator.clearPendingIncomingVideo()
+    fun clearPendingIncomingWebLink() = incomingMediaCoordinator.clearPendingIncomingWebLink()
+    fun handleIncomingAudioUri(uri: Uri, trimSilence: Boolean = false) = incomingMediaCoordinator.handleIncomingAudioUri(uri, trimSilence)
+    fun handleIncomingMultipleAudioUris(uris: List<Uri>, trimSilence: Boolean = false) = incomingMediaCoordinator.handleIncomingMultipleAudioUris(uris, trimSilence)
 
     override fun onCleared() {
         super.onCleared()
         cancelSleepTimer()
-        headphoneController.release()
+        headphoneCoordinator.release()
         audioPlayer.release()
     }
 }
