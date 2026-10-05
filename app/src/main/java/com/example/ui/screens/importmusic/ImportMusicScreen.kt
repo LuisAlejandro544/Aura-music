@@ -47,7 +47,13 @@ fun ImportMusicScreen(
     onDismissStatusMessage: () -> Unit,
     downloadProgress: com.example.model.DownloadProgress = com.example.model.DownloadProgress(),
     onImportVideoAsMusic: (videoUri: Uri, title: String, artist: String, album: String, attachAsCanvas: Boolean, forceLoop: Boolean?, trimSilence: Boolean) -> Unit = { _, _, _, _, _, _, _ -> },
+    onImportVideoAsMusicWithLoopStyle: (videoUri: Uri, title: String, artist: String, album: String, attachAsCanvas: Boolean, forceLoop: Boolean?, trimSilence: Boolean, loopStyle: com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle) -> Unit = { uri, title, artist, album, attach, forceLoop, trim, _ ->
+        onImportVideoAsMusic(uri, title, artist, album, attach, forceLoop, trim)
+    },
     onDownloadFromLink: (resolvedInfo: com.example.data.importer.OnlineVideoAudioImporter.ResolvedMediaInfo, customTitle: String, customArtist: String, attachAsCanvas: Boolean, trimSilence: Boolean) -> Unit = { _, _, _, _, _ -> },
+    onDownloadFromLinkWithLoopStyle: (resolvedInfo: com.example.data.importer.OnlineVideoAudioImporter.ResolvedMediaInfo, customTitle: String, customArtist: String, attachAsCanvas: Boolean, trimSilence: Boolean, loopStyle: com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle) -> Unit = { info, title, artist, attach, trim, _ ->
+        onDownloadFromLink(info, title, artist, attach, trim)
+    },
     modifier: Modifier = Modifier
 ) {
     var showClearConfirmation by remember { mutableStateOf(false) }
@@ -553,6 +559,10 @@ fun ImportMusicScreen(
             onConfirm = { title, artist, album, attachAsCanvas, forceLoop, trimSilence ->
                 onImportVideoAsMusic(selectedVideoForConversion!!, title, artist, album, attachAsCanvas, forceLoop, trimSilence)
                 selectedVideoForConversion = null
+            },
+            onConfirmWithLoopStyle = { title, artist, album, attachAsCanvas, forceLoop, trimSilence, loopStyle ->
+                onImportVideoAsMusicWithLoopStyle(selectedVideoForConversion!!, title, artist, album, attachAsCanvas, forceLoop, trimSilence, loopStyle)
+                selectedVideoForConversion = null
             }
         )
     }
@@ -571,6 +581,9 @@ fun ImportMusicScreen(
             onDismiss = { showDownloadFromLinkDialog = false },
             onConfirmDownload = { info, title, artist, attachCanvas, trimSilence ->
                 onDownloadFromLink(info, title, artist, attachCanvas, trimSilence)
+            },
+            onConfirmDownloadWithLoopStyle = { info, title, artist, attachCanvas, trimSilence, loopStyle ->
+                onDownloadFromLinkWithLoopStyle(info, title, artist, attachCanvas, trimSilence, loopStyle)
             }
         )
     }

@@ -87,32 +87,41 @@ object InvidiousStreamResolver {
             var maxAudioBitrate = 0L
 
             var bestVideoUrl: String? = null
-            var bestVideoDiff = 9999
+            var bestVideoScore = -999999
 
             if (adaptiveFormats != null) {
                 for (i in 0 until adaptiveFormats.length()) {
                     val format = adaptiveFormats.getJSONObject(i)
-                    val mimeType = format.optString("type", "")
+                    val mimeType = format.optString("type", "").lowercase()
                     val bitrate = format.optLong("bitrate", 0L)
                     val url = format.optString("url", "")
 
-                    if (url.isNotBlank()) {
+                    if (url.isNotBlank() && !url.contains(".m3u8") && !url.contains(".mpd")) {
                         if (mimeType.contains("audio/")) {
-                            if (bitrate >= maxAudioBitrate) {
-                                maxAudioBitrate = bitrate
+                            val bonus = if (mimeType.contains("mp4")) 50000L else 0L
+                            if (bitrate + bonus >= maxAudioBitrate) {
+                                maxAudioBitrate = bitrate + bonus
                                 bestAudioUrl = url
                             }
                         } else if (mimeType.contains("video/")) {
                             val qualityLabel = format.optString("qualityLabel", "")
                             val height = format.optInt("height", 0).takeIf { it > 0 }
-                                ?: qualityLabel.replace("p", "").toIntOrNull() ?: 0
+                                ?: qualityLabel.replace(Regex("[^0-9]"), "").toIntOrNull() ?: 0
                             val targetHeight = 480
                             val diff = kotlin.math.abs(height - targetHeight)
-                            if (height == 480) {
-                                bestVideoUrl = url
-                                bestVideoDiff = 0
-                            } else if (bestVideoDiff > 0 && diff < bestVideoDiff) {
-                                bestVideoDiff = diff
+                            var score = 10000 - (diff * 15)
+                            if (height == 480) score += 5000
+                            if (mimeType.contains("video/mp4")) score += 3000
+                            if (mimeType.contains("avc1")) {
+                                score += 4000
+                            } else if (mimeType.contains("av01") || mimeType.contains("av1")) {
+                                score -= 6000
+                            } else if (mimeType.contains("vp9")) {
+                                score -= 2000
+                            }
+
+                            if (score > bestVideoScore) {
+                                bestVideoScore = score
                                 bestVideoUrl = url
                             }
                         }
@@ -120,15 +129,19 @@ object InvidiousStreamResolver {
                 }
             }
 
-            // Fallback a formatos combinados si no hubo audio adaptativo
-            if (bestAudioUrl == null && formatStreams != null) {
+            // Fallback a formatos combinados (formatStreams MP4) si falta audio o falta video
+            if (formatStreams != null) {
                 for (i in 0 until formatStreams.length()) {
                     val format = formatStreams.getJSONObject(i)
                     val url = format.optString("url", "")
-                    if (url.isNotBlank()) {
-                        bestAudioUrl = url
-                        bestVideoUrl = url
-                        break
+                    val mimeType = format.optString("type", "").lowercase()
+                    if (url.isNotBlank() && !url.contains(".m3u8")) {
+                        if (bestVideoUrl == null && (mimeType.contains("video/") || mimeType.isBlank())) {
+                            bestVideoUrl = url
+                        }
+                        if (bestAudioUrl == null) {
+                            bestAudioUrl = url
+                        }
                     }
                 }
             }

@@ -84,6 +84,7 @@ fun NowPlayingScreen(
     onEditTrack: ((trackId: Long, newTitle: String, newArtist: String, newAlbum: String) -> Unit)? = null,
     onEditTrackDetails: ((trackId: Long, newTitle: String, newArtist: String, newAlbum: String, customArtUri: android.net.Uri?, removeArtwork: Boolean) -> Unit)? = null,
     onEditTrackDetailsWithVideo: ((trackId: Long, newTitle: String, newArtist: String, newAlbum: String, customArtUri: android.net.Uri?, removeArtwork: Boolean, customVideoUri: android.net.Uri?, removeVideo: Boolean, forceLoop: Boolean?) -> Unit)? = null,
+    onEditTrackDetailsWithLoopStyle: ((trackId: Long, newTitle: String, newArtist: String, newAlbum: String, customArtUri: android.net.Uri?, removeArtwork: Boolean, customVideoUri: android.net.Uri?, removeVideo: Boolean, forceLoop: Boolean?, loopStyle: com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle) -> Unit)? = null,
     isVideoCanvasActive: Boolean = true,
     videoDisplayMode: VideoDisplayMode = VideoDisplayMode.FULLSCREEN_BACKGROUND,
     isDynamicArtworkColorEnabled: Boolean = true,
@@ -567,6 +568,17 @@ fun NowPlayingScreen(
                 },
                 onConfirmWithLoopOption = { trackId, title, artist, album, customArtUri, removeArtwork, customVideoUri, removeVideo, forceLoop ->
                     if (onEditTrackDetailsWithVideo != null) {
+                        onEditTrackDetailsWithVideo(trackId, title, artist, album, customArtUri, removeArtwork, customVideoUri, removeVideo, forceLoop)
+                    } else if (onEditTrackDetails != null) {
+                        onEditTrackDetails(trackId, title, artist, album, customArtUri, removeArtwork)
+                    } else if (onEditTrack != null) {
+                        onEditTrack(trackId, title, artist, album)
+                    }
+                },
+                onConfirmWithLoopStyle = { trackId, title, artist, album, customArtUri, removeArtwork, customVideoUri, removeVideo, forceLoop, loopStyle ->
+                    if (onEditTrackDetailsWithLoopStyle != null) {
+                        onEditTrackDetailsWithLoopStyle(trackId, title, artist, album, customArtUri, removeArtwork, customVideoUri, removeVideo, forceLoop, loopStyle)
+                    } else if (onEditTrackDetailsWithVideo != null) {
                         onEditTrackDetailsWithVideo(trackId, title, artist, album, customArtUri, removeArtwork, customVideoUri, removeVideo, forceLoop)
                     } else if (onEditTrackDetails != null) {
                         onEditTrackDetails(trackId, title, artist, album, customArtUri, removeArtwork)

@@ -54,7 +54,7 @@ AuraMusic/
 │   │   │   │   │   │   ├── ProceduralArtworkGenerator.kt # Generador procedural de carátulas
 │   │   │   │   │   │   ├── SampleMusicGenerator.kt # Sintetizador de audio WAV para demos
 │   │   │   │   │   │   ├── VideoAudioExtractor.kt  # Extractor de audio nativo y generador 3 en 1 de Video a Música
-│   │   │   │   │   │   ├── FFmpegNativeEngine.kt   # Motor nativo FFmpeg puro (CLI/JNI): Seamless Loop con xfade, GOP corto y faststart
+│   │   │   │   │   │   ├── FFmpegNativeEngine.kt   # Motor nativo FFmpeg puro (CLI/JNI): Seamless Loop con xfade, Efecto Boomerang (reverse + concat), GOP corto y faststart
 │   │   │   │   │   │   ├── YtDlpAutoUpdater.kt     # Gestor de actualización en caliente OTA para yt-dlp desde GitHub Releases
 │   │   │   │   │   │   ├── YtDlpNativeEngine.kt    # Extractor nativo local basado en yt-dlp y FFmpeg
 │   │   │   │   │   │   ├── InnerTubeClient.kt      # Cliente InnerTube multi-cliente sin fricción (ANDROID_VR, VISIONOS)
@@ -163,7 +163,7 @@ AuraMusic/
 │   │   └── test/                               # Pruebas unitarias y Robolectric
 │   └── build.gradle.kts                        # Configuración Gradle con CMake, NDK y LeakCanary
 ├── scripts/
-│   ├── compile_native_deps.sh          # Script de compilación y aprovisionamiento nativo con NDK y caché de CI/CD
+│   ├── compile_native_deps.sh          # Script de compilación y aprovisionamiento NDK multi-ABI que asegura el binario real de FFmpeg (CLI estático/PIE o puente dlopen a libffmpegkit/libavcodec/libavfilter), Python, QuickJS y yt-dlp
 │   └── generate_keystore_and_build.sh  # Script ejecutable de generación de firma y build local
 ├── gradle/
 │   └── libs.versions.toml                      # Catálogo de versiones centralizado (incluye LeakCanary)

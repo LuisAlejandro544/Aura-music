@@ -384,8 +384,20 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                                     viewModel.setNowPlayingExpanded(true)
                                 }
                             },
+                            onImportVideoAsMusicWithLoopStyle = { videoUri, title, artist, album, attachCanvas, forceLoop, trimSilence, loopStyle ->
+                                viewModel.importVideoAsTrack(videoUri, title, artist, album, attachCanvas, forceLoop, trimSilence, loopStyle) { createdTrack ->
+                                    viewModel.playTrack(createdTrack)
+                                    viewModel.setNowPlayingExpanded(true)
+                                }
+                            },
                             onDownloadFromLink = { info, title, artist, canvas, trimSilence ->
                                 viewModel.importFromWebVideoLink(info, title, artist, canvas, trimSilence) { createdTrack ->
+                                    viewModel.playTrack(createdTrack)
+                                    viewModel.setNowPlayingExpanded(true)
+                                }
+                            },
+                            onDownloadFromLinkWithLoopStyle = { info, title, artist, canvas, trimSilence, loopStyle ->
+                                viewModel.importFromWebVideoLink(info, title, artist, canvas, trimSilence, loopStyle) { createdTrack ->
                                     viewModel.playTrack(createdTrack)
                                     viewModel.setNowPlayingExpanded(true)
                                 }
@@ -514,6 +526,9 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                 },
                 onEditTrackDetailsWithVideo = { id, t, a, al, art, removeArt, video, removeVideo, forceLoop ->
                     viewModel.updateTrackDetails(id, t, a, al, art, removeArt, video, removeVideo, forceLoop)
+                },
+                onEditTrackDetailsWithLoopStyle = { id, t, a, al, art, removeArt, video, removeVideo, forceLoop, loopStyle ->
+                    viewModel.updateTrackDetails(id, t, a, al, art, removeArt, video, removeVideo, forceLoop, loopStyle)
                 },
                 isVideoCanvasActive = isVideoCanvasActive,
                 videoDisplayMode = videoDisplayMode,
@@ -733,6 +748,22 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                         viewModel.setNowPlayingExpanded(true)
                     }
                     viewModel.clearPendingIncomingVideo()
+                },
+                onConfirmWithLoopStyle = { title, artist, album, attachAsCanvas, forceLoop, trimSilence, loopStyle ->
+                    viewModel.importVideoAsTrack(
+                        videoUri = pendingIncomingVideoUri!!,
+                        title = title,
+                        artist = artist,
+                        album = album,
+                        attachAsCanvas = attachAsCanvas,
+                        forceLoop = forceLoop,
+                        trimSilence = trimSilence,
+                        loopStyle = loopStyle
+                    ) { track ->
+                        viewModel.playTrack(track)
+                        viewModel.setNowPlayingExpanded(true)
+                    }
+                    viewModel.clearPendingIncomingVideo()
                 }
             )
         }
@@ -750,6 +781,20 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                         customArtist = artist,
                         attachAsCanvas = attachAsCanvas,
                         trimSilence = trimSilence
+                    ) { track ->
+                        viewModel.playTrack(track)
+                        viewModel.setNowPlayingExpanded(true)
+                        viewModel.clearPendingIncomingWebLink()
+                    }
+                },
+                onConfirmDownloadWithLoopStyle = { resolvedInfo, title, artist, attachAsCanvas, trimSilence, loopStyle ->
+                    viewModel.importFromWebVideoLink(
+                        resolvedInfo = resolvedInfo,
+                        customTitle = title,
+                        customArtist = artist,
+                        attachAsCanvas = attachAsCanvas,
+                        trimSilence = trimSilence,
+                        loopStyle = loopStyle
                     ) { track ->
                         viewModel.playTrack(track)
                         viewModel.setNowPlayingExpanded(true)

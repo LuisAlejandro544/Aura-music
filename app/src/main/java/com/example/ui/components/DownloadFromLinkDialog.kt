@@ -61,7 +61,15 @@ fun DownloadFromLinkDialog(
         customArtist: String,
         attachAsCanvas: Boolean,
         trimSilence: Boolean
-    ) -> Unit
+    ) -> Unit,
+    onConfirmDownloadWithLoopStyle: ((
+        resolvedInfo: OnlineVideoAudioImporter.ResolvedMediaInfo,
+        customTitle: String,
+        customArtist: String,
+        attachAsCanvas: Boolean,
+        trimSilence: Boolean,
+        loopStyle: com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle
+    ) -> Unit)? = null
 ) {
     val coroutineScope = rememberCoroutineScope()
     val clipboardManager = LocalClipboardManager.current
@@ -81,6 +89,9 @@ fun DownloadFromLinkDialog(
     var editableTitle by remember { mutableStateOf("") }
     var editableArtist by remember { mutableStateOf("") }
     var attachAsCanvas by remember { mutableStateOf(true) }
+    var selectedLoopStyle by remember {
+        mutableStateOf(com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE)
+    }
     var trimSilence by remember { mutableStateOf(true) }
 
     // Auto-resolución si se recibe una URL inicial compartida desde otra app
@@ -629,6 +640,36 @@ fun DownloadFromLinkDialog(
                         )
                     }
 
+                    if (attachAsCanvas) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Efecto de bucle FFmpeg (para Loops ≤20s):",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            FilterChip(
+                                selected = selectedLoopStyle == com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE,
+                                onClick = {
+                                    selectedLoopStyle = com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE
+                                },
+                                label = { Text("✨ Crossfade (xfade)", style = MaterialTheme.typography.labelSmall) }
+                            )
+                            FilterChip(
+                                selected = selectedLoopStyle == com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle.BOOMERANG,
+                                onClick = {
+                                    selectedLoopStyle = com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle.BOOMERANG
+                                },
+                                label = { Text("🪃 Boomerang (Ping-Pong)", style = MaterialTheme.typography.labelSmall) }
+                            )
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(10.dp))
 
                     // Switch para Eliminación Inteligente de Silencios al inicio y final
@@ -680,13 +721,26 @@ fun DownloadFromLinkDialog(
 
                         Button(
                             onClick = {
-                                onConfirmDownload(
-                                    currentInfo,
-                                    editableTitle.ifBlank { currentInfo.suggestedTitle },
-                                    editableArtist.ifBlank { currentInfo.suggestedArtist },
-                                    attachAsCanvas,
-                                    trimSilence
-                                )
+                                val finalTitle = editableTitle.ifBlank { currentInfo.suggestedTitle }
+                                val finalArtist = editableArtist.ifBlank { currentInfo.suggestedArtist }
+                                if (onConfirmDownloadWithLoopStyle != null) {
+                                    onConfirmDownloadWithLoopStyle(
+                                        currentInfo,
+                                        finalTitle,
+                                        finalArtist,
+                                        attachAsCanvas,
+                                        trimSilence,
+                                        selectedLoopStyle
+                                    )
+                                } else {
+                                    onConfirmDownload(
+                                        currentInfo,
+                                        finalTitle,
+                                        finalArtist,
+                                        attachAsCanvas,
+                                        trimSilence
+                                    )
+                                }
                             },
                             shape = RoundedCornerShape(14.dp),
                             colors = ButtonDefaults.buttonColors(

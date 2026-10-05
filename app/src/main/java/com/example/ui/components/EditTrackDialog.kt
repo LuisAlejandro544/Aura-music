@@ -64,6 +64,18 @@ fun EditTrackDialog(
         customVideoUri: Uri?,
         removeVideo: Boolean,
         forceLoop: Boolean?
+    ) -> Unit)? = null,
+    onConfirmWithLoopStyle: ((
+        trackId: Long,
+        newTitle: String,
+        newArtist: String,
+        newAlbum: String,
+        customArtUri: Uri?,
+        removeArtwork: Boolean,
+        customVideoUri: Uri?,
+        removeVideo: Boolean,
+        forceLoop: Boolean?,
+        loopStyle: com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle
     ) -> Unit)? = null
 ) {
     var title by remember { mutableStateOf(track.title) }
@@ -76,6 +88,9 @@ fun EditTrackDialog(
     var selectedCustomVideoUri by remember { mutableStateOf<Uri?>(null) }
     var shouldRemoveVideo by remember { mutableStateOf(false) }
     var selectedLoopMode by remember { mutableStateOf<Boolean?>(null) }
+    var selectedLoopStyle by remember {
+        mutableStateOf(com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE)
+    }
 
     // Launcher del Android Photo Picker para imágenes (carátula)
     val photoPickerLauncher = rememberLauncherForActivityResult(
@@ -305,6 +320,33 @@ fun EditTrackDialog(
                                     label = { Text("Sync", style = MaterialTheme.typography.labelSmall) }
                                 )
                             }
+
+                            if (selectedLoopMode != false) {
+                                Text(
+                                    text = "Efecto de bucle FFmpeg (para Loops ≤20s):",
+                                    style = MaterialTheme.typography.labelSmall.copy(color = TextPrimary, fontWeight = FontWeight.Bold)
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    FilterChip(
+                                        selected = selectedLoopStyle == com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE,
+                                        onClick = {
+                                            selectedLoopStyle = com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE
+                                        },
+                                        label = { Text("✨ Crossfade (xfade)", style = MaterialTheme.typography.labelSmall) }
+                                    )
+                                    FilterChip(
+                                        selected = selectedLoopStyle == com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle.BOOMERANG,
+                                        onClick = {
+                                            selectedLoopStyle = com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle.BOOMERANG
+                                            selectedLoopMode = true
+                                        },
+                                        label = { Text("🪃 Boomerang (Ping-Pong)", style = MaterialTheme.typography.labelSmall) }
+                                    )
+                                }
+                            }
                         }
 
                         Row(
@@ -381,29 +423,46 @@ fun EditTrackDialog(
             Button(
                 onClick = {
                     if (title.isNotBlank()) {
-                        if (onConfirmWithLoopOption != null) {
-                            onConfirmWithLoopOption(
-                                track.id,
-                                title,
-                                artist,
-                                album,
-                                selectedCustomArtUri,
-                                shouldRemoveArtwork,
-                                selectedCustomVideoUri,
-                                shouldRemoveVideo,
-                                selectedLoopMode
-                            )
-                        } else {
-                            onConfirm(
-                                track.id,
-                                title,
-                                artist,
-                                album,
-                                selectedCustomArtUri,
-                                shouldRemoveArtwork,
-                                selectedCustomVideoUri,
-                                shouldRemoveVideo
-                            )
+                        when {
+                            onConfirmWithLoopStyle != null -> {
+                                onConfirmWithLoopStyle(
+                                    track.id,
+                                    title,
+                                    artist,
+                                    album,
+                                    selectedCustomArtUri,
+                                    shouldRemoveArtwork,
+                                    selectedCustomVideoUri,
+                                    shouldRemoveVideo,
+                                    selectedLoopMode,
+                                    selectedLoopStyle
+                                )
+                            }
+                            onConfirmWithLoopOption != null -> {
+                                onConfirmWithLoopOption(
+                                    track.id,
+                                    title,
+                                    artist,
+                                    album,
+                                    selectedCustomArtUri,
+                                    shouldRemoveArtwork,
+                                    selectedCustomVideoUri,
+                                    shouldRemoveVideo,
+                                    selectedLoopMode
+                                )
+                            }
+                            else -> {
+                                onConfirm(
+                                    track.id,
+                                    title,
+                                    artist,
+                                    album,
+                                    selectedCustomArtUri,
+                                    shouldRemoveArtwork,
+                                    selectedCustomVideoUri,
+                                    shouldRemoveVideo
+                                )
+                            }
                         }
                         onDismiss()
                     }

@@ -47,7 +47,16 @@ fun VideoToMusicDialog(
         attachAsCanvas: Boolean,
         forceLoop: Boolean?,
         trimSilence: Boolean
-    ) -> Unit
+    ) -> Unit,
+    onConfirmWithLoopStyle: ((
+        title: String,
+        artist: String,
+        album: String,
+        attachAsCanvas: Boolean,
+        forceLoop: Boolean?,
+        trimSilence: Boolean,
+        loopStyle: com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle
+    ) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -60,6 +69,9 @@ fun VideoToMusicDialog(
     var thumbnailBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var attachAsCanvas by remember { mutableStateOf(true) }
     var selectedLoopMode by remember { mutableStateOf<Boolean?>(null) } // null = Auto (<= 20s), true = Loop, false = Sync
+    var selectedLoopStyle by remember {
+        mutableStateOf(com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE)
+    }
     var trimSilence by remember { mutableStateOf(true) }
 
     LaunchedEffect(videoUri) {
@@ -298,6 +310,36 @@ fun VideoToMusicDialog(
                                         label = { Text("Sincronizado", style = MaterialTheme.typography.labelSmall) }
                                     )
                                 }
+
+                                if (selectedLoopMode != false) {
+                                    Text(
+                                        text = "Efecto de bucle FFmpeg (para Loops ≤20s):",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = TextPrimary
+                                        )
+                                    )
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        FilterChip(
+                                            selected = selectedLoopStyle == com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE,
+                                            onClick = {
+                                                selectedLoopStyle = com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE
+                                            },
+                                            label = { Text("✨ Crossfade (xfade)", style = MaterialTheme.typography.labelSmall) }
+                                        )
+                                        FilterChip(
+                                            selected = selectedLoopStyle == com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle.BOOMERANG,
+                                            onClick = {
+                                                selectedLoopStyle = com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle.BOOMERANG
+                                                selectedLoopMode = true
+                                            },
+                                            label = { Text("🪃 Boomerang (Ping-Pong)", style = MaterialTheme.typography.labelSmall) }
+                                        )
+                                    }
+                                }
                             }
 
                             HorizontalDivider(color = CardBorder.copy(alpha = 0.5f))
@@ -340,14 +382,26 @@ fun VideoToMusicDialog(
             Button(
                 onClick = {
                     if (suggestedTitle.isNotBlank()) {
-                        onConfirm(
-                            suggestedTitle,
-                            suggestedArtist,
-                            suggestedAlbum,
-                            attachAsCanvas,
-                            selectedLoopMode,
-                            trimSilence
-                        )
+                        if (onConfirmWithLoopStyle != null) {
+                            onConfirmWithLoopStyle(
+                                suggestedTitle,
+                                suggestedArtist,
+                                suggestedAlbum,
+                                attachAsCanvas,
+                                selectedLoopMode,
+                                trimSilence,
+                                selectedLoopStyle
+                            )
+                        } else {
+                            onConfirm(
+                                suggestedTitle,
+                                suggestedArtist,
+                                suggestedAlbum,
+                                attachAsCanvas,
+                                selectedLoopMode,
+                                trimSilence
+                            )
+                        }
                         onDismiss()
                     }
                 },

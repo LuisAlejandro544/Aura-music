@@ -144,45 +144,56 @@ object InnerTubeClient {
             var maxAudioBitrate = 0
 
             var bestVideoUrl: String? = null
-            var bestVideoDiff = 9999
+            var bestVideoScore = -999999
 
-            // 1. Revisar formatos adaptativos priorizando estrictamente 480p para Video Canvas
+            // 1. Revisar formatos adaptativos priorizando estrictamente 480p en MP4 (avc1 / H.264) libre de m3u8/AV1
             for (i in 0 until adaptiveFormats.length()) {
                 val format = adaptiveFormats.getJSONObject(i)
-                val mimeType = format.optString("mimeType", "")
+                val mimeType = format.optString("mimeType", "").lowercase()
                 val bitrate = format.optInt("bitrate", 0)
                 val url = format.optString("url", "")
 
-                if (url.isNotBlank()) {
+                if (url.isNotBlank() && !url.contains(".m3u8") && !url.contains(".mpd")) {
                     if (mimeType.contains("audio/")) {
-                        if (bitrate >= maxAudioBitrate) {
-                            maxAudioBitrate = bitrate
+                        val bonus = if (mimeType.contains("mp4")) 50000 else 0
+                        if (bitrate + bonus >= maxAudioBitrate) {
+                            maxAudioBitrate = bitrate + bonus
                             bestAudioUrl = url
                         }
                     } else if (mimeType.contains("video/")) {
                         val height = format.optInt("height", 0)
                         val targetHeight = 480
                         val diff = kotlin.math.abs(height - targetHeight)
-                        if (height == 480) {
-                            bestVideoUrl = url
-                            bestVideoDiff = 0
-                        } else if (bestVideoDiff > 0 && diff < bestVideoDiff) {
-                            bestVideoDiff = diff
+                        var score = 10000 - (diff * 15)
+                        if (height == 480) score += 5000
+                        if (mimeType.contains("video/mp4")) score += 3000
+                        if (mimeType.contains("avc1")) {
+                            score += 4000
+                        } else if (mimeType.contains("av01") || mimeType.contains("av1")) {
+                            score -= 6000
+                        } else if (mimeType.contains("vp9")) {
+                            score -= 2000
+                        }
+
+                        if (score > bestVideoScore) {
+                            bestVideoScore = score
                             bestVideoUrl = url
                         }
                     }
                 }
             }
 
-            // 2. Revisar formatos combinados
-            if (bestAudioUrl == null) {
-                for (i in 0 until combinedFormats.length()) {
-                    val format = combinedFormats.getJSONObject(i)
-                    val url = format.optString("url", "")
-                    if (url.isNotBlank()) {
-                        bestAudioUrl = url
+            // 2. Revisar formatos combinados (contienen video + audio, ej. itag 18 MP4 360p) si falta audio o falta video
+            for (i in 0 until combinedFormats.length()) {
+                val format = combinedFormats.getJSONObject(i)
+                val url = format.optString("url", "")
+                val mimeType = format.optString("mimeType", "").lowercase()
+                if (url.isNotBlank() && !url.contains(".m3u8")) {
+                    if (bestVideoUrl == null && mimeType.contains("video/")) {
                         bestVideoUrl = url
-                        break
+                    }
+                    if (bestAudioUrl == null) {
+                        bestAudioUrl = url
                     }
                 }
             }
@@ -195,7 +206,8 @@ object InnerTubeClient {
                     videoUrl = bestVideoUrl ?: bestAudioUrl,
                     audioUrl = bestAudioUrl,
                     coverUrl = thumbnail,
-                    durationSeconds = durationSeconds
+                    durationSeconds = durationSeconds,
+                    httpHeaders = mapOf("User-Agent" to userAgent)
                 )
             } else {
                 null

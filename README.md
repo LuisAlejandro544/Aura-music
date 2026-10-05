@@ -94,9 +94,9 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
   - El componente `BackgroundVideoPlayer` sincroniza la posición exacta (`seekTo`) antes de inicializar el buffer (`prepare()`) evitando pausas de re-buffering.
   - El obturador negro de ExoPlayer se desactiva (`setShutterBackgroundColor(TRANSPARENT)`) y se muestra la carátula oficial de la pista como capa base de respaldo (`placeholderTrack`) mientras el decodificador prepara el primer cuadro.
   - Al renderizarse el primer fotograma (`onRenderedFirstFrame`), el video se desvanece suavemente sobre la carátula sin un solo milisegundo de fondo negro en Now Playing ni en el Mini Reproductor.
-- **Bucle Infinito sin Cortes (Seamless Loop con Crossfade Nativo en FFmpeg)**:
-  - Para loops cortos de Canvas (≤ 20s), el motor nativo `FFmpegNativeEngine` aplica una transición de fundido cruzado (*crossfade* continuo con `xfade`) entre el final y el inicio del video.
-  - Al repetirse en bucle continuo dentro de ExoPlayer, el corte brusco entre el último y el primer fotograma desaparece por completo, logrando una animación cíclica infinita, fluida e imperceptible.
+- **Bucle Infinito sin Cortes (Seamless Loop con Crossfade) & Efecto Boomerang / Ping-Pong (`reverse` + `concat`) en FFmpeg**:
+  - **Modo Crossfade (`xfade`)**: Para loops cortos de Canvas (≤ 20s), el motor nativo `FFmpegNativeEngine` aplica una transición de fundido cruzado (*crossfade* continuo con `xfade`) entre el final y el inicio del video.
+  - **Modo Boomerang / Ping-Pong (`reverse` + `concat`)**: El usuario puede elegir el **Efecto Boomerang** en los diálogos de *Editar Canción*, *Video a Música* y *Descargar desde Enlace*. El motor **FFmpeg** invierte una copia del clip y la concatena (`[0:v]split[f][r];[r]reverse[rev];[f][rev]concat=n=2:v=1:a=0`), creando un ciclo continuo de ida y vuelta matemáticamente perfecto donde el último fotograma coincide exactamente con el primero sin ningún corte brusco en ExoPlayer.
 - **Optimización de Fotogramas Clave (Keyframes / GOP Corto a 30fps) para Saltos Instantáneos**:
   - Para videos largos sincronizados con la música (> 20s), se reestructura el flujo de video insertando un *Keyframe* (`I-frame`) regular cada 30 fotogramas (exactamente cada 1 segundo a 30 FPS constantes CFR) con `-movflags +faststart`.
   - Al arrastrar el deslizador de tiempo o saltar pistas en *Now Playing* y en el *Mini Reproductor*, el video se sincroniza al milisegundo exacto con 0ms de congelamiento de fotogramas, eliminando los molestos retrasos provocados por los fotogramas clave espaciados de YouTube o TikTok.
@@ -151,9 +151,9 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
 
 ### 7. Descarga Directa desde TikTok, YouTube y Enlaces Web con FFmpeg Puro y yt-dlp Integrados en el APK Final 🎬🔗🎵
 - **Descargas sin Límite de Duración**: Permite pegar enlaces de **TikTok**, **YouTube** y videos web para descargar música completa, directos, sesiones o parodias de cualquier duración.
-- **Motor FFmpeg Puro sin Wrappers en el APK Final (`FFmpegNativeEngine`)**:
-  - Binario nativo ejecutable `libffmpeg.so` empaquetado directamente en `jniLibs/` para todas las arquitecturas (`arm64-v8a`, `armeabi-v7a`, `x86_64`, `x86`), instalado con permisos nativos de ejecución en `nativeLibraryDir` sin wrappers desactualizados.
-  - Paquete dinámico optimizado con solo lo necesario para audio y video (`libffmpeg.zip.so`), descomprimido de forma atómica en segundo plano para procesar y transcodificar en alta fidelidad (AAC, Opus, Vorbis, FLAC, WebM -> M4A / MP3) y fusionar flujos DASH de video y audio (`-c copy`) sin inflar el APK con encoders pesados innecesarios.
+- **Motor FFmpeg Puro sin Wrappers en el APK Final (`FFmpegNativeEngine` + `compile_native_deps.sh`)**:
+  - Binario nativo ejecutable `libffmpeg.so` empaquetado directamente en `jniLibs/` para todas las arquitecturas (`arm64-v8a`, `armeabi-v7a`, `x86_64`, `x86`), aprovisionado en `scripts/compile_native_deps.sh` mediante descarga de ejecutable CLI estático/PIE real de FFmpeg para Android (`arm64`, `arm`, `x86_64`, `x86`) y puente C/NDK con `dlopen`/`dlsym` sobre `libffmpegkit.so` / `libavcodec.so` / `libavfilter.so` (`FFmpegKitConfig_run` / `ffmpeg_execute`), instalado con permisos nativos de ejecución en `nativeLibraryDir`.
+  - Paquete dinámico optimizado con solo lo necesario para audio y video (`libffmpeg.zip.so`), descomprimido de forma atómica en segundo plano para procesar y transcodificar en alta fidelidad (AAC, Opus, Vorbis, FLAC, WebM -> M4A / MP3), aplicar filtros de video (`xfade`, `reverse` + `concat` Boomerang, Keyframes GOP corto) y fusionar flujos DASH de video y audio (`-c copy`) sin inflar el APK con encoders pesados innecesarios.
 - **Entorno Python Nativo y Actualización en Caliente OTA para yt-dlp (`YtDlpNativeEngine` & `YtDlpAutoUpdater`)**:
   - Runtime de CPython nativo (`libpython.so`) con entorno optimizado (`libpython.zip.so`) y motor QuickJS (`libqjs.so`) empaquetados en el APK final para ejecutar scripts de extracción y descifrar firmas dinámicas (`n-sig`) localmente a máxima velocidad.
   - Copia base oficial de `yt-dlp` empaquetada en `assets/bin/yt-dlp` para funcionamiento inmediato fuera de línea desde la primera instalación.
@@ -167,9 +167,9 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
 - **Acelerador de Descarga sin Estrangulamiento (Chunked Range Download a Máxima Velocidad)**:
   - Destruye la limitación artificial de ~63 KB/s de los servidores de Google Video mediante descargas fragmentadas por bloques HTTP Range (`Range: bytes=X-Y` de 2.5 MB).
   - Descarga a la velocidad real de la red (10 MB/s - 40 MB/s), completando pistas de audio en segundos y videos en ~2-4 segundos.
-- **Video Canvas por Defecto en 480p Óptimo y Vinculación Automática**:
-  - Tanto `yt-dlp` como `InnerTube` e `Invidious` priorizan por defecto y de forma estricta la resolución **480p** (`bestvideo[height<=480]`), garantizando el equilibrio perfecto entre peso liviano (10-20 MB), fluidez total a 60/30 FPS y nitidez impecable en la pantalla del celular sin sobrecalentar el procesador.
-  - El video se descarga, se procesa con GOP corto (Keyframes cada 1s) o Seamless Loop con FFmpeg, y se vincula automáticamente en `videos/` para reproducirse de inmediato como Video Canvas en Now Playing y Mini Reproductor.
+- **Video Canvas por Defecto en 480p Óptimo y Vinculación Automática Garantizada**:
+  - Tanto `yt-dlp` como `InnerTube` e `Invidious` priorizan por defecto y de forma estricta la resolución **480p en contenedor MP4 con códec H.264 (`avc1`)**, excluyendo manifiestos HLS (`.m3u8`), DASH (`.mpd`) y códecs conflictivos (`AV1`/`VP9`), y preservando los `http_headers` (`User-Agent`) firmados por el extractor para evitar rechazos HTTP 403 en `googlevideo.com`.
+  - Si el flujo inicial tenía `videoUrl == audioUrl` (pista de solo audio), `OnlineVideoAudioImporter` resuelve activamente en segundo plano un stream de video MP4 de 480p dedicado y verifica mediante `MediaMetadataRetriever` (`METADATA_KEY_HAS_VIDEO`) que contenga pista de video real antes de vincularlo en `videos/`.
 - **Extracción Automática 3 en 1**:
   - 🎵 **Audio de Alta Fidelidad**: Extrae la pista de audio pura en formato `.m4a` o `.mp3` directamente a `songs/`.
   - 🖼️ **Carátula Oficial en WebP**: Descarga la portada oficial en alta resolución y la procesa a WebP sin pérdida en `images/`.

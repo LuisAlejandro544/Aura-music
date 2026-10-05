@@ -93,7 +93,8 @@ object VideoAudioExtractor {
         album: String,
         attachAsCanvas: Boolean,
         forceLoop: Boolean?,
-        trimSilence: Boolean = false
+        trimSilence: Boolean = false,
+        loopStyle: FFmpegNativeEngine.CanvasLoopStyle = FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE
     ): Track? = withContext(Dispatchers.IO) {
         val tempTrackId = System.currentTimeMillis()
 
@@ -184,14 +185,15 @@ object VideoAudioExtractor {
 
         // 3. Vincular como Video Canvas si el usuario lo solicitó
         var videoCanvasPath: String? = null
-        var isLoopMode = forceLoop ?: (durationMs in 1..20500L)
+        var isLoopMode = forceLoop ?: (loopStyle == FFmpegNativeEngine.CanvasLoopStyle.BOOMERANG || durationMs in 1..20500L)
 
         if (attachAsCanvas) {
             val canvasResult = storageManager.saveCustomVideoFromUri(
                 trackId = tempTrackId,
                 sourceUri = videoUri,
                 oldVideoPath = null,
-                forceLoop = forceLoop
+                forceLoop = forceLoop,
+                loopStyle = loopStyle
             )
             if (canvasResult != null) {
                 videoCanvasPath = canvasResult.first

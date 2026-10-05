@@ -46,7 +46,8 @@ object OnlineVideoAudioImporter {
         val videoUrl: String,
         val audioUrl: String?,
         val coverUrl: String?,
-        val durationSeconds: Long
+        val durationSeconds: Long,
+        val httpHeaders: Map<String, String> = emptyMap()
     )
 
     /**
@@ -201,6 +202,7 @@ object OnlineVideoAudioImporter {
         attachAsCanvas: Boolean = true,
         forceLoop: Boolean? = null,
         trimSilence: Boolean = false,
+        loopStyle: FFmpegNativeEngine.CanvasLoopStyle = FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE,
         onProgressUpdate: (DownloadProgress) -> Unit = {}
     ): Result<Track> = withContext(Dispatchers.IO) {
         val timestamp = System.currentTimeMillis()
@@ -219,6 +221,7 @@ object OnlineVideoAudioImporter {
                     url = resolvedInfo.audioUrl,
                     targetFile = audioFile,
                     phase = "Descargando audio de alta fidelidad...",
+                    customHeaders = resolvedInfo.httpHeaders,
                     onProgress = onProgressUpdate
                 )
                 if (downloadedAudio && audioFile.exists() && audioFile.length() > 0L) {
@@ -232,6 +235,7 @@ object OnlineVideoAudioImporter {
                     url = resolvedInfo.videoUrl,
                     targetFile = tempVideoFile,
                     phase = "Descargando flujo multimedia...",
+                    customHeaders = resolvedInfo.httpHeaders,
                     onProgress = onProgressUpdate
                 )
                 if (downloadVideoSuccess && tempVideoFile.exists() && tempVideoFile.length() > 0L) {
@@ -298,6 +302,7 @@ object OnlineVideoAudioImporter {
                                 url = freshInfo.audioUrl,
                                 targetFile = audioFile,
                                 phase = "Descargando audio de alta fidelidad...",
+                                customHeaders = freshInfo.httpHeaders,
                                 onProgress = onProgressUpdate
                             )
                             if (backupAudioSuccess && audioFile.exists() && audioFile.length() > 0L) {
@@ -310,6 +315,7 @@ object OnlineVideoAudioImporter {
                                 url = freshInfo.videoUrl,
                                 targetFile = tempVideoFile,
                                 phase = "Descargando flujo multimedia...",
+                                customHeaders = freshInfo.httpHeaders,
                                 onProgress = onProgressUpdate
                             )
                             if (backupVideoSuccess && tempVideoFile.exists() && tempVideoFile.length() > 0L) {
@@ -469,39 +475,110 @@ object OnlineVideoAudioImporter {
             }
 
             var videoCanvasPath: String? = null
-            val isLoop = forceLoop ?: (durationMs in 1..20500L)
+            val isLoop = forceLoop ?: (loopStyle == FFmpegNativeEngine.CanvasLoopStyle.BOOMERANG || durationMs in 1..20500L)
 
             if (attachAsCanvas) {
-                // Si attachAsCanvas está marcado pero aún no descargamos el video porque el audio vino directo
-                if ((!tempVideoFile.exists() || tempVideoFile.length() == 0L) &&
-                    !resolvedInfo.videoUrl.isNullOrBlank()
+                // Función auxiliar para validar que el archivo descargado contiene una pista de video real decodificable
+                fun isValidVideoFile(file: File): Boolean {
+                    if (!file.exists() || file.length() < 4096L) return false
+                    return try {
+                        val vRetriever = MediaMetadataRetriever()
+                        vRetriever.setDataSource(file.absolutePath)
+                        val hasVid = vRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_HAS_VIDEO)
+                        val width = vRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 0
+                        vRetriever.release()
+                        hasVid == "yes" || width > 0
+                    } catch (_: Throwable) {
+                        false
+                    }
+                }
+
+                // 1. Si aún no tenemos tempVideoFile y videoUrl es distinto de audioUrl, descargarlo directamente
+                if (!isValidVideoFile(tempVideoFile) &&
+                    !resolvedInfo.videoUrl.isNullOrBlank() &&
+                    resolvedInfo.videoUrl != resolvedInfo.audioUrl
                 ) {
-                    if (resolvedInfo.videoUrl != resolvedInfo.audioUrl) {
-                        downloadUrlToFile(
-                            url = resolvedInfo.videoUrl,
-                            targetFile = tempVideoFile,
-                            phase = "Descargando Video Canvas de fondo (480p)...",
-                            onProgress = onProgressUpdate
+                    downloadUrlToFile(
+                        url = resolvedInfo.videoUrl,
+                        targetFile = tempVideoFile,
+                        phase = "Descargando Video Canvas de fondo (480p)...",
+                        customHeaders = resolvedInfo.httpHeaders,
+                        onProgress = onProgressUpdate
+                    )
+                }
+
+                // 2. Si videoUrl == audioUrl, verificar si audioFile era un contenedor combinado (video + audio)
+                if (!isValidVideoFile(tempVideoFile) && resolvedInfo.videoUrl == resolvedInfo.audioUrl) {
+                    if (isValidVideoFile(audioFile)) {
+                        audioFile.copyTo(tempVideoFile, overwrite = true)
+                    }
+                }
+
+                // 3. Si videoUrl == audioUrl (ej. porque el extractor inicial solo obtuvo audio) o la primera descarga falló,
+                // resolver activamente un flujo de video MP4 480p dedicado desde InnerTube / Invidious / yt-dlp sin omitir el video
+                if (!isValidVideoFile(tempVideoFile) && WebStreamExtractor.isWebVideoUrl(resolvedInfo.originalUrl)) {
+                    val ytId = WebStreamExtractor.extractVideoId(resolvedInfo.originalUrl)
+                    if (ytId != null) {
+                        com.example.debug.AuraDebugManager.logInfo(
+                            "OnlineImporter",
+                            "Resolviendo flujo de Video Canvas 480p dedicado para $ytId..."
                         )
-                    } else {
-                        // Si la URL es la misma (stream combinado), verificar si el archivo de audio ya contiene pista de video
-                        val hasVideoTrack = try {
-                            val vRetriever = MediaMetadataRetriever()
-                            vRetriever.setDataSource(audioFile.absolutePath)
-                            val hasVid = vRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_HAS_VIDEO) == "yes"
-                            vRetriever.release()
-                            hasVid
-                        } catch (_: Throwable) { false }
-                        if (hasVideoTrack) {
-                            audioFile.copyTo(tempVideoFile, overwrite = true)
+                        val videoCandidates = mutableListOf<Pair<String, Map<String, String>>>()
+
+                        val innerTubeFallback = InnerTubeClient.resolve(ytId, resolvedInfo.originalUrl)
+                        if (innerTubeFallback != null &&
+                            innerTubeFallback.videoUrl.isNotBlank() &&
+                            innerTubeFallback.videoUrl != innerTubeFallback.audioUrl
+                        ) {
+                            videoCandidates.add(innerTubeFallback.videoUrl to innerTubeFallback.httpHeaders)
+                        }
+
+                        val invidiousFallback = InvidiousStreamResolver.resolve(ytId, resolvedInfo.originalUrl)
+                        if (invidiousFallback != null &&
+                            invidiousFallback.videoUrl.isNotBlank() &&
+                            invidiousFallback.videoUrl != invidiousFallback.audioUrl
+                        ) {
+                            videoCandidates.add(invidiousFallback.videoUrl to invidiousFallback.httpHeaders)
+                        }
+
+                        if (YtDlpNativeEngine.isAvailable(context)) {
+                            val ytdlpFallback = YtDlpNativeEngine.resolveStream(context, resolvedInfo.originalUrl).getOrNull()
+                            if (ytdlpFallback != null &&
+                                ytdlpFallback.videoUrl.isNotBlank() &&
+                                ytdlpFallback.videoUrl != ytdlpFallback.audioUrl
+                            ) {
+                                videoCandidates.add(ytdlpFallback.videoUrl to ytdlpFallback.httpHeaders)
+                            }
+                        }
+
+                        for ((candidateVideoUrl, candidateHeaders) in videoCandidates) {
+                            if (tempVideoFile.exists()) tempVideoFile.delete()
+                            val downloaded = downloadUrlToFile(
+                                url = candidateVideoUrl,
+                                targetFile = tempVideoFile,
+                                phase = "Descargando Video Canvas de fondo (480p)...",
+                                customHeaders = candidateHeaders,
+                                onProgress = onProgressUpdate
+                            )
+                            if (downloaded && isValidVideoFile(tempVideoFile)) {
+                                break
+                            }
                         }
                     }
                 }
+
                 if (tempVideoFile.exists() && tempVideoFile.length() > 0L) {
                     onProgressUpdate(
                         DownloadProgress(
                             isDownloading = true,
-                            phase = if (isLoop) "Perfeccionando bucle infinito continuo (Seamless Loop)..." else "Optimizando fluidez de video y fotogramas clave (480p)...",
+                            phase = when {
+                                isLoop && loopStyle == FFmpegNativeEngine.CanvasLoopStyle.BOOMERANG ->
+                                    "Generando bucle infinito Boomerang / Ping-Pong (reverse + concat)..."
+                                isLoop ->
+                                    "Perfeccionando bucle infinito continuo (Seamless Loop)..."
+                                else ->
+                                    "Optimizando fluidez de video y fotogramas clave (480p)..."
+                            },
                             bytesDownloaded = tempVideoFile.length(),
                             totalBytes = tempVideoFile.length(),
                             progressFraction = 0.94f
@@ -512,12 +589,14 @@ object OnlineVideoAudioImporter {
                         context = context,
                         inputFile = tempVideoFile,
                         outputFile = optimizedVideoFile,
-                        isLoop = isLoop
+                        isLoop = isLoop,
+                        loopStyle = loopStyle
                     )
-                    if (canvasResult.success && optimizedVideoFile.exists() && optimizedVideoFile.length() > 0L) {
+                    if (canvasResult.success && isValidVideoFile(optimizedVideoFile)) {
                         tempVideoFile.delete()
                         videoCanvasPath = optimizedVideoFile.absolutePath
                     } else {
+                        if (optimizedVideoFile.exists()) optimizedVideoFile.delete()
                         videoCanvasPath = tempVideoFile.absolutePath
                     }
                 }
@@ -573,6 +652,7 @@ object OnlineVideoAudioImporter {
         url: String,
         targetFile: File,
         phase: String,
+        customHeaders: Map<String, String> = emptyMap(),
         onProgress: (DownloadProgress) -> Unit
     ): Boolean {
         val isYoutubeStream = url.contains("googlevideo.com") || url.contains("youtube.com")
@@ -586,14 +666,14 @@ object OnlineVideoAudioImporter {
             url
         }
 
-        val success = executeDownload(cleanUrl, targetFile, phase, isYoutubeStream, onProgress)
+        val success = executeDownload(cleanUrl, targetFile, phase, isYoutubeStream, customHeaders, onProgress)
         if (success && targetFile.exists() && targetFile.length() > 0L) {
             return true
         }
 
         // 2. Si la URL limpia falló (ej. la firma requería el query string original), reintentar con la URL original
         if (cleanUrl != url) {
-            val retrySuccess = executeDownload(url, targetFile, phase, isYoutubeStream, onProgress)
+            val retrySuccess = executeDownload(url, targetFile, phase, isYoutubeStream, customHeaders, onProgress)
             if (retrySuccess && targetFile.exists() && targetFile.length() > 0L) {
                 return true
             }
@@ -606,6 +686,7 @@ object OnlineVideoAudioImporter {
         targetFile: File,
         phase: String,
         isYoutubeStream: Boolean,
+        customHeaders: Map<String, String>,
         onProgress: (DownloadProgress) -> Unit
     ): Boolean {
         val cleanUrl = if (url.contains("googlevideo.com")) {
@@ -615,7 +696,7 @@ object OnlineVideoAudioImporter {
 
         // 1. Acelerador de descarga por bloques HTTP Range (evita el estrangulamiento de 63 KB/s de YouTube)
         if (cleanUrl.contains("googlevideo.com")) {
-            val chunkedSuccess = executeChunkedDownload(cleanUrl, targetFile, phase, onProgress)
+            val chunkedSuccess = executeChunkedDownload(cleanUrl, targetFile, phase, customHeaders, onProgress)
             if (chunkedSuccess && targetFile.exists() && targetFile.length() > 0L) {
                 return true
             }
@@ -623,16 +704,28 @@ object OnlineVideoAudioImporter {
 
         // 2. Descarga lineal estándar de respaldo
         return try {
+            val defaultUa = customHeaders["User-Agent"]
+                ?: customHeaders["user-agent"]
+                ?: "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
+
             val reqBuilder = Request.Builder().url(cleanUrl)
-                .header("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36")
+                .header("User-Agent", defaultUa)
                 .header("Accept", "*/*")
                 .header("Accept-Encoding", "identity")
 
+            for ((k, v) in customHeaders) {
+                if (!k.equals("Range", ignoreCase = true) && !k.equals("Accept-Encoding", ignoreCase = true)) {
+                    reqBuilder.header(k, v)
+                }
+            }
+
             if (isYoutubeStream || cleanUrl.contains("googlevideo.com")) {
-                reqBuilder.header("Referer", "https://m.youtube.com/")
+                if (customHeaders.isEmpty()) {
+                    reqBuilder.header("Referer", "https://m.youtube.com/")
+                }
                 try {
                     val cookies = android.webkit.CookieManager.getInstance().getCookie("https://m.youtube.com")
-                    if (!cookies.isNullOrBlank()) {
+                    if (!cookies.isNullOrBlank() && !customHeaders.containsKey("Cookie")) {
                         reqBuilder.header("Cookie", cookies)
                     }
                 } catch (_: Throwable) {}
@@ -645,7 +738,7 @@ object OnlineVideoAudioImporter {
                 response.close()
                 val fallbackReq = Request.Builder()
                     .url(cleanUrl)
-                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                    .header("User-Agent", defaultUa)
                     .header("Accept", "*/*")
                     .build()
                 response = httpClient.newCall(fallbackReq).execute()
@@ -737,20 +830,29 @@ object OnlineVideoAudioImporter {
         url: String,
         targetFile: File,
         phase: String,
+        customHeaders: Map<String, String>,
         onProgress: (DownloadProgress) -> Unit
     ): Boolean {
         return try {
+            val signedUa = customHeaders["User-Agent"]
+                ?: customHeaders["user-agent"]
+                ?: "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
+
             // Sonda inicial ligera para determinar Content-Range y tamaño total exacto
-            val probeReq = Request.Builder()
+            val probeBuilder = Request.Builder()
                 .url(url)
-                .header("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36")
+                .header("User-Agent", signedUa)
                 .header("Accept", "*/*")
-                .header("Referer", "https://m.youtube.com/")
-                .header("Range", "bytes=0-0")
-                .build()
+
+            for ((k, v) in customHeaders) {
+                if (!k.equals("Range", ignoreCase = true) && !k.equals("Accept-Encoding", ignoreCase = true)) {
+                    probeBuilder.header(k, v)
+                }
+            }
+            probeBuilder.header("Range", "bytes=0-0")
 
             var totalBytes = -1L
-            httpClient.newCall(probeReq).execute().use { probeRes ->
+            httpClient.newCall(probeBuilder.build()).execute().use { probeRes ->
                 if (probeRes.code == 206) {
                     val crHeader = probeRes.header("Content-Range")
                     totalBytes = crHeader?.substringAfterLast("/")?.trim()?.toLongOrNull() ?: -1L
@@ -778,15 +880,19 @@ object OnlineVideoAudioImporter {
             FileOutputStream(targetFile, true).use { fileOut ->
                 while (currentByte < totalBytes) {
                     val endByte = minOf(currentByte + CHUNK_SIZE - 1, totalBytes - 1)
-                    val chunkReq = Request.Builder()
+                    val chunkBuilder = Request.Builder()
                         .url(url)
-                        .header("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36")
+                        .header("User-Agent", signedUa)
                         .header("Accept", "*/*")
-                        .header("Referer", "https://m.youtube.com/")
-                        .header("Range", "bytes=$currentByte-$endByte")
-                        .build()
 
-                    val chunkRes = httpClient.newCall(chunkReq).execute()
+                    for ((k, v) in customHeaders) {
+                        if (!k.equals("Range", ignoreCase = true) && !k.equals("Accept-Encoding", ignoreCase = true)) {
+                            chunkBuilder.header(k, v)
+                        }
+                    }
+                    chunkBuilder.header("Range", "bytes=$currentByte-$endByte")
+
+                    val chunkRes = httpClient.newCall(chunkBuilder.build()).execute()
                     if (!chunkRes.isSuccessful && chunkRes.code != 206) {
                         chunkRes.close()
                         com.example.debug.AuraDebugManager.logWarning("Downloader", "Bloque rechazado con código ${chunkRes.code}. Recurriendo a descarga lineal.")

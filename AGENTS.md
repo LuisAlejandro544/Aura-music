@@ -76,7 +76,7 @@ Este documento define el protocolo de trabajo para los agentes de software y des
 - [x] ¿LeakCanary está añadido y funcional en dependencias de depuración?
 - [x] ¿El almacenamiento estructurado (`images/`, `songs/`, `lyrics/`, `metadata/`) está activo?
 - [x] ¿Las carátulas se procesan como WebP sin pérdida en segundo plano y las faltantes se generan proceduralmente?
-- [x] ¿El Video Canvas de fondo soporta loops cortos (≤20s) con bucle infinito sin cortes (Seamless Loop con crossfade xfade en FFmpeg), videos largos sincronizados con fotogramas clave (GOP corto a 30fps) para saltos instantáneos (0ms) y armonización cromática sin interferencias de carátula?
+- [x] ¿El Video Canvas de fondo soporta loops cortos (≤20s) con bucle infinito sin cortes (Seamless Loop con crossfade xfade en FFmpeg) y Efecto Boomerang / Ping-Pong (reverse + concat en FFmpeg), videos largos sincronizados con fotogramas clave (GOP corto a 30fps) para saltos instantáneos (0ms) y armonización cromática sin interferencias de carátula?
 - [x] ¿El video de fondo soporta los 3 modos (Fondo Completo con carátula al frente, Lienzo en carátula y Solo Carátula) seleccionables por el usuario mediante diálogo modal?
 - [x] ¿El corazón en Now Playing se refleja inmediatamente en rojo y se sincroniza reactivamente con Room y ExoPlayer?
 - [x] ¿La sección 'Populares en tu biblioteca' de la pantalla de inicio permanece fija sin renombrarse a 'Tus favoritos' ni ocultar canciones al marcar favoritos?

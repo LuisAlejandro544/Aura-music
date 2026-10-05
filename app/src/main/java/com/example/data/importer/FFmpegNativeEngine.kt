@@ -254,6 +254,84 @@ object FFmpegNativeEngine {
     }
 
     /**
+     * Estilo de bucle continuo para Video Canvas cortos (<= 20s):
+     * - CROSSFADE: Fundido suave entre el final y el inicio mediante 'xfade'.
+     * - BOOMERANG: Efecto Ping-Pong (Ida y Vuelta) hipnótico mediante 'reverse' + 'concat=n=2:v=1:a=0'.
+     */
+    enum class CanvasLoopStyle(val label: String, val description: String) {
+        CROSSFADE("Crossfade Suave", "Fundido cruzado continuo entre el final y el inicio (xfade)"),
+        BOOMERANG("Boomerang (Ping-Pong)", "Reproducción fluida de ida y vuelta en reversa sin cortes (reverse + concat)")
+    }
+
+    /**
+     * Crea un bucle infinito cinemático con Efecto Boomerang / Ping-Pong (reverse + concat)
+     * para Video Canvas cortos (<= 20s).
+     * Reproduce el segmento hacia adelante y regresa suavemente en reversa, eliminando
+     * al 100% cualquier salto o fantasmagoría en clips con movimiento rápido.
+     */
+    suspend fun createBoomerangLoopVideo(
+        context: Context,
+        inputFile: File,
+        outputFile: File,
+        maxSourceDurationSec: Float = 10.0f,
+        targetFps: Int = 30
+    ): ExecutionResult = withContext(Dispatchers.IO) {
+        init(context)
+        val ffmpegBin = getBinaryFile(context)
+        if (ffmpegBin == null) {
+            return@withContext ExecutionResult(false, -1, "FFmpeg no disponible", null)
+        }
+
+        val retriever = android.media.MediaMetadataRetriever()
+        var durationMs = 0L
+        try {
+            retriever.setDataSource(inputFile.absolutePath)
+            durationMs = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+        } catch (_: Throwable) {} finally {
+            try { retriever.release() } catch (_: Throwable) {}
+        }
+
+        val durationSec = (durationMs / 1000.0f).coerceAtLeast(1.0f)
+        val clipSec = durationSec.coerceAtMost(maxSourceDurationSec)
+        val clipFormatted = String.format(java.util.Locale.US, "%.3f", clipSec)
+
+        // Filtro reverse + concat para bucle Ping-Pong 100% simétrico sin cortes
+        val filterComplex = "[0:v]trim=start=0:end=${clipFormatted},setpts=PTS-STARTPTS,split=2[v_fwd][v_rev_src];" +
+                "[v_rev_src]reverse,setpts=PTS-STARTPTS[v_rev];" +
+                "[v_fwd][v_rev]concat=n=2:v=1:a=0[v_out]"
+
+        if (outputFile.exists()) outputFile.delete()
+
+        val args = arrayOf(
+            ffmpegBin.absolutePath,
+            "-y",
+            "-i", inputFile.absolutePath,
+            "-filter_complex", filterComplex,
+            "-map", "[v_out]",
+            "-c:v", "libx264",
+            "-preset", "veryfast",
+            "-crf", "23",
+            "-r", targetFps.toString(),
+            "-g", targetFps.toString(),
+            "-keyint_min", (targetFps / 2).toString(),
+            "-sc_threshold", "0",
+            "-an",
+            "-movflags", "+faststart",
+            outputFile.absolutePath
+        )
+
+        val expectedTotalMs = (clipSec * 2000.0f).toLong()
+        val result = executeCommand(context, args, expectedTotalMs, null)
+        if (result.success) {
+            AuraDebugManager.logInfo(TAG, "Loop Boomerang / Ping-Pong (reverse + concat) generado exitosamente (${outputFile.name}).")
+            result
+        } else {
+            AuraDebugManager.logWarning(TAG, "Filtro Boomerang reverse+concat falló, aplicando fallback Seamless Loop xfade...")
+            createSeamlessLoopVideo(context, inputFile, outputFile, targetFps = targetFps)
+        }
+    }
+
+    /**
      * Crea un bucle infinito cinemático sin cortes (Seamless Loop con Crossfade) para Video Canvas cortos (<= 20s).
      * Mezcla suavemente los últimos segundos con los primeros mediante el filtro 'xfade',
      * garantizando que al repetirse continuamente en ExoPlayer no exista ningún salto brusco ni interrupción visual.
@@ -380,14 +458,17 @@ object FFmpegNativeEngine {
 
     /**
      * Orquestador inteligente de procesamiento para Video Canvas:
-     * Si es bucle (isLoop = true, <= 20s), aplica Seamless Loop con Crossfade.
+     * Si es bucle (isLoop = true, <= 20s):
+     *   - Si loopStyle == BOOMERANG: aplica Efecto Boomerang / Ping-Pong (reverse + concat).
+     *   - Si loopStyle == CROSSFADE: aplica Seamless Loop con Crossfade (xfade).
      * Si es video largo sincronizado (isLoop = false, > 20s), aplica optimización de Keyframes (GOP Corto).
      */
     suspend fun processVideoForCanvas(
         context: Context,
         inputFile: File,
         outputFile: File,
-        isLoop: Boolean
+        isLoop: Boolean,
+        loopStyle: CanvasLoopStyle = CanvasLoopStyle.CROSSFADE
     ): ExecutionResult = withContext(Dispatchers.IO) {
         if (!isAvailable(context)) {
             return@withContext try {
@@ -398,10 +479,24 @@ object FFmpegNativeEngine {
             }
         }
 
-        if (isLoop) {
-            createSeamlessLoopVideo(context, inputFile, outputFile)
+        val res = if (isLoop) {
+            when (loopStyle) {
+                CanvasLoopStyle.BOOMERANG -> createBoomerangLoopVideo(context, inputFile, outputFile)
+                CanvasLoopStyle.CROSSFADE -> createSeamlessLoopVideo(context, inputFile, outputFile)
+            }
         } else {
             optimizeVideoForInstantSync(context, inputFile, outputFile)
+        }
+
+        if (res.success && outputFile.exists() && outputFile.length() > 4096L) {
+            res
+        } else {
+            try {
+                inputFile.copyTo(outputFile, overwrite = true)
+                ExecutionResult(true, 0, "Respaldo directo de flujo MP4", outputFile)
+            } catch (e: Exception) {
+                res
+            }
         }
     }
 

@@ -242,13 +242,16 @@ class AppStorageManager(private val context: Context) {
          trackId: Long,
          sourceUri: Uri,
          oldVideoPath: String?,
-         forceLoop: Boolean? = null
+         forceLoop: Boolean? = null,
+         loopStyle: com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle = com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE
      ): Pair<String, Boolean>? = withContext(Dispatchers.IO) {
          try {
              // 1. Determinar duración con MediaMetadataRetriever o respetar forzado manual
              var isLoop = false
              if (forceLoop != null) {
                  isLoop = forceLoop
+             } else if (loopStyle == com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle.BOOMERANG) {
+                 isLoop = true
              } else {
                  try {
                      val retriever = android.media.MediaMetadataRetriever()
@@ -282,13 +285,14 @@ class AppStorageManager(private val context: Context) {
                  }
              } ?: return@withContext null
 
-             // 4. Optimizar con FFmpeg nativo: Seamless Loop con crossfade si es <=20s, o GOP corto a 30fps si es sincronizado
+             // 4. Optimizar con FFmpeg nativo: Seamless Loop (xfade o Boomerang reverse+concat) si es loop, o GOP corto a 30fps si es sincronizado
              try {
                  val processResult = com.example.data.importer.FFmpegNativeEngine.processVideoForCanvas(
                      context = context,
                      inputFile = rawTempFile,
                      outputFile = newFile,
-                     isLoop = isLoop
+                     isLoop = isLoop,
+                     loopStyle = loopStyle
                  )
                  if (!processResult.success || !newFile.exists() || newFile.length() == 0L) {
                      rawTempFile.renameTo(newFile)

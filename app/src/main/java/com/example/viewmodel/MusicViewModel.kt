@@ -489,7 +489,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         removeArtwork: Boolean = false,
         customVideoUri: Uri? = null,
         removeVideo: Boolean = false,
-        forceVideoLoop: Boolean? = null
+        forceVideoLoop: Boolean? = null,
+        loopStyle: com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle = com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE
     ) {
         viewModelScope.launch {
             val updated = repository.updateTrackDetails(
@@ -502,7 +503,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 removeArtwork,
                 customVideoUri,
                 removeVideo,
-                forceVideoLoop
+                forceVideoLoop,
+                loopStyle
             )
             audioPlayer.updateTrackMetadata(
                 trackId,
@@ -513,7 +515,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 updateArt = (customArtUri != null || removeArtwork),
                 videoUri = updated?.videoUri,
                 isVideoLoop = updated?.isVideoLoop ?: false,
-                updateVideo = (customVideoUri != null || removeVideo)
+                updateVideo = (customVideoUri != null || removeVideo || loopStyle == com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle.BOOMERANG)
             )
         }
     }
@@ -647,6 +649,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         attachAsCanvas: Boolean,
         forceLoop: Boolean?,
         trimSilence: Boolean = false,
+        loopStyle: com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle = com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE,
         onTrackCreated: ((Track) -> Unit)? = null
     ) {
         viewModelScope.launch {
@@ -664,7 +667,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 album = album,
                 attachAsCanvas = attachAsCanvas,
                 forceLoop = forceLoop,
-                trimSilence = trimSilence
+                trimSilence = trimSilence,
+                loopStyle = loopStyle
             )
             _isImporting.value = false
             if (track != null) {
@@ -686,6 +690,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         customArtist: String,
         attachAsCanvas: Boolean,
         trimSilence: Boolean = false,
+        loopStyle: com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle = com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE,
         onSuccess: (Track) -> Unit
     ) {
         viewModelScope.launch {
@@ -708,6 +713,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 customArtist = customArtist,
                 attachAsCanvas = attachAsCanvas,
                 trimSilence = trimSilence,
+                loopStyle = loopStyle,
                 onProgressUpdate = { progress ->
                     _downloadProgress.value = progress
                     _importStatusMessage.value = "${progress.phase} • ${progress.formattedProgress} • ${progress.formattedSpeed}"

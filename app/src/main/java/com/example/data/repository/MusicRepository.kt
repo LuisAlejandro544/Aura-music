@@ -92,7 +92,8 @@ class MusicRepository(private val database: AppDatabase) {
         shouldRemoveArt: Boolean = false,
         customVideoUri: Uri? = null,
         shouldRemoveVideo: Boolean = false,
-        forceVideoLoop: Boolean? = null
+        forceVideoLoop: Boolean? = null,
+        loopStyle: com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle = com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE
     ): Track? = withContext(Dispatchers.IO) {
         val current = trackDao.getTrackById(trackId) ?: return@withContext null
         val storageManager = com.example.data.storage.AppStorageManager(context)
@@ -112,7 +113,7 @@ class MusicRepository(private val database: AppDatabase) {
 
         val (finalVideoPath, finalIsLoop) = when {
             customVideoUri != null -> {
-                val result = storageManager.saveCustomVideoFromUri(trackId, customVideoUri, current.videoUri, forceVideoLoop)
+                val result = storageManager.saveCustomVideoFromUri(trackId, customVideoUri, current.videoUri, forceVideoLoop, loopStyle)
                 if (result != null) result.first to result.second else null to false
             }
             shouldRemoveVideo -> {
@@ -121,7 +122,23 @@ class MusicRepository(private val database: AppDatabase) {
             }
             else -> {
                 val resolvedLoop = forceVideoLoop ?: current.isVideoLoop
-                current.videoUri to resolvedLoop
+                if (resolvedLoop && !current.videoUri.isNullOrEmpty() && loopStyle == com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle.BOOMERANG) {
+                    val existingVideoFile = java.io.File(current.videoUri)
+                    if (existingVideoFile.exists()) {
+                        val result = storageManager.saveCustomVideoFromUri(
+                            trackId = trackId,
+                            sourceUri = Uri.fromFile(existingVideoFile),
+                            oldVideoPath = current.videoUri,
+                            forceLoop = true,
+                            loopStyle = loopStyle
+                        )
+                        if (result != null) result.first to result.second else current.videoUri to resolvedLoop
+                    } else {
+                        current.videoUri to resolvedLoop
+                    }
+                } else {
+                    current.videoUri to resolvedLoop
+                }
             }
         }
 
@@ -371,7 +388,8 @@ class MusicRepository(private val database: AppDatabase) {
         album: String,
         attachAsCanvas: Boolean,
         forceLoop: Boolean?,
-        trimSilence: Boolean = false
+        trimSilence: Boolean = false,
+        loopStyle: com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle = com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE
     ): Track? = withContext(Dispatchers.IO) {
         val storageManager = com.example.data.storage.AppStorageManager(context)
         val extractedTrack = com.example.data.importer.VideoAudioExtractor.convertVideoToTrack(
@@ -383,7 +401,8 @@ class MusicRepository(private val database: AppDatabase) {
             album = album,
             attachAsCanvas = attachAsCanvas,
             forceLoop = forceLoop,
-            trimSilence = trimSilence
+            trimSilence = trimSilence,
+            loopStyle = loopStyle
         ) ?: return@withContext null
 
         val entity = TrackEntity.fromDomain(extractedTrack)
