@@ -112,10 +112,21 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val sleepTimerState: StateFlow<com.example.model.SleepTimerState> = _sleepTimerState.asStateFlow()
 
     // Estados de navegación y UI
-    private val _currentScreen = MutableStateFlow<NavScreen>(NavScreen.Home)
+    private val appPrefs = getApplication<Application>().getSharedPreferences("aura_music_ui_prefs", android.content.Context.MODE_PRIVATE)
+
+    private val _isOnboardingCompleted = MutableStateFlow(
+        appPrefs.getBoolean("pref_onboarding_completed", false)
+    )
+    val isOnboardingCompleted: StateFlow<Boolean> = _isOnboardingCompleted.asStateFlow()
+
+    private val _currentScreen = MutableStateFlow<NavScreen>(
+        if (appPrefs.getBoolean("pref_onboarding_completed", false)) NavScreen.Home else NavScreen.Onboarding
+    )
     val currentScreen: StateFlow<NavScreen> = _currentScreen.asStateFlow()
 
-    private val screenBackStack = mutableListOf<NavScreen>(NavScreen.Home)
+    private val screenBackStack = mutableListOf<NavScreen>(
+        if (appPrefs.getBoolean("pref_onboarding_completed", false)) NavScreen.Home else NavScreen.Onboarding
+    )
 
     private val _selectedPlaylist = MutableStateFlow<Playlist?>(null)
     val selectedPlaylist: StateFlow<Playlist?> = _selectedPlaylist.asStateFlow()
@@ -131,8 +142,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _selectedLibraryTab = MutableStateFlow(LibraryTab.SONGS)
     val selectedLibraryTab: StateFlow<LibraryTab> = _selectedLibraryTab.asStateFlow()
-
-    private val appPrefs = getApplication<Application>().getSharedPreferences("aura_music_ui_prefs", android.content.Context.MODE_PRIVATE)
 
     private val _currentTheme = MutableStateFlow(
         run {
@@ -272,6 +281,18 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             screenBackStack.add(screen)
             _currentScreen.value = screen
         }
+    }
+
+    fun completeOnboarding() {
+        appPrefs.edit().putBoolean("pref_onboarding_completed", true).apply()
+        _isOnboardingCompleted.value = true
+        screenBackStack.clear()
+        screenBackStack.add(NavScreen.Home)
+        _currentScreen.value = NavScreen.Home
+    }
+
+    fun reopenOnboarding() {
+        navigateTo(NavScreen.Onboarding)
     }
 
     fun handleBackPress(): Boolean {

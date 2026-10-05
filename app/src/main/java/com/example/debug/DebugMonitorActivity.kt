@@ -54,6 +54,13 @@ class DebugMonitorActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        // Blindaje contra intromisión de Intents externos no autorizados:
+        // Si la actividad es invocada desde fuera, descartar extras maliciosos y limitar a ACTION_MAIN
+        val incomingAction = intent?.action
+        if (incomingAction != null && incomingAction != Intent.ACTION_MAIN) {
+            intent?.replaceExtras(Bundle())
+        }
+
         setContent {
             AuraMusicTheme {
                 DebugMonitorScreen(

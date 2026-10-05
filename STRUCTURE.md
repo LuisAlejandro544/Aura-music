@@ -155,6 +155,8 @@ AuraMusic/
 │   │   │   │   │   │   │       ├── NowPlayingQueueSheet.kt        # Hoja modal de cola ("Up Next") con carátulas y marquesina
 │   │   │   │   │   │   │       ├── AudioSpecsDialog.kt            # Diálogo con ficha técnica del archivo
 │   │   │   │   │   │   │       └── VideoDisplayModeDialog.kt      # Diálogo selector de los 3 modos de video
+│   │   │   │   │   │   ├── onboarding/
+│   │   │   │   │   │   │   └── OnboardingScreen.kt # Pantallas independientes de bienvenida, inducción y disclaimer de almacenamiento
 │   │   │   │   │   │   ├── equalizer/EqualizerScreen.kt # Referencia de ecualizador (integrado en modal)
 │   │   │   │   │   │   ├── settings/
 │   │   │   │   │   │   │   ├── SettingsScreen.kt # Pantalla de ajustes y selector de pestañas
@@ -183,8 +185,13 @@ AuraMusic/
 │   │   └── test/                               # Pruebas unitarias y Robolectric
 │   └── build.gradle.kts                        # Configuración Gradle con CMake, NDK y LeakCanary
 ├── scripts/
-│   ├── compile_native_deps.sh          # Script de compilación y aprovisionamiento NDK multi-ABI (FFmpeg, Python, QuickJS, yt-dlp)
-│   └── generate_keystore_and_build.sh  # Script ejecutable de generación de firma y build local
+│   ├── compile_native_deps.sh          # Orquestador modular principal de compilación y aprovisionamiento nativo
+│   ├── generate_keystore_and_build.sh  # Script ejecutable de generación de firma y build local
+│   └── native/                         # Módulos especializados de aprovisionamiento puro sin wrappers
+│       ├── provision_ytdlp.sh          # Aprovisionamiento de yt-dlp con verificación criptográfica SHA-256
+│       ├── provision_quickjs.sh        # Compilación nativa PIE de motor QuickJS C99 puro (libqjs.so)
+│       ├── provision_python.sh         # Aprovisionamiento de CPython nativo (libpython.so, libpython3.11.so)
+│       └── provision_ffmpeg.sh         # Aprovisionamiento de FFmpeg CLI nativo puro multi-ABI (libffmpeg.so)
 ├── gradle/
 │   └── libs.versions.toml                      # Catálogo de versiones centralizado (incluye LeakCanary)
 ├── README.md                                   # Descripción general e instalación
@@ -254,3 +261,33 @@ Siguiendo el principio de **desarrollo modular** para evitar el colapso de la ap
     - `LyricsCoordinator.kt` (160 líneas): Carga, sincronización, LRCLIB y búsqueda de letras.
     - `IncomingMediaCoordinator.kt` (120 líneas): Gestión de Intents externos ("Abrir con..."), discriminación y recorte de silencios.
     - `HeadphoneSettingsCoordinator.kt` (75 líneas): Configuración de acústica, botones y gestos de audífonos.
+
+---
+
+## 🔒 Blindaje de Seguridad y Protección Criptográfica
+
+1. **Permisos de Red y Conectividad (`AndroidManifest.xml`)**:
+   - Inclusión obligatoria de `<uses-permission android:name="android.permission.INTERNET" />` y `ACCESS_NETWORK_STATE`, garantizando la resolución segura de letras LRCLIB, descargas multimedia y telemetría de red.
+
+2. **Mitigación de Ejecución Remota de Código (RCE en `YtDlpAutoUpdater`)**:
+   - Descarga atómica con verificación estricta de hash criptográfico `SHA-256` contra el archivo oficial `SHA2-256SUMS` publicado en GitHub Releases.
+   - Validación de host de descarga (`github.com` / `objects.githubusercontent.com`).
+
+3. **Neutralización de Zip Slip / Path Traversal**:
+   - Validación canónica de rutas (`canonicalFile.toPath().startsWith(...)`) en la descompresión de paquetes nativos dentro de `FFmpegNativeEngine` y `YtDlpNativeEngine`.
+
+4. **Blindaje de Procesos CLI e Intents**:
+   - Uso de delimitador de argumentos (`--`) en `YtDlpNativeEngine` previniendo inyecciones de flags CLI.
+   - Aislamiento y sanitización de intents externos en `DebugMonitorActivity`.
+
+---
+
+## 🛠️ Scripts de Aprovisionamiento Nativo Modular (`scripts/native/`)
+
+- **`scripts/compile_native_deps.sh`**: Orquestador principal que invoca los 4 módulos especializados y ejecuta optimización de símbolos `llvm-strip`.
+- **`scripts/native/provision_ytdlp.sh`**: Descarga yt-dlp oficial con verificación criptográfica SHA-256 (`SHA2-256SUMS`).
+- **`scripts/native/provision_quickjs.sh`**: Compila el intérprete QuickJS C99 puro (Fabrice Bellard) como ejecutable PIE (`libqjs.so`) con NDK Clang para las 4 ABIs.
+- **`scripts/native/provision_python.sh`**: Aprovisiona CPython nativo puro multi-arquitectura (`libpython.so`, `libpython3.11.so`, `libpython_stdlib.zip.so`).
+- **`scripts/native/provision_ffmpeg.sh`**: Aprovisiona binarios FFmpeg CLI/PIE puros (`libffmpeg.so` y `libffmpeg.zip.so`) sin wrappers ni stubs falsos.
+- **`.github/workflows/build-debug-apk.yml`**: Flujo de trabajo CI/CD con caché inteligente (`actions/cache@v4`), instalación de NDK, exportación de toolchains LLVM, preservación de firma permanente (`debug.keystore.base64`) y compilación APK Debug lista para dispositivos móviles.
+

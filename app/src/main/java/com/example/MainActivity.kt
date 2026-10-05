@@ -48,6 +48,7 @@ import com.example.ui.screens.home.HomeScreen
 import com.example.ui.screens.importmusic.ImportMusicScreen
 import com.example.ui.screens.library.LibraryScreen
 import com.example.ui.screens.nowplaying.NowPlayingScreen
+import com.example.ui.screens.onboarding.OnboardingScreen
 import com.example.ui.screens.playlist.PlaylistDetailScreen
 import com.example.ui.screens.settings.SettingsScreen
 import com.example.ui.theme.ArtworkColorExtractor
@@ -242,7 +243,7 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
     )
 
     // Manejo de botón Atrás
-    val canGoBack = isNowPlayingExpanded || (currentScreen !is NavScreen.Home)
+    val canGoBack = isNowPlayingExpanded || (currentScreen !is NavScreen.Home && currentScreen !is NavScreen.Onboarding)
     BackHandler(enabled = canGoBack) {
         viewModel.handleBackPress()
     }
@@ -257,44 +258,46 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
             containerColor = BackgroundDark,
             contentWindowInsets = WindowInsets.statusBars,
             bottomBar = {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(BackgroundDark)
-                ) {
-                    // Mini reproductor flotante con transición suave y fondo tintado dinámico
-                    AnimatedVisibility(
-                        visible = currentTrack != null && !isNowPlayingExpanded,
-                        enter = fadeIn(animationSpec = tween(220)) + slideInVertically(
-                            initialOffsetY = { it / 2 },
-                            animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
-                        ),
-                        exit = fadeOut(animationSpec = tween(150)) + slideOutVertically(
-                            targetOffsetY = { it / 2 },
-                            animationSpec = tween(180)
-                        )
+                if (currentScreen !is NavScreen.Onboarding) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(BackgroundDark)
                     ) {
-                        MiniPlayer(
-                            currentTrack = currentTrack,
-                            isPlaying = isPlaying,
-                            currentPositionMs = currentPosition,
-                            durationMs = duration,
-                            onTogglePlayPause = { viewModel.togglePlayPause() },
-                            onSkipNext = { viewModel.playNext() },
-                            onSkipPrevious = { viewModel.playPrevious() },
-                            onClick = { viewModel.setNowPlayingExpanded(true) },
-                            dynamicPrimary = animatedMiniPrimary,
-                            dynamicSecondary = animatedMiniSecondary,
-                            isMiniPlayerVideoEnabled = isMiniPlayerVideoEnabled,
-                            playbackSpeed = playbackSpeed
+                        // Mini reproductor flotante con transición suave y fondo tintado dinámico
+                        AnimatedVisibility(
+                            visible = currentTrack != null && !isNowPlayingExpanded,
+                            enter = fadeIn(animationSpec = tween(220)) + slideInVertically(
+                                initialOffsetY = { it / 2 },
+                                animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+                            ),
+                            exit = fadeOut(animationSpec = tween(150)) + slideOutVertically(
+                                targetOffsetY = { it / 2 },
+                                animationSpec = tween(180)
+                            )
+                        ) {
+                            MiniPlayer(
+                                currentTrack = currentTrack,
+                                isPlaying = isPlaying,
+                                currentPositionMs = currentPosition,
+                                durationMs = duration,
+                                onTogglePlayPause = { viewModel.togglePlayPause() },
+                                onSkipNext = { viewModel.playNext() },
+                                onSkipPrevious = { viewModel.playPrevious() },
+                                onClick = { viewModel.setNowPlayingExpanded(true) },
+                                dynamicPrimary = animatedMiniPrimary,
+                                dynamicSecondary = animatedMiniSecondary,
+                                isMiniPlayerVideoEnabled = isMiniPlayerVideoEnabled,
+                                playbackSpeed = playbackSpeed
+                            )
+                        }
+
+                        // Barra de navegación inferior
+                        BottomNavBar(
+                            currentScreen = currentScreen,
+                            onNavigate = { viewModel.navigateTo(it) }
                         )
                     }
-
-                    // Barra de navegación inferior
-                    BottomNavBar(
-                        currentScreen = currentScreen,
-                        onNavigate = { viewModel.navigateTo(it) }
-                    )
                 }
             }
         ) { innerPadding ->
@@ -319,6 +322,10 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                     label = "ScreenTransition"
                 ) { targetScreen ->
                     when (targetScreen) {
+                        is NavScreen.Onboarding -> OnboardingScreen(
+                            onFinishOnboarding = { viewModel.completeOnboarding() }
+                        )
+
                         is NavScreen.Home -> HomeScreen(
                             allTracks = allTracks,
                             favoriteTracks = favoriteTracks,
@@ -473,7 +480,8 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                             onSetHeadsetAction = { type, action -> viewModel.setHeadsetAction(type, action) },
                             allTracks = allTracks,
                             onDeleteTrackArtwork = { viewModel.deleteTrackArtwork(it) },
-                            onDeleteTrackVideo = { viewModel.deleteTrackVideo(it) }
+                            onDeleteTrackVideo = { viewModel.deleteTrackVideo(it) },
+                            onOpenOnboarding = { viewModel.reopenOnboarding() }
                         )
                     }
                 }

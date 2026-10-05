@@ -11,19 +11,19 @@ on:
         type: boolean
         default: true
       force_rebuild_native:
-        description: 'Forzar recompilación de dependencias nativas (FFmpeg y yt-dlp) ignorando la caché'
+        description: 'Forzar recompilación de dependencias nativas (FFmpeg, Python, QuickJS y yt-dlp) ignorando la caché'
         required: false
         type: boolean
         default: false
       force_new_keystore:
-        description: 'Obligar a generar firma debug desde cero sin esperar ninguna'
+        description: 'Generar nueva firma debug desde cero (ADVERTENCIA: Si cambias la firma, deberás desinstalar la app previa en tu teléfono)'
         required: false
         type: boolean
-        default: true
+        default: false
 
 jobs:
   build-debug-apk:
-    name: Compilación APK Debug con Motor C++20, Dependencias Nativas y Firma Autónoma
+    name: Compilación APK Debug con Motor C++20, Dependencias Nativas y Firma Permanente
     runs-on: ubuntu-latest
 
     steps:
@@ -56,22 +56,37 @@ jobs:
           echo "Aceptando licencias del SDK..."
           yes | sdkmanager --licenses > /dev/null 2>&1 || true
 
-      - name: 🛠️ 4. Instalar CMake y NDK para compilar C++20
+      - name: 🛠️ 4. Instalar CMake, NDK y Herramientas de Compilación Nativa C++20
         run: |
-          echo "=== Instalando componentes nativos CMake 3.22.1 y NDK ==="
+          echo "=== Instalando herramientas de sistema y NDK ==="
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends file curl unzip tar xz-utils build-essential
+
           # Instalar CMake 3.22.1 requerido por el proyecto
+          echo "Instalando CMake 3.22.1..."
           sdkmanager --install "cmake;3.22.1" || true
 
-          # AGP seleccionará automáticamente la versión de NDK compatible o se instala ndk;25.1.8937393
-          sdkmanager --install "ndk;25.1.8937393" || true
+          # Instalar NDK coincidente con ndkVersion (28.2.13676358) o compatible
+          echo "Instalando NDK de Android..."
+          sdkmanager --install "ndk;28.2.13676358" || sdkmanager --install "ndk;25.1.8937393" || true
 
-          # Confirmar instalación
-          if [ -d "$ANDROID_HOME/ndk/25.1.8937393" ]; then
-            echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/25.1.8937393" >> $GITHUB_ENV
-            echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.1.8937393" >> $GITHUB_ENV
+          # Localizar NDK instalado y configurar variables de entorno para los scripts modulares
+          NDK_PATH=$(ls -1vd "$ANDROID_HOME/ndk/"* 2>/dev/null | tail -n 1 || true)
+          if [ -n "$NDK_PATH" ] && [ -d "$NDK_PATH" ]; then
+            echo "ANDROID_NDK_ROOT=$NDK_PATH" >> $GITHUB_ENV
+            echo "ANDROID_NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
+            echo "NDK_ROOT=$NDK_PATH" >> $GITHUB_ENV
+            echo "NDK_PATH=$NDK_PATH" >> $GITHUB_ENV
+            
+            # Exportar toolchain de Clang del NDK al PATH para compilación de QuickJS y strip
+            LLVM_BIN="$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin"
+            if [ -d "$LLVM_BIN" ]; then
+              echo "$LLVM_BIN" >> $GITHUB_PATH
+            fi
+            echo "✅ NDK configurado para dependencias nativas: $NDK_PATH"
           fi
 
-      - name: 💾 5. Verificar o Restaurar Caché de Dependencias Nativas (FFmpeg, Python, yt-dlp)
+      - name: 💾 5. Verificar o Restaurar Caché de Dependencias Nativas (FFmpeg, Python, QuickJS, yt-dlp)
         if: ${{ inputs.enable_cache }}
         id: cache-native-deps
         uses: actions/cache@v4
@@ -79,18 +94,27 @@ jobs:
           path: |
             app/src/main/jniLibs
             app/src/main/assets/bin
-          key: native-deps-${{ runner.os }}-${{ hashFiles('scripts/compile_native_deps.sh') }}
+          key: native-deps-${{ runner.os }}-${{ hashFiles('scripts/compile_native_deps.sh', 'scripts/native/*.sh') }}
           restore-keys: |
             native-deps-${{ runner.os }}-
 
-      - name: ⚙️ 6. Compilar / Aprovisionar Dependencias Nativas (Cache Miss o Rebuild Forzado)
+      - name: ⚙️ 6. Compilar y Aprovisionar Dependencias Nativas Puras (scripts/native/)
         if: steps.cache-native-deps.outputs.cache-hit != 'true' || inputs.force_rebuild_native == true
         run: |
-          echo "=== Ejecutando compilación / ensamblaje de librerías nativas ==="
-          chmod +x ./scripts/compile_native_deps.sh
+          echo "=== Ejecutando compilación y aprovisionamiento modular nativo ==="
+          mkdir -p app/src/main/jniLibs app/src/main/assets/bin
+          chmod -R +x ./scripts
           ./scripts/compile_native_deps.sh
 
-      - name: 💾 7. Configurar Caché de Gradle (Opcional)
+      - name: 🔍 7. Auditar Binarios Nativos Ensamblados (Multi-ABI y Assets)
+        run: |
+          echo "=== Auditoría de módulos JNI generados (app/src/main/jniLibs) ==="
+          ls -lhR app/src/main/jniLibs/ || true
+          echo ""
+          echo "=== Auditoría de ejecutables en Assets (app/src/main/assets/bin) ==="
+          ls -lh app/src/main/assets/bin/ || true
+
+      - name: 💾 8. Configurar Caché de Gradle
         if: ${{ inputs.enable_cache }}
         uses: actions/cache@v4
         with:
@@ -101,12 +125,12 @@ jobs:
           restore-keys: |
             gradle-${{ runner.os }}-
 
-      - name: 🔑 8. Generar firma de depuración desde cero
+      - name: 🔑 9. Preservar o Restaurar Firma de Depuración debug.keystore
         run: |
-          echo "=== Verificando / Generando firma debug.keystore limpia ==="
-          if [ "${{ inputs.force_new_keystore }}" = "true" ] || [ ! -f "debug.keystore" ]; then
-            echo "Eliminando cualquier keystore anterior y generando firma fresca desde cero..."
-            rm -f debug.keystore
+          echo "=== Verificando firma debug.keystore permanente ==="
+          if [ "${{ inputs.force_new_keystore }}" = "true" ]; then
+            echo "⚠️ Forzando creación de nueva firma debug.keystore..."
+            rm -f debug.keystore debug.keystore.base64
             keytool -genkeypair -v \
               -keystore debug.keystore \
               -alias androiddebugkey \
@@ -116,25 +140,45 @@ jobs:
               -storepass android \
               -keypass android \
               -dname "CN=AuraMusicDebug, OU=Engineering, O=AuraSound, L=Local, ST=State, C=US"
-            echo "✅ Firma debug.keystore creada exitosamente (RSA 2048 bits, validez 10.000 días)."
-          else
+            base64 debug.keystore > debug.keystore.base64
+            echo "✅ Nueva firma debug.keystore generada y respaldada en debug.keystore.base64."
+          elif [ -f "debug.keystore.base64" ]; then
+            echo "Restaurando firma permanente desde debug.keystore.base64..."
+            base64 -d debug.keystore.base64 > debug.keystore
+            echo "✅ Firma debug.keystore restaurada con éxito (mantiene compatibilidad de actualización sin reinstalar)."
+          elif [ -f "debug.keystore" ]; then
             echo "Reutilizando firma debug.keystore existente."
+          else
+            echo "Generando firma debug.keystore por primera vez..."
+            keytool -genkeypair -v \
+              -keystore debug.keystore \
+              -alias androiddebugkey \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -storepass android \
+              -keypass android \
+              -dname "CN=AuraMusicDebug, OU=Engineering, O=AuraSound, L=Local, ST=State, C=US"
+            base64 debug.keystore > debug.keystore.base64
+            echo "✅ Firma debug.keystore creada y respaldada en debug.keystore.base64."
           fi
 
-      - name: 🔧 9. Preparar Gradle Wrapper
+      - name: 🔧 10. Preparar Gradle Wrapper
         run: |
           if [ ! -f "./gradlew" ]; then
             echo "Generando gradle wrapper..."
-            gradle wrapper
+            gradle wrapper || true
           fi
-          chmod +x ./gradlew
+          if [ -f "./gradlew" ]; then
+            chmod +x ./gradlew
+          fi
 
-      - name: 🚀 10. Compilar APK Debug con motor DSP C++20
+      - name: 🚀 11. Compilar APK Debug con Motor DSP C++20
         run: |
           echo "Iniciando compilación de Aura Music Debug APK..."
           ./gradlew :app:assembleDebug --no-daemon --stacktrace
 
-      - name: 📦 11. Publicar APK Debug como Artefacto descargable
+      - name: 📦 12. Publicar APK Debug como Artefacto Descargable
         uses: actions/upload-artifact@v4
         with:
           name: AuraMusic-Debug-APK

@@ -317,6 +317,7 @@ object FFmpegNativeEngine {
             "-keyint_min", (targetFps / 2).toString(),
             "-sc_threshold", "0",
             "-an",
+            "-map_metadata", "-1",
             "-movflags", "+faststart",
             outputFile.absolutePath
         )
@@ -389,6 +390,7 @@ object FFmpegNativeEngine {
             "-keyint_min", (targetFps / 2).toString(),
             "-sc_threshold", "0",
             "-an",
+            "-map_metadata", "-1",
             "-movflags", "+faststart",
             outputFile.absolutePath
         )
@@ -434,6 +436,7 @@ object FFmpegNativeEngine {
             "-keyint_min", (gopSize / 2).toString(),
             "-sc_threshold", "0",
             "-an",
+            "-map_metadata", "-1",
             "-movflags", "+faststart",
             outputFile.absolutePath
         )
@@ -450,6 +453,7 @@ object FFmpegNativeEngine {
                 "-i", inputFile.absolutePath,
                 "-c:v", "copy",
                 "-an",
+                "-map_metadata", "-1",
                 "-movflags", "+faststart",
                 outputFile.absolutePath
             )
@@ -529,6 +533,7 @@ object FFmpegNativeEngine {
             "-keyint_min", (targetFps / 2).toString(),
             "-sc_threshold", "0",
             "-an",
+            "-map_metadata", "-1",
             "-movflags", "+faststart",
             outputFile.absolutePath
         )
@@ -541,6 +546,34 @@ object FFmpegNativeEngine {
             AuraDebugManager.logWarning(TAG, "Filtro de lienzo 9:16 falló, aplicando fallback de sincronización GOP...")
             optimizeVideoForInstantSync(context, inputFile, outputFile, gopSize = targetFps, targetFps = targetFps)
         }
+    }
+
+    /**
+     * Elimina el audio (-an) y purga metadatos innecesarios (-map_metadata -1) de un video
+     * de forma ultra rápida sin recodificar el video (-c:v copy).
+     */
+    suspend fun stripAudioAndMetadata(
+        context: Context,
+        inputFile: File,
+        outputFile: File
+    ): ExecutionResult = withContext(Dispatchers.IO) {
+        init(context)
+        val ffmpegBin = getBinaryFile(context)
+        if (ffmpegBin == null) {
+            return@withContext ExecutionResult(false, -1, "FFmpeg no disponible", null)
+        }
+        if (outputFile.exists()) outputFile.delete()
+        val args = arrayOf(
+            ffmpegBin.absolutePath,
+            "-y",
+            "-i", inputFile.absolutePath,
+            "-c:v", "copy",
+            "-an",
+            "-map_metadata", "-1",
+            "-movflags", "+faststart",
+            outputFile.absolutePath
+        )
+        executeCommand(context, args, 0L, null)
     }
 
     /**
@@ -595,11 +628,16 @@ object FFmpegNativeEngine {
         if (res.success && outputFile.exists() && outputFile.length() > 4096L) {
             res
         } else {
-            try {
-                inputFile.copyTo(outputFile, overwrite = true)
-                ExecutionResult(true, 0, "Respaldo directo de flujo MP4", outputFile)
-            } catch (e: Exception) {
-                res
+            val fallbackStrip = stripAudioAndMetadata(context, inputFile, outputFile)
+            if (fallbackStrip.success && outputFile.exists() && outputFile.length() > 4096L) {
+                fallbackStrip
+            } else {
+                try {
+                    inputFile.copyTo(outputFile, overwrite = true)
+                    ExecutionResult(true, 0, "Respaldo directo de flujo MP4", outputFile)
+                } catch (e: Exception) {
+                    res
+                }
             }
         }
     }
@@ -678,11 +716,17 @@ object FFmpegNativeEngine {
     }
 
     private fun extractZip(zipFile: File, destDir: File) {
+        val canonicalDestDir = destDir.canonicalFile
         val zip = ZipFile(zipFile)
         val entries = zip.entries()
         while (entries.hasMoreElements()) {
             val entry = entries.nextElement()
             val entryFile = File(destDir, entry.name)
+            val canonicalEntryFile = entryFile.canonicalFile
+            if (!canonicalEntryFile.toPath().startsWith(canonicalDestDir.toPath())) {
+                throw SecurityException("Violación de seguridad Zip Slip: '${entry.name}' intenta escapar de '${destDir.path}'")
+            }
+
             if (entry.isDirectory) {
                 entryFile.mkdirs()
             } else {

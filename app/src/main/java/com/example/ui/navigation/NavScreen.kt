@@ -11,6 +11,7 @@ sealed class NavScreen(val route: String) {
     object Equalizer : NavScreen("equalizer")
     object PlaylistDetail : NavScreen("playlist_detail")
     object Settings : NavScreen("settings")
+    object Onboarding : NavScreen("onboarding")
 }
 
 enum class LibraryTab(val title: String) {

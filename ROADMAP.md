@@ -245,6 +245,20 @@ Este documento traza las fases de evolución técnica y funcional para convertir
 - [x] **Modularización y Partición de Archivos Gigantes**:
   - Reestructuración del núcleo C++20 (`auramusic_dsp.h`) en cabeceras modulares especializadas: `dsp_filters.h`, `dsp_spatial.h`, `dsp_crossfeed.h` y `dsp_reverb.h`.
   - Desacoplamiento de `MusicViewModel.kt` mediante el patrón de Coordinadores en `viewmodel/delegates/`: `LyricsCoordinator`, `IncomingMediaCoordinator` y `HeadphoneSettingsCoordinator`, reduciendo la complejidad ciclomática y manteniendo intacta la API pública.
+- [x] **Blindaje Criptográfico de Seguridad y Aprovisionamiento Nativo Puro**:
+  - Declaración obligatoria de los permisos `android.permission.INTERNET` y `ACCESS_NETWORK_STATE` en `AndroidManifest.xml`.
+  - Protección criptográfica contra Ejecución Remota de Código (RCE) en `YtDlpAutoUpdater` mediante verificación de hash `SHA-256` contra `SHA2-256SUMS` oficial de GitHub Releases y validación de host.
+  - Neutralización de vulnerabilidad Zip Slip (Path Traversal) con validación estricta de rutas canónicas en `FFmpegNativeEngine` y `YtDlpNativeEngine`.
+  - Protección contra inyección de argumentos (`--`) en procesos CLI y sanitización de intents externos en `DebugMonitorActivity`.
+  - Reestructuración de scripts de dependencias nativas en `scripts/native/` (`provision_ytdlp.sh`, `provision_quickjs.sh`, `provision_python.sh`, `provision_ffmpeg.sh`) con orquestador principal `compile_native_deps.sh`, aprovisionando QuickJS C99 puro, CPython real y FFmpeg nativo sin stubs vacíos ni wrappers.
+- [x] **Compresión Ligera en FFmpeg: Pista de Audio Eliminada (`-an`) y Purga de Metadatos (`-map_metadata -1`)**:
+  - Aplicación automática de `-an` en la tubería de Video Canvas de FFmpeg para descartar pistas de audio duplicadas, ahorrando de 5 a 20 MB por canción.
+  - Purga de metadatos innecesarios (`-map_metadata -1`) en el contenedor MP4.
+  - Implementación de `stripAudioAndMetadata` (`-c:v copy -an -map_metadata -1 -movflags +faststart`) como remux ultrarrápido y seguro de respaldo.
+- [x] **Pantallas Independientes de Bienvenida, Inducción y Disclaimer de Almacenamiento (`OnboardingScreen`)**:
+  - Flujo modular de bienvenida en 3 etapas con estética Dark Luxury Neo-Glass: Bienvenida y filosofía offline, resumen de lo que ofrecemos (C++20 DSP, Video Canvas, Karaoke LRCLIB, Video a Música) y aviso importante de almacenamiento.
+  - Disclaimer transparente informando que los Video Canvas se almacenan en alta resolución en el teléfono y cómo gestionarlos desde Ajustes > Medios para liberar espacio en MB.
+  - Persistencia con `pref_onboarding_completed`, navegación fluida en `MainActivity` sin barras inferiores intrusivas y botón de re-apertura en Ajustes.
 
 ---
 

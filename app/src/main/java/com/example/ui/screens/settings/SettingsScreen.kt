@@ -57,6 +57,7 @@ fun SettingsScreen(
     allTracks: List<Track> = emptyList(),
     onDeleteTrackArtwork: (Track) -> Unit = {},
     onDeleteTrackVideo: (Track) -> Unit = {},
+    onOpenOnboarding: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var mainSettingsTab by remember { mutableIntStateOf(0) }
@@ -157,7 +158,8 @@ fun SettingsScreen(
                 isDynamicArtworkColorEnabled = isDynamicArtworkColorEnabled,
                 onToggleDynamicArtworkColor = onToggleDynamicArtworkColor,
                 isMiniPlayerVideoEnabled = isMiniPlayerVideoEnabled,
-                onToggleMiniPlayerVideo = onToggleMiniPlayerVideo
+                onToggleMiniPlayerVideo = onToggleMiniPlayerVideo,
+                onOpenOnboarding = onOpenOnboarding
             )
         }
 

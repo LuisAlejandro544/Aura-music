@@ -47,7 +47,8 @@ fun LazyListScope.appearanceSettingsTab(
     isDynamicArtworkColorEnabled: Boolean,
     onToggleDynamicArtworkColor: (Boolean) -> Unit,
     isMiniPlayerVideoEnabled: Boolean = true,
-    onToggleMiniPlayerVideo: (Boolean) -> Unit = {}
+    onToggleMiniPlayerVideo: (Boolean) -> Unit = {},
+    onOpenOnboarding: () -> Unit = {}
 ) {
     // Opción Avanzada: Aura Dinámica de Carátula
     item {
@@ -461,6 +462,53 @@ fun LazyListScope.appearanceSettingsTab(
                     Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Abrir Aura Monitor", fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Acceso directo a Pantalla de Bienvenida, Inducción y Avisos
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = SurfaceCard),
+            border = BorderStroke(1.dp, CardBorder),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(18.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Bienvenida & Guía de la Aplicación",
+                        style = MaterialTheme.typography.titleSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                    )
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Vuelve a consultar la pantalla de bienvenida, el resumen de lo que ofrece Aura Music y el aviso importante sobre almacenamiento de Video Canvas.",
+                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                )
+                Spacer(modifier = Modifier.height(14.dp))
+                OutlinedButton(
+                    onClick = onOpenOnboarding,
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.secondary),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("open_onboarding_btn")
+                ) {
+                    Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Ver Bienvenida y Disclaimer", fontWeight = FontWeight.Bold)
                 }
             }
         }

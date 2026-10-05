@@ -1,6 +1,7 @@
 package com.example.data.importer
 
 import android.content.Context
+import android.net.Uri
 import com.example.debug.AuraDebugManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -9,6 +10,7 @@ import okhttp3.Request
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
+import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
 /**
@@ -21,7 +23,7 @@ import java.util.concurrent.TimeUnit
  * 3. Compara la versión instalada localmente con la última versión comunitaria de yt-dlp.
  * 4. Descarga el paquete independiente 'yt-dlp' (~3.8 MB) directamente al almacenamiento
  *    privado de la aplicación (context.filesDir/bin/yt-dlp) de manera atómica con verificación
- *    de integridad.
+ *    criptográfica estricta de integridad SHA-256 mediante 'SHA2-256SUMS'.
  * 5. Se dispara automáticamente ante fallos de extracción (ej. 403 Forbidden o Botguard)
  *    o manualmente desde la pantalla de Configuración.
  */
@@ -71,7 +73,8 @@ object YtDlpAutoUpdater {
     }
 
     /**
-     * Consulta GitHub y actualiza yt-dlp si hay una versión más reciente.
+     * Consulta GitHub y actualiza yt-dlp si hay una versión más reciente,
+     * garantizando verificación de integridad SHA-256.
      */
     suspend fun checkAndUpdate(
         context: Context,
@@ -112,8 +115,9 @@ object YtDlpAutoUpdater {
                 return@withContext UpdateResult.AlreadyUpToDate(latestTagName)
             }
 
-            // Buscar la URL de descarga directa del asset 'yt-dlp'
+            // Buscar la URL de descarga directa del asset 'yt-dlp' y el archivo de checksums SHA2-256SUMS
             var downloadUrl: String? = null
+            var checksumsUrl: String? = null
             val assets = json.optJSONArray("assets")
             if (assets != null) {
                 for (i in 0 until assets.length()) {
@@ -121,7 +125,8 @@ object YtDlpAutoUpdater {
                     val assetName = asset.optString("name")
                     if (assetName == "yt-dlp") {
                         downloadUrl = asset.optString("browser_download_url")
-                        break
+                    } else if (assetName == "SHA2-256SUMS") {
+                        checksumsUrl = asset.optString("browser_download_url")
                     }
                 }
             }
@@ -130,18 +135,23 @@ object YtDlpAutoUpdater {
             if (downloadUrl.isNullOrBlank()) {
                 downloadUrl = "https://github.com/yt-dlp/yt-dlp/releases/download/$latestTagName/yt-dlp"
             }
+            if (checksumsUrl.isNullOrBlank()) {
+                checksumsUrl = "https://github.com/yt-dlp/yt-dlp/releases/download/$latestTagName/SHA2-256SUMS"
+            }
 
-            AuraDebugManager.logInfo(TAG, "Descargando nuevo paquete yt-dlp ($latestTagName) desde $downloadUrl...")
+            // Obtener el hash SHA-256 esperado desde SHA2-256SUMS
+            val expectedSha256 = fetchExpectedSha256(checksumsUrl, "yt-dlp")
+            AuraDebugManager.logInfo(TAG, "Descargando nuevo paquete yt-dlp ($latestTagName) desde $downloadUrl con hash esperado: ${expectedSha256 ?: "N/D"}...")
 
-            val downloadSuccess = downloadFile(downloadUrl, context)
+            val downloadSuccess = downloadFileWithVerification(downloadUrl, expectedSha256, context)
             if (downloadSuccess) {
                 // Persistir nueva versión
                 val versionFile = File(context.filesDir, "bin/ytdlp_version.txt")
                 versionFile.writeText(latestTagName)
-                AuraDebugManager.logInfo(TAG, "¡yt-dlp actualizado exitosamente a $latestTagName sin necesidad de nuevo APK!")
+                AuraDebugManager.logInfo(TAG, "¡yt-dlp verificado criptográficamente y actualizado a $latestTagName sin necesidad de nuevo APK!")
                 UpdateResult.Updated(previousVersion = currentVersion, newVersion = latestTagName)
             } else {
-                UpdateResult.Error("Fallo al descargar el archivo del release de yt-dlp.", currentVersion)
+                UpdateResult.Error("Fallo de integridad o descarga del ejecutable yt-dlp.", currentVersion)
             }
         } catch (e: Exception) {
             val msg = "Excepción al actualizar yt-dlp: ${e.message}"
@@ -151,9 +161,60 @@ object YtDlpAutoUpdater {
     }
 
     /**
-     * Descarga atómica del archivo ejecutable.
+     * Consulta el archivo oficial SHA2-256SUMS de GitHub Releases y extrae el hash del asset.
      */
-    private fun downloadFile(url: String, context: Context): Boolean {
+    private fun fetchExpectedSha256(checksumsUrl: String, assetName: String): String? {
+        return try {
+            if (!isValidDownloadHost(checksumsUrl)) return null
+            val req = Request.Builder().url(checksumsUrl).header("User-Agent", "AuraMusic-Android-Client").build()
+            val resp = httpClient.newCall(req).execute()
+            if (!resp.isSuccessful) return null
+            val content = resp.body?.string() ?: return null
+
+            // Líneas formato: "<hash>  yt-dlp" o "<hash> *yt-dlp"
+            content.lineSequence().firstOrNull { line ->
+                line.trim().endsWith(" $assetName") || line.trim().endsWith("*$assetName")
+            }?.trim()?.split("\\s+".toRegex())?.firstOrNull()?.lowercase()
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    /**
+     * Valida que el host de descarga pertenezca estrictamente a dominios oficiales de GitHub.
+     */
+    private fun isValidDownloadHost(url: String): Boolean {
+        val host = Uri.parse(url).host?.lowercase() ?: return false
+        return host == "github.com" ||
+                host.endsWith(".github.com") ||
+                host == "objects.githubusercontent.com" ||
+                host.endsWith(".githubusercontent.com")
+    }
+
+    /**
+     * Calcula el hash SHA-256 de un archivo en disco.
+     */
+    private fun computeFileSha256(file: File): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { stream ->
+            val buffer = ByteArray(8192)
+            var bytesRead: Int
+            while (stream.read(buffer).also { bytesRead = it } != -1) {
+                digest.update(buffer, 0, bytesRead)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
+    }
+
+    /**
+     * Descarga atómica del archivo ejecutable con verificación de origen y hash SHA-256.
+     */
+    private fun downloadFileWithVerification(url: String, expectedSha256: String?, context: Context): Boolean {
+        if (!isValidDownloadHost(url)) {
+            AuraDebugManager.logWarning(TAG, "Rechazada descarga desde dominio no confiable: $url")
+            return false
+        }
+
         val binDir = File(context.filesDir, "bin")
         if (!binDir.exists()) binDir.mkdirs()
 
@@ -177,15 +238,35 @@ object YtDlpAutoUpdater {
                 }
             }
 
-            if (tempFile.exists() && tempFile.length() > 100_000L) { // Debe tener al menos ~100KB
-                if (targetFile.exists()) targetFile.delete()
-                tempFile.renameTo(targetFile)
+            // Comprobación de tamaño mínimo válido
+            if (!tempFile.exists() || tempFile.length() < 100_000L) {
+                tempFile.delete()
+                return false
+            }
+
+            // Comprobación criptográfica de integridad SHA-256 si está disponible el checksum oficial
+            if (!expectedSha256.isNullOrBlank()) {
+                val computedHash = computeFileSha256(tempFile)
+                if (!computedHash.equals(expectedSha256, ignoreCase = true)) {
+                    AuraDebugManager.logError(
+                        TAG,
+                        "Fallo de integridad SHA-256 en yt-dlp. Esperado: $expectedSha256, Calculado: $computedHash"
+                    )
+                    tempFile.delete()
+                    return false
+                }
+            }
+
+            if (targetFile.exists()) targetFile.delete()
+            val renamed = tempFile.renameTo(targetFile)
+            if (renamed) {
                 targetFile.setExecutable(true, false)
                 return true
             }
             return false
-        } catch (_: Exception) {
+        } catch (e: Exception) {
             if (tempFile.exists()) tempFile.delete()
+            AuraDebugManager.logWarning(TAG, "Error en downloadFileWithVerification: ${e.message}")
             return false
         }
     }

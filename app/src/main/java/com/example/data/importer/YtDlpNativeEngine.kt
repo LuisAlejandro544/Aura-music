@@ -168,6 +168,13 @@ object YtDlpNativeEngine {
         val ffmpegBin = FFmpegNativeEngine.getBinaryFile(context)
         val qjsBin = getQuickJsExecutable(context)
 
+        val cleanUrl = url.trim()
+        if (!cleanUrl.startsWith("http://", ignoreCase = true) && !cleanUrl.startsWith("https://", ignoreCase = true)) {
+            return@withContext Result.failure(
+                IllegalArgumentException("URL inválida o insegura para resolver con yt-dlp: $url")
+            )
+        }
+
         val cmdList = mutableListOf<String>().apply {
             add(activePython.absolutePath)
             add(ytdlpFile.absolutePath)
@@ -184,7 +191,9 @@ object YtDlpNativeEngine {
                 add("--ffmpeg-location")
                 add(ffmpegBin.absolutePath)
             }
-            add(url)
+            // Delimitador para garantizar que el argumento no sea interpretado como flag CLI
+            add("--")
+            add(cleanUrl)
         }
 
         AuraDebugManager.logInfo(TAG, "Ejecutando yt-dlp con Python nativo para resolver URL: $url")
@@ -423,11 +432,17 @@ object YtDlpNativeEngine {
     }
 
     private fun extractZip(zipFile: File, destDir: File) {
+        val canonicalDestDir = destDir.canonicalFile
         val zip = ZipFile(zipFile)
         val entries = zip.entries()
         while (entries.hasMoreElements()) {
             val entry = entries.nextElement()
             val entryFile = File(destDir, entry.name)
+            val canonicalEntryFile = entryFile.canonicalFile
+            if (!canonicalEntryFile.toPath().startsWith(canonicalDestDir.toPath())) {
+                throw SecurityException("Violación de seguridad Zip Slip: '${entry.name}' intenta escapar de '${destDir.path}'")
+            }
+
             if (entry.isDirectory) {
                 entryFile.mkdirs()
             } else {

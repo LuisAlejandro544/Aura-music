@@ -30,6 +30,12 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
   - **Acceso Directo al Ecualizador C++20 integrado** mediante hoja modal inferior sin abandonar la vista actual.
 - **Visualizador de Cola de Reproducción con Carátulas (Now Playing Queue Sheet)**:
   - Despliegue modal de la lista en espera ("Up Next") con **miniatura de carátula oficial en alta fidelidad** (`ArtworkImage` de 42dp con esquinas redondeadas) para cada canción, permitiendo identificar instantáneamente cada pista de un vistazo, con marquesina fluida y ecualizador animado en la canción activa.
+- **Pantallas Independientes de Bienvenida, Inducción y Disclaimer de Almacenamiento (`OnboardingScreen`)**:
+  - Experiencia introductoria modular en 3 etapas diseñada con estética Dark Luxury Neo-Glass:
+    - *Etapa 1: Bienvenida a Aura Music*: Filosofía 100% fuera de línea, privacidad total SAF sin escaneos ciegos y motor audiófilo C++20.
+    - *Etapa 2: Lo Que Te Ofrecemos*: Resumen de capacidades clave (DSP C++20 de 10 bandas, Video Canvas dinámico, Karaoke con letras sincronizadas LRCLIB y conversor Video a Música 3 en 1).
+    - *Etapa 3: Aviso Importante & Disclaimer de Almacenamiento*: Información transparente de que los Video Canvas se almacenan en alta resolución en el teléfono y pueden acumular espacio con el tiempo, complementado con la optimización automática en FFmpeg y el acceso directo a *Ajustes > Medios* para inspeccionar y liberar espacio en MB.
+  - Persistencia permanente del estado de bienvenida (`pref_onboarding_completed`), ocultamiento inmersivo de la barra inferior y mini reproductor, y botón accesible desde Ajustes de Apariencia para volver a consultarlo en cualquier momento.
 - **Transparencia y Gestión de Medios Almacenados en Ajustes**:
   - Pestaña dedicada **"Medios"** en los Ajustes del sistema (`StoredMediaSettingsTab`) con panel de transparencia total sobre las carátulas WebP y Videos Canvas MP4 guardados en disco (`images/` y `videos/`).
   - Muestra qué archivo pertenece a qué canción, su tamaño exacto en KB/MB y botones con confirmación para borrar la carátula o el video canvas individualmente, liberando espacio físico de inmediato.
@@ -109,6 +115,10 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
 - **Optimización de Fotogramas Clave (Keyframes / GOP Corto a 30fps) para Saltos Instantáneos**:
   - Para videos largos sincronizados con la música (> 20s), se reestructura el flujo de video insertando un *Keyframe* (`I-frame`) regular cada 30 fotogramas (exactamente cada 1 segundo a 30 FPS constantes CFR) con `-movflags +faststart`.
   - Al arrastrar el deslizador de tiempo o saltar pistas en *Now Playing* y en el *Mini Reproductor*, el video se sincroniza al milisegundo exacto con 0ms de congelamiento de fotogramas, eliminando los molestos retrasos provocados por los fotogramas clave espaciados de YouTube o TikTok.
+- **Compresión Ligera en FFmpeg: Pista de Audio Eliminada (`-an`) y Purga de Metadatos (`-map_metadata -1`)**:
+  - El motor nativo de procesamiento aplica sistemáticamente `-an` para eliminar cualquier flujo de audio duplicado del archivo de video, ahorrando de 5 a 20 MB por archivo ya que el audio de alta fidelidad se reproduce desde `songs/`.
+  - Purga completa de metadatos, tags y miniaturas innecesarias con `-map_metadata -1` en contenedores MP4.
+  - Tubería de remux rápido ultra ligero `stripAudioAndMetadata` (`-c:v copy -an -map_metadata -1 -movflags +faststart`) ejecutada como respaldo universal ante cualquier video de galería, importación o descarga web.
 - **Sincronización Total de Velocidad de Video y Música (0.50x a 2.00x)**:
   - Al modular la velocidad de la música o cambiar de presets rápidos, el reproductor de Video Canvas adapta en tiempo real su velocidad de reproducción para marchar al unísono exacto con el tempo musical.
 - **Mini Reproductor Tintado Dinámicamente con Soporte de Video Canvas**:
@@ -163,10 +173,11 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
 - **Motor FFmpeg Puro sin Wrappers en el APK Final (`FFmpegNativeEngine` + `compile_native_deps.sh`)**:
   - Binario nativo ejecutable `libffmpeg.so` empaquetado directamente en `jniLibs/` para todas las arquitecturas (`arm64-v8a`, `armeabi-v7a`, `x86_64`, `x86`), aprovisionado en `scripts/compile_native_deps.sh` mediante descarga de ejecutable CLI estático/PIE real de FFmpeg para Android (`arm64`, `arm`, `x86_64`, `x86`) y puente C/NDK con `dlopen`/`dlsym` sobre `libffmpegkit.so` / `libavcodec.so` / `libavfilter.so` (`FFmpegKitConfig_run` / `ffmpeg_execute`), instalado con permisos nativos de ejecución en `nativeLibraryDir`.
   - Paquete dinámico optimizado con solo lo necesario para audio y video (`libffmpeg.zip.so`), descomprimido de forma atómica en segundo plano para procesar y transcodificar en alta fidelidad (AAC, Opus, Vorbis, FLAC, WebM -> M4A / MP3), aplicar filtros de video (`xfade`, `reverse` + `concat` Boomerang, Keyframes GOP corto) y fusionar flujos DASH de video y audio (`-c copy`) sin inflar el APK con encoders pesados innecesarios.
-- **Entorno Python Nativo y Actualización en Caliente OTA para yt-dlp (`YtDlpNativeEngine` & `YtDlpAutoUpdater`)**:
+- **Entorno Python Nativo y Actualización en Caliente OTA Blindada para yt-dlp (`YtDlpNativeEngine` & `YtDlpAutoUpdater`)**:
   - Runtime de CPython nativo (`libpython.so`) con entorno optimizado (`libpython.zip.so`) y motor QuickJS (`libqjs.so`) empaquetados en el APK final para ejecutar scripts de extracción y descifrar firmas dinámicas (`n-sig`) localmente a máxima velocidad.
-  - Copia base oficial de `yt-dlp` empaquetada en `assets/bin/yt-dlp` para funcionamiento inmediato fuera de línea desde la primera instalación.
-  - **Auto-Actualización OTA**: Ante cambios en los algoritmos de YouTube, la app comprueba y descarga en caliente la versión más reciente del extractor oficial de yt-dlp desde GitHub Releases directamente en `files/bin/yt-dlp` sin forzar al usuario a esperar una nueva versión del APK en Uptodown.
+  - Copia base oficial de `yt-dlp` empaquetada en `assets/bin/yt-dlp` con verificación criptográfica SHA-256 (`SHA2-256SUMS`) para funcionamiento inmediato fuera de línea desde la primera instalación.
+  - **Auto-Actualización OTA con Blindaje Criptográfico Anti-RCE**: Comprueba y descarga en caliente la versión más reciente del extractor oficial de yt-dlp desde GitHub Releases directamente en `files/bin/yt-dlp`, validando su hash SHA-256 y origen de host antes de otorgar permisos de ejecución, previniendo cualquier riesgo de ejecución remota de código arbitrario.
+  - **Protección Zip Slip en Motores Nativos**: Tanto `FFmpegNativeEngine` como `YtDlpNativeEngine` validan exhaustivamente las rutas canónicas (`canonicalFile.toPath().startsWith(...)`) al desempaquetar librerías dinámicas, impidiendo cualquier escape de directorio.
   - **Disparador Dual**: Comprobación automática ante errores de extracción de YouTube y botón interactivo manual en *Ajustes > Apariencia & Temas > Motores de Extracción & yt-dlp OTA*.
 - **Arquitectura de Extracción Resiliente de 3 Niveles con Carátula Garantizada**:
   - ⚡ **Motor InnerTube Nativo (`InnerTubeClient`)**: Consulta directa ultrarrápida al endpoint oficial de YouTube mediante clientes de baja fricción (`ANDROID_VR` y `VISIONOS`). Entrega flujos de audio y video directos sin cifrado de firma (`n-sig`) ni bloqueos de `LOGIN_REQUIRED` en menos de ~300ms.

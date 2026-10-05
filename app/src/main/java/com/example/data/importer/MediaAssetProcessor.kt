@@ -133,7 +133,7 @@ object MediaAssetProcessor {
     /**
      * Procesa y optimiza el flujo de Video Canvas vinculando loops o videos sincronizados.
      */
-    fun processVideoCanvas(
+    suspend fun processVideoCanvas(
         context: Context,
         storageManager: AppStorageManager,
         resolvedInfo: OnlineVideoAudioImporter.ResolvedMediaInfo,
