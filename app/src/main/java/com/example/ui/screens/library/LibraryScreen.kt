@@ -55,13 +55,15 @@ fun LibraryScreen(
     onFavoriteToggle: (Track) -> Unit,
     onDeleteTrack: (Long) -> Unit,
     onOpenPlaylist: (Playlist) -> Unit,
-    onCreatePlaylist: (String, String) -> Unit,
+    onOpenAlbum: (String) -> Unit = {},
+    onOpenArtist: (String) -> Unit = {},
+    onCreatePlaylist: (String, String, android.net.Uri?) -> Unit,
     onDeletePlaylist: (Long) -> Unit,
     onAddToPlaylist: (Long, Long) -> Unit,
     onNavigate: (NavScreen) -> Unit,
     onEditTrack: (Long, String, String, String) -> Unit = { _, _, _, _ -> },
     onEditTrackDetails: (Long, String, String, String, android.net.Uri?, Boolean) -> Unit = { _, _, _, _, _, _ -> },
-    onRenamePlaylist: (Long, String, String) -> Unit = { _, _, _ -> },
+    onRenamePlaylist: (Long, String, String, android.net.Uri?, Boolean) -> Unit = { _, _, _, _, _ -> },
     modifier: Modifier = Modifier
 ) {
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
@@ -341,8 +343,9 @@ fun LibraryScreen(
                             artist = tracks.firstOrNull()?.artist ?: "Varios artistas",
                             trackCount = tracks.size,
                             representativeTrack = tracks.firstOrNull(),
+                            previewTracks = tracks.take(4),
                             onClick = {
-                                tracks.firstOrNull()?.let { onTrackClick(it, tracks) }
+                                onOpenAlbum(albumName)
                             }
                         )
                     }
@@ -358,8 +361,9 @@ fun LibraryScreen(
                             artistName = artistName,
                             trackCount = tracks.size,
                             representativeTrack = tracks.firstOrNull(),
+                            previewTracks = tracks.take(4),
                             onClick = {
-                                tracks.firstOrNull()?.let { onTrackClick(it, tracks) }
+                                onOpenArtist(artistName)
                             }
                         )
                     }

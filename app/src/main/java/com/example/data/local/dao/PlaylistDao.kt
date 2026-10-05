@@ -27,6 +27,15 @@ interface PlaylistDao {
     @Query("UPDATE playlists SET name = :name, description = :description WHERE id = :id")
     suspend fun updatePlaylist(id: Long, name: String, description: String)
 
+    @Query("UPDATE playlists SET name = :name, description = :description, customArtPath = :customArtPath WHERE id = :id")
+    suspend fun updatePlaylistWithArt(id: Long, name: String, description: String, customArtPath: String?)
+
+    @Query("SELECT * FROM playlist_track_cross_ref ORDER BY addedAt ASC")
+    fun getAllPlaylistCrossRefs(): Flow<List<PlaylistTrackCrossRef>>
+
+    @Query("DELETE FROM playlist_track_cross_ref WHERE playlistId = :playlistId")
+    suspend fun deleteCrossRefsForPlaylist(playlistId: Long)
+
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertCrossRef(crossRef: PlaylistTrackCrossRef)
 

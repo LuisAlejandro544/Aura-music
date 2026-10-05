@@ -35,6 +35,7 @@ fun AlbumGroupCard(
     artist: String,
     trackCount: Int,
     representativeTrack: Track?,
+    previewTracks: List<Track> = listOfNotNull(representativeTrack),
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -53,8 +54,9 @@ fun AlbumGroupCard(
                 .padding(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            ArtworkImage(
-                track = representativeTrack,
+            com.example.ui.components.PlaylistCoverCollage(
+                playlist = com.example.model.Playlist(id = -2L, name = albumName),
+                tracksOverride = previewTracks.take(4),
                 modifier = Modifier.size(54.dp),
                 cornerRadius = 8.dp
             )
@@ -77,10 +79,9 @@ fun AlbumGroupCard(
                 )
             }
             Icon(
-                imageVector = Icons.Default.PlayCircle,
-                contentDescription = "Reproducir álbum",
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(32.dp)
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = "Ver canciones del álbum",
+                tint = TextSecondary
             )
         }
     }
@@ -94,6 +95,7 @@ fun ArtistGroupCard(
     artistName: String,
     trackCount: Int,
     representativeTrack: Track?,
+    previewTracks: List<Track> = listOfNotNull(representativeTrack),
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -116,8 +118,9 @@ fun ArtistGroupCard(
                 shape = CircleShape,
                 modifier = Modifier.size(50.dp)
             ) {
-                ArtworkImage(
-                    track = representativeTrack,
+                com.example.ui.components.PlaylistCoverCollage(
+                    playlist = com.example.model.Playlist(id = -3L, name = artistName),
+                    tracksOverride = previewTracks.take(4),
                     modifier = Modifier.fillMaxSize(),
                     cornerRadius = 25.dp
                 )
@@ -141,7 +144,7 @@ fun ArtistGroupCard(
             }
             Icon(
                 imageVector = Icons.Default.ChevronRight,
-                contentDescription = null,
+                contentDescription = "Ver canciones del artista",
                 tint = TextSecondary
             )
         }

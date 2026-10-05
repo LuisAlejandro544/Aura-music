@@ -14,12 +14,13 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
   - Cambio entre pantallas con animación combinada de desvanecimiento y deslizamiento suave (`AnimatedContent`).
   - Despliegue elástico de la pantalla completa Now Playing desde el mini reproductor y **cierre suave con deslizamiento vertical instantáneo sin capas negras residuales**.
   - Indicadores y micro-interacciones táctiles con retroalimentación inmediata.
-- **5 Paletas de Acentos Vibrantes & Material You**:
+- **5 Paletas de Acentos Vibrantes & Material You (Con Persistencia Permanente)**:
   - 🎨 **Material You**: Colores dinámicos sincronizados con el fondo de pantalla del sistema operativo (Android 12+ / Material 3) manteniendo el fondo oscuro OLED.
   - 🌌 **Nebula Violet**: Violeta eléctrico y cyan neón futurista.
   - 🍃 **Cyber Mint**: Esmeralda brillante y menta líquida.
   - 🔥 **Sunset Ember**: Coral cálido, naranja fuego y destellos dorados.
   - 🌊 **Ocean Abyss**: Azul zafiro profundo y agua bioluminiscente.
+  - 💾 **Persistencia Permanente en el Dispositivo**: El tema elegido (incluyendo *Material You*), el interruptor de *Aura Dinámica de Carátula* y el modo de visualización de *Video Canvas* se guardan permanentemente en las preferencias del sistema (`SharedPreferences`), conservándose intactos al cerrar y volver a abrir la aplicación.
 - **Protección Tipográfica Fija y Marquesina Automática (Cero Desbordamientos)**:
   - Escala de densidad y fuente estabilizada (`fontScale = 1.0f`) para que las configuraciones globales de tamaño de letra en Android no rompan la maquetación ni corten textos.
   - **Títulos en Movimiento (Marquee Fluido)**: Los títulos y artistas largos se desplazan horizontalmente de forma continua (`basicMarquee`) en la pantalla completa *Now Playing*, en el *Mini Reproductor* y en la canción en reproducción dentro de las listas y la cola.
@@ -227,8 +228,17 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
 - **Reproducción Continua en Segundo Plano (*Foreground Service*)**: Mantiene la música sonando ininterrumpidamente cuando la pantalla está apagada o la aplicación se minimiza.
 - **Soporte Extendido**: Detección automática en **relojes inteligentes (Wear OS)**, **Android Auto** y mandos remotos Bluetooth.
 
-### 12. Playlists y Almacenamiento Estructurado
-- **Pestaña "Playlists" en Tu Biblioteca**: Tarjeta "Tus Me Gusta" sincronizada, creación, renombrado y adición rápida de canciones.
+### 12. Playlists con Imagen Personalizada o Collage Dinámico (1-4 Fotos), Vista de Álbumes/Artistas y Almacenamiento Estructurado
+- **Portadas Personalizadas en Playlists y Collage Dinámico Automático de 1 a 4 Canciones (`PlaylistCoverCollage`)**:
+  - El usuario puede asignar cualquier **imagen personalizada de su galería** como portada de una Playlist (tanto al crearla como al editarla), la cual se comprime a **WebP sin pérdida** en `images/` y se elimina automáticamente al cambiarla o borrar la lista.
+  - Si el usuario **no asigna una imagen manual**, la Playlist genera automáticamente un **collage dinámico** basado en las canciones que contiene:
+    - **1 canción**: Muestra la carátula de esa única canción a cuadro completo.
+    - **2 canciones**: Muestra un collage dividido de 2 fotos lado a lado.
+    - **3 canciones**: Muestra un collage equilibrado de 3 fotos (2 arriba y 1 panorámica abajo).
+    - **4 o más canciones**: Muestra una cuadrícula 2x2 con las carátulas de las primeras 4 canciones añadidas.
+- **Vista Detallada de Canciones para Artistas y Álbumes**:
+  - Al tocar cualquier **Artista** o **Álbum** en la Biblioteca, la aplicación **no reproduce directamente la primera canción**, sino que despliega una vista detallada idéntica a la de las Playlists (`PlaylistDetailScreen`), mostrando su collage de portadas, el listado completo de sus canciones y los botones dedicados de *Reproducir* y *Aleatorio*.
+- **Pestaña "Playlists" en Tu Biblioteca**: Tarjeta "Tus Me Gusta" sincronizada, creación, edición de nombre/descripción/portada y adición rápida de canciones.
 - **Almacenamiento Organizado** en `Android/data/com.aistudio.musicplayer.aurasound/files/`:
   - 📁 `images/`: Carátulas en WebP Lossless.
   - 📁 `songs/`: Canciones locales y demos.

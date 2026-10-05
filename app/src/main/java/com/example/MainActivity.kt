@@ -353,8 +353,12 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                             onFavoriteToggle = { viewModel.toggleFavorite(it) },
                             onDeleteTrack = { viewModel.deleteTrack(it) },
                             onOpenPlaylist = { viewModel.openPlaylist(it) },
-                            onCreatePlaylist = { name, desc -> viewModel.createPlaylist(name, desc) },
-                            onRenamePlaylist = { pId, name, desc -> viewModel.updatePlaylist(pId, name, desc) },
+                            onOpenAlbum = { viewModel.openAlbum(it) },
+                            onOpenArtist = { viewModel.openArtist(it) },
+                            onCreatePlaylist = { name, desc, artUri -> viewModel.createPlaylist(name, desc, artUri) },
+                            onRenamePlaylist = { pId, name, desc, artUri, removeArt ->
+                                viewModel.updatePlaylist(pId, name, desc, artUri, removeArt)
+                            },
                             onDeletePlaylist = { viewModel.deletePlaylist(it) },
                             onAddToPlaylist = { playlistId, trackId -> viewModel.addTrackToPlaylist(playlistId, trackId) },
                             onNavigate = { viewModel.navigateTo(it) },
@@ -425,9 +429,12 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                             onBack = { viewModel.handleBackPress() },
                             onTrackClick = { track, list -> viewModel.playTrack(track, list) },
                             onFavoriteToggle = { viewModel.toggleFavorite(it) },
+                            onDeleteTrackFromLibrary = { viewModel.deleteTrack(it) },
                             onRemoveFromPlaylist = { pId, tId -> viewModel.removeTrackFromPlaylist(pId, tId) },
                             onAddToPlaylist = { pId, tId -> viewModel.addTrackToPlaylist(pId, tId) },
-                            onRenamePlaylist = { pId, name, desc -> viewModel.updatePlaylist(pId, name, desc) },
+                            onRenamePlaylist = { pId, name, desc, artUri, removeArt ->
+                                viewModel.updatePlaylist(pId, name, desc, artUri, removeArt)
+                            },
                             onEditTrack = { id, t, a, al -> viewModel.updateTrackInfo(id, t, a, al) },
                             onEditTrackDetails = { id, t, a, al, art, removeArt ->
                                 viewModel.updateTrackDetails(id, t, a, al, art, removeArt)

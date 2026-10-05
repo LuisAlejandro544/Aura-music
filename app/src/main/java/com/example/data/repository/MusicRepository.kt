@@ -44,8 +44,21 @@ class MusicRepository(private val database: AppDatabase) {
         list.map { it.toDomain() }
     }
 
-    val playlists: Flow<List<Playlist>> = playlistDao.getAllPlaylists().map { list ->
-        list.map { it.toDomain() }
+    val playlists: Flow<List<Playlist>> = kotlinx.coroutines.flow.combine(
+        playlistDao.getAllPlaylists(),
+        playlistDao.getAllPlaylistCrossRefs(),
+        trackDao.getAllTracks()
+    ) { playlistEntities, crossRefs, trackEntities ->
+        val tracksById = trackEntities.associate { it.id to it.toDomain() }
+        val crossRefsByPlaylist = crossRefs.groupBy { it.playlistId }
+        playlistEntities.map { entity ->
+            val refs = crossRefsByPlaylist[entity.id].orEmpty()
+            val playlistTracks = refs.mapNotNull { tracksById[it.trackId] }
+            entity.toDomain(
+                trackCount = playlistTracks.size,
+                previewTracks = playlistTracks.take(4)
+            )
+        }
     }
 
     fun getTracksForPlaylist(playlistId: Long): Flow<List<Track>> =
@@ -140,20 +153,60 @@ class MusicRepository(private val database: AppDatabase) {
         trackDao.deleteAllTracks()
     }
 
-    suspend fun createPlaylist(name: String, description: String = ""): Long = withContext(Dispatchers.IO) {
-        playlistDao.insertPlaylist(
+    suspend fun createPlaylist(
+        context: Context,
+        name: String,
+        description: String = "",
+        customArtUri: Uri? = null
+    ): Long = withContext(Dispatchers.IO) {
+        val newId = playlistDao.insertPlaylist(
             PlaylistEntity(
                 name = name.trim(),
                 description = description.trim()
             )
         )
+        if (customArtUri != null) {
+            val storageManager = com.example.data.storage.AppStorageManager(context)
+            val savedPath = storageManager.savePlaylistArtworkFromUri(newId, customArtUri, null)
+            if (savedPath != null) {
+                playlistDao.updatePlaylistWithArt(newId, name.trim(), description.trim(), savedPath)
+            }
+        }
+        newId
     }
 
-    suspend fun updatePlaylist(playlistId: Long, name: String, description: String = "") = withContext(Dispatchers.IO) {
-        playlistDao.updatePlaylist(playlistId, name.trim(), description.trim())
+    suspend fun updatePlaylist(
+        context: Context,
+        playlistId: Long,
+        name: String,
+        description: String = "",
+        customArtUri: Uri? = null,
+        removeArtwork: Boolean = false
+    ): String? = withContext(Dispatchers.IO) {
+        val existing = playlistDao.getPlaylistById(playlistId)
+        val storageManager = com.example.data.storage.AppStorageManager(context)
+        val finalArtPath = when {
+            customArtUri != null -> {
+                storageManager.savePlaylistArtworkFromUri(playlistId, customArtUri, existing?.customArtPath)
+            }
+            removeArtwork -> {
+                storageManager.deleteArtworkFile(existing?.customArtPath)
+                null
+            }
+            else -> {
+                existing?.customArtPath
+            }
+        }
+        playlistDao.updatePlaylistWithArt(playlistId, name.trim(), description.trim(), finalArtPath)
+        finalArtPath
     }
 
-    suspend fun deletePlaylist(playlistId: Long) = withContext(Dispatchers.IO) {
+    suspend fun deletePlaylist(context: Context, playlistId: Long) = withContext(Dispatchers.IO) {
+        val existing = playlistDao.getPlaylistById(playlistId)
+        if (!existing?.customArtPath.isNullOrEmpty()) {
+            com.example.data.storage.AppStorageManager(context).deleteArtworkFile(existing?.customArtPath)
+        }
+        playlistDao.deleteCrossRefsForPlaylist(playlistId)
         playlistDao.deletePlaylist(playlistId)
     }
 

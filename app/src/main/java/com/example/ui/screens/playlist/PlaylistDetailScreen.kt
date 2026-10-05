@@ -46,9 +46,10 @@ fun PlaylistDetailScreen(
     onBack: () -> Unit,
     onTrackClick: (Track, List<Track>) -> Unit,
     onFavoriteToggle: (Track) -> Unit,
+    onDeleteTrackFromLibrary: (Long) -> Unit = {},
     onRemoveFromPlaylist: (Long, Long) -> Unit,
     onAddToPlaylist: (Long, Long) -> Unit,
-    onRenamePlaylist: (Long, String, String) -> Unit = { _, _, _ -> },
+    onRenamePlaylist: (Long, String, String, android.net.Uri?, Boolean) -> Unit = { _, _, _, _, _ -> },
     onEditTrack: (Long, String, String, String) -> Unit = { _, _, _, _ -> },
     onEditTrackDetails: (Long, String, String, String, android.net.Uri?, Boolean) -> Unit = { _, _, _, _, _, _ -> },
     modifier: Modifier = Modifier
@@ -60,6 +61,9 @@ fun PlaylistDetailScreen(
     if (playlist == null) return
 
     val isFavoritesVirtual = playlist.id == -1L
+    val isAlbumVirtual = playlist.id == -2L
+    val isArtistVirtual = playlist.id == -3L
+    val isVirtualCollection = playlist.id < 0L
 
     var showRenameDialog by remember { mutableStateOf(false) }
     var renameName by remember { mutableStateOf(playlist.name) }
@@ -109,7 +113,7 @@ fun PlaylistDetailScreen(
                     modifier = Modifier.weight(1f)
                 )
 
-                if (!isFavoritesVirtual) {
+                if (!isVirtualCollection) {
                     IconButton(
                         onClick = {
                             renameName = playlist.name
@@ -120,26 +124,96 @@ fun PlaylistDetailScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Edit,
-                            contentDescription = "Renombrar lista",
+                            contentDescription = "Editar lista",
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }
                 }
             }
 
-            if (playlist.description.isNotBlank()) {
-                Text(
-                    text = playlist.description,
-                    style = MaterialTheme.typography.bodyMedium.copy(color = TextSecondary),
-                    modifier = Modifier.padding(start = 48.dp, bottom = 4.dp)
-                )
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Cabecera visual con Portada Personalizada o Collage de 1 a 4 canciones
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(108.dp)
+                        .clip(RoundedCornerShape(18.dp))
+                        .then(
+                            if (!isVirtualCollection) {
+                                Modifier.clickable {
+                                    renameName = playlist.name
+                                    renameDesc = playlist.description
+                                    showRenameDialog = true
+                                }
+                            } else Modifier
+                        )
+                ) {
+                    com.example.ui.components.PlaylistCoverCollage(
+                        playlist = playlist,
+                        tracksOverride = tracks.take(4),
+                        modifier = Modifier.fillMaxSize(),
+                        cornerRadius = 18.dp
+                    )
+                    if (!isVirtualCollection) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.88f),
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(6.dp)
+                                .size(28.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.AddPhotoAlternate,
+                                    contentDescription = "Cambiar imagen de lista",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    val collectionBadge = when {
+                        isFavoritesVirtual -> "COLECCIÓN FAVORITOS"
+                        isAlbumVirtual -> "ÁLBUM"
+                        isArtistVirtual -> "ARTISTA"
+                        else -> "PLAYLIST PERSONALIZADA"
+                    }
+                    Text(
+                        text = collectionBadge,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    if (playlist.description.isNotBlank()) {
+                        Text(
+                            text = playlist.description,
+                            style = MaterialTheme.typography.bodyMedium.copy(color = TextSecondary),
+                            maxLines = 2
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+                    Text(
+                        text = "${tracks.size} canción(es) disponible(s)",
+                        style = MaterialTheme.typography.bodySmall.copy(color = TextMuted)
+                    )
+                }
             }
 
-            Text(
-                text = "${tracks.size} canciones sincronizadas",
-                style = MaterialTheme.typography.bodySmall.copy(color = TextMuted),
-                modifier = Modifier.padding(start = 48.dp, bottom = 16.dp)
-            )
+            Spacer(modifier = Modifier.height(16.dp))
 
             // Fila de Botones de Acción (Reproducir, Aleatorio y Añadir Canciones)
             Row(
@@ -174,7 +248,7 @@ fun PlaylistDetailScreen(
                     }
                 }
 
-                if (!isFavoritesVirtual && allTracks.isNotEmpty()) {
+                if (!isVirtualCollection && allTracks.isNotEmpty()) {
                     FilledTonalButton(
                         onClick = { showAddTracksDialog = true },
                         shape = RoundedCornerShape(24.dp),
@@ -234,10 +308,10 @@ fun PlaylistDetailScreen(
                     onTrackClick = { onTrackClick(track, tracks) },
                     onFavoriteToggle = { onFavoriteToggle(track) },
                     onDeleteTrack = {
-                        if (isFavoritesVirtual) {
-                            onFavoriteToggle(track)
-                        } else {
-                            onRemoveFromPlaylist(playlist.id, track.id)
+                        when {
+                            isFavoritesVirtual -> onFavoriteToggle(track)
+                            isAlbumVirtual || isArtistVirtual -> onDeleteTrackFromLibrary(track.id)
+                            else -> onRemoveFromPlaylist(playlist.id, track.id)
                         }
                     },
                     playlists = allPlaylists,
@@ -250,46 +324,15 @@ fun PlaylistDetailScreen(
         }
     }
 
-    // Cuadro de diálogo para renombrar la playlist
-    if (showRenameDialog) {
-        AlertDialog(
+    // Cuadro de diálogo para editar nombre, descripción e imagen de la playlist
+    if (showRenameDialog && !isVirtualCollection) {
+        com.example.ui.screens.library.components.RenamePlaylistDialog(
+            playlist = playlist,
+            tracksPreview = tracks.take(4),
             onDismissRequest = { showRenameDialog = false },
-            title = { Text("Renombrar Lista", fontWeight = FontWeight.Bold) },
-            text = {
-                Column {
-                    OutlinedTextField(
-                        value = renameName,
-                        onValueChange = { renameName = it },
-                        label = { Text("Nombre de la lista") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    OutlinedTextField(
-                        value = renameDesc,
-                        onValueChange = { renameDesc = it },
-                        label = { Text("Descripción (opcional)") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (renameName.isNotBlank()) {
-                            onRenamePlaylist(playlist.id, renameName, renameDesc)
-                            showRenameDialog = false
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                ) {
-                    Text("Guardar")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showRenameDialog = false }) {
-                    Text("Cancelar")
-                }
+            onRenamePlaylist = { pId, name, desc, artUri, removeArt ->
+                onRenamePlaylist(pId, name, desc, artUri, removeArt)
+                showRenameDialog = false
             }
         )
     }

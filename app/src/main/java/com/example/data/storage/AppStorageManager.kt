@@ -175,6 +175,48 @@ class AppStorageManager(private val context: Context) {
      }
 
     /**
+     * Guarda una carátula personalizada para una Playlist seleccionada por el usuario desde la galería,
+     * comprimiéndola a WebP sin pérdida en images/ y eliminando físicamente la carátula previa
+     * de la lista para liberar espacio en disco.
+     */
+    suspend fun savePlaylistArtworkFromUri(
+        playlistId: Long,
+        sourceUri: Uri,
+        oldArtworkPath: String?
+    ): String? = withContext(Dispatchers.IO) {
+        try {
+            val inputStream = context.contentResolver.openInputStream(sourceUri) ?: return@withContext null
+            val bitmap = BitmapFactory.decodeStream(inputStream)
+            inputStream.close()
+            if (bitmap == null) return@withContext null
+
+            if (!oldArtworkPath.isNullOrEmpty()) {
+                try {
+                    val oldFile = File(oldArtworkPath)
+                    if (oldFile.exists() && oldFile.canonicalPath.startsWith(imagesDir.canonicalPath)) {
+                        oldFile.delete()
+                    }
+                } catch (_: Exception) {}
+            }
+
+            val newFile = File(imagesDir, "playlist_cover_${playlistId}_${System.currentTimeMillis()}.webp")
+            FileOutputStream(newFile).use { outStream ->
+                val format = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    Bitmap.CompressFormat.WEBP_LOSSLESS
+                } else {
+                    @Suppress("DEPRECATION")
+                    Bitmap.CompressFormat.WEBP
+                }
+                bitmap.compress(format, 100, outStream)
+            }
+            bitmap.recycle()
+            newFile.absolutePath
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
      * Elimina físicamente un archivo de carátula si existe en el directorio de imágenes.
      */
      suspend fun deleteArtworkFile(artworkPath: String?): Boolean = withContext(Dispatchers.IO) {

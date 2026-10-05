@@ -124,8 +124,21 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val _selectedLibraryTab = MutableStateFlow(LibraryTab.SONGS)
     val selectedLibraryTab: StateFlow<LibraryTab> = _selectedLibraryTab.asStateFlow()
 
-    private val _currentTheme = MutableStateFlow(AuraTheme.NEBULA_GLOW)
+    private val appPrefs = getApplication<Application>().getSharedPreferences("aura_music_ui_prefs", android.content.Context.MODE_PRIVATE)
+
+    private val _currentTheme = MutableStateFlow(
+        run {
+            val savedThemeName = appPrefs.getString("pref_aura_theme", AuraTheme.NEBULA_GLOW.name)
+            try {
+                AuraTheme.valueOf(savedThemeName ?: AuraTheme.NEBULA_GLOW.name)
+            } catch (_: Exception) {
+                AuraTheme.NEBULA_GLOW
+            }
+        }
+    )
     val currentTheme: StateFlow<AuraTheme> = _currentTheme.asStateFlow()
+
+    private var selectedCollectionJob: kotlinx.coroutines.Job? = null
 
     private val _isImporting = MutableStateFlow(false)
     val isImporting: StateFlow<Boolean> = _isImporting.asStateFlow()
@@ -265,18 +278,71 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun openPlaylist(playlist: Playlist) {
         _selectedPlaylist.value = playlist
-        viewModelScope.launch {
-            if (playlist.id == -1L) {
-                repository.favoriteTracks.collect { tracks ->
-                    _selectedPlaylistTracks.value = tracks
+        selectedCollectionJob?.cancel()
+        selectedCollectionJob = viewModelScope.launch {
+            when (playlist.id) {
+                -1L -> {
+                    repository.favoriteTracks.collect { tracks ->
+                        _selectedPlaylistTracks.value = tracks
+                    }
                 }
-            } else {
-                repository.getTracksForPlaylist(playlist.id).collect { tracks ->
-                    _selectedPlaylistTracks.value = tracks
+                -2L -> {
+                    repository.allTracks.collect { tracks ->
+                        _selectedPlaylistTracks.value = tracks.filter { it.album == playlist.name }
+                    }
+                }
+                -3L -> {
+                    repository.allTracks.collect { tracks ->
+                        _selectedPlaylistTracks.value = tracks.filter { it.artist == playlist.name }
+                    }
+                }
+                else -> {
+                    repository.getTracksForPlaylist(playlist.id).collect { tracks ->
+                        _selectedPlaylistTracks.value = tracks
+                        val cur = _selectedPlaylist.value
+                        if (cur != null && cur.id == playlist.id) {
+                            _selectedPlaylist.value = cur.copy(
+                                trackCount = tracks.size,
+                                previewTracks = tracks.take(4)
+                            )
+                        }
+                    }
                 }
             }
         }
         navigateTo(NavScreen.PlaylistDetail)
+    }
+
+    fun openAlbum(albumName: String) {
+        val albumTracks = allTracks.value.filter { it.album == albumName }
+        val artistSubtitle = albumTracks.map { it.artist }.distinct().let { artists ->
+            if (artists.size == 1) "Álbum de ${artists.first()}"
+            else if (artists.isNotEmpty()) "Álbum • ${artists.size} artistas"
+            else "Álbum musical"
+        }
+        openPlaylist(
+            Playlist(
+                id = -2L,
+                name = albumName,
+                description = artistSubtitle,
+                trackCount = albumTracks.size,
+                previewTracks = albumTracks.take(4)
+            )
+        )
+    }
+
+    fun openArtist(artistName: String) {
+        val artistTracks = allTracks.value.filter { it.artist == artistName }
+        val albumCount = artistTracks.map { it.album }.distinct().size
+        openPlaylist(
+            Playlist(
+                id = -3L,
+                name = artistName,
+                description = "Artista • $albumCount álbum(es) en tu biblioteca",
+                trackCount = artistTracks.size,
+                previewTracks = artistTracks.take(4)
+            )
+        )
     }
 
     fun setNowPlayingExpanded(expanded: Boolean) {
@@ -293,6 +359,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setTheme(theme: AuraTheme) {
         _currentTheme.value = theme
+        appPrefs.edit().putString("pref_aura_theme", theme.name).apply()
     }
 
     // Acciones de Reproducción con Cola Contextual Fiel
@@ -347,17 +414,25 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     // FULLSCREEN_BACKGROUND: video a pantalla completa con carátula flotando al frente
     // CARD_CANVAS: video dentro del recuadro de la carátula
     // OFF: solo carátula estática
-    private val _videoDisplayMode = MutableStateFlow(VideoDisplayMode.FULLSCREEN_BACKGROUND)
+    private val _videoDisplayMode = MutableStateFlow(
+        run {
+            val savedMode = appPrefs.getString("pref_video_display_mode", VideoDisplayMode.FULLSCREEN_BACKGROUND.name)
+            try {
+                VideoDisplayMode.valueOf(savedMode ?: VideoDisplayMode.FULLSCREEN_BACKGROUND.name)
+            } catch (_: Exception) {
+                VideoDisplayMode.FULLSCREEN_BACKGROUND
+            }
+        }
+    )
     val videoDisplayMode: StateFlow<VideoDisplayMode> = _videoDisplayMode.asStateFlow()
 
-    private val _isVideoCanvasActive = MutableStateFlow(true)
+    private val _isVideoCanvasActive = MutableStateFlow(_videoDisplayMode.value != VideoDisplayMode.OFF)
     val isVideoCanvasActive: StateFlow<Boolean> = _isVideoCanvasActive.asStateFlow()
 
-    private val _isDynamicArtworkColorEnabled = MutableStateFlow(true)
+    private val _isDynamicArtworkColorEnabled = MutableStateFlow(
+        appPrefs.getBoolean("pref_dynamic_artwork_color_enabled", true)
+    )
     val isDynamicArtworkColorEnabled: StateFlow<Boolean> = _isDynamicArtworkColorEnabled.asStateFlow()
-
-    // Configuración para permitir reproducir el Video Canvas también en la miniatura del Mini Reproductor
-    private val appPrefs = getApplication<Application>().getSharedPreferences("aura_music_ui_prefs", android.content.Context.MODE_PRIVATE)
 
     private val _isMiniPlayerVideoEnabled = MutableStateFlow(
         appPrefs.getBoolean("pref_mini_player_video_enabled", true)
@@ -376,6 +451,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     fun setVideoDisplayMode(mode: VideoDisplayMode) {
         _videoDisplayMode.value = mode
         _isVideoCanvasActive.value = (mode != VideoDisplayMode.OFF)
+        appPrefs.edit().putString("pref_video_display_mode", mode.name).apply()
     }
 
     fun cycleVideoDisplayMode() {
@@ -397,6 +473,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleDynamicArtworkColor(enabled: Boolean) {
         _isDynamicArtworkColorEnabled.value = enabled
+        appPrefs.edit().putBoolean("pref_dynamic_artwork_color_enabled", enabled).apply()
     }
 
     fun updateTrackInfo(trackId: Long, newTitle: String, newArtist: String, newAlbum: String) {
@@ -467,13 +544,30 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
-    fun updatePlaylist(playlistId: Long, newName: String, newDescription: String = "") {
+    fun updatePlaylist(
+        playlistId: Long,
+        newName: String,
+        newDescription: String = "",
+        customArtUri: Uri? = null,
+        removeArtwork: Boolean = false
+    ) {
         if (newName.isBlank()) return
         viewModelScope.launch {
-            repository.updatePlaylist(playlistId, newName, newDescription)
+            val savedArtPath = repository.updatePlaylist(
+                context = getApplication(),
+                playlistId = playlistId,
+                name = newName,
+                description = newDescription,
+                customArtUri = customArtUri,
+                removeArtwork = removeArtwork
+            )
             val current = _selectedPlaylist.value
             if (current != null && current.id == playlistId) {
-                _selectedPlaylist.value = current.copy(name = newName, description = newDescription)
+                _selectedPlaylist.value = current.copy(
+                    name = newName,
+                    description = newDescription,
+                    customArtPath = savedArtPath
+                )
             }
         }
     }
@@ -637,16 +731,16 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // Acciones de Listas de Reproducción
-    fun createPlaylist(name: String, description: String = "") {
+    fun createPlaylist(name: String, description: String = "", customArtUri: Uri? = null) {
         if (name.isBlank()) return
         viewModelScope.launch {
-            repository.createPlaylist(name, description)
+            repository.createPlaylist(getApplication(), name, description, customArtUri)
         }
     }
 
     fun deletePlaylist(playlistId: Long) {
         viewModelScope.launch {
-            repository.deletePlaylist(playlistId)
+            repository.deletePlaylist(getApplication(), playlistId)
             if (_selectedPlaylist.value?.id == playlistId) {
                 handleBackPress()
             }

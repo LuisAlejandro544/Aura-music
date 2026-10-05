@@ -95,6 +95,7 @@ AuraMusic/
 │   │   │   │   ├── ui/
 │   │   │   │   │   ├── components/             # Componentes visuales reutilizables
 │   │   │   │   │   │   ├── ArtworkImage.kt     # Renderizador de carátulas (WebP + Procedural)
+│   │   │   │   │   │   ├── PlaylistCoverCollage.kt # Renderizador de portada personalizada o collage dinámico (1 a 4 fotos)
 │   │   │   │   │   │   ├── AudioEffectsBottomSheet.kt # Modal unificado orquestador de EQ 10 bandas, 8D, Bucle A-B y efectos
 │   │   │   │   │   │   ├── audioeffects/       # Pestañas modulares de efectos acústicos
 │   │   │   │   │   │   │   ├── EqualizerTabContent.kt         # Ecualizador 10 bandas ISO, presets y Bass Boost

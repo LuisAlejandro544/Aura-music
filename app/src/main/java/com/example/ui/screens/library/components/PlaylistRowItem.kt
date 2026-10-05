@@ -49,19 +49,11 @@ fun PlaylistRowItem(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                modifier = Modifier.size(48.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Default.QueueMusic,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
+            com.example.ui.components.PlaylistCoverCollage(
+                playlist = playlist,
+                modifier = Modifier.size(54.dp),
+                cornerRadius = 10.dp
+            )
             Spacer(modifier = Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -69,16 +61,21 @@ fun PlaylistRowItem(
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary
-                    )
+                    ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
-                if (playlist.description.isNotBlank()) {
-                    Text(
-                        text = playlist.description,
-                        style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                val subtitleText = if (playlist.description.isNotBlank()) {
+                    "${playlist.trackCount} canción(es) • ${playlist.description}"
+                } else {
+                    "${playlist.trackCount} canción(es)"
                 }
+                Text(
+                    text = subtitleText,
+                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
             Box {
                 IconButton(onClick = { showMenu = true }) {
@@ -101,7 +98,7 @@ fun PlaylistRowItem(
                         }
                     )
                     DropdownMenuItem(
-                        text = { Text("Renombrar lista") },
+                        text = { Text("Editar nombre o imagen") },
                         leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
                         onClick = {
                             showMenu = false

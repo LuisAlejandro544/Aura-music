@@ -48,7 +48,10 @@ Este archivo define el contexto de diseño, directrices técnicas y restriccione
    - La animación de salida de Now Playing hacia abajo debe realizarse sin superposiciones de capas negras residuales (`slideOutVertically` limpio sobre fondo nativo).
    - Todos los elementos interactivos deben cumplir con un tamaño mínimo de toque de **48.dp**.
    - Modularidad en pantallas: `Home`, `Library`, `Import`, `NowPlaying`, `Settings`, `PlaylistDetail`.
-   - **Soporte Material You**: Permitir seleccionar tema dinámico Material You en Android 12+ (API 31+) armonizado con el wallpaper del sistema sin perder las superficies oscuras puras OLED.
+   - **Soporte Material You y Persistencia Permanente**: Permitir seleccionar tema dinámico Material You en Android 12+ (API 31+) armonizado con el wallpaper del sistema sin perder las superficies oscuras puras OLED. El tema elegido (`pref_aura_theme`), el Aura Dinámica de Carátula (`pref_dynamic_artwork_color_enabled`) y el modo de visualización de video (`pref_video_display_mode`) se persisten permanentemente en `SharedPreferences` para conservarse al cerrar y reabrir la app.
+   - **Portadas en Playlists (Imagen Personalizada o Collage 1-4) y Detalle de Álbumes/Artistas**:
+     - Las Playlists soportan una imagen personalizada comprimida en WebP sin pérdida (`customArtPath` en Room v3). Si no tienen imagen asignada, `PlaylistCoverCollage` genera un collage dinámico según la cantidad de canciones: 1 foto si hay 1 canción, collage de 2 fotos si hay 2, collage de 3 fotos si hay 3, y collage 2x2 de 4 fotos si hay 4 o más.
+     - Al pulsar sobre un Artista o un Álbum en la Biblioteca, no se debe reproducir inmediatamente la primera canción, sino abrir la vista detallada de canciones (`PlaylistDetailScreen` con `openArtist` / `openAlbum`) mostrando todas sus pistas.
    - **Protección Tipográfica Fija**: La escala tipográfica del sistema se fija mediante `LocalDensity` con `fontScale = 1.0f` para garantizar que la configuración global de tamaño de texto del usuario en Android no altere ni rompa la composición visual ni corte títulos o etiquetas en la app.
 
 8. **Suite de Diagnóstico Propia, Telemetría de Rendimiento & LeakCanary**:

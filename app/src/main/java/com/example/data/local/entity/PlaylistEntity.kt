@@ -13,14 +13,20 @@ data class PlaylistEntity(
     val id: Long = 0,
     val name: String,
     val description: String = "",
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    val customArtPath: String? = null
 ) {
-    fun toDomain(trackCount: Int = 0): Playlist = Playlist(
+    fun toDomain(
+        trackCount: Int = 0,
+        previewTracks: List<com.example.model.Track> = emptyList()
+    ): Playlist = Playlist(
         id = id,
         name = name,
         description = description,
         createdAt = createdAt,
-        trackCount = trackCount
+        trackCount = trackCount,
+        customArtPath = customArtPath,
+        previewTracks = previewTracks
     )
 
     companion object {
@@ -28,7 +34,8 @@ data class PlaylistEntity(
             id = playlist.id,
             name = playlist.name,
             description = playlist.description,
-            createdAt = playlist.createdAt
+            createdAt = playlist.createdAt,
+            customArtPath = playlist.customArtPath
         )
     }
 }

@@ -225,6 +225,13 @@ Este documento traza las fases de evolución técnica y funcional para convertir
 - [x] **Consistencia Geométrica y Pulido de Diseño en Letras / Karaoke**:
   - Homogeneización de dimensiones de `NowPlayingLyricsCard` con la carátula (`fillMaxWidth(0.86f).aspectRatio(1f)` con radio de 26dp), eliminando saltos o desalineaciones visuales al alternar entre carátula y letras.
   - Resaltado activo tipo píldora para la frase en reproducción y rediseño de insignias en `SearchLyricsDialog` para erradicar cualquier desbordamiento o colisión de texto.
+- [x] **Persistencia Permanente de Configuración de Color y Material You**:
+  - Almacenamiento y restauración automática en `SharedPreferences` del tema visual seleccionado (`AuraTheme`, incluyendo *Material You*), el estado de *Aura Dinámica de Carátula* y el modo de *Video Canvas*, garantizando que nunca se reinicien al cerrar y volver a entrar a la app.
+- [x] **Portadas Personalizadas en Playlists y Collage Dinámico de 1 a 4 Canciones (`PlaylistCoverCollage`)**:
+  - Soporte para elegir una imagen personalizada desde la galería (con compresión WebP sin pérdida en `images/` y migración Room `v2 -> v3`) al crear o editar cualquier Playlist.
+  - Generador automático de collage adaptativo cuando la Playlist no tiene imagen propia: 1 foto (1 canción), collage de 2 fotos (2 canciones), collage de 3 fotos (3 canciones) y cuadrícula 2x2 de 4 fotos (4 o más canciones).
+- [x] **Navegación a Vista de Canciones en Artistas y Álbumes**:
+  - Al pulsar sobre un Artista o un Álbum en la Biblioteca, se abre la vista detallada con todas sus canciones listadas (igual que en las Playlists) en lugar de reproducir la primera pista de inmediato.
 
 ---
 

@@ -96,7 +96,9 @@ Este documento define el protocolo de trabajo para los agentes de software y des
 - [x] ¿El temporizador de apagado ejecuta su atenuación suave y pausa en el hilo principal (Main Thread) previniendo excepciones de ExoPlayer?
 - [x] ¿La función de descarga desde TikTok y enlaces web extrae la música de cualquier duración, genera carátula en WebP y vincula el Video Canvas de fondo automáticamente?
 - [x] ¿La descarga desde YouTube / Video Web con arquitectura resiliente de 3 niveles (InnerTube multi-cliente sin fricción + Bypass Invidious + Headless WebView reparado sobre m.youtube.com) y selector interactivo está integrada y operativa?
-- [x] ¿La opción de paleta dinámica 'Material You' está disponible y operativa en ajustes para Android 12+?
+- [x] ¿La opción de paleta dinámica 'Material You' y las configuraciones de color/tema están disponibles y se guardan permanentemente al salir y volver a entrar a la app?
+- [x] ¿Las Playlists permiten asignar una imagen personalizada en WebP o muestran automáticamente un collage dinámico de 1, 2, 3 o 4 fotos según las canciones añadidas?
+- [x] ¿Al tocar un Artista o un Álbum en la biblioteca se abre su lista detallada de canciones (igual que en las Playlists) en lugar de reproducir inmediatamente la primera canción?
 - [x] ¿La escala tipográfica está fijada a un valor cómodo (fontScale = 1.0f) para evitar que los ajustes de texto del sistema desborden la interfaz?
 - [x] ¿La reproducción continua automática al finalizar una pista pasa fluidamente a la siguiente canción de la biblioteca sin detenerse?
 - [x] ¿El fundido de transición (fade-out) y entrada progresiva (fade-in) restauran suavemente el volumen original sin quedarse atrapados en volumen bajo?
