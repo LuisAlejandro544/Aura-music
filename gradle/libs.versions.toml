@@ -44,9 +44,13 @@ media3 = "1.5.1"
 documentfile = "1.0.1"
 leakcanary = "2.14"
 palette = "1.0.0"
+pythonTarget = "3.11.6-0"
+ffmpegNative = "6.0.1"
 
 
 [libraries]
+chaquo-python-target = { group = "com.chaquo.python", name = "target", version.ref = "pythonTarget" }
+ffmpeg-native-bundle = { group = "io.github.jamaismagic.ffmpeg", name = "ffmpeg-kit-lts-16kb", version.ref = "ffmpegNative" }
 androidx-palette = { group = "androidx.palette", name = "palette-ktx", version.ref = "palette" }
 leakcanary-android = { group = "com.squareup.leakcanary", name = "leakcanary-android", version.ref = "leakcanary" }
 androidx-documentfile = { group = "androidx.documentfile", name = "documentfile", version.ref = "documentfile" }

@@ -1,0 +1,6 @@
+{
+  "summary":  "Plan revisado: 100% motores nativos puros (CPython puro, FFmpeg puro, QuickJS C99 puro de Fabrice Bellard y yt-dlp oficial puro) sin ningún wrapper de terceros, trasladando toda la lógica de los scripts .sh directamente a app/build.gradle.kts y CMakeLists.txt, y eliminando por completo todos los archivos .sh.",
+  "updatedAt":  "2026-10-06T01:33:53.992773031Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}

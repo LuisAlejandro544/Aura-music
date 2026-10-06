@@ -656,12 +656,16 @@ object FFmpegNativeEngine {
 
         return try {
             AuraDebugManager.logInfo(TAG, "Iniciando proceso FFmpeg puro: ${args.joinToString(" ")}")
+            val nativeDir = context.applicationInfo.nativeLibraryDir
+            val envLibDir = File(context.filesDir, "env/ffmpeg/usr/lib")
             val processBuilder = ProcessBuilder(*args)
+                .directory(File(nativeDir))
                 .redirectErrorStream(true)
 
             processBuilder.environment().apply {
                 this["LD_LIBRARY_PATH"] = getLibraryPath(context)
-                this["PATH"] = "${context.applicationInfo.nativeLibraryDir}:${context.filesDir.absolutePath}/bin:${System.getenv("PATH") ?: ""}"
+                this["FFMPEG_LIB_DIR"] = if (envLibDir.exists()) envLibDir.absolutePath else nativeDir
+                this["PATH"] = "$nativeDir:${context.filesDir.absolutePath}/bin:${System.getenv("PATH") ?: ""}"
                 this["TMPDIR"] = context.cacheDir.absolutePath
             }
 

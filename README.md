@@ -170,8 +170,8 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
 
 ### 7. Descarga Directa desde TikTok, YouTube y Enlaces Web con FFmpeg Puro y yt-dlp Integrados en el APK Final 🎬🔗🎵
 - **Descargas sin Límite de Duración**: Permite pegar enlaces de **TikTok**, **YouTube** y videos web para descargar música completa, directos, sesiones o parodias de cualquier duración.
-- **Motor FFmpeg Puro sin Wrappers en el APK Final (`FFmpegNativeEngine` + `compile_native_deps.sh`)**:
-  - Binario nativo ejecutable `libffmpeg.so` empaquetado directamente en `jniLibs/` para todas las arquitecturas (`arm64-v8a`, `armeabi-v7a`, `x86_64`, `x86`), aprovisionado en `scripts/compile_native_deps.sh` mediante descarga de ejecutable CLI estático/PIE real de FFmpeg para Android (`arm64`, `arm`, `x86_64`, `x86`) y puente C/NDK con `dlopen`/`dlsym` sobre `libffmpegkit.so` / `libavcodec.so` / `libavfilter.so` (`FFmpegKitConfig_run` / `ffmpeg_execute`), instalado con permisos nativos de ejecución en `nativeLibraryDir`.
+- **Motor FFmpeg Puro sin Wrappers en el APK Final (`FFmpegNativeEngine` + `app/build.gradle.kts`)**:
+  - Binario nativo ejecutable `libffmpeg.so` empaquetado directamente en `jniLibs/` para todas las arquitecturas (`arm64-v8a`, `armeabi-v7a`, `x86_64`, `x86`), aprovisionado y compilado de forma 100% pura desde la tarea `provisionNativeDeps` en `app/build.gradle.kts` y `native_ffmpeg_launcher.c` con el NDK Clang Toolchain (`dlopen`/`dlsym` sobre `libffmpegkit.so` / `libavcodec.so` / `libavfilter.so`), instalado con permisos nativos de ejecución en `nativeLibraryDir` sin depender jamás de scripts `.sh`.
   - Paquete dinámico optimizado con solo lo necesario para audio y video (`libffmpeg.zip.so`), descomprimido de forma atómica en segundo plano para procesar y transcodificar en alta fidelidad (AAC, Opus, Vorbis, FLAC, WebM -> M4A / MP3), aplicar filtros de video (`xfade`, `reverse` + `concat` Boomerang, Keyframes GOP corto) y fusionar flujos DASH de video y audio (`-c copy`) sin inflar el APK con encoders pesados innecesarios.
 - **Entorno Python Nativo y Actualización en Caliente OTA Blindada para yt-dlp (`YtDlpNativeEngine` & `YtDlpAutoUpdater`)**:
   - Runtime de CPython nativo (`libpython.so`) con entorno optimizado (`libpython.zip.so`) y motor QuickJS (`libqjs.so`) empaquetados en el APK final para ejecutar scripts de extracción y descifrar firmas dinámicas (`n-sig`) localmente a máxima velocidad.
@@ -294,18 +294,18 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
 
 ## 🛠️ Compilación y GitHub Actions
 
-### Compilación Local con Generación Limpia de Firma:
+### Compilación Local con Aprovisionamiento Nativo Puro y Firma en Gradle (Cero `.sh`):
 ```bash
-# Ejecutar script que genera la firma debug desde cero y compila el APK
-./scripts/generate_keystore_and_build.sh
+# Ejecutar compilación completa (aprovisiona motores nativos puros, firma debug.keystore y ensambla el APK)
+gradle :app:assembleDebug
 ```
 
-### GitHub Actions (Activación Manual y Caché de Dependencias Nativas):
+### GitHub Actions (Activación Manual y Caché de Dependencias Nativas en Gradle):
 - **Compilación de APK (`.github/workflows/build-debug-apk.yml`)**:
   - Se activa manualmente desde la pestaña **Actions -> Run workflow** (`workflow_dispatch`).
-  - **Caché Inteligente de Dependencias Nativas**: Mediante `actions/cache@v4`, almacena y restaura instantáneamente los binarios de FFmpeg, Python y yt-dlp (`app/src/main/jniLibs` y `app/src/main/assets/bin`) basados en el hash de `scripts/compile_native_deps.sh`.
-  - **Compilación Autónoma ante Cache Miss**: Si no existe la caché o si se activa el parámetro `force_rebuild_native`, el runner ejecuta `scripts/compile_native_deps.sh` para compilar y preparar los binarios nativos para las 4 arquitecturas (`arm64-v8a`, `armeabi-v7a`, `x86_64`, `x86`) con el Android NDK.
-  - Genera la firma `debug.keystore` de forma autónoma en el runner, compila con C++20 y sube el APK Debug listo para descargar.
+  - **Caché Inteligente de Dependencias Nativas**: Mediante `actions/cache@v4`, almacena y restaura instantáneamente los binarios de FFmpeg, CPython 3.11, QuickJS y yt-dlp (`app/src/main/jniLibs` y `app/src/main/assets/bin`) basados en el hash de `app/build.gradle.kts`, `gradle/libs.versions.toml` y `app/src/main/cpp/*`.
+  - **Compilación Autónoma en Gradle ante Cache Miss**: Si no existe la caché o si se activa el parámetro `force_rebuild_native`, el runner ejecuta `./gradlew :app:provisionNativeDeps` para resolver los artefactos nativos reales y compilar los lanzadores PIE puros para las 4 arquitecturas (`arm64-v8a`, `armeabi-v7a`, `x86_64`, `x86`) con el Android NDK sin utilizar ningún script `.sh`.
+  - Restaura o genera la firma `debug.keystore` desde la tarea Gradle `ensureDebugKeystore`, compila con C++20/C17 y sube el APK Debug listo para descargar.
 - **Purgar Binarios del Historial Git (`.github/workflows/purge-native-binaries-history.yml`)**:
   - Permite limpiar definitivamente los archivos `.so`, `.zip.so` y `yt-dlp` del historial remoto usando `git-filter-repo` previa confirmación manual (`PURGAR`), dejando el repositorio ultra liviano.
   - El archivo `.gitignore` está configurado para evitar que los archivos binarios compilados vuelvan a ser añadidos al control de versiones.

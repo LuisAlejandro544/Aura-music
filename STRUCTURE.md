@@ -15,14 +15,18 @@ AuraMusic/
 ├── app/
 │   ├── src/
 │   │   ├── main/
-│   │   │   ├── cpp/                            # Código Nativo C++20 (DSP y Audio Avanzado Modular)
-│   │   │   │   ├── CMakeLists.txt              # Configuración CMake integrada en Gradle (C++20)
+│   │   │   ├── cpp/                            # Código Nativo C++20 / C17 (DSP y Lanzadores Puros Multi-ABI)
+│   │   │   │   ├── CMakeLists.txt              # Configuración CMake integrada en Gradle (C17 / C++20)
 │   │   │   │   ├── dsp_filters.h               # Módulo C++20: Filtros Biquad IIR, EQ 10 bandas y limitador con reset()
 │   │   │   │   ├── dsp_spatial.h               # Módulo C++20: Motor Audio Espacial 8D Binaural orbital con reset()
 │   │   │   │   ├── dsp_crossfeed.h             # Módulo C++20: Filtro acústico Crossfeed Bauer / Chu Moy con reset()
 │   │   │   │   ├── dsp_reverb.h                # Módulo C++20: Suite Reverb acústica híbrida con resetBuffers()
 │   │   │   │   ├── auramusic_dsp.h             # Orquestador nativo C++20 con limpieza atómica de buffers (flushDspBuffers)
-│   │   │   │   └── auramusic_dsp.cpp           # Implementación JNI del motor nativo con nativeFlushDspBuffers
+│   │   │   │   ├── auramusic_dsp.cpp           # Implementación JNI del motor nativo con nativeFlushDspBuffers
+│   │   │   │   ├── native_python_launcher.c    # Lanzador PIE puro C17 para CPython 3.11 (Py_BytesMain sin sh)
+│   │   │   │   ├── native_ffmpeg_launcher.c    # Lanzador PIE puro C17 para FFmpeg CLI nativo (sin sh)
+│   │   │   │   ├── native_quickjs_cli.c        # Evaluador CLI nativo C99 de respaldo para QuickJS (libqjs.so)
+│   │   │   │   └── aura_ytdlp_fallback.py      # Extractor Python nativo de respaldo offline para yt-dlp
 │   │   │   ├── jniLibs/                        # Estructura ABI protegida por .gitkeep e ignorada en Git (*.so en CI/CD)
 │   │   │   │   ├── arm64-v8a/.gitkeep          # 64-bit ARM
 │   │   │   │   ├── armeabi-v7a/.gitkeep        # 32-bit ARM
@@ -183,17 +187,9 @@ AuraMusic/
 │   │   │   │           └── HeadphoneSettingsCoordinator.kt# Parámetros DSP y gestos de auriculares
 │   │   │   └── res/                            # Recursos gráficos, iconos y strings
 │   │   └── test/                               # Pruebas unitarias y Robolectric
-│   └── build.gradle.kts                        # Configuración Gradle con CMake, NDK y LeakCanary
-├── scripts/
-│   ├── compile_native_deps.sh          # Orquestador modular principal de compilación y aprovisionamiento nativo
-│   ├── generate_keystore_and_build.sh  # Script ejecutable de generación de firma y build local
-│   └── native/                         # Módulos especializados de aprovisionamiento puro sin wrappers
-│       ├── provision_ytdlp.sh          # Aprovisionamiento de yt-dlp con verificación criptográfica SHA-256
-│       ├── provision_quickjs.sh        # Compilación nativa PIE de motor QuickJS C99 puro (libqjs.so)
-│       ├── provision_python.sh         # Aprovisionamiento de CPython nativo (libpython.so, libpython3.11.so)
-│       └── provision_ffmpeg.sh         # Aprovisionamiento de FFmpeg CLI nativo puro multi-ABI (libffmpeg.so)
+│   └── build.gradle.kts                        # Configuración Gradle con CMake, NDK, LeakCanary y tarea provisionNativeDeps (Cero .sh)
 ├── gradle/
-│   └── libs.versions.toml                      # Catálogo de versiones centralizado (incluye LeakCanary)
+│   └── libs.versions.toml                      # Catálogo de versiones centralizado (incluye CPython 3.11, FFmpeg y LeakCanary)
 ├── README.md                                   # Descripción general e instalación
 ├── ROADMAP.md                                  # Fases de desarrollo y avances
 ├── STRUCTURE.md                                # Arquitectura y mapa de archivos
@@ -282,12 +278,12 @@ Siguiendo el principio de **desarrollo modular** para evitar el colapso de la ap
 
 ---
 
-## 🛠️ Scripts de Aprovisionamiento Nativo Modular (`scripts/native/`)
+## 🛠️ Aprovisionamiento y Compilación Nativa 100% Pura en Gradle y CMake (Cero `.sh`)
 
-- **`scripts/compile_native_deps.sh`**: Orquestador principal que invoca los 4 módulos especializados y ejecuta optimización de símbolos `llvm-strip`.
-- **`scripts/native/provision_ytdlp.sh`**: Descarga yt-dlp oficial con verificación criptográfica SHA-256 (`SHA2-256SUMS`).
-- **`scripts/native/provision_quickjs.sh`**: Compila el intérprete QuickJS C99 puro (Fabrice Bellard) como ejecutable PIE (`libqjs.so`) con NDK Clang para las 4 ABIs.
-- **`scripts/native/provision_python.sh`**: Aprovisiona CPython nativo puro multi-arquitectura (`libpython.so`, `libpython3.11.so`, `libpython_stdlib.zip.so`).
-- **`scripts/native/provision_ffmpeg.sh`**: Aprovisiona binarios FFmpeg CLI/PIE puros (`libffmpeg.so` y `libffmpeg.zip.so`) sin wrappers ni stubs falsos.
-- **`.github/workflows/build-debug-apk.yml`**: Flujo de trabajo CI/CD con caché inteligente (`actions/cache@v4`), instalación de NDK, exportación de toolchains LLVM, preservación de firma permanente (`debug.keystore.base64`) y compilación APK Debug lista para dispositivos móviles.
+- **`app/build.gradle.kts` (`provisionNativeDeps` y `ensureDebugKeystore`)**: Orquestador nativo en Kotlin DSL que reemplaza y elimina por completo los antiguos scripts `.sh`:
+  - **Motor `yt-dlp` Puro**: Descarga oficial con verificación criptográfica SHA-256 (`SHA2-256SUMS`) en `src/main/assets/bin/yt-dlp`.
+  - **Motor QuickJS C99 Puro**: Descarga las fuentes originales de Fabrice Bellard y las compila con NDK Clang como ejecutable PIE (`libqjs.so`) para las 4 ABIs (`arm64-v8a`, `armeabi-v7a`, `x86_64`, `x86`).
+  - **Motor CPython 3.11 Puro Multi-ABI**: Resuelve los artefactos nativos de `com.chaquo.python:target:3.11.6-0`, extrae `libpython3.11.so`, OpenSSL (`libcrypto`, `libssl`), `libsqlite3`, la librería estándar (`stdlib`) y módulos C nativos en `libpython.zip.so`, y compila `native_python_launcher.c` en `libpython.so` con `-Wl,-rpath,$ORIGIN` y cero llamadas a `/system/bin/sh`.
+  - **Motor FFmpeg Puro Multi-ABI**: Resuelve el paquete nativo multi-ABI de FFmpeg (`libavcodec`, `libavfilter`, `libavformat`, `libswscale`, `libavutil`, `libffmpegkit`), empaqueta `libffmpeg.zip.so` y compila `native_ffmpeg_launcher.c` en `libffmpeg.so` ejecutando `llvm-strip`.
+- **`.github/workflows/build-debug-apk.yml`**: Flujo de trabajo CI/CD sincronizado con `:app:provisionNativeDeps` y `:app:assembleDebug`, con caché inteligente (`actions/cache@v4`), instalación de NDK, preservación de firma permanente (`debug.keystore.base64`) y compilación APK Debug lista para dispositivos móviles.
 

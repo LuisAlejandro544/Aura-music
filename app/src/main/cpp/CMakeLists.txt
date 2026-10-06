@@ -2,9 +2,11 @@
 # Estándar configurado: C++20 (Última versión recomendada para Android NDK con soporte de std::span y matemáticas modernas)
 cmake_minimum_required(VERSION 3.22.1)
 
-project("auramusic_dsp" LANGUAGES CXX)
+project("auramusic_dsp" LANGUAGES C CXX)
 
-# Forzar C++20 como estándar del compilador
+# Configurar C17 y C++20 como estándares del compilador NDK
+set(CMAKE_C_STANDARD 17)
+set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)

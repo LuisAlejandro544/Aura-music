@@ -37,10 +37,9 @@ Este documento traza las fases de evolución técnica y funcional para convertir
   - Transiciones de pantalla fluidas con `AnimatedContent` (desvanecimiento y deslizamiento).
   - Expansión y repliegue elástico de la pantalla completa Now Playing.
   - Micro-interacciones y feedback táctil enriquecido.
-- [x] **Pipeline de CI/CD GitHub Actions con Caché Nativa y Script Shell**:
-  - Workflow manual (`workflow_dispatch`) con generación forzada de firma `debug.keystore` RSA 2048-bit.
-  - Script autónomo `scripts/generate_keystore_and_build.sh` para compilación local.
-  - **Caché Inteligente de Binarios Nativos (`actions/cache@v4`)**: Sistema en GitHub Actions que almacena y restaura los `.so` de FFmpeg, Python y el binario de `yt-dlp` en segundos, con compilación y ensamblaje autónomo mediante `scripts/compile_native_deps.sh` ante cache-miss o actualización de parámetros.
+- [x] **Pipeline de CI/CD GitHub Actions con Caché Nativa y Orquestación Pura en Gradle (Cero `.sh`)**:
+  - Workflow manual (`workflow_dispatch`) con tarea integrada `ensureDebugKeystore` en Gradle.
+  - **Caché Inteligente de Binarios Nativos (`actions/cache@v4`)**: Sistema en GitHub Actions que almacena y restaura los `.so` de FFmpeg, CPython 3.11, QuickJS y el binario de `yt-dlp` en segundos, con compilación y ensamblaje autónomo mediante la tarea `:app:provisionNativeDeps` en `app/build.gradle.kts` ante cache-miss o actualización de parámetros.
 
 ---
 
@@ -209,7 +208,7 @@ Este documento traza las fases de evolución técnica y funcional para convertir
   - Integración accesible tanto desde el botón de búsqueda en la tarjeta de Karaoke como desde el estado de canción sin letra.
 
 - [x] **Integración Completa de FFmpeg Puro y Entorno Python con yt-dlp en el APK Final**:
-  - `FFmpegNativeEngine`: Motor de procesamiento multimedia a nivel nativo/CLI sin wrappers obsoletos, con binario ejecutable `libffmpeg.so` real asegurado en `scripts/compile_native_deps.sh` (ejecutable CLI estático/PIE para Android y puente NDK `dlopen`/`dlsym` hacia `libffmpegkit.so`/`libavcodec.so`/`libavfilter.so`) y paquete dinámico depurado (`libffmpeg.zip.so`) empaquetados en `jniLibs/` para todas las arquitecturas (`arm64-v8a`, `armeabi-v7a`, `x86_64`, `x86`), optimizado para extracción de audio, transcodificación a AAC/MP3 y fusión DASH `-c copy`.
+  - `FFmpegNativeEngine`: Motor de procesamiento multimedia a nivel nativo/CLI sin wrappers obsoletos, con binario ejecutable `libffmpeg.so` real asegurado en `app/build.gradle.kts` (`provisionNativeDeps` + `native_ffmpeg_launcher.c` con puente NDK `dlopen`/`dlsym` hacia `libffmpegkit.so`/`libavcodec.so`/`libavfilter.so`) y paquete dinámico depurado (`libffmpeg.zip.so`) empaquetados en `jniLibs/` para todas las arquitecturas (`arm64-v8a`, `armeabi-v7a`, `x86_64`, `x86`), optimizado para extracción de audio, transcodificación a AAC/MP3 y fusión DASH `-c copy`.
   - **Bucle Infinito sin Cortes (Seamless Loop con Crossfade) & Efecto Boomerang / Ping-Pong (`reverse` + `concat`)**: Creación automatizada de loops de Video Canvas (≤ 20s) con selector interactivo entre fundido continuo mediante `xfade` y **Efecto Boomerang (`reverse` + `concat=n=2:v=1:a=0`)** en *Editar Canción*, *Video a Música* y *Descargar desde Enlace*, logrando repetición cíclica continua de ida y vuelta sin saltos en ExoPlayer.
   - **Optimización de Fotogramas Clave (Keyframes / GOP Corto a 30fps)**: Reestructuración de videos largos sincronizados con inserción de I-frames cada 1 segundo (GOP=30), eliminando audio residual y aplicando `-movflags +faststart` para saltos temporales instantáneos (0ms) en Now Playing y Mini Reproductor.
   - `YtDlpNativeEngine`: Runtime de CPython nativo (`libpython.so`) con entorno optimizado (`libpython.zip.so`) y QuickJS (`libqjs.so`) empaquetados en el APK, con copia base oficial en `assets/bin/yt-dlp` para funcionamiento inmediato offline.
@@ -250,7 +249,7 @@ Este documento traza las fases de evolución técnica y funcional para convertir
   - Protección criptográfica contra Ejecución Remota de Código (RCE) en `YtDlpAutoUpdater` mediante verificación de hash `SHA-256` contra `SHA2-256SUMS` oficial de GitHub Releases y validación de host.
   - Neutralización de vulnerabilidad Zip Slip (Path Traversal) con validación estricta de rutas canónicas en `FFmpegNativeEngine` y `YtDlpNativeEngine`.
   - Protección contra inyección de argumentos (`--`) en procesos CLI y sanitización de intents externos en `DebugMonitorActivity`.
-  - Reestructuración de scripts de dependencias nativas en `scripts/native/` (`provision_ytdlp.sh`, `provision_quickjs.sh`, `provision_python.sh`, `provision_ffmpeg.sh`) con orquestador principal `compile_native_deps.sh`, aprovisionando QuickJS C99 puro, CPython real y FFmpeg nativo sin stubs vacíos ni wrappers.
+  - Eliminación total de archivos `.sh` y migración del 100% de la lógica de aprovisionamiento y compilación nativa a `app/build.gradle.kts` (`provisionNativeDeps` y `ensureDebugKeystore`) y `app/src/main/cpp/` (`native_python_launcher.c`, `native_ffmpeg_launcher.c`, QuickJS C99 puro), aprovisionando CPython 3.11 real multi-ABI, FFmpeg nativo puro, QuickJS C99 y `yt-dlp` sin wrappers ni llamadas a `sh`.
 - [x] **Compresión Ligera en FFmpeg: Pista de Audio Eliminada (`-an`) y Purga de Metadatos (`-map_metadata -1`)**:
   - Aplicación automática de `-an` en la tubería de Video Canvas de FFmpeg para descartar pistas de audio duplicadas, ahorrando de 5 a 20 MB por canción.
   - Purga de metadatos innecesarios (`-map_metadata -1`) en el contenedor MP4.

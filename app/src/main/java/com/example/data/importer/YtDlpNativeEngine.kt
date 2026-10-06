@@ -84,6 +84,21 @@ object YtDlpNativeEngine {
                 ytdlpFile.setExecutable(true, false)
             }
 
+            // Asegurar alias ejecutables python3 / python en filesDir/bin apuntando al motor PIE nativo
+            val pythonNative = File(nativeLibDir, "libpython.so")
+            if (pythonNative.exists()) {
+                val binDir = File(context.filesDir, "bin").apply { mkdirs() }
+                listOf("python3", "python").forEach { aliasName ->
+                    val aliasFile = File(binDir, aliasName)
+                    if (!aliasFile.exists() || aliasFile.length() != pythonNative.length()) {
+                        try {
+                            pythonNative.copyTo(aliasFile, overwrite = true)
+                            aliasFile.setExecutable(true, false)
+                        } catch (_: Exception) {}
+                    }
+                }
+            }
+
             isInitialized = true
         } catch (e: Exception) {
             AuraDebugManager.logWarning(TAG, "Fallo al inicializar entorno Python yt-dlp: ${e.message}")
@@ -201,18 +216,21 @@ object YtDlpNativeEngine {
         val errorLog = StringBuilder()
 
         try {
-            val processBuilder = ProcessBuilder(cmdList)
-                .redirectErrorStream(false)
-
             val pythonEnvDir = File(context.filesDir, "env/python")
+            val stdlibZip = File(pythonEnvDir, "stdlib.zip")
             val stdlibDir = File(pythonEnvDir, "stdlib")
             val modulesDir = File(pythonEnvDir, "modules")
             val ffmpegEnvDir = File(context.filesDir, "env/ffmpeg")
             val nativeDir = context.applicationInfo.nativeLibraryDir
 
+            val processBuilder = ProcessBuilder(cmdList)
+                .directory(File(nativeDir))
+                .redirectErrorStream(false)
+
             processBuilder.environment().apply {
                 this["PYTHONHOME"] = pythonEnvDir.absolutePath
-                this["PYTHONPATH"] = "${stdlibDir.absolutePath}:${modulesDir.absolutePath}:${pythonEnvDir.absolutePath}:${pythonEnvDir.absolutePath}/usr/lib/python3.12:${context.filesDir.absolutePath}/bin"
+                this["PYTHONPATH"] = "${stdlibZip.absolutePath}:${stdlibDir.absolutePath}:${modulesDir.absolutePath}:${pythonEnvDir.absolutePath}:${pythonEnvDir.absolutePath}/usr/lib/python3.11:${context.filesDir.absolutePath}/bin"
+                this["PYTHONNOUSERSITE"] = "1"
                 this["HOME"] = pythonEnvDir.absolutePath
                 this["LD_LIBRARY_PATH"] = "$nativeDir:${modulesDir.absolutePath}:${pythonEnvDir.absolutePath}/usr/lib:${ffmpegEnvDir.absolutePath}/usr/lib"
                 this["SSL_CERT_FILE"] = "${pythonEnvDir.absolutePath}/usr/etc/tls/cert.pem"
