@@ -50,6 +50,9 @@ class AudioEffectManager {
     private val _reverbConfig = MutableStateFlow(ReverbConfig())
     val reverbConfig: StateFlow<ReverbConfig> = _reverbConfig.asStateFlow()
 
+    private val _volumeNormalizationConfig = MutableStateFlow(com.example.model.VolumeNormalizationConfig())
+    val volumeNormalizationConfig: StateFlow<com.example.model.VolumeNormalizationConfig> = _volumeNormalizationConfig.asStateFlow()
+
     init {
         // Inicializar motor DSP nativo C++20 con valores iniciales
         NativeAudioEngine.setDspEnabled(true)
@@ -242,6 +245,27 @@ class AudioEffectManager {
         NativeAudioEngine.setStereoBalance(balance)
     }
 
+    fun setVolumeNormalizationEnabled(enabled: Boolean) {
+        val updated = _volumeNormalizationConfig.value.copy(enabled = enabled)
+        _volumeNormalizationConfig.value = updated
+        NativeAudioEngine.setVolumeNormalization(updated.enabled, updated.targetLufs, updated.mode)
+    }
+
+    fun setVolumeNormalizationMode(mode: Int) {
+        val target = when (mode) {
+            0 -> -18.0f
+            2 -> -11.0f
+            else -> -14.0f
+        }
+        val updated = _volumeNormalizationConfig.value.copy(mode = mode, targetLufs = target)
+        _volumeNormalizationConfig.value = updated
+        NativeAudioEngine.setVolumeNormalization(updated.enabled, updated.targetLufs, updated.mode)
+    }
+
+    fun setDjAutomixTransition(enabled: Boolean, progress: Float) {
+        NativeAudioEngine.setDjAutomixTransition(enabled, progress)
+    }
+
     /**
      * Limpieza Atómica de Buffers (Buffer Flushing):
      * Pone a cero los acumuladores de los filtros IIR Bi-cuadráticos (10 bandas),
@@ -269,6 +293,9 @@ class AudioEffectManager {
 
         val rev = _reverbConfig.value
         NativeAudioEngine.setReverbParameters(rev.isEnabled, rev.roomSize, rev.decayMs, rev.reverbLevelDb)
+
+        val vn = _volumeNormalizationConfig.value
+        NativeAudioEngine.setVolumeNormalization(vn.enabled, vn.targetLufs, vn.mode)
     }
 
     private fun releaseHardwareEffects() {

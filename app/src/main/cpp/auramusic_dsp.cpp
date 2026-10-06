@@ -144,6 +144,17 @@ Java_com_example_playback_NativeAudioEngine_nativeFlushDspBuffers(JNIEnv* /* env
     sDspEngine.flushDspBuffers();
 }
 
+JNIEXPORT void JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeSetVolumeNormalization(JNIEnv* /* env */, jobject /* thiz */, jboolean enabled, jfloat targetLufs, jint mode) {
+    LOGI("Aura Music Normalizacion de Volumen: %s (Target=%.1f LUFS, Mode=%d)", enabled ? "ACTIVADA" : "DESACTIVADA", targetLufs, mode);
+    sDspEngine.setVolumeNormalization(enabled == JNI_TRUE, static_cast<float>(targetLufs), static_cast<int>(mode));
+}
+
+JNIEXPORT void JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeSetDjAutomixTransition(JNIEnv* /* env */, jobject /* thiz */, jboolean enabled, jfloat progress) {
+    sDspEngine.setDjAutomixTransition(enabled == JNI_TRUE, static_cast<float>(progress));
+}
+
 }
 
 

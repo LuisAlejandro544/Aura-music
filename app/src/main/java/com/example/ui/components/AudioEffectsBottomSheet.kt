@@ -95,6 +95,13 @@ fun AudioEffectsBottomSheet(
     onAdjustABPointA: (Long) -> Unit = {},
     onAdjustABPointB: (Long) -> Unit = {},
     onClearABLoop: () -> Unit = {},
+    isDjAutomixEnabled: Boolean = false,
+    onSetDjAutomixEnabled: (Boolean) -> Unit = {},
+    isDjEqCurveEnabled: Boolean = true,
+    onSetDjEqCurveEnabled: (Boolean) -> Unit = {},
+    volumeNormalizationConfig: com.example.model.VolumeNormalizationConfig = com.example.model.VolumeNormalizationConfig(),
+    onSetVolumeNormalizationEnabled: (Boolean) -> Unit = {},
+    onSetVolumeNormalizationMode: (Int) -> Unit = {},
     // Auriculares y Balance L/R
     headphoneConfig: HeadphoneConfig = HeadphoneConfig(),
     onSetCrossfeedEnabled: (Boolean) -> Unit = {},
@@ -273,7 +280,15 @@ fun AudioEffectsBottomSheet(
                         onToggleABLoopEnabled = onToggleABLoopEnabled,
                         onAdjustABPointA = onAdjustABPointA,
                         onAdjustABPointB = onAdjustABPointB,
-                        onClearABLoop = onClearABLoop
+                        onClearABLoop = onClearABLoop,
+                        isDjAutomixEnabled = isDjAutomixEnabled,
+                        onDjAutomixToggle = onSetDjAutomixEnabled,
+                        isDjEqCurveEnabled = isDjEqCurveEnabled,
+                        onDjEqCurveToggle = onSetDjEqCurveEnabled,
+                        isVolumeNormalizationEnabled = volumeNormalizationConfig.enabled,
+                        onVolumeNormalizationToggle = onSetVolumeNormalizationEnabled,
+                        volumeNormalizationMode = volumeNormalizationConfig.mode,
+                        onVolumeNormalizationModeChange = onSetVolumeNormalizationMode
                     )
                     6 -> BalanceAndHeadphonesTabContent(
                         headphoneConfig = headphoneConfig,

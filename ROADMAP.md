@@ -249,6 +249,7 @@ Este documento traza las fases de evolución técnica y funcional para convertir
   - Protección criptográfica contra Ejecución Remota de Código (RCE) en `YtDlpAutoUpdater` mediante verificación de hash `SHA-256` contra `SHA2-256SUMS` oficial de GitHub Releases y validación de host.
   - Neutralización de vulnerabilidad Zip Slip (Path Traversal) con validación estricta de rutas canónicas en `FFmpegNativeEngine` y `YtDlpNativeEngine`.
   - Protección contra inyección de argumentos (`--`) en procesos CLI y sanitización de intents externos en `DebugMonitorActivity`.
+  - **Consolidación de Certificados TLS para Android 14+**: Erradicación del error `[SSL: CERTIFICATE_VERIFY_FAILED: unable to get local issuer certificate]` mediante volcador automático de certificados CA de Conscrypt APEX (`/apex/com.android.conscrypt/cacerts/`) y KeyStore hacia `usr/etc/tls/cert.pem` con reintento auto-sanador en `YtDlpNativeEngine`.
   - Eliminación total de archivos `.sh` y migración del 100% de la lógica de aprovisionamiento y compilación nativa a `app/build.gradle.kts` (`provisionNativeDeps` y `ensureDebugKeystore`) y `app/src/main/cpp/` (`native_python_launcher.c`, `native_ffmpeg_launcher.c`, QuickJS C99 puro), aprovisionando CPython 3.11 real multi-ABI, FFmpeg nativo puro, QuickJS C99 y `yt-dlp` sin wrappers ni llamadas a `sh`.
 - [x] **Compresión Ligera en FFmpeg: Pista de Audio Eliminada (`-an`) y Purga de Metadatos (`-map_metadata -1`)**:
   - Aplicación automática de `-an` en la tubería de Video Canvas de FFmpeg para descartar pistas de audio duplicadas, ahorrando de 5 a 20 MB por canción.
@@ -274,6 +275,10 @@ Este documento traza las fases de evolución técnica y funcional para convertir
   - **Sincronización Cromática Continua**: Extracción dinámica de color de fondo y ambient glow adaptada a cada capítulo activo de la mezcla en tiempo real.
   - **Karaoke con Letras LRC Continuas Concatenadas**: Concatenación automática de las letras sincronizadas (.lrc) sumando el offset temporal acumulado de cada capítulo, permitiendo auto-scroll continuo y karaoke fluido a lo largo de todo el mix continuo.
   - **Portada Oficial en Collage WebP**: Generación automática de portada en collage de 1 a 4 fotos comprimida en WebP Lossless en `images/`, registrándose como pista completa en la base de datos bajo el álbum *"Aura Mixtapes"*.
+- [x] **Funcionalidades de Audio y Karaoke de Nivel Spotify**:
+  - **Normalización de Volumen Inteligente (Loudness Normalizer Spotify / EBU R128 en C++20 `VolumeNormalizerProcessor`)**: Nivelación dinámica de sonoridad acústica entre pistas de diferentes épocas y fuentes (YouTube, TikTok, audios locales) en 64 bits con limitador transparente anti-clipping y 3 modos seleccionables (*Sutil -18 LUFS*, *Estándar Spotify -14 LUFS*, *Alto -11 LUFS*).
+  - **Automix Inteligente & Crossfade DJ con Curva de Ecualización en X (`DjAutomixFilter` en C++20)**: Transición fluida de discoteca entre canciones con detección acústica de outro (< 0.07f) para omitir silencios vacíos y curva paramétrica de ecualización en X que atenúa subgraves (< 120 Hz) y agudos de la pista que finaliza, eliminando choques de bajos (*bass clashing*) con la pista entrante.
+  - **Modo Karaoke a Pantalla Completa Inmersivo (`FullScreenLyricsScreen`)**: Experiencia estilo Spotify / Apple Music Sing con fondo ambiental dinámico que respira con el audio en C++20, tipografía grande de hasta 26sp con resaltado neón, auto-scroll interactivo con botón flotante *"Sincronizar con audio"* y barra de transporte flotante inferior con minicarátula, marquesina fluida y seekbar.
 
 ---
 

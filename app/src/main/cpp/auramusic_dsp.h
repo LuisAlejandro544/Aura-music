@@ -65,6 +65,8 @@ public:
             mVocalClarityProcessor.init(mSampleRate);
             mCrossfeedProcessor.init(mSampleRate);
             mReverbProcessor.init(mSampleRate);
+            mVolumeNormalizer.init(mSampleRate);
+            mDjAutomixFilter.init(mSampleRate);
             mInitialized = true;
         }
     }
@@ -87,7 +89,30 @@ public:
         mEightDProcessor.reset();
         mCrossfeedProcessor.reset();
         mReverbProcessor.resetBuffers();
+        mVolumeNormalizer.reset();
+        mDjAutomixFilter.reset();
         mCurrentIntensity = 0.08f;
+    }
+
+    void setVolumeNormalization(bool enabled, float targetLufs, int mode) {
+        mVolumeNormalizer.setEnabled(enabled);
+        mVolumeNormalizer.setMode(mode);
+        if (targetLufs < -5.0f) {
+            mVolumeNormalizer.setTargetLufs(targetLufs);
+        }
+    }
+
+    [[nodiscard]] bool isVolumeNormalizationEnabled() const {
+        return mVolumeNormalizer.isEnabled();
+    }
+
+    void setDjAutomixTransition(bool enabled, float progress) {
+        mDjAutomixFilter.setEnabled(enabled);
+        mDjAutomixFilter.setTransitionProgress(progress);
+    }
+
+    [[nodiscard]] bool isDjAutomixEnabled() const {
+        return mDjAutomixFilter.isEnabled();
     }
 
     void setReverbParameters(bool enabled, float roomSize, int decayMs, float levelDb) {
@@ -276,10 +301,21 @@ public:
                 mReverbProcessor.processSample(sampleL, sampleR);
             }
 
+            // Normalización Inteligente de Volumen (Loudness Normalizer estilo Spotify / EBU R128)
+            if (mVolumeNormalizer.isEnabled()) {
+                mVolumeNormalizer.processSample(sampleL, sampleR);
+            }
+
+            // Curva de Ecualización DJ Automix para transiciones suaves de pista
+            if (mDjAutomixFilter.isEnabled()) {
+                mDjAutomixFilter.processSample(sampleL, sampleR);
+            }
+
             // Si hubo procesamiento acústico activo, aplicar limitador suave y reescribir muestras
             if (mEnabled || mVocalClarityProcessor.isEnabled() || mEightDProcessor.isEnabled() || 
                 (mCrossfeedProcessor.isEnabled() && mCrossfeedProcessor.isHeadphonesConnected()) || 
-                mBalanceEnabled || mReverbProcessor.isEnabled()) {
+                mBalanceEnabled || mReverbProcessor.isEnabled() ||
+                mVolumeNormalizer.isEnabled() || mDjAutomixFilter.isEnabled()) {
                 sampleL = softClip(sampleL);
                 samples[i] = static_cast<int16_t>(std::clamp(sampleL * 32767.0, -32768.0, 32767.0));
 
@@ -330,6 +366,8 @@ private:
     EightDProcessor mEightDProcessor{};
     CrossfeedProcessor mCrossfeedProcessor{};
     ReverbProcessor mReverbProcessor{};
+    VolumeNormalizerProcessor mVolumeNormalizer{};
+    DjAutomixFilter mDjAutomixFilter{};
 
     bool mBalanceEnabled{false};
     double mStereoBalance{0.0};
@@ -416,6 +454,12 @@ Java_com_example_playback_NativeAudioEngine_nativeGetAudioIntensity(JNIEnv* env,
 
 JNIEXPORT void JNICALL
 Java_com_example_playback_NativeAudioEngine_nativeGetVisualizerBands(JNIEnv* env, jobject thiz, jfloatArray outBands);
+
+JNIEXPORT void JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeSetVolumeNormalization(JNIEnv* env, jobject thiz, jboolean enabled, jfloat targetLufs, jint mode);
+
+JNIEXPORT void JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeSetDjAutomixTransition(JNIEnv* env, jobject thiz, jboolean enabled, jfloat progress);
 
 #ifdef __cplusplus
 }

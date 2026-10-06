@@ -89,6 +89,16 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
   - Minutos personalizados o chips rápidos (15m, 30m, 45m, 60m).
   - Contador regresivo en tiempo real con opción de añadir +5 minutos.
   - **Atenuación suave de volumen de 10 segundos** (*fade-out*) antes de pausar.
+- **Normalización de Volumen Inteligente (Loudness Normalizer Spotify / EBU R128 en C++20)**:
+  - Nivelación automática de sonoridad acústica entre pistas grabadas en épocas dispares o procedentes de fuentes heterogéneas (audios antiguos, grabaciones Hi-Fi, videos de YouTube y clips de TikTok).
+  - Algoritmo de control de ganancia dinámico en coma flotante de 64 bits en C++20 con limitador transparente anti-clipping:
+    - *Modo Sutil (-18 LUFS)*: Preserva el rango dinámico completo para música clásica y acústica.
+    - *Modo Estándar Spotify (-14 LUFS)*: Nivel oficial de streaming Spotify, garantizando volumen consistente sin pérdida de pegada.
+    - *Modo Alto (-11 LUFS)*: Sonoridad potente y constante para entornos ruidosos o altavoces portátiles.
+- **Automix Inteligente & Crossfade DJ con Curva de Ecualización en X (`DjAutomixFilter` en C++20)**:
+  - Mezcla continua y dinámica entre canciones estilo discoteca/DJ.
+  - **Detección Acústica de Outro**: Si la energía de la canción actual cae por debajo del umbral de silencio (`< 0.07f`) durante los últimos 4 segundos, salta suavemente a la siguiente pista omitiendo silencios muertos.
+  - **Curva de Ecualización DJ en X (Anti Bass Clashing)**: Atenúa progresivamente los subgraves (< 120 Hz) y agudos de la canción que finaliza para abrir espacio acústico a la canción entrante, eliminando saturaciones y choques de frecuencias bajas.
 - **Reproducción Continua Automática y Transición Suave (Crossfade / Fade-In)**:
   - Al terminar cualquier canción, avanza y reproduce automáticamente la siguiente pista de la cola o biblioteca de forma ininterrumpida.
   - Fundido de salida progresivo al acercarse al final de la pista y rampa de entrada suave (*fade-in*) calibrada al iniciar la siguiente canción, subiendo poco a poco hasta restaurar el 100% del volumen original sin quedarse atrapado en volumen bajo.
@@ -168,6 +178,12 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
   - Atenuación de frases anteriores y estilo neutro para los versos venideros.
   - Salto táctil instantáneo (*Seek-to-time*): Tocar cualquier verso rebobina o avanza la canción exactamente a esa marca de tiempo `[mm:ss.xx]`.
   - Visualizador de letras planas `.txt` con desplazamiento vertical continuo y tipografía cómoda.
+- **Modo Karaoke a Pantalla Completa Inmersivo (Full Screen Lyrics estilo Spotify / Apple Music Sing)**:
+  - Experiencia inmersiva completa accesible desde el botón de pantalla completa en la tarjeta de Karaoke o desde los controles de reproducción.
+  - Fondo degradado dinámico cinematográfico con halo ambiental que respira al ritmo del audio en C++20.
+  - Tipografía grande de alta definición (hasta 26sp) con resaltado neón, escala suave ampliada y atenuación progresiva de versos pasados y futuros.
+  - Auto-scroll continuo y botón flotante de sincronización (*"Sincronizar con audio"*) que aparece si el usuario explora la letra manualmente.
+  - Barra de transporte flotante inferior con minicarátula, marquesina fluida de título y artista, seekbar interactiva y controles de salto y reproducción.
 - **Edición y Carga Manual**: Diálogo modal para ingresar o pegar letras `.lrc` personalizadas o texto plano en cualquier momento.
 - **Acceso Rápido**: Botón de micrófono en la barra superior de Now Playing y botón alternador en los atajos inferiores para alternar entre carátula/canvas y vista karaoke con un solo toque.
 
@@ -192,7 +208,7 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
     - Cuando detecta una actualización disponible, la notificación nativa y el indicador interno muestran una barra de progreso en tiempo real (*"Descargando actualización de paquetes"*), con blindaje criptográfico SHA-256 (`SHA2-256SUMS`).
     - Mientras se descarga o está pendiente de aplicar una actualización de `yt-dlp`, las descargas por el motor `yt-dlp` quedan bloqueadas preventivamente (permitiendo usar InnerTube o WebView).
     - Al finalizar la descarga en staging seguro (`yt-dlp.staged`), recomienda al usuario salir de la app o pulsar **"Actualizar y Reiniciar"** para aplicar el nuevo paquete instantáneamente.
-  - **Protección Zip Slip en Motores Nativos**: Tanto `FFmpegNativeEngine` como `YtDlpNativeEngine` validan exhaustivamente las rutas canónicas (`canonicalFile.toPath().startsWith(...)`) al desempaquetar librerías dinámicas, impidiendo cualquier escape de directorio.
+  - **Protección Zip Slip y Consolidación de Certificados TLS en Android 14+**: Tanto `FFmpegNativeEngine` como `YtDlpNativeEngine` validan exhaustivamente las rutas canónicas (`canonicalFile.toPath().startsWith(...)`) al desempaquetar librerías dinámicas, impidiendo cualquier escape de directorio. Además, en Android 14+ (API 34+), consolida automáticamente los certificados CA de Conscrypt APEX (`/apex/com.android.conscrypt/cacerts/`) y KeyStore en `usr/etc/tls/cert.pem` con auto-recuperación ante fallos de emisor local (`CERTIFICATE_VERIFY_FAILED`).
   - **Disparador Dual**: Comprobación automática ante errores de extracción de YouTube y botón interactivo manual en *Ajustes > Apariencia & Temas > Motores de Extracción & yt-dlp OTA*.
 - **Arquitectura de Extracción Resiliente de 3 Niveles con Carátula Garantizada**:
   - ⚡ **Motor InnerTube Nativo (`InnerTubeClient`)**: Consulta directa ultrarrápida al endpoint oficial de YouTube mediante clientes de baja fricción (`ANDROID_VR` y `VISIONOS`). Entrega flujos de audio y video directos sin cifrado de firma (`n-sig`) ni bloqueos de `LOGIN_REQUIRED` en menos de ~300ms.

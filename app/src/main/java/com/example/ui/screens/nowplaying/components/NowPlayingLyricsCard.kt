@@ -59,6 +59,7 @@ fun NowPlayingLyricsCard(
     onSaveCustomLyrics: (String) -> Unit,
     onImportLyricsUri: (android.net.Uri) -> Unit = {},
     onOpenSearchLyrics: () -> Unit = {},
+    onOpenFullScreen: () -> Unit = {},
     onCloseLyrics: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -191,6 +192,19 @@ fun NowPlayingLyricsCard(
                             contentDescription = "Editar letra",
                             tint = TextSecondary,
                             modifier = Modifier.size(16.dp)
+                        )
+                    }
+
+                    // Botón para modo Karaoke a pantalla completa
+                    IconButton(
+                        onClick = onOpenFullScreen,
+                        modifier = Modifier.size(30.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Fullscreen,
+                            contentDescription = "Pantalla completa Karaoke",
+                            tint = animatedPrimary,
+                            modifier = Modifier.size(19.dp)
                         )
                     }
 

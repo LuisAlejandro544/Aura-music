@@ -119,6 +119,13 @@ fun NowPlayingScreen(
     onSetCrossfadeSeconds: (Int) -> Unit = {},
     isGaplessEnabled: Boolean = true,
     onSetGaplessEnabled: (Boolean) -> Unit = {},
+    isDjAutomixEnabled: Boolean = false,
+    onSetDjAutomixEnabled: (Boolean) -> Unit = {},
+    isDjEqCurveEnabled: Boolean = true,
+    onSetDjEqCurveEnabled: (Boolean) -> Unit = {},
+    volumeNormalizationConfig: com.example.model.VolumeNormalizationConfig = com.example.model.VolumeNormalizationConfig(),
+    onSetVolumeNormalizationEnabled: (Boolean) -> Unit = {},
+    onSetVolumeNormalizationMode: (Int) -> Unit = {},
     // Repetidor de Segmento A-B
     abLoopState: ABLoopState = ABLoopState(),
     onMarkABPointA: () -> Unit = {},
@@ -243,6 +250,7 @@ fun NowPlayingScreen(
     var showEditDialog by remember { mutableStateOf(false) }
     var showVideoModeDialog by remember { mutableStateOf(false) }
     var showLyrics by remember { mutableStateOf(false) }
+    var isFullScreenLyricsOpen by remember { mutableStateOf(false) }
 
     val hasVideo = !currentTrack.videoUri.isNullOrEmpty()
     val isFullscreenVideo = hasVideo && videoDisplayMode.isFullscreen
@@ -357,6 +365,7 @@ fun NowPlayingScreen(
                     onSaveCustomLyrics = onSaveCustomLyrics,
                     onImportLyricsUri = onImportLyricsUri,
                     onOpenSearchLyrics = onOpenSearchLyrics,
+                    onOpenFullScreen = { isFullScreenLyricsOpen = true },
                     onCloseLyrics = { showLyrics = false }
                 )
             } else {
@@ -652,6 +661,13 @@ fun NowPlayingScreen(
                 onSetCrossfadeSeconds = onSetCrossfadeSeconds,
                 isGaplessEnabled = isGaplessEnabled,
                 onSetGaplessEnabled = onSetGaplessEnabled,
+                isDjAutomixEnabled = isDjAutomixEnabled,
+                onSetDjAutomixEnabled = onSetDjAutomixEnabled,
+                isDjEqCurveEnabled = isDjEqCurveEnabled,
+                onSetDjEqCurveEnabled = onSetDjEqCurveEnabled,
+                volumeNormalizationConfig = volumeNormalizationConfig,
+                onSetVolumeNormalizationEnabled = onSetVolumeNormalizationEnabled,
+                onSetVolumeNormalizationMode = onSetVolumeNormalizationMode,
                 abLoopState = abLoopState,
                 onMarkABPointA = onMarkABPointA,
                 onMarkABPointB = onMarkABPointB,
@@ -679,6 +695,29 @@ fun NowPlayingScreen(
                 onDismissRequest = onCloseSearchLyrics,
                 onSearch = onSearchLyrics,
                 onSelectResult = onSelectLyricSearchResult
+            )
+        }
+
+        // Modo Karaoke a Pantalla Completa Inmersivo (Full Screen Lyrics)
+        if (isFullScreenLyricsOpen && currentTrack != null) {
+            FullScreenLyricsScreen(
+                currentTrack = currentTrack,
+                lyricsState = lyricsState,
+                isPlaying = isPlaying,
+                currentPositionMs = currentPositionMs,
+                durationMs = durationMs,
+                animatedPrimary = animatedPrimary,
+                animatedSecondary = animatedSecondary,
+                audioIntensity = audioIntensity,
+                onSeekTo = onSeekTo,
+                onTogglePlayPause = onTogglePlayPause,
+                onPlayNext = onPlayNext,
+                onPlayPrevious = onPlayPrevious,
+                onClose = { isFullScreenLyricsOpen = false },
+                onOpenSearchLyrics = onOpenSearchLyrics,
+                onImportLyricsUri = onImportLyricsUri,
+                onSaveCustomLyrics = onSaveCustomLyrics,
+                onFetchOnlineLyrics = onFetchOnlineLyrics
             )
         }
     }

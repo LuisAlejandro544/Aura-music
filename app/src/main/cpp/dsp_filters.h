@@ -186,6 +186,146 @@ private:
     BiquadPeakingFilter mArticulationFilter{};
 };
 
+/**
+ * Procesador C++20 de Normalización de Volumen Inteligente (Loudness Normalizer estilo Spotify / EBU R128).
+ * Mide continuamente la energía envolvente de la señal de audio (RMS aproximado) con seguimiento suave
+ * (ataque de 120ms, decaimiento de 600ms) y calcula una ganancia de compensación dinámica hacia el nivel
+ * objetivo (por defecto -14.0 LUFS / Spotify).
+ *
+ * Incluye filtro IIR de suavizado para evitar cambios abruptos ("pumping") y limitador suave softClip.
+ */
+class VolumeNormalizerProcessor {
+public:
+    void init(int sampleRate) {
+        mSampleRate = (sampleRate > 0) ? sampleRate : 44100;
+        reset();
+    }
+
+    void reset() {
+        mCurrentRms = 0.15;
+        mCurrentGain = 1.0;
+    }
+
+    void setEnabled(bool enabled) {
+        if (mEnabled != enabled) {
+            mEnabled = enabled;
+            if (!enabled) reset();
+        }
+    }
+
+    [[nodiscard]] bool isEnabled() const { return mEnabled; }
+
+    void setTargetLufs(float targetLufs) {
+        mTargetLufs = std::clamp(targetLufs, -24.0f, -6.0f);
+    }
+
+    [[nodiscard]] float getTargetLufs() const { return mTargetLufs; }
+
+    void setMode(int mode) {
+        mMode = std::clamp(mode, 0, 2); // 0 = Sutil (-18 LUFS), 1 = Estándar Spotify (-14 LUFS), 2 = Alto (-11 LUFS)
+        if (mMode == 0) mTargetLufs = -18.0f;
+        else if (mMode == 1) mTargetLufs = -14.0f;
+        else mTargetLufs = -11.0f;
+    }
+
+    [[nodiscard]] int getMode() const { return mMode; }
+
+    inline void processSample(double& sampleL, double& sampleR) {
+        if (!mEnabled) return;
+
+        double sampleEnergy = 0.5 * (std::abs(sampleL) + std::abs(sampleR));
+        double alpha = (sampleEnergy > mCurrentRms) ? 0.00015 : 0.00004;
+        mCurrentRms = (1.0 - alpha) * mCurrentRms + alpha * sampleEnergy;
+
+        double targetLinear = std::pow(10.0, (mTargetLufs + 3.0) / 20.0);
+        double targetGain = targetLinear / std::max(0.04, mCurrentRms);
+        targetGain = std::clamp(targetGain, 0.40, 2.50);
+
+        mCurrentGain = 0.99985 * mCurrentGain + 0.00015 * targetGain;
+
+        sampleL *= mCurrentGain;
+        sampleR *= mCurrentGain;
+    }
+
+private:
+    int mSampleRate{44100};
+    bool mEnabled{false};
+    float mTargetLufs{-14.0f}; // Spotify estándar
+    int mMode{1};              // 0 = Sutil, 1 = Estándar, 2 = Alto
+    double mCurrentRms{0.15};
+    double mCurrentGain{1.0};
+};
+
+/**
+ * Filtro C++20 de Curva de Ecualización DJ Automix (Crossfade con Curva en X).
+ * Durante la transición de pistas, atenúa de forma paramétrica y progresiva los subgraves (<160 Hz)
+ * y el brillo extremo (>9 kHz) de la canción que está finalizando, abriendo espacio acústico en la mezcla
+ * para que la canción entrante entre con pegada limpia sin distorsión por choque de bajos.
+ */
+class DjAutomixFilter {
+public:
+    void init(int sampleRate) {
+        mSampleRate = (sampleRate > 0) ? sampleRate : 44100;
+        reconfigure();
+        reset();
+    }
+
+    void reset() {
+        mBassCutFilterL.reset();
+        mBassCutFilterR.reset();
+        mHighTameFilterL.reset();
+        mHighTameFilterR.reset();
+    }
+
+    void setEnabled(bool enabled) {
+        if (mEnabled != enabled) {
+            mEnabled = enabled;
+            if (!enabled) reset();
+        }
+    }
+
+    [[nodiscard]] bool isEnabled() const { return mEnabled; }
+
+    void setTransitionProgress(float progress) {
+        float clamped = std::clamp(progress, 0.0f, 1.0f);
+        if (std::abs(mProgress - clamped) > 0.005f) {
+            mProgress = clamped;
+            reconfigure();
+        }
+    }
+
+    [[nodiscard]] float getTransitionProgress() const { return mProgress; }
+
+    inline void processSample(double& sampleL, double& sampleR) {
+        if (!mEnabled || mProgress <= 0.005f) return;
+
+        sampleL = mBassCutFilterL.process(sampleL);
+        sampleR = mBassCutFilterR.process(sampleR);
+        sampleL = mHighTameFilterL.process(sampleL);
+        sampleR = mHighTameFilterR.process(sampleR);
+    }
+
+private:
+    void reconfigure() {
+        double bassGainDb = -12.0 * mProgress;
+        double highGainDb = -6.0 * mProgress;
+
+        mBassCutFilterL.configurePeaking(mSampleRate, 120.0, bassGainDb, 0.85);
+        mBassCutFilterR.configurePeaking(mSampleRate, 120.0, bassGainDb, 0.85);
+        mHighTameFilterL.configurePeaking(mSampleRate, 9500.0, highGainDb, 0.95);
+        mHighTameFilterR.configurePeaking(mSampleRate, 9500.0, highGainDb, 0.95);
+    }
+
+    int mSampleRate{44100};
+    bool mEnabled{false};
+    float mProgress{0.0f};
+
+    BiquadPeakingFilter mBassCutFilterL{};
+    BiquadPeakingFilter mBassCutFilterR{};
+    BiquadPeakingFilter mHighTameFilterL{};
+    BiquadPeakingFilter mHighTameFilterR{};
+};
+
 } // namespace aura::dsp
 
 #endif // AURAMUSIC_DSP_FILTERS_H

@@ -75,7 +75,7 @@ app/
 │   │       │       ├── mixtape/                    # Motor de Fusión y Capítulos de Mixtape
 │   │       │       │   └── MixtapeEngine.kt        # Fusión FFmpeg acrossfade, collage WebP y capítulos
 │   │       │       ├── FFmpegNativeEngine.kt   # Extracción y Canvas con prevención de Flag Injection
-│   │       │       ├── YtDlpNativeEngine.kt    # Entorno nativo de ejecución con verificación TLS/SSL
+│   │       │       ├── YtDlpNativeEngine.kt    # Entorno nativo de ejecución con TLS/SSL y Android 14+ APEX CA
 │   │       │       ├── YtDlpAutoUpdater.kt     # Actualizador OTA con blindaje SHA-256 verificado
 │   │       │       ├── OnlineVideoAudioImporter.kt # Orquestador de importación web
 │   │       │       ├── InnerTubeClient.kt      # Cliente directo YouTube InnerTube
@@ -144,6 +144,15 @@ app/
 │   │       │   │   ├── nowplaying/
 │   │       │   │   │   ├── NowPlayingScreen.kt
 │   │       │   │   │   └── components/
+│   │       │   │   │       ├── FullScreenLyricsScreen.kt # Modo Karaoke Inmersivo a Pantalla Completa
+│   │       │   │   │       ├── NowPlayingArtworkCard.kt
+│   │       │   │   │       ├── NowPlayingLyricsCard.kt
+│   │       │   │   │       ├── NowPlayingPlaybackControls.kt
+│   │       │   │   │       ├── NowPlayingQueueSheet.kt
+│   │       │   │   │       ├── NowPlayingTopBar.kt
+│   │       │   │   │       ├── NowPlayingBalanceBar.kt
+│   │       │   │   │       ├── AudioSpecsDialog.kt
+│   │       │   │   │       └── VideoDisplayModeDialog.kt
 │   │       │   │   ├── settings/
 │   │       │   │   │   ├── SettingsScreen.kt
 │   │       │   │   │   └── components/

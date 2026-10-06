@@ -78,6 +78,12 @@ class AuraAudioPlayer(
     private val _isGaplessEnabled = MutableStateFlow(true)
     val isGaplessEnabled: StateFlow<Boolean> = _isGaplessEnabled.asStateFlow()
 
+    private val _isDjAutomixEnabled = MutableStateFlow(false)
+    val isDjAutomixEnabled: StateFlow<Boolean> = _isDjAutomixEnabled.asStateFlow()
+
+    private val _isDjEqCurveEnabled = MutableStateFlow(true)
+    val isDjEqCurveEnabled: StateFlow<Boolean> = _isDjEqCurveEnabled.asStateFlow()
+
     // Controladores modulares desacoplados
     private val queueController = PlayerQueueController()
     val queue: StateFlow<List<Track>> = queueController.queue
@@ -329,7 +335,21 @@ class AuraAudioPlayer(
     }
 
     fun setCrossfadeSeconds(seconds: Int) {
-        _crossfadeSeconds.value = seconds.coerceIn(0, 12)
+        _crossfadeSeconds.value = seconds.coerceIn(0, 15)
+    }
+
+    fun setDjAutomixEnabled(enabled: Boolean) {
+        _isDjAutomixEnabled.value = enabled
+        if (!enabled) {
+            effectManager.setDjAutomixTransition(false, 0.0f)
+        }
+    }
+
+    fun setDjEqCurveEnabled(enabled: Boolean) {
+        _isDjEqCurveEnabled.value = enabled
+        if (!enabled) {
+            effectManager.setDjAutomixTransition(false, 0.0f)
+        }
     }
 
     fun setGaplessEnabled(enabled: Boolean) {
@@ -502,10 +522,35 @@ class AuraAudioPlayer(
                             _currentPosition.value = aMs
                         }
                     } else {
-                        if (_crossfadeSeconds.value > 0 && player.duration > 0 && player.isPlaying) {
+                        val crossfadeSecs = _crossfadeSeconds.value
+                        val isDjMix = _isDjAutomixEnabled.value
+                        val effectiveCrossfadeSecs = if (isDjMix && crossfadeSecs == 0) 5 else crossfadeSecs
+
+                        if (effectiveCrossfadeSecs > 0 && player.duration > 0 && player.isPlaying) {
                             val remainingMs = player.duration - pos
-                            val crossfadeMs = _crossfadeSeconds.value * 1000L
+                            val crossfadeMs = effectiveCrossfadeSecs * 1000L
                             fadeController.applyFadeOut(remainingMs, crossfadeMs, player)
+
+                            // Curva de ecualización DJ en X: atenúa subgraves de la canción saliente
+                            if (_isDjEqCurveEnabled.value && remainingMs in 0..crossfadeMs) {
+                                val progress = (1.0f - (remainingMs.toFloat() / crossfadeMs.toFloat())).coerceIn(0.0f, 1.0f)
+                                effectManager.setDjAutomixTransition(true, progress)
+                            } else {
+                                effectManager.setDjAutomixTransition(false, 0.0f)
+                            }
+
+                            // Detección inteligente de outro en DJ Automix: si la intensidad acústica cae (<0.07f)
+                            // en los últimos 4 segundos, avanzar a la siguiente pista para omitir silencio muerto
+                            if (isDjMix && remainingMs in 250L..4200L && NativeAudioEngine.getAudioIntensity() < 0.07f && !isTransitioningTrack) {
+                                isTransitioningTrack = true
+                                playerScope.launch(Dispatchers.Main) {
+                                    handleTrackEnded()
+                                    delay(600L)
+                                    isTransitioningTrack = false
+                                }
+                            }
+                        } else {
+                            effectManager.setDjAutomixTransition(false, 0.0f)
                         }
 
                         if (player.duration > 0 && player.isPlaying && !isTransitioningTrack) {

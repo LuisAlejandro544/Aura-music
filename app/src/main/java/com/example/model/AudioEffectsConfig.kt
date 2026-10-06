@@ -67,8 +67,22 @@ data class SleepTimerState(
 }
 
 data class PlaybackTransitionConfig(
-    val crossfadeSeconds: Int = 0, // 0 = Gapless directo; 1..12 = segundos de fundido cruzado
-    val isGapless: Boolean = true
+    val crossfadeSeconds: Int = 0, // 0 = Gapless directo; 1..15 = segundos de fundido cruzado
+    val isGapless: Boolean = true,
+    val isDjAutomixEnabled: Boolean = false,
+    val isDjEqCurveEnabled: Boolean = true
+)
+
+/**
+ * Configuración de Normalización de Volumen Inteligente (Loudness Normalizer estilo Spotify / EBU R128).
+ * Nivela automáticamente la energía acústica entre canciones dispares para eliminar saltos bruscos de volumen.
+ * - targetLufs: Nivel objetivo (-14.0f es el estándar oficial de Spotify).
+ * - mode: 0 = Sutil (-18 LUFS), 1 = Estándar Spotify (-14 LUFS), 2 = Alto (-11 LUFS).
+ */
+data class VolumeNormalizationConfig(
+    val enabled: Boolean = false,
+    val targetLufs: Float = -14.0f,
+    val mode: Int = 1 // 0 = Sutil (-18 LUFS), 1 = Estándar Spotify (-14 LUFS), 2 = Alto (-11 LUFS)
 )
 
 /**

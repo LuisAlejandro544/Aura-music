@@ -82,6 +82,9 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
     val playbackPitch by viewModel.playbackPitch.collectAsStateWithLifecycle()
     val crossfadeSeconds by viewModel.crossfadeSeconds.collectAsStateWithLifecycle()
     val isGaplessEnabled by viewModel.isGaplessEnabled.collectAsStateWithLifecycle()
+    val isDjAutomixEnabled by viewModel.isDjAutomixEnabled.collectAsStateWithLifecycle()
+    val isDjEqCurveEnabled by viewModel.isDjEqCurveEnabled.collectAsStateWithLifecycle()
+    val volumeNormalizationConfig by viewModel.volumeNormalizationConfig.collectAsStateWithLifecycle()
     val abLoopState by viewModel.abLoopState.collectAsStateWithLifecycle()
     val videoDisplayMode by viewModel.videoDisplayMode.collectAsStateWithLifecycle()
     val isVideoCanvasActive by viewModel.isVideoCanvasActive.collectAsStateWithLifecycle()
@@ -486,6 +489,13 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
                 onSetCrossfadeSeconds = { viewModel.setCrossfadeSeconds(it) },
                 isGaplessEnabled = isGaplessEnabled,
                 onSetGaplessEnabled = { viewModel.setGaplessEnabled(it) },
+                isDjAutomixEnabled = isDjAutomixEnabled,
+                onSetDjAutomixEnabled = { viewModel.setDjAutomixEnabled(it) },
+                isDjEqCurveEnabled = isDjEqCurveEnabled,
+                onSetDjEqCurveEnabled = { viewModel.setDjEqCurveEnabled(it) },
+                volumeNormalizationConfig = volumeNormalizationConfig,
+                onSetVolumeNormalizationEnabled = { viewModel.setVolumeNormalizationEnabled(it) },
+                onSetVolumeNormalizationMode = { viewModel.setVolumeNormalizationMode(it) },
                 abLoopState = abLoopState,
                 onMarkABPointA = { viewModel.markABPointA() },
                 onMarkABPointB = { viewModel.markABPointB() },

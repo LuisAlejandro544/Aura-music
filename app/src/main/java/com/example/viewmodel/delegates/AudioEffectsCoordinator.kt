@@ -32,6 +32,9 @@ class AudioEffectsCoordinator(
     val spatial8DConfig = effectManager.spatial8DConfig
     val vocalClarityConfig = effectManager.vocalClarityConfig
     val reverbConfig = effectManager.reverbConfig
+    val volumeNormalizationConfig = effectManager.volumeNormalizationConfig
+    val isDjAutomixEnabled = audioPlayer.isDjAutomixEnabled
+    val isDjEqCurveEnabled = audioPlayer.isDjEqCurveEnabled
 
     // Estado del Temporizador de Apagado (Sleep Timer)
     private var sleepTimerJob: Job? = null
@@ -133,6 +136,14 @@ class AudioEffectsCoordinator(
         )
         audioPlayer.setVolume(1.0f)
     }
+
+    // Normalización de Volumen Inteligente (Spotify -14 LUFS / EBU R128)
+    fun setVolumeNormalizationEnabled(enabled: Boolean) = effectManager.setVolumeNormalizationEnabled(enabled)
+    fun setVolumeNormalizationMode(mode: Int) = effectManager.setVolumeNormalizationMode(mode)
+
+    // Automix Inteligente DJ & Curva de Ecualización en X
+    fun setDjAutomixEnabled(enabled: Boolean) = audioPlayer.setDjAutomixEnabled(enabled)
+    fun setDjEqCurveEnabled(enabled: Boolean) = audioPlayer.setDjEqCurveEnabled(enabled)
 
     fun release() {
         cancelSleepTimer()

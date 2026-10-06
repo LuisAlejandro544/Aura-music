@@ -143,5 +143,9 @@ Este documento define el protocolo de trabajo para los agentes de software y des
 - [x] ¿Se completó el desarrollo modular de `MusicViewModel.kt`, `MainActivity.kt`, `DownloadFromLinkDialog.kt` y `StoredMediaSettingsTab.kt` manteniendo todos los archivos bajo 500 líneas con 100% de compatibilidad pública?
 - [x] ¿Se mitigó la Omisión Silenciosa de SHA-256 en OTA, la desactivación TLS/SSL en yt-dlp, las colisiones de nombres/extensiones en SAF y la inyección de opciones en FFmpeg?
 - [x] ¿Se erradicó el bucle de re-descarga infinita de yt-dlp (`forceDownload`), alcanzando el progreso al 100% verificado en la notificación nativa, descartándola limpiamente ante fallos de red, aplicando paquetes en caliente y desbloqueando el diálogo con fallback instantáneo a InnerTube?
+- [x] ¿Se solucionó el error de verificación de certificados SSL/TLS en Android 14+ (`CERTIFICATE_VERIFY_FAILED: unable to get local issuer certificate`) mediante consolidación automática del almacén CA de Conscrypt APEX (`/apex/com.android.conscrypt/cacerts`), KeyStore PEM y auto-recuperación con reintento resiliente en `YtDlpNativeEngine`?
+- [x] ¿La Normalización de Volumen Inteligente (Loudness Normalizer Spotify / EBU R128) en C++20 (`VolumeNormalizerProcessor`) nivela la energía entre canciones con modos Sutil (-18 LUFS), Estándar (-14 LUFS) y Alto (-11 LUFS) sin distorsión?
+- [x] ¿El Automix Inteligente DJ con Curva de Ecualización en X (`DjAutomixFilter`) atenúa subgraves (<120 Hz) durante la mezcla y detecta el outro acústico (<0.07f) para transiciones fluidas de discoteca?
+- [x] ¿El Modo Karaoke a Pantalla Completa Inmersivo (`FullScreenLyricsScreen`) proporciona una experiencia visual tipo Spotify / Apple Music Sing con resaltado neón, escala dinámica, auto-scroll interactivo y barra de transporte flotante?
 - [x] ¿Los 5 archivos Markdown (`README.md`, `ROADMAP.md`, `STRUCTURE.md`, `AI_CONTEXT.md`, `AGENTS.md`) están actualizados y en español?
 

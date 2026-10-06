@@ -226,6 +226,29 @@ object NativeAudioEngine {
         }
     }
 
+    /**
+     * Activa o desactiva la Normalización de Volumen Inteligente (Spotify -14 LUFS / EBU R128).
+     */
+    fun setVolumeNormalization(enabled: Boolean, targetLufs: Float = -14.0f, mode: Int = 1) {
+        if (isLoaded) {
+            try {
+                nativeSetVolumeNormalization(enabled, targetLufs, mode)
+            } catch (ignored: Throwable) {}
+        }
+    }
+
+    /**
+     * Aplica la Curva de Ecualización DJ Automix en tiempo real durante la transición de pistas.
+     * [progress] va de 0.0f (reproducción normal) a 1.0f (outro/mezcla con recorte de bajos para dar paso a la siguiente).
+     */
+    fun setDjAutomixTransition(enabled: Boolean, progress: Float) {
+        if (isLoaded) {
+            try {
+                nativeSetDjAutomixTransition(enabled, progress.coerceIn(0.0f, 1.0f))
+            } catch (ignored: Throwable) {}
+        }
+    }
+
     // --- Declaraciones de Métodos Nativos C++20 JNI ---
     private external fun getNativeEngineInfo(): String
     private external fun isDspActive(): Boolean
@@ -249,4 +272,6 @@ object NativeAudioEngine {
     private external fun nativeGetAudioIntensity(): Float
     private external fun nativeGetVisualizerBands(outBands: FloatArray)
     private external fun nativeFlushDspBuffers()
+    private external fun nativeSetVolumeNormalization(enabled: Boolean, targetLufs: Float, mode: Int)
+    private external fun nativeSetDjAutomixTransition(enabled: Boolean, progress: Float)
 }

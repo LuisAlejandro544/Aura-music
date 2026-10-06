@@ -143,6 +143,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val vocalClarityConfig = effectsCoordinator.vocalClarityConfig
     val reverbConfig = effectsCoordinator.reverbConfig
     val sleepTimerState = effectsCoordinator.sleepTimerState
+    val volumeNormalizationConfig = effectsCoordinator.volumeNormalizationConfig
+    val isDjAutomixEnabled = effectsCoordinator.isDjAutomixEnabled
+    val isDjEqCurveEnabled = effectsCoordinator.isDjEqCurveEnabled
 
     // Estado del actualizador de paquetes yt-dlp
     val packageUpdateState = YtDlpAutoUpdater.packageUpdateState
@@ -439,6 +442,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     fun startSleepTimer(minutes: Int) = effectsCoordinator.startSleepTimer(minutes)
     fun cancelSleepTimer() = effectsCoordinator.cancelSleepTimer()
     fun addSleepTimerMinutes(extraMinutes: Int = 5) = effectsCoordinator.addSleepTimerMinutes(extraMinutes)
+    fun setVolumeNormalizationEnabled(enabled: Boolean) = effectsCoordinator.setVolumeNormalizationEnabled(enabled)
+    fun setVolumeNormalizationMode(mode: Int) = effectsCoordinator.setVolumeNormalizationMode(mode)
+    fun setDjAutomixEnabled(enabled: Boolean) = effectsCoordinator.setDjAutomixEnabled(enabled)
+    fun setDjEqCurveEnabled(enabled: Boolean) = effectsCoordinator.setDjEqCurveEnabled(enabled)
 
     // Parámetros de velocidad y bucle A-B
     fun setPlaybackSpeed(speed: Float) = audioPlayer.setPlaybackSpeed(speed)
