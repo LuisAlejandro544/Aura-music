@@ -82,7 +82,7 @@ fun DownloadFromLinkDialog(
             if (initialUrl.contains("youtu", ignoreCase = true)) DownloadSourceMode.YOUTUBE_WEB else initialMode
         )
     }
-    var selectedEngine by remember { mutableStateOf(YoutubeExtractionEngine.YTDLP) }
+    var selectedEngine by remember { mutableStateOf(YoutubeExtractionEngine.INNERTUBE) }
     var linkUrl by remember { mutableStateOf(initialUrl) }
     var isResolving by remember { mutableStateOf(false) }
     var resolveError by remember { mutableStateOf<String?>(null) }
@@ -106,8 +106,8 @@ fun DownloadFromLinkDialog(
             packageUpdateState.isYtDlpTemporarilyLocked
 
     // Auto-resolución al abrir con URL predeterminada
-    LaunchedEffect(initialUrl, isYtDlpBlocked) {
-        if (initialUrl.isNotBlank() && resolvedInfo == null && !isYtDlpBlocked) {
+    LaunchedEffect(initialUrl) {
+        if (initialUrl.isNotBlank() && resolvedInfo == null) {
             isResolving = true
             resolveError = null
             val result = OnlineVideoAudioImporter.resolveMediaLink(
@@ -287,7 +287,7 @@ fun DownloadFromLinkDialog(
                                     }
                                 }
                             },
-                            enabled = !isResolving && linkUrl.isNotBlank() && !isYtDlpBlocked,
+                            enabled = !isResolving && linkUrl.isNotBlank(),
                             shape = RoundedCornerShape(14.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                             modifier = Modifier
@@ -300,9 +300,9 @@ fun DownloadFromLinkDialog(
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Text("Inspeccionando enlace...")
                             } else if (isYtDlpBlocked) {
-                                Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Icon(Icons.Default.Bolt, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("yt-dlp bloqueado hasta actualizar", fontWeight = FontWeight.Bold)
+                                Text("Inspeccionar Video (Vía Rápida)", fontWeight = FontWeight.Bold)
                             } else {
                                 Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(8.dp))

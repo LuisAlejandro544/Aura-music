@@ -184,6 +184,13 @@ object YtDlpAutoUpdater {
         }
     }
 
+    private fun resetToIdle(context: Context, showNotifications: Boolean) {
+        if (showNotifications) {
+            AuraDownloadService.dismissPackageNotification(context)
+        }
+        _packageUpdateState.value = PackageUpdateState.Idle
+    }
+
     /**
      * Consulta GitHub y actualiza yt-dlp si hay una versión más reciente,
      * sincronizando el progreso con la notificación nativa y el estado reactivo de la UI.
@@ -195,18 +202,14 @@ object YtDlpAutoUpdater {
     ): UpdateResult = withContext(Dispatchers.IO) {
         updateMutex.withLock {
             val appContext = context.applicationContext
-            // 1. Si había un paquete .staged pendiente de una sesión previa, aplicarlo antes de verificar
+            // Si había un paquete .staged pendiente de una sesión previa, aplicarlo antes de verificar
             applyStagedUpdateIfPresent(appContext)
-
-            // Asegurar que la copia base de assets esté extraída si es primera ejecución
             YtDlpNativeEngine.init(appContext)
 
             val currentVersion = getInstalledVersion(appContext)
             val checkingMsg = "Verificando paquetes necesarios..."
             _packageUpdateState.value = PackageUpdateState.Checking(checkingMsg)
-            if (showNotifications) {
-                AuraDownloadService.notifyPackageChecking(appContext, checkingMsg)
-            }
+            if (showNotifications) AuraDownloadService.notifyPackageChecking(appContext, checkingMsg)
             AuraDebugManager.logInfo(TAG, "Comprobando actualizaciones de paquetes (yt-dlp actual: $currentVersion)...")
 
             try {
@@ -221,30 +224,21 @@ object YtDlpAutoUpdater {
                 if (!response.isSuccessful) {
                     val err = "Error al consultar GitHub API: HTTP ${response.code}"
                     AuraDebugManager.logWarning(TAG, err)
-                    if (showNotifications) {
-                        AuraDownloadService.dismissPackageNotification(appContext)
-                    }
-                    _packageUpdateState.value = PackageUpdateState.Idle
+                    resetToIdle(appContext, showNotifications)
                     return@withLock UpdateResult.Error(err, currentVersion)
                 }
 
                 val body = response.body?.string()
                 if (body.isNullOrBlank()) {
-                    if (showNotifications) {
-                        AuraDownloadService.dismissPackageNotification(appContext)
-                    }
-                    _packageUpdateState.value = PackageUpdateState.Idle
+                    resetToIdle(appContext, showNotifications)
                     return@withLock UpdateResult.Error("Respuesta vacía de GitHub Releases.", currentVersion)
                 }
 
                 val json = JSONObject(body)
                 val latestTagName = json.optString("tag_name", "").trim()
                 if (latestTagName.isBlank()) {
-                    if (showNotifications) {
-                        AuraDownloadService.dismissPackageNotification(appContext)
-                    }
-                    _packageUpdateState.value = PackageUpdateState.Idle
-                    return@withLock UpdateResult.Error("No se pudo obtener la etiqueta de versión de GitHub.", currentVersion)
+                    resetToIdle(appContext, showNotifications)
+                    return@withLock UpdateResult.Error("No se pudo obtener la versión de GitHub.", currentVersion)
                 }
 
                 // Comprobar si ya está al día
@@ -254,14 +248,11 @@ object YtDlpAutoUpdater {
                         version = latestTagName,
                         message = "Paquetes necesarios al día ($latestTagName)"
                     )
-                    if (showNotifications) {
-                        AuraDownloadService.notifyPackageUpToDate(appContext, latestTagName)
-                    }
+                    if (showNotifications) AuraDownloadService.notifyPackageUpToDate(appContext, latestTagName)
                     updaterScope.launch {
                         delay(2600L)
                         if (_packageUpdateState.value is PackageUpdateState.UpToDate) {
-                            _packageUpdateState.value = PackageUpdateState.Idle
-                            AuraDownloadService.dismissPackageNotification(appContext)
+                            resetToIdle(appContext, true)
                         }
                     }
                     return@withLock UpdateResult.AlreadyUpToDate(latestTagName)
@@ -274,45 +265,32 @@ object YtDlpAutoUpdater {
                 if (assets != null) {
                     for (i in 0 until assets.length()) {
                         val asset = assets.getJSONObject(i)
-                        val assetName = asset.optString("name")
-                        if (assetName == "yt-dlp") {
-                            downloadUrl = asset.optString("browser_download_url")
-                        } else if (assetName == "SHA2-256SUMS") {
-                            checksumsUrl = asset.optString("browser_download_url")
+                        when (asset.optString("name")) {
+                            "yt-dlp" -> downloadUrl = asset.optString("browser_download_url")
+                            "SHA2-256SUMS" -> checksumsUrl = asset.optString("browser_download_url")
                         }
                     }
                 }
 
-                if (downloadUrl.isNullOrBlank()) {
-                    downloadUrl = "https://github.com/yt-dlp/yt-dlp/releases/download/$latestTagName/yt-dlp"
-                }
-                if (checksumsUrl.isNullOrBlank()) {
-                    checksumsUrl = "https://github.com/yt-dlp/yt-dlp/releases/download/$latestTagName/SHA2-256SUMS"
-                }
+                if (downloadUrl.isNullOrBlank()) downloadUrl = "https://github.com/yt-dlp/yt-dlp/releases/download/$latestTagName/yt-dlp"
+                if (checksumsUrl.isNullOrBlank()) checksumsUrl = "https://github.com/yt-dlp/yt-dlp/releases/download/$latestTagName/SHA2-256SUMS"
 
-                // Emitir estado de descarga (bloquea temporalmente yt-dlp hasta terminar y aplicar)
                 _packageUpdateState.value = PackageUpdateState.Downloading(
                     progressPercent = 0,
                     version = latestTagName,
                     message = "Descargando actualización de paquetes ($latestTagName)..."
                 )
-                if (showNotifications) {
-                    AuraDownloadService.notifyPackageDownloadProgress(appContext, 0, latestTagName)
-                }
+                if (showNotifications) AuraDownloadService.notifyPackageDownloadProgress(appContext, 0, latestTagName)
 
                 val expectedSha256 = fetchExpectedSha256(checksumsUrl, "yt-dlp")
                 if (expectedSha256.isNullOrBlank()) {
-                    val err = "No se pudo obtener el hash SHA-256 criptográfico para yt-dlp ($latestTagName). Abortando por seguridad."
+                    val err = "No se pudo obtener el hash SHA-256 oficial para yt-dlp ($latestTagName). Cancelando."
                     AuraDebugManager.logError(TAG, err)
-                    if (showNotifications) {
-                        AuraDownloadService.dismissPackageNotification(appContext)
-                    }
-                    _packageUpdateState.value = PackageUpdateState.Idle
+                    resetToIdle(appContext, showNotifications)
                     return@withLock UpdateResult.Error(err, currentVersion)
                 }
 
-                AuraDebugManager.logInfo(TAG, "Descargando paquete yt-dlp ($latestTagName) con verificación SHA-256 obligatoria ($expectedSha256)...")
-
+                AuraDebugManager.logInfo(TAG, "Descargando paquete yt-dlp ($latestTagName) con SHA-256 ($expectedSha256)...")
                 val downloadSuccess = downloadFileWithProgressAndVerification(
                     url = downloadUrl,
                     expectedSha256 = expectedSha256,
@@ -322,30 +300,30 @@ object YtDlpAutoUpdater {
                 )
 
                 if (downloadSuccess) {
-                    AuraDebugManager.logInfo(TAG, "¡Paquete yt-dlp ($latestTagName) descargado y verificado! Pendiente de reinicio para aplicar.")
-                    val restartMsg = "Actualización de paquetes descargada ($latestTagName). Sal de la app o toca Actualizar para aplicar."
-                    _packageUpdateState.value = PackageUpdateState.RestartRequired(
-                        version = latestTagName,
-                        message = restartMsg
-                    )
-                    if (showNotifications) {
-                        AuraDownloadService.notifyPackageRestartRequired(appContext, latestTagName)
+                    val applied = applyStagedUpdateIfPresent(appContext)
+                    if (applied) {
+                        AuraDebugManager.logInfo(TAG, "¡Paquete yt-dlp ($latestTagName) aplicado en caliente con éxito!")
+                        _packageUpdateState.value = PackageUpdateState.UpToDate(latestTagName, "Paquetes actualizados ($latestTagName)")
+                        if (showNotifications) AuraDownloadService.notifyPackageUpToDate(appContext, latestTagName)
+                        updaterScope.launch {
+                            delay(2500L)
+                            if (_packageUpdateState.value is PackageUpdateState.UpToDate) resetToIdle(appContext, true)
+                        }
+                        UpdateResult.Updated(currentVersion, latestTagName)
+                    } else {
+                        AuraDebugManager.logInfo(TAG, "Paquete yt-dlp ($latestTagName) preparado (.staged). Pendiente de reinicio.")
+                        _packageUpdateState.value = PackageUpdateState.RestartRequired(latestTagName, "Paquetes descargados ($latestTagName).")
+                        if (showNotifications) AuraDownloadService.notifyPackageRestartRequired(appContext, latestTagName)
+                        UpdateResult.Updated(currentVersion, latestTagName)
                     }
-                    UpdateResult.Updated(previousVersion = currentVersion, newVersion = latestTagName)
                 } else {
-                    if (showNotifications) {
-                        AuraDownloadService.dismissPackageNotification(appContext)
-                    }
-                    _packageUpdateState.value = PackageUpdateState.Idle
+                    resetToIdle(appContext, showNotifications)
                     UpdateResult.Error("Fallo de integridad o descarga del paquete yt-dlp.", currentVersion)
                 }
             } catch (e: Exception) {
                 val msg = "Excepción al verificar/actualizar paquetes: ${e.message}"
                 AuraDebugManager.logWarning(TAG, msg)
-                if (showNotifications) {
-                    AuraDownloadService.dismissPackageNotification(appContext)
-                }
-                _packageUpdateState.value = PackageUpdateState.Idle
+                resetToIdle(appContext, showNotifications)
                 UpdateResult.Error(msg, currentVersion)
             }
         }
@@ -370,28 +348,18 @@ object YtDlpAutoUpdater {
         }
     }
 
-    /**
-     * Valida que el host de descarga pertenezca estrictamente a dominios oficiales de GitHub.
-     */
     private fun isValidDownloadHost(url: String): Boolean {
         val host = Uri.parse(url).host?.lowercase() ?: return false
-        return host == "github.com" ||
-                host.endsWith(".github.com") ||
-                host == "objects.githubusercontent.com" ||
-                host.endsWith(".githubusercontent.com")
+        return host == "github.com" || host.endsWith(".github.com") ||
+                host == "objects.githubusercontent.com" || host.endsWith(".githubusercontent.com")
     }
 
-    /**
-     * Calcula el hash SHA-256 de un archivo en disco.
-     */
     private fun computeFileSha256(file: File): String {
         val digest = MessageDigest.getInstance("SHA-256")
         file.inputStream().use { stream ->
-            val buffer = ByteArray(8192)
-            var bytesRead: Int
-            while (stream.read(buffer).also { bytesRead = it } != -1) {
-                digest.update(buffer, 0, bytesRead)
-            }
+            val buf = ByteArray(8192)
+            var n: Int
+            while (stream.read(buf).also { n = it } != -1) digest.update(buf, 0, n)
         }
         return digest.digest().joinToString("") { "%02x".format(it) }
     }
@@ -441,7 +409,7 @@ object YtDlpAutoUpdater {
                     while (input.read(buffer).also { read = it } != -1) {
                         output.write(buffer, 0, read)
                         downloadedBytes += read
-                        val pct = ((downloadedBytes * 100L) / totalBytes).toInt().coerceIn(0, 99)
+                        val pct = ((downloadedBytes * 100L) / totalBytes).toInt().coerceIn(0, 95)
                         if (pct >= lastReportedPct + 2 || lastReportedPct == -1) {
                             lastReportedPct = pct
                             _packageUpdateState.value = PackageUpdateState.Downloading(
@@ -461,7 +429,20 @@ object YtDlpAutoUpdater {
 
             if (!tempFile.exists() || tempFile.length() < 100_000L) {
                 tempFile.delete()
+                if (showNotifications) AuraDownloadService.dismissPackageNotification(context)
                 return false
+            }
+
+            // Reportar progreso de verificación de hash SHA-256
+            _packageUpdateState.value = PackageUpdateState.Downloading(
+                progressPercent = 98,
+                downloadedBytes = totalBytes,
+                totalBytes = totalBytes,
+                version = versionTag,
+                message = "Verificando integridad SHA-256 (98%)..."
+            )
+            if (showNotifications) {
+                AuraDownloadService.notifyPackageDownloadProgress(context, 98, versionTag)
             }
 
             if (expectedSha256.isNullOrBlank()) {
@@ -470,6 +451,7 @@ object YtDlpAutoUpdater {
                     "Rechazando actualización OTA: No se pudo obtener la suma criptográfica SHA-256 oficial para yt-dlp ($versionTag). Abortando por seguridad."
                 )
                 tempFile.delete()
+                if (showNotifications) AuraDownloadService.dismissPackageNotification(context)
                 return false
             }
 
@@ -480,6 +462,7 @@ object YtDlpAutoUpdater {
                     "Fallo de integridad SHA-256 en yt-dlp. Esperado: $expectedSha256, Calculado: $computedHash"
                 )
                 tempFile.delete()
+                if (showNotifications) AuraDownloadService.dismissPackageNotification(context)
                 return false
             }
 
@@ -491,10 +474,25 @@ object YtDlpAutoUpdater {
             }
             stagedFile.setExecutable(true, false)
             stagedVersionFile.writeText(versionTag)
+
+            // Emitir 100% completado con éxito
+            _packageUpdateState.value = PackageUpdateState.Downloading(
+                progressPercent = 100,
+                downloadedBytes = totalBytes,
+                totalBytes = totalBytes,
+                version = versionTag,
+                message = "¡Paquete verificado exitosamente! (100%)"
+            )
+            if (showNotifications) {
+                AuraDownloadService.notifyPackageDownloadProgress(context, 100, versionTag)
+            }
             return true
         } catch (e: Exception) {
             if (tempFile.exists()) tempFile.delete()
             AuraDebugManager.logWarning(TAG, "Error en downloadFileWithProgressAndVerification: ${e.message}")
+            if (showNotifications) {
+                AuraDownloadService.dismissPackageNotification(context)
+            }
             return false
         }
     }

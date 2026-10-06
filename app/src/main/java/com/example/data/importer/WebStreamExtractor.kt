@@ -57,15 +57,14 @@ object WebStreamExtractor {
         // Opción 1: Solicitado yt-dlp prioritario
         if (preferredEngine == YoutubeExtractionEngine.YTDLP) {
             if (YtDlpAutoUpdater.isYtDlpTemporarilyBlocked()) {
-                return Result.failure(
-                    IllegalStateException("Las descargas por yt-dlp están bloqueadas temporalmente mientras se actualiza el paquete. Reinicia la app para aplicar los nuevos paquetes.")
-                )
+                AuraDebugManager.logInfo("WebStreamExtractor", "yt-dlp en actualización. Fallback automático transparente a InnerTube...")
+            } else {
+                val ytdlpResult = YtDlpNativeEngine.resolveStream(context, url)
+                if (ytdlpResult.isSuccess) {
+                    return ytdlpResult
+                }
+                AuraDebugManager.logWarning("WebStreamExtractor", "yt-dlp no pudo resolver el stream. Continuando con InnerTube...")
             }
-            val ytdlpResult = YtDlpNativeEngine.resolveStream(context, url)
-            if (ytdlpResult.isSuccess) {
-                return ytdlpResult
-            }
-            AuraDebugManager.logWarning("WebStreamExtractor", "yt-dlp no pudo resolver el stream. Continuando con InnerTube...")
         }
 
         return if (preferredEngine == YoutubeExtractionEngine.INNERTUBE || preferredEngine == YoutubeExtractionEngine.YTDLP) {

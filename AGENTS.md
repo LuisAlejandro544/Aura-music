@@ -142,5 +142,6 @@ Este documento define el protocolo de trabajo para los agentes de software y des
 - [x] ¿El Mixtape Maker / Fusión de Canciones con Crossfade Continuo en FFmpeg (`MixtapeEngine`), carátula collage WebP sin pérdida, sincronización reactiva de carátulas y Video Canvas por capítulos en tiempo real, y concatenación offset de letras Karaoke (.LRC) están integrados y operativos desde las Playlists?
 - [x] ¿Se completó el desarrollo modular de `MusicViewModel.kt`, `MainActivity.kt`, `DownloadFromLinkDialog.kt` y `StoredMediaSettingsTab.kt` manteniendo todos los archivos bajo 500 líneas con 100% de compatibilidad pública?
 - [x] ¿Se mitigó la Omisión Silenciosa de SHA-256 en OTA, la desactivación TLS/SSL en yt-dlp, las colisiones de nombres/extensiones en SAF y la inyección de opciones en FFmpeg?
+- [x] ¿Se erradicó el bucle de re-descarga infinita de yt-dlp (`forceDownload`), alcanzando el progreso al 100% verificado en la notificación nativa, descartándola limpiamente ante fallos de red, aplicando paquetes en caliente y desbloqueando el diálogo con fallback instantáneo a InnerTube?
 - [x] ¿Los 5 archivos Markdown (`README.md`, `ROADMAP.md`, `STRUCTURE.md`, `AI_CONTEXT.md`, `AGENTS.md`) están actualizados y en español?
 

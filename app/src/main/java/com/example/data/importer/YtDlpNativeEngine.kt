@@ -285,10 +285,8 @@ object YtDlpNativeEngine {
 
             if (exitCode != 0 || jsonOutput.isBlank()) {
                 AuraDebugManager.logWarning(TAG, "yt-dlp terminó con código $exitCode. Error: ${errorLog.takeLast(300)}")
-                // Intentar auto-actualización por si YouTube parchó sus firmas
-                YtDlpAutoUpdater.checkAndUpdate(context, forceDownload = true)
                 return@withContext Result.failure(
-                    Exception("yt-dlp finalizó con código $exitCode. Se sincronizó actualización OTA.")
+                    Exception("yt-dlp finalizó con código $exitCode. Error: ${errorLog.takeLast(120).trim()}")
                 )
             }
 
