@@ -72,6 +72,8 @@ app/
 │   │       │   │   └── AppStorageManager.kt    # Manejo de disco en Android/data/.../files/
 │   │       │   │
 │   │       │   └── importer/                   # Motores de Descarga, Conversión y Medios
+│   │       │       ├── mixtape/                    # Motor de Fusión y Capítulos de Mixtape
+│   │       │       │   └── MixtapeEngine.kt        # Fusión FFmpeg acrossfade, collage WebP y capítulos
 │   │       │       ├── FFmpegNativeEngine.kt   # Extracción y Canvas con prevención de Flag Injection
 │   │       │       ├── YtDlpNativeEngine.kt    # Entorno nativo de ejecución con verificación TLS/SSL
 │   │       │       ├── YtDlpAutoUpdater.kt     # Actualizador OTA con blindaje SHA-256 verificado
@@ -110,11 +112,13 @@ app/
 │   │       │       ├── TrackLibraryCoordinator.kt       # Operaciones de pistas y playlists
 │   │       │       ├── LyricsCoordinator.kt             # Coordinación de letras sincronizadas
 │   │       │       ├── IncomingMediaCoordinator.kt      # Recepción de Intents externos
-│   │       │       └── HeadphoneSettingsCoordinator.kt  # Ajustes de acústica y auriculares
+│   │       │       ├── HeadphoneSettingsCoordinator.kt  # Ajustes de acústica y auriculares
+│   │       │       └── MixtapeCoordinator.kt            # Coordinador reactivo de Mixtapes y capítulos
 │   │       │
 │   │       ├── model/                          # Modelos de Dominio y Datos
 │   │       │   ├── Track.kt
 │   │       │   ├── Playlist.kt
+│   │       │   ├── MixtapeModels.kt                 # Modelos de capítulos y metadatos de Mixtape
 │   │       │   ├── LyricsState.kt
 │   │       │   ├── EqualizerConfig.kt
 │   │       │   ├── AudioEffectsConfig.kt
@@ -166,6 +170,7 @@ app/
 │   │       │       ├── AudioVisualizer.kt
 │   │       │       ├── BackgroundVideoPlayer.kt
 │   │       │       ├── EditTrackDialog.kt
+│   │       │       ├── CreateMixtapeDialog.kt  # Diálogo de creación de Mixtape continuo
 │   │       │       ├── SearchLyricsDialog.kt
 │   │       │       ├── VideoToMusicDialog.kt
 │   │       │       ├── PackageUpdateBanner.kt

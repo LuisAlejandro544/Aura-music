@@ -58,6 +58,9 @@ fun NowPlayingPlaybackControls(
     onMarkABPointA: () -> Unit = {},
     onMarkABPointB: () -> Unit = {},
     onClearABLoop: () -> Unit = {},
+    activeMixtapeChapter: com.example.model.MixtapeChapter? = null,
+    mixtapeChapterIndex: Int = -1,
+    mixtapeTotalChapters: Int = 0,
     modifier: Modifier = Modifier
 ) {
     var isDraggingSlider by remember { mutableStateOf(false) }
@@ -115,19 +118,36 @@ fun NowPlayingPlaybackControls(
                         .fillMaxWidth()
                         .clipToBounds()
                 ) {
-                    Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = animatedPrimary.copy(alpha = 0.16f),
-                        modifier = Modifier.padding(end = 8.dp)
-                    ) {
-                        Text(
-                            text = currentTrack.formatBadge(),
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = FontWeight.ExtraBold,
-                                color = animatedPrimary
-                            ),
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
+                    if (activeMixtapeChapter != null && mixtapeTotalChapters > 0) {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = Color(0xFF10B981).copy(alpha = 0.22f),
+                            modifier = Modifier.padding(end = 6.dp)
+                        ) {
+                            Text(
+                                text = "MIX ${mixtapeChapterIndex + 1}/$mixtapeTotalChapters",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = Color(0xFF10B981)
+                                ),
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                            )
+                        }
+                    } else {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = animatedPrimary.copy(alpha = 0.16f),
+                            modifier = Modifier.padding(end = 8.dp)
+                        ) {
+                            Text(
+                                text = currentTrack.formatBadge(),
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = animatedPrimary
+                                ),
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
                     }
                     Text(
                         text = currentTrack.artist,

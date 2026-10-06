@@ -52,6 +52,10 @@ fun PlaylistDetailScreen(
     onRenamePlaylist: (Long, String, String, android.net.Uri?, Boolean) -> Unit = { _, _, _, _, _ -> },
     onEditTrack: (Long, String, String, String) -> Unit = { _, _, _, _ -> },
     onEditTrackDetails: (Long, String, String, String, android.net.Uri?, Boolean) -> Unit = { _, _, _, _, _, _ -> },
+    onCreateMixtape: ((List<Track>, String, Int, ((Track) -> Unit)?) -> Unit)? = null,
+    isCreatingMixtape: Boolean = false,
+    mixtapeProgress: Float = 0f,
+    mixtapeStatusMessage: String? = null,
     modifier: Modifier = Modifier
 ) {
     BackHandler {
@@ -71,6 +75,9 @@ fun PlaylistDetailScreen(
 
     var showAddTracksDialog by remember { mutableStateOf(false) }
     var trackSearchQuery by remember { mutableStateOf("") }
+
+    var showCreateMixtapeDialog by remember { mutableStateOf(false) }
+    var createdMixtapeTrack by remember { mutableStateOf<Track?>(null) }
 
     val availableToAdd = remember(allTracks, tracks, trackSearchQuery) {
         val existingIds = tracks.map { it.id }.toSet()
@@ -264,6 +271,32 @@ fun PlaylistDetailScreen(
                     }
                 }
             }
+
+            // Botón destacado de Creación de Mixtape Continuo con Crossfade
+            if (tracks.size >= 2) {
+                Spacer(modifier = Modifier.height(10.dp))
+                FilledTonalButton(
+                    onClick = {
+                        createdMixtapeTrack = null
+                        showCreateMixtapeDialog = true
+                    },
+                    shape = RoundedCornerShape(20.dp),
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f),
+                        contentColor = MaterialTheme.colorScheme.secondary
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("create_mixtape_btn")
+                ) {
+                    Icon(Icons.Default.AllInclusive, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Crear Mixtape Continuo (${tracks.size} pistas)",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                    )
+                }
+            }
             Spacer(modifier = Modifier.height(16.dp))
         }
 
@@ -421,6 +454,31 @@ fun PlaylistDetailScreen(
                 TextButton(onClick = { showAddTracksDialog = false }) {
                     Text("Cerrar")
                 }
+            }
+        )
+    }
+
+    // Cuadro de diálogo para crear Mixtape continuo con FFmpeg
+    if (showCreateMixtapeDialog) {
+        com.example.ui.components.CreateMixtapeDialog(
+            initialTitle = "${playlist.name} (Continuous Mix)",
+            tracks = tracks,
+            isCreating = isCreatingMixtape,
+            progress = mixtapeProgress,
+            statusMessage = mixtapeStatusMessage,
+            onDismissRequest = {
+                showCreateMixtapeDialog = false
+                createdMixtapeTrack = null
+            },
+            onCreateMixtape = { title, crossfadeSec ->
+                onCreateMixtape?.invoke(tracks, title, crossfadeSec) { created ->
+                    createdMixtapeTrack = created
+                }
+            },
+            createdTrack = createdMixtapeTrack,
+            onPlayCreatedTrack = { created ->
+                onTrackClick(created, listOf(created))
+                showCreateMixtapeDialog = false
             }
         )
     }

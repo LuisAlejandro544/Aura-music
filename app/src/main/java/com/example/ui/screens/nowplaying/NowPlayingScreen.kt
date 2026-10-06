@@ -157,6 +157,9 @@ fun NowPlayingScreen(
     onCloseSearchLyrics: () -> Unit = {},
     onSearchLyrics: (title: String, artist: String) -> Unit = { _, _ -> },
     onSelectLyricSearchResult: (LyricSearchResult) -> Unit = {},
+    activeMixtapeChapter: com.example.model.MixtapeChapter? = null,
+    mixtapeChapterIndex: Int = -1,
+    mixtapeTotalChapters: Int = 0,
     modifier: Modifier = Modifier
 ) {
     BackHandler {
@@ -405,7 +408,10 @@ fun NowPlayingScreen(
                 abLoopState = abLoopState,
                 onMarkABPointA = onMarkABPointA,
                 onMarkABPointB = onMarkABPointB,
-                onClearABLoop = onClearABLoop
+                onClearABLoop = onClearABLoop,
+                activeMixtapeChapter = activeMixtapeChapter,
+                mixtapeChapterIndex = mixtapeChapterIndex,
+                mixtapeTotalChapters = mixtapeTotalChapters
             )
 
             // Barra de Balance Estéreo Fino L/R en Tiempo Real

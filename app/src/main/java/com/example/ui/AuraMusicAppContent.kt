@@ -100,6 +100,24 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
     val pendingIncomingWebLink by viewModel.pendingIncomingWebLink.collectAsStateWithLifecycle()
     val downloadProgress by viewModel.downloadProgress.collectAsStateWithLifecycle()
 
+    // Estados de Mixtape Continuo con Capítulos Reactivos
+    val isCreatingMixtape by viewModel.isCreatingMixtape.collectAsStateWithLifecycle()
+    val mixtapeProgress by viewModel.mixtapeProgress.collectAsStateWithLifecycle()
+    val mixtapeStatusMessage by viewModel.mixtapeStatusMessage.collectAsStateWithLifecycle()
+    val activeMixtapeChapter by viewModel.activeMixtapeChapter.collectAsStateWithLifecycle()
+    val activeMixtapeMetadata by viewModel.activeMixtapeMetadata.collectAsStateWithLifecycle()
+
+    // Si la pista actual es un Mixtape continuo, virtualizamos la pista activa con el capítulo en curso
+    val effectiveTrack = remember(currentTrack, activeMixtapeChapter) {
+        val track = currentTrack
+        val chapter = activeMixtapeChapter
+        if (track != null && chapter != null) {
+            chapter.toVirtualTrack(track)
+        } else {
+            track
+        }
+    }
+
     var showGlobalAudioEffectsSheet by remember { mutableStateOf(false) }
     var initialAudioEffectsTab by remember { mutableIntStateOf(0) }
 
@@ -116,12 +134,12 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
         )
     }
 
-    LaunchedEffect(currentTrack?.id, currentTrack?.albumArtPath, currentTrack?.videoUri, isDynamicArtworkColorEnabled) {
-        if (currentTrack != null && isDynamicArtworkColorEnabled) {
-            val isVideo = (videoDisplayMode != VideoDisplayMode.OFF) && !currentTrack?.videoUri.isNullOrEmpty()
+    LaunchedEffect(effectiveTrack?.id, effectiveTrack?.albumArtPath, effectiveTrack?.videoUri, isDynamicArtworkColorEnabled) {
+        if (effectiveTrack != null && isDynamicArtworkColorEnabled) {
+            val isVideo = (videoDisplayMode != VideoDisplayMode.OFF) && !effectiveTrack.videoUri.isNullOrEmpty()
             miniPlayerColors = ArtworkColorExtractor.extractPlaybackColors(
                 context = context,
-                track = currentTrack,
+                track = effectiveTrack,
                 isVideoActive = isVideo,
                 isDynamicEnabled = isDynamicArtworkColorEnabled,
                 fallbackPrimary = defaultMiniPrimary,
@@ -171,7 +189,7 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
                             .background(BackgroundDark)
                     ) {
                         AnimatedVisibility(
-                            visible = currentTrack != null && !isNowPlayingExpanded,
+                            visible = effectiveTrack != null && !isNowPlayingExpanded,
                             enter = fadeIn(animationSpec = tween(220)) + slideInVertically(
                                 initialOffsetY = { it / 2 },
                                 animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
@@ -182,7 +200,7 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
                             )
                         ) {
                             MiniPlayer(
-                                currentTrack = currentTrack,
+                                currentTrack = effectiveTrack,
                                 isPlaying = isPlaying,
                                 currentPositionMs = currentPosition,
                                 durationMs = duration,
@@ -332,7 +350,7 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
                                 tracks = selectedPlaylistTracks,
                                 allTracks = allTracks,
                                 allPlaylists = playlists,
-                                currentTrack = currentTrack,
+                                currentTrack = effectiveTrack,
                                 isPlaying = isPlaying,
                                 onBack = { viewModel.handleBackPress() },
                                 onTrackClick = { track, list -> viewModel.playTrack(track, list) },
@@ -346,7 +364,13 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
                                 onEditTrack = { id, t, a, al -> viewModel.updateTrackInfo(id, t, a, al) },
                                 onEditTrackDetails = { id, t, a, al, art, removeArt ->
                                     viewModel.updateTrackDetails(id, t, a, al, art, removeArt)
-                                }
+                                },
+                                onCreateMixtape = { tracksToMix, title, crossfadeSec, onDone ->
+                                    viewModel.createMixtape(tracksToMix, title, crossfadeSec, onDone)
+                                },
+                                isCreatingMixtape = isCreatingMixtape,
+                                mixtapeProgress = mixtapeProgress,
+                                mixtapeStatusMessage = mixtapeStatusMessage
                             )
 
                             is NavScreen.Settings -> SettingsScreen(
@@ -395,7 +419,7 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
             modifier = Modifier.fillMaxSize()
         ) {
             NowPlayingScreen(
-                currentTrack = currentTrack,
+                currentTrack = effectiveTrack,
                 isPlaying = isPlaying,
                 currentPositionMs = currentPosition,
                 durationMs = duration,
@@ -495,7 +519,10 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
                 onOpenSearchLyrics = { viewModel.openSearchLyricsDialog() },
                 onCloseSearchLyrics = { viewModel.closeSearchLyricsDialog() },
                 onSearchLyrics = { title, artist -> viewModel.searchLyricsOptions(title, artist) },
-                onSelectLyricSearchResult = { viewModel.selectLyricSearchResult(it) }
+                onSelectLyricSearchResult = { viewModel.selectLyricSearchResult(it) },
+                activeMixtapeChapter = activeMixtapeChapter,
+                mixtapeChapterIndex = activeMixtapeMetadata?.chapters?.indexOfFirst { it.startMs == activeMixtapeChapter?.startMs } ?: -1,
+                mixtapeTotalChapters = activeMixtapeMetadata?.chapters?.size ?: 0
             )
         }
 

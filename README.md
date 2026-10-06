@@ -281,7 +281,23 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
   - 📁 `metadata/`: Ficheros JSON estructurados con información técnica.
   - 📁 `videos/`: Videos de fondo y loops de Canvas (.mp4/.webm).
 
-### 13. Suite de Diagnóstico Autónoma: Aura Monitor 🛠️ & LeakCanary
+### 13. Mixtape Maker / Fusión de Canciones con Crossfade Continuo en FFmpeg 🎛️✨
+- **Fusión Nativa en un Solo Archivo Continuo (.m4a) con FFmpeg (`MixtapeEngine`)**:
+  - Permite tomar cualquier lista de canciones (mínimo 2 pistas) y combinarlas en una sola pieza musical continua mediante fundido cruzado (*acrossfade* en FFmpeg).
+  - Selector de duración de transición personalizado: **3s**, **5s (recomendado)**, **8s** o **10s** de fundido suave entre canciones.
+  - Normalización acústica previa a 44.1 kHz estéreo para garantizar cero chasquidos, desajustes de reloj o saltos de volumen durante la transición.
+- **Carátulas y Video Canvas Reactivos en Tiempo Real por Capítulos**:
+  - Resuelve de forma elegante el dilema visual de los mixes largos: en lugar de dejar estática la primera carátula durante toda la hora, el sistema registra un fichero estructurado de capítulos (`metadata/mixtape_{id}.json`) con los offsets exactos calculados matemáticamente.
+  - **Conmutación Visual Dinámica**: Al reproducirse el Mixtape, tanto la pantalla completa *Now Playing* como el *Mini Reproductor* detectan reactivamente el segundo actual (`currentPositionMs`) y transicionan suavemente el título, artista, carátula oficial WebP y Video Canvas sincronizado de la canción que suena en ese tramo.
+  - **Sincronización Cromática**: La paleta ambiental superior y el brillo de la pantalla extraen los tonos de la carátula o video de cada capítulo activo instantáneamente.
+  - **Insignia de Mezcla**: Muestra una etiqueta refinada `MIX X/Y` en los controles de reproducción indicando qué segmento está activo del mix total.
+- **Modo Karaoke Continuo con Letras (.LRC) Concatenadas**:
+  - El motor compila automáticamente los archivos de letras de cada canción agregando el offset acumulado `[mm:ss.xx]` a cada verso.
+  - Al abrir la tarjeta de Karaoke durante el Mixtape, los versos corren sincronizados con auto-scroll a lo largo de todo el mix continuo.
+- **Portada Collage Oficial en WebP**:
+  - Genera automáticamente una portada oficial en collage de 1 a 4 canciones en formato WebP Lossless en `images/`, integrándose como una pista completa en la biblioteca de Aura Music bajo el álbum *"Aura Mixtapes"*.
+
+### 14. Suite de Diagnóstico Autónoma: Aura Monitor 🛠️ & LeakCanary
 - **Aura Monitor (App Debug Propia con Navegación Modular por Pestañas)**:
   - Cuenta con su propio icono independiente en el cajón de aplicaciones del teléfono móvil (tarea aislada con `taskAffinity` y `singleTask`) y también es accesible desde **Ajustes > Arquitectura y Privacidad > Abrir Aura Monitor**.
   - 📋 **Pestaña 1: Incidentes & Logs**:

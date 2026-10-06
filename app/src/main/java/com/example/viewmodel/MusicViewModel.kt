@@ -34,6 +34,7 @@ import kotlinx.coroutines.launch
  * - [LyricsCoordinator]: Karaoke sincronizado LRCLIB, parsing LRC y búsqueda interactiva.
  * - [IncomingMediaCoordinator]: Recepción de enlaces e intents externos ("Abrir con..." / "Compartir con...").
  * - [TrackLibraryCoordinator]: Gestión de pistas, metadatos, playlists e importaciones SAF / Video a Música.
+ * - [MixtapeCoordinator]: Fusión continua de pistas con FFmpeg y capítulos reactivos en tiempo real.
  */
 class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -97,6 +98,14 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             if (selectedPlaylist.value?.id == id) handleBackPress()
         }
     )
+
+    // Coordinador modular de Mixtape y Capítulos Continuos
+    val mixtapeCoordinator = MixtapeCoordinator(application, viewModelScope)
+    val isCreatingMixtape: StateFlow<Boolean> = mixtapeCoordinator.isCreatingMixtape
+    val mixtapeProgress: StateFlow<Float> = mixtapeCoordinator.mixtapeProgress
+    val mixtapeStatusMessage: StateFlow<String?> = mixtapeCoordinator.mixtapeStatusMessage
+    val activeMixtapeChapter = mixtapeCoordinator.activeMixtapeChapter
+    val activeMixtapeMetadata = mixtapeCoordinator.activeMixtapeMetadata
 
     // Datos reactivos de Room
     val allTracks: StateFlow<List<Track>> = repository.allTracks
@@ -236,6 +245,15 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         // Carga automática de letras sincronizadas
         viewModelScope.launch {
             audioPlayer.currentTrack.collect { track -> loadLyrics(track) }
+        }
+
+        // Seguimiento reactivo del capítulo activo para Mixtapes Continuos
+        viewModelScope.launch {
+            combine(audioPlayer.currentTrack, audioPlayer.currentPosition) { trk, pos ->
+                trk to pos
+            }.collect { (trk, pos) ->
+                mixtapeCoordinator.updateActiveChapter(trk, pos)
+            }
         }
 
         // Sincronización reactiva del reproductor con Room
@@ -388,6 +406,18 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
+
+    // --- Mixtapes Continuos (FFmpeg) ---
+    fun createMixtape(
+        tracks: List<Track>,
+        title: String,
+        crossfadeSeconds: Int = 5,
+        onCreated: ((Track) -> Unit)? = null
+    ) = mixtapeCoordinator.createMixtape(tracks, title, crossfadeSeconds, onCreated)
+
+    fun dismissMixtapeStatus() = mixtapeCoordinator.dismissStatus()
+    fun getActiveChapterIndex(): Int = mixtapeCoordinator.getActiveChapterIndex()
+    fun getActiveTotalChapters(): Int = mixtapeCoordinator.getActiveTotalChapters()
 
     fun dismissImportStatus() = trackLibraryCoordinator.dismissImportStatus()
 
