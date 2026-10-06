@@ -122,6 +122,18 @@ object FFmpegNativeEngine {
     }
 
     /**
+     * Sanitiza y valida una ruta de archivo para prevenir vulnerabilidades de Flag / Option Injection en FFmpeg.
+     * Garantiza que la ruta sea absoluta canónica y nunca comience con guión '-'.
+     */
+    fun sanitizeFilePath(file: File): String {
+        val canonical = file.canonicalPath
+        if (canonical.startsWith("-")) {
+            throw SecurityException("Ruta no permitida para FFmpeg: '$canonical' comienza con un guión ('-') lo que constituye un intento de flag injection.")
+        }
+        return canonical
+    }
+
+    /**
      * Extrae y transcodifica una pista de audio desde cualquier archivo de video o audio.
      */
     suspend fun extractAudio(
@@ -149,26 +161,29 @@ object FFmpegNativeEngine {
             outputFile.delete()
         }
 
+        val safeInput = sanitizeFilePath(inputFile)
+        val safeOutput = sanitizeFilePath(outputFile)
+
         val args = if (targetFormat.equals("mp3", ignoreCase = true)) {
             arrayOf(
                 ffmpegBin.absolutePath,
                 "-y",
-                "-i", inputFile.absolutePath,
+                "-i", safeInput,
                 "-vn",
                 "-c:a", "libmp3lame",
                 "-b:a", audioBitrate,
-                outputFile.absolutePath
+                safeOutput
             )
         } else {
             arrayOf(
                 ffmpegBin.absolutePath,
                 "-y",
-                "-i", inputFile.absolutePath,
+                "-i", safeInput,
                 "-vn",
                 "-c:a", "aac",
                 "-b:a", audioBitrate,
                 "-movflags", "+faststart",
-                outputFile.absolutePath
+                safeOutput
             )
         }
 
@@ -201,17 +216,21 @@ object FFmpegNativeEngine {
             outputFile.delete()
         }
 
+        val safeVideo = sanitizeFilePath(videoFile)
+        val safeAudio = sanitizeFilePath(audioFile)
+        val safeOutput = sanitizeFilePath(outputFile)
+
         val args = arrayOf(
             ffmpegBin.absolutePath,
             "-y",
-            "-i", videoFile.absolutePath,
-            "-i", audioFile.absolutePath,
+            "-i", safeVideo,
+            "-i", safeAudio,
             "-c:v", "copy",
             "-c:a", "copy",
             "-map", "0:v:0",
             "-map", "1:a:0",
             "-movflags", "+faststart",
-            outputFile.absolutePath
+            safeOutput
         )
 
         executeCommand(context, args, totalDurationMs, onProgress)
@@ -238,6 +257,9 @@ object FFmpegNativeEngine {
             )
         }
 
+        val safeInput = sanitizeFilePath(inputFile)
+        val safeOutput = sanitizeFilePath(outputFile)
+
         val startSec = String.format(java.util.Locale.US, "%.3f", startMs / 1000.0)
         val durationSec = String.format(java.util.Locale.US, "%.3f", durationMs / 1000.0)
 
@@ -246,9 +268,9 @@ object FFmpegNativeEngine {
             "-y",
             "-ss", startSec,
             "-t", durationSec,
-            "-i", inputFile.absolutePath,
+            "-i", safeInput,
             "-c", "copy",
-            outputFile.absolutePath
+            safeOutput
         )
 
         executeCommand(context, args, durationMs, null)
@@ -303,10 +325,13 @@ object FFmpegNativeEngine {
 
         if (outputFile.exists()) outputFile.delete()
 
+        val safeInput = sanitizeFilePath(inputFile)
+        val safeOutput = sanitizeFilePath(outputFile)
+
         val args = arrayOf(
             ffmpegBin.absolutePath,
             "-y",
-            "-i", inputFile.absolutePath,
+            "-i", safeInput,
             "-filter_complex", filterComplex,
             "-map", "[v_out]",
             "-c:v", "libx264",
@@ -319,7 +344,7 @@ object FFmpegNativeEngine {
             "-an",
             "-map_metadata", "-1",
             "-movflags", "+faststart",
-            outputFile.absolutePath
+            safeOutput
         )
 
         val expectedTotalMs = (clipSec * 2000.0f).toLong()
@@ -376,10 +401,13 @@ object FFmpegNativeEngine {
 
         if (outputFile.exists()) outputFile.delete()
 
+        val safeInput = sanitizeFilePath(inputFile)
+        val safeOutput = sanitizeFilePath(outputFile)
+
         val args = arrayOf(
             ffmpegBin.absolutePath,
             "-y",
-            "-i", inputFile.absolutePath,
+            "-i", safeInput,
             "-filter_complex", filterComplex,
             "-map", "[v_out]",
             "-c:v", "libx264",
@@ -392,7 +420,7 @@ object FFmpegNativeEngine {
             "-an",
             "-map_metadata", "-1",
             "-movflags", "+faststart",
-            outputFile.absolutePath
+            safeOutput
         )
 
         val result = executeCommand(context, args, durationMs, null)
@@ -424,10 +452,13 @@ object FFmpegNativeEngine {
 
         if (outputFile.exists()) outputFile.delete()
 
+        val safeInput = sanitizeFilePath(inputFile)
+        val safeOutput = sanitizeFilePath(outputFile)
+
         val args = arrayOf(
             ffmpegBin.absolutePath,
             "-y",
-            "-i", inputFile.absolutePath,
+            "-i", safeInput,
             "-c:v", "libx264",
             "-preset", "veryfast",
             "-crf", "23",
@@ -438,7 +469,7 @@ object FFmpegNativeEngine {
             "-an",
             "-map_metadata", "-1",
             "-movflags", "+faststart",
-            outputFile.absolutePath
+            safeOutput
         )
 
         val result = executeCommand(context, args, 0L, null)
@@ -447,15 +478,17 @@ object FFmpegNativeEngine {
             result
         } else {
             AuraDebugManager.logWarning(TAG, "Recodificación de video falló, aplicando faststart sin recodificar...")
+            val safeFallbackInput = sanitizeFilePath(inputFile)
+            val safeFallbackOutput = sanitizeFilePath(outputFile)
             val fallbackArgs = arrayOf(
                 ffmpegBin.absolutePath,
                 "-y",
-                "-i", inputFile.absolutePath,
+                "-i", safeFallbackInput,
                 "-c:v", "copy",
                 "-an",
                 "-map_metadata", "-1",
                 "-movflags", "+faststart",
-                outputFile.absolutePath
+                safeFallbackOutput
             )
             executeCommand(context, fallbackArgs, 0L, null)
         }
@@ -509,6 +542,9 @@ object FFmpegNativeEngine {
 
         if (outputFile.exists()) outputFile.delete()
 
+        val safeInput = sanitizeFilePath(inputFile)
+        val safeOutput = sanitizeFilePath(outputFile)
+
         // Filtro complejo:
         // 1. Divide el video en [fg] (primer plano) y [bg] (fondo).
         // 2. [bg] se escala para rellenar 480x854 (9:16), se recorta exactamente a esas dimensiones, se difumina y oscurece.
@@ -522,7 +558,7 @@ object FFmpegNativeEngine {
         val args = arrayOf(
             ffmpegBin.absolutePath,
             "-y",
-            "-i", inputFile.absolutePath,
+            "-i", safeInput,
             "-filter_complex", filterComplex,
             "-map", "[v_out]",
             "-c:v", "libx264",
@@ -535,7 +571,7 @@ object FFmpegNativeEngine {
             "-an",
             "-map_metadata", "-1",
             "-movflags", "+faststart",
-            outputFile.absolutePath
+            safeOutput
         )
 
         val result = executeCommand(context, args, 0L, null)
@@ -563,15 +599,17 @@ object FFmpegNativeEngine {
             return@withContext ExecutionResult(false, -1, "FFmpeg no disponible", null)
         }
         if (outputFile.exists()) outputFile.delete()
+        val safeInput = sanitizeFilePath(inputFile)
+        val safeOutput = sanitizeFilePath(outputFile)
         val args = arrayOf(
             ffmpegBin.absolutePath,
             "-y",
-            "-i", inputFile.absolutePath,
+            "-i", safeInput,
             "-c:v", "copy",
             "-an",
             "-map_metadata", "-1",
             "-movflags", "+faststart",
-            outputFile.absolutePath
+            safeOutput
         )
         executeCommand(context, args, 0L, null)
     }
@@ -654,6 +692,12 @@ object FFmpegNativeEngine {
     ): ExecutionResult {
         val logBuilder = StringBuilder()
         val outputFile = args.lastOrNull()?.let { File(it) }
+
+        // Defensa contra Flag/Option Injection: El último argumento posicional (archivo de salida) no debe comenzar con '-'
+        val lastArg = args.lastOrNull()
+        if (lastArg != null && lastArg.startsWith("-")) {
+            throw SecurityException("Inyección de banderas rechazada: El argumento de salida '$lastArg' no puede comenzar con '-'")
+        }
 
         return try {
             AuraDebugManager.logInfo(TAG, "Iniciando proceso FFmpeg puro: ${args.joinToString(" ")}")

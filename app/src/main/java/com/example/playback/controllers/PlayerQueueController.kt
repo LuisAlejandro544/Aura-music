@@ -157,4 +157,19 @@ class PlayerQueueController {
         _queue.value = updatedQueue
         return updatedCurrent to updatedQueue
     }
+
+    /**
+     * Remueve una pista de la cola activa por su ID.
+     */
+    fun removeTrack(trackId: Long) {
+        val currentQ = _queue.value
+        val index = currentQ.indexOfFirst { it.id == trackId }
+        if (index != -1) {
+            val newQ = currentQ.toMutableList().apply { removeAt(index) }
+            _queue.value = newQ
+            if (_currentIndex.value >= newQ.size && newQ.isNotEmpty()) {
+                _currentIndex.value = newQ.size - 1
+            }
+        }
+    }
 }

@@ -436,6 +436,13 @@ class AuraAudioPlayer(
         _currentTrack.value = updatedCurrent
     }
 
+    fun removeTrackFromQueue(trackId: Long) {
+        queueController.removeTrack(trackId)
+        if (_currentTrack.value?.id == trackId) {
+            playNext()
+        }
+    }
+
     fun updateTrackMetadata(
         trackId: Long,
         title: String,

@@ -139,5 +139,7 @@ Este documento define el protocolo de trabajo para los agentes de software y des
 - [x] ¿Se corrigió la maquetación vertical de las tarjetas en Ajustes > Medios, el recorte de marquesinas (`clipToBounds`) y las franjas negras de las miniaturas 4:3 de YouTube?
 - [x] ¿Al entrar a la app se verifican y actualizan los paquetes nativos (`yt-dlp`) en segundo plano con notificación nativa en la barra de estado, barra de progreso en vivo, banner no intrusivo en la app, bloqueo temporal preventivo de descargas por `yt-dlp` y botón de reinicio rápido para aplicar los paquetes?
 - [x] ¿El motor de Audio 16D Multi-Órbita en C++20 (`EightDProcessor::set16DMode`) y el Clarificador de Voces HD en C++20 (`VocalClarityProcessor` Mid-Side) están integrados estratégicamente sin logotipos ni animaciones decorativas?
+- [x] ¿Se completó el desarrollo modular de `MusicViewModel.kt`, `MainActivity.kt`, `DownloadFromLinkDialog.kt` y `StoredMediaSettingsTab.kt` manteniendo todos los archivos bajo 500 líneas con 100% de compatibilidad pública?
+- [x] ¿Se mitigó la Omisión Silenciosa de SHA-256 en OTA, la desactivación TLS/SSL en yt-dlp, las colisiones de nombres/extensiones en SAF y la inyección de opciones en FFmpeg?
 - [x] ¿Los 5 archivos Markdown (`README.md`, `ROADMAP.md`, `STRUCTURE.md`, `AI_CONTEXT.md`, `AGENTS.md`) están actualizados y en español?
 

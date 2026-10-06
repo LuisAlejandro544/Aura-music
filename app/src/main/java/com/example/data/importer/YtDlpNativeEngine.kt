@@ -201,7 +201,6 @@ object YtDlpNativeEngine {
             add(ytdlpFile.absolutePath)
             add("--dump-single-json")
             add("--no-warnings")
-            add("--no-check-certificates")
             add("--format")
             add("bestvideo[height<=480][ext=mp4][vcodec^=avc1][protocol^=http]+bestaudio[ext=m4a][protocol^=http]/bestvideo[height<=480][ext=mp4][protocol^=http]+bestaudio[protocol^=http]/best[height<=480][ext=mp4][protocol^=http]/best[height<=480]")
             if (qjsBin != null && qjsBin.exists()) {
@@ -239,7 +238,15 @@ object YtDlpNativeEngine {
                 this["PYTHONNOUSERSITE"] = "1"
                 this["HOME"] = pythonEnvDir.absolutePath
                 this["LD_LIBRARY_PATH"] = "$nativeDir:${modulesDir.absolutePath}:${pythonEnvDir.absolutePath}/usr/lib:${ffmpegEnvDir.absolutePath}/usr/lib"
-                this["SSL_CERT_FILE"] = "${pythonEnvDir.absolutePath}/usr/etc/tls/cert.pem"
+                val localCert = File(pythonEnvDir, "usr/etc/tls/cert.pem")
+                if (localCert.exists() && localCert.length() > 0) {
+                    this["SSL_CERT_FILE"] = localCert.absolutePath
+                } else {
+                    val systemCacerts = File("/system/etc/security/cacerts")
+                    if (systemCacerts.exists() && systemCacerts.isDirectory) {
+                        this["SSL_CERT_DIR"] = systemCacerts.absolutePath
+                    }
+                }
                 this["PATH"] = "$nativeDir:${context.filesDir.absolutePath}/bin:${System.getenv("PATH") ?: ""}"
                 this["TMPDIR"] = context.cacheDir.absolutePath
             }

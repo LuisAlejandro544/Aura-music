@@ -301,7 +301,17 @@ object YtDlpAutoUpdater {
                 }
 
                 val expectedSha256 = fetchExpectedSha256(checksumsUrl, "yt-dlp")
-                AuraDebugManager.logInfo(TAG, "Descargando paquete yt-dlp ($latestTagName) con verificación SHA-256...")
+                if (expectedSha256.isNullOrBlank()) {
+                    val err = "No se pudo obtener el hash SHA-256 criptográfico para yt-dlp ($latestTagName). Abortando por seguridad."
+                    AuraDebugManager.logError(TAG, err)
+                    if (showNotifications) {
+                        AuraDownloadService.dismissPackageNotification(appContext)
+                    }
+                    _packageUpdateState.value = PackageUpdateState.Idle
+                    return@withLock UpdateResult.Error(err, currentVersion)
+                }
+
+                AuraDebugManager.logInfo(TAG, "Descargando paquete yt-dlp ($latestTagName) con verificación SHA-256 obligatoria ($expectedSha256)...")
 
                 val downloadSuccess = downloadFileWithProgressAndVerification(
                     url = downloadUrl,
@@ -454,16 +464,23 @@ object YtDlpAutoUpdater {
                 return false
             }
 
-            if (!expectedSha256.isNullOrBlank()) {
-                val computedHash = computeFileSha256(tempFile)
-                if (!computedHash.equals(expectedSha256, ignoreCase = true)) {
-                    AuraDebugManager.logError(
-                        TAG,
-                        "Fallo de integridad SHA-256 en yt-dlp. Esperado: $expectedSha256, Calculado: $computedHash"
-                    )
-                    tempFile.delete()
-                    return false
-                }
+            if (expectedSha256.isNullOrBlank()) {
+                AuraDebugManager.logError(
+                    TAG,
+                    "Rechazando actualización OTA: No se pudo obtener la suma criptográfica SHA-256 oficial para yt-dlp ($versionTag). Abortando por seguridad."
+                )
+                tempFile.delete()
+                return false
+            }
+
+            val computedHash = computeFileSha256(tempFile)
+            if (!computedHash.equals(expectedSha256, ignoreCase = true)) {
+                AuraDebugManager.logError(
+                    TAG,
+                    "Fallo de integridad SHA-256 en yt-dlp. Esperado: $expectedSha256, Calculado: $computedHash"
+                )
+                tempFile.delete()
+                return false
             }
 
             if (stagedFile.exists()) stagedFile.delete()

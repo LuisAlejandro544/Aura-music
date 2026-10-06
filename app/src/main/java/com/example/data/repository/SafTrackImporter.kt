@@ -241,9 +241,36 @@ class SafTrackImporter(private val trackDao: TrackDao) {
 
             try {
                 context.contentResolver.openInputStream(uri)?.use { inStream ->
-                    val ext = AudioMetadataParser.getFileExtension(context, uri) ?: "mp3"
-                    val safeTitle = title.replace(Regex("[^a-zA-Z0-9._-]"), "_").take(25)
-                    val fileName = "ext_${System.currentTimeMillis()}_$safeTitle.$ext"
+                    val mime = context.contentResolver.getType(uri)?.lowercase()
+                    val rawExt = AudioMetadataParser.getFileExtension(context, uri)?.lowercase()
+                    val mimeMappedExt = when {
+                        mime?.contains("flac") == true -> "flac"
+                        mime?.contains("wav") == true -> "wav"
+                        mime?.contains("ogg") == true -> "ogg"
+                        mime?.contains("opus") == true -> "opus"
+                        mime?.contains("aac") == true -> "aac"
+                        mime?.contains("mp4") == true || mime?.contains("m4a") == true -> "m4a"
+                        mime?.contains("webm") == true -> "webm"
+                        else -> null
+                    }
+                    val allowedExtensions = setOf("mp3", "m4a", "flac", "wav", "ogg", "opus", "aac", "webm")
+                    val safeExt = when {
+                        rawExt != null && rawExt in allowedExtensions -> rawExt
+                        mimeMappedExt != null -> mimeMappedExt
+                        else -> "mp3"
+                    }
+                    val safeTitle = title.replace(Regex("[^a-zA-Z0-9_-]"), "_").take(25).ifBlank { "track" }
+                    val uniqueToken = java.util.UUID.randomUUID().toString().replace("-", "").take(8)
+                    var fileName = "ext_${System.currentTimeMillis()}_${uniqueToken}_$safeTitle.$safeExt"
+                    
+                    // Verificación de no-colisión en disco
+                    val songsDir = storageManager.songsDir
+                    var counter = 1
+                    while (File(songsDir, fileName).exists()) {
+                        fileName = "ext_${System.currentTimeMillis()}_${uniqueToken}_${safeTitle}_$counter.$safeExt"
+                        counter++
+                    }
+
                     val copiedFile = storageManager.saveSongFile(fileName, inStream)
                     copiedLocalFile = copiedFile
                     finalUriString = Uri.fromFile(copiedFile).toString()
