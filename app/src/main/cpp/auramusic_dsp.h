@@ -62,6 +62,7 @@ public:
 
         if (rateChanged) {
             mEightDProcessor.init(mSampleRate);
+            mVocalClarityProcessor.init(mSampleRate);
             mCrossfeedProcessor.init(mSampleRate);
             mReverbProcessor.init(mSampleRate);
             mInitialized = true;
@@ -71,7 +72,8 @@ public:
     /**
      * Limpieza Atómica de Buffer (Buffer Flushing):
      * Pone a cero los acumuladores de muestras previas (x1, x2, y1, y2) en las 10 bandas del ecualizador,
-     * en el filtro de graves, en las líneas de retardo del filtro Crossfeed y en las colas de Reverb.
+     * en el filtro de graves, en el clarificador vocal, en los procesadores espaciales 8D/16D,
+     * en las líneas de retardo del filtro Crossfeed y en las colas de Reverb.
      * Erradica pops, clics y ecos residuales en cambios de pista, seekTo y pausas.
      */
     void flushDspBuffers() {
@@ -81,6 +83,7 @@ public:
         }
         mBassBoostFilterL.reset();
         mBassBoostFilterR.reset();
+        mVocalClarityProcessor.reset();
         mEightDProcessor.reset();
         mCrossfeedProcessor.reset();
         mReverbProcessor.resetBuffers();
@@ -93,6 +96,15 @@ public:
 
     [[nodiscard]] bool isReverbEnabled() const {
         return mReverbProcessor.isEnabled();
+    }
+
+    void setVocalClarityParameters(bool enabled, double strength) {
+        mVocalClarityProcessor.setEnabled(enabled);
+        mVocalClarityProcessor.setStrength(strength);
+    }
+
+    [[nodiscard]] bool isVocalClarityEnabled() const {
+        return mVocalClarityProcessor.isEnabled();
     }
 
     void setEnabled(bool enabled) {
@@ -125,6 +137,14 @@ public:
 
     [[nodiscard]] bool isEightDEnabled() const {
         return mEightDProcessor.isEnabled();
+    }
+
+    void setEightD16DMode(bool is16DMode) {
+        mEightDProcessor.setSixteenDMode(is16DMode);
+    }
+
+    [[nodiscard]] bool isEightD16DMode() const {
+        return mEightDProcessor.isSixteenDMode();
     }
 
     void setEightDOrbitSpeed(double speedSeconds) {
@@ -230,7 +250,12 @@ public:
                 }
             }
 
-            // Procesamiento de Audio 8D Espacial
+            // Clarificador Vocal HD en C++20 (Aislamiento Mid-Side y realce de inteligibilidad)
+            if (mVocalClarityProcessor.isEnabled()) {
+                mVocalClarityProcessor.processSample(sampleL, sampleR);
+            }
+
+            // Procesamiento de Audio 8D / 16D Espacial
             if (mEightDProcessor.isEnabled() && mChannels > 1) {
                 mEightDProcessor.processSample(sampleL, sampleR);
             }
@@ -252,7 +277,7 @@ public:
             }
 
             // Si hubo procesamiento acústico activo, aplicar limitador suave y reescribir muestras
-            if (mEnabled || mEightDProcessor.isEnabled() || 
+            if (mEnabled || mVocalClarityProcessor.isEnabled() || mEightDProcessor.isEnabled() || 
                 (mCrossfeedProcessor.isEnabled() && mCrossfeedProcessor.isHeadphonesConnected()) || 
                 mBalanceEnabled || mReverbProcessor.isEnabled()) {
                 sampleL = softClip(sampleL);
@@ -285,7 +310,7 @@ public:
     }
 
     [[nodiscard]] std::string getEngineInfo() const {
-        return "Aura Music C++20 10-Band Biquad, 8D Spatial, Reverb & Crossfeed DSP Core [Modular Active]";
+        return "Aura Music C++20 10-Band Biquad, Vocal Clarity, 8D/16D Spatial, Reverb & Crossfeed DSP Core [Modular Active]";
     }
 
 private:
@@ -301,6 +326,7 @@ private:
     BiquadPeakingFilter mBassBoostFilterL{};
     BiquadPeakingFilter mBassBoostFilterR{};
 
+    VocalClarityProcessor mVocalClarityProcessor{};
     EightDProcessor mEightDProcessor{};
     CrossfeedProcessor mCrossfeedProcessor{};
     ReverbProcessor mReverbProcessor{};
@@ -353,6 +379,9 @@ JNIEXPORT void JNICALL
 Java_com_example_playback_NativeAudioEngine_nativeSetEightDEnabled(JNIEnv* env, jobject thiz, jboolean enabled);
 
 JNIEXPORT void JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeSetEightD16DMode(JNIEnv* env, jobject thiz, jboolean is16DMode);
+
+JNIEXPORT void JNICALL
 Java_com_example_playback_NativeAudioEngine_nativeSetEightDOrbitSpeed(JNIEnv* env, jobject thiz, jfloat speedSeconds);
 
 JNIEXPORT void JNICALL
@@ -360,6 +389,9 @@ Java_com_example_playback_NativeAudioEngine_nativeSetEightDSpatialIntensity(JNIE
 
 JNIEXPORT void JNICALL
 Java_com_example_playback_NativeAudioEngine_nativeSetEightDRoomDepth(JNIEnv* env, jobject thiz, jfloat depth);
+
+JNIEXPORT void JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeSetVocalClarityParameters(JNIEnv* env, jobject thiz, jboolean enabled, jfloat strength);
 
 JNIEXPORT void JNICALL
 Java_com_example_playback_NativeAudioEngine_nativeSetCrossfeedEnabled(JNIEnv* env, jobject thiz, jboolean enabled);

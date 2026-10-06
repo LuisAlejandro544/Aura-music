@@ -97,7 +97,11 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val currentPreset = effectManager.currentPreset
     val isEqEnabled = effectManager.isEnabled
     val spatial8DConfig = effectManager.spatial8DConfig
+    val vocalClarityConfig = effectManager.vocalClarityConfig
     val reverbConfig = effectManager.reverbConfig
+
+    // Estado del motor de verificación y actualización de paquetes en segundo plano (yt-dlp)
+    val packageUpdateState = com.example.data.importer.YtDlpAutoUpdater.packageUpdateState
 
     // Estados de velocidad, tono, crossfade, gapless y bucle A-B
     val playbackSpeed = audioPlayer.playbackSpeed
@@ -270,6 +274,38 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                             updateVideo = true
                         )
                     }
+                }
+            }
+        }
+
+        // Sincronización reactiva con el servicio de descargas en segundo plano (AuraDownloadService)
+        viewModelScope.launch {
+            com.example.playback.AuraDownloadService.downloadProgress.collect { progress ->
+                _downloadProgress.value = progress
+                _isImporting.value = progress.isDownloading
+            }
+        }
+
+        viewModelScope.launch {
+            com.example.playback.AuraDownloadService.statusMessages.collect { msg ->
+                _importStatusMessage.value = msg
+            }
+        }
+
+        viewModelScope.launch {
+            com.example.playback.AuraDownloadService.completedEvents.collect { event ->
+                _isImporting.value = false
+                if (event.autoPlayImmediately) {
+                    val callback = pendingDownloadSuccessCallback
+                    pendingDownloadSuccessCallback = null
+                    if (callback != null) {
+                        callback.invoke(event.track)
+                    } else {
+                        playTrack(event.track)
+                        setNowPlayingExpanded(true)
+                    }
+                } else {
+                    pendingDownloadSuccessCallback = null
                 }
             }
         }
@@ -460,6 +496,25 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _isVideoCanvasActive = MutableStateFlow(_videoDisplayMode.value != VideoDisplayMode.OFF)
     val isVideoCanvasActive: StateFlow<Boolean> = _isVideoCanvasActive.asStateFlow()
+
+    private var pendingDownloadSuccessCallback: ((Track) -> Unit)? = null
+
+    private val prefsChangeListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { sharedPreferences, key ->
+        if (key == "pref_video_display_mode") {
+            val saved = sharedPreferences.getString(key, VideoDisplayMode.FULLSCREEN_BACKGROUND.name)
+            val newMode = try {
+                VideoDisplayMode.valueOf(saved ?: VideoDisplayMode.FULLSCREEN_BACKGROUND.name)
+            } catch (_: Exception) {
+                VideoDisplayMode.FULLSCREEN_BACKGROUND
+            }
+            if (_videoDisplayMode.value != newMode) {
+                _videoDisplayMode.value = newMode
+                _isVideoCanvasActive.value = (newMode != VideoDisplayMode.OFF)
+            }
+        }
+    }.also { listener ->
+        appPrefs.registerOnSharedPreferenceChangeListener(listener)
+    }
 
     private val _isDynamicArtworkColorEnabled = MutableStateFlow(
         appPrefs.getBoolean("pref_dynamic_artwork_color_enabled", true)
@@ -713,8 +768,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Descarga e importa una canción desde un enlace web (TikTok u online),
-     * extrayendo el audio, carátula en WebP y vinculando el Video Canvas.
+     * Descarga e importa una canción desde un enlace web (YouTube, TikTok u online) en segundo plano
+     * mediante [com.example.playback.AuraDownloadService] con notificación nativa en la barra de estado.
      */
     fun importFromWebVideoLink(
         resolvedInfo: com.example.data.importer.OnlineVideoAudioImporter.ResolvedMediaInfo,
@@ -725,41 +780,42 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         loopStyle: com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle = com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE,
         onSuccess: (Track) -> Unit
     ) {
-        viewModelScope.launch {
-            _isImporting.value = true
-            _downloadProgress.value = DownloadProgress(
-                isDownloading = true,
-                phase = "Iniciando descarga...",
-                bytesDownloaded = 0L,
-                totalBytes = -1L,
-                bytesPerSecond = 0L,
-                progressFraction = 0f
-            )
-            _importStatusMessage.value = "Iniciando descarga de video y audio..."
-            val storageManager = com.example.data.storage.AppStorageManager(getApplication())
-            val result = com.example.data.importer.OnlineVideoAudioImporter.downloadAndImport(
-                context = getApplication(),
-                storageManager = storageManager,
-                resolvedInfo = resolvedInfo,
-                customTitle = customTitle,
-                customArtist = customArtist,
-                attachAsCanvas = attachAsCanvas,
-                trimSilence = trimSilence,
-                loopStyle = loopStyle,
-                onProgressUpdate = { progress ->
-                    _downloadProgress.value = progress
-                    _importStatusMessage.value = "${progress.phase} • ${progress.formattedProgress} • ${progress.formattedSpeed}"
-                }
-            )
+        pendingDownloadSuccessCallback = onSuccess
+        _isImporting.value = true
+        _downloadProgress.value = DownloadProgress(
+            isDownloading = true,
+            phase = "Iniciando descarga en segundo plano...",
+            bytesDownloaded = 0L,
+            totalBytes = -1L,
+            bytesPerSecond = 0L,
+            progressFraction = 0f
+        )
+        _importStatusMessage.value = "Descargando en segundo plano (puedes salir de la app)..."
+        com.example.playback.AuraDownloadService.startDownload(
+            context = getApplication(),
+            resolvedInfo = resolvedInfo,
+            customTitle = customTitle,
+            customArtist = customArtist,
+            attachAsCanvas = attachAsCanvas,
+            trimSilence = trimSilence,
+            loopStyle = loopStyle
+        )
+    }
 
-            _isImporting.value = false
-            _downloadProgress.value = DownloadProgress(isDownloading = false)
-            result.onSuccess { track ->
-                val saved = repository.insertCustomTrack(getApplication(), track)
-                _importStatusMessage.value = "¡Éxito! Se descargó \"${saved.title}\" con carátula y Video Canvas."
-                onSuccess(saved)
-            }.onFailure { error ->
-                _importStatusMessage.value = "Error al descargar: ${error.message ?: "Verifica tu conexión y el enlace"}"
+    /**
+     * Reproduce inmediatamente una canción recién descargada cuando el usuario toca la notificación nativa.
+     */
+    fun playDownloadedTrackFromNotification(trackId: Long) {
+        if (trackId <= 0L) return
+        viewModelScope.launch {
+            var target = allTracks.value.find { it.id == trackId }
+            if (target == null) {
+                kotlinx.coroutines.delay(250L)
+                target = allTracks.value.find { it.id == trackId }
+            }
+            if (target != null) {
+                playTrack(target)
+                setNowPlayingExpanded(true)
             }
         }
     }
@@ -806,14 +862,25 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun applyPreset(preset: EqualizerPreset) = effectManager.applyPreset(preset)
 
-    // Acciones de Audio Espacial 8D C++20
+    // Acciones de Audio Espacial 8D / 16D C++20
     fun set8DEnabled(enabled: Boolean) = effectManager.set8DEnabled(enabled)
+
+    fun set8DMode16D(is16DMode: Boolean) = effectManager.set8DMode16D(is16DMode)
 
     fun set8DOrbitSpeed(speedSeconds: Float) = effectManager.set8DOrbitSpeed(speedSeconds)
 
     fun set8DSpatialIntensity(intensity: Float) = effectManager.set8DSpatialIntensity(intensity)
 
     fun set8DRoomDepth(depth: Float) = effectManager.set8DRoomDepth(depth)
+
+    // Acciones de Clarificador de Voces HD C++20 (Mid-Side)
+    fun setVocalClarityEnabled(enabled: Boolean) = effectManager.setVocalClarityEnabled(enabled)
+
+    fun setVocalClarityStrength(strength: Float) = effectManager.setVocalClarityStrength(strength)
+
+    // Acciones de Verificación y Actualización de Paquetes en Segundo Plano
+    fun applyPendingPackageUpdateAndRestart() =
+        com.example.data.importer.YtDlpAutoUpdater.applyPendingUpdateAndRestart(getApplication())
 
     // Acciones de Suite Reverb Acústica (Presets + Personalización Libre)
     fun setReverbEnabled(enabled: Boolean) = effectManager.setReverbEnabled(enabled)
@@ -948,6 +1015,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         super.onCleared()
+        appPrefs.unregisterOnSharedPreferenceChangeListener(prefsChangeListener)
         cancelSleepTimer()
         headphoneCoordinator.release()
         audioPlayer.release()

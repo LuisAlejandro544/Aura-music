@@ -23,6 +23,7 @@ import com.example.model.ReverbConfig
 import com.example.model.ReverbPreset
 import com.example.model.SleepTimerState
 import com.example.model.Spatial8DConfig
+import com.example.model.VocalClarityConfig
 import com.example.ui.components.audioeffects.*
 import com.example.ui.theme.BackgroundDark
 import com.example.ui.theme.SurfaceCard
@@ -34,11 +35,11 @@ import com.example.ui.theme.TextSecondary
  * Arquitectura Modular (MVVM):
  * Actúa como orquestador de pestañas y contenedor modal, delegando el renderizado de cada sección
  * en submódulos especializados en [com.example.ui.components.audioeffects]:
- * - [EqualizerTabContent]: Ecualizador Paramétrico de 10 Bandas ISO en C++20, Presets y Bass Boost.
- * - [Spatial8DTabContent]: Motor de Audio Espacial 8D Binaural nativo en C++20.
+ * - [EqualizerTabContent]: Ecualizador Paramétrico de 10 Bandas ISO en C++20, Clarificador Vocal HD, Presets y Bass Boost.
+ * - [Spatial8DTabContent]: Motor de Audio Espacial 8D (Órbita 360°) y 16D (Doble Órbita Multi-Capa) en C++20.
  * - [ReverbTabContent]: Suite Reverb Híbrida (Presets ambientales de sala/catedral/club + Ajuste libre de tamaño, decay y wet).
  * - [SleepTimerTabContent]: Temporizador de Apagado personalizable con fade-out progresivo de 10s.
- * - [PlaybackParametersTabContent]: Control de Velocidad y Tono (Pitch Shift) con protección anti-pausas.
+ * - [PlaybackParametersTabContent]: Control de Velocidad, Tono (Pitch Shift) y Clarificador Vocal HD.
  * - [TransitionsTabContent]: Repetidor de Segmento A-B, Transiciones suaves (Crossfade configurable) y Reproducción Gapless.
  * - [BalanceAndHeadphonesTabContent]: Balance Estéreo Fino L/R y Filtro Crossfeed C++20 para audífonos.
  */
@@ -55,9 +56,14 @@ fun AudioEffectsBottomSheet(
     onBandLevelChange: (Int, Int) -> Unit = { _, _ -> },
     onBassBoostChange: (Int) -> Unit = {},
     onPresetSelect: (EqualizerPreset) -> Unit = {},
-    // Audio 8D
+    // Clarificador de Voces HD (C++20 Mid-Side)
+    vocalClarityConfig: VocalClarityConfig = VocalClarityConfig(),
+    onSetVocalClarityEnabled: (Boolean) -> Unit = {},
+    onSetVocalClarityStrength: (Float) -> Unit = {},
+    // Audio 8D / 16D
     spatial8DConfig: Spatial8DConfig = Spatial8DConfig(),
     onSet8DEnabled: (Boolean) -> Unit = {},
+    onSet8DMode16D: (Boolean) -> Unit = {},
     onSet8DOrbitSpeed: (Float) -> Unit = {},
     onSet8DSpatialIntensity: (Float) -> Unit = {},
     onSet8DRoomDepth: (Float) -> Unit = {},
@@ -165,7 +171,7 @@ fun AudioEffectsBottomSheet(
                 Tab(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
-                    text = { Text("Audio 8D", style = MaterialTheme.typography.labelSmall) },
+                    text = { Text("Audio 8D / 16D", style = MaterialTheme.typography.labelSmall) },
                     icon = { Icon(Icons.Default.Headphones, contentDescription = null, modifier = Modifier.size(18.dp)) }
                 )
                 Tab(
@@ -218,14 +224,18 @@ fun AudioEffectsBottomSheet(
                         onToggleEnabled = onToggleEqEnabled,
                         onBandLevelChange = onBandLevelChange,
                         onBassBoostChange = onBassBoostChange,
-                        onPresetSelect = onPresetSelect
+                        onPresetSelect = onPresetSelect,
+                        vocalClarityConfig = vocalClarityConfig,
+                        onVocalClarityEnabledChange = onSetVocalClarityEnabled,
+                        onVocalClarityStrengthChange = onSetVocalClarityStrength
                     )
                     1 -> Spatial8DTabContent(
                         config = spatial8DConfig,
                         onToggle = onSet8DEnabled,
                         onSpeedChange = onSet8DOrbitSpeed,
                         onIntensityChange = onSet8DSpatialIntensity,
-                        onDepthChange = onSet8DRoomDepth
+                        onDepthChange = onSet8DRoomDepth,
+                        onMode16DChange = onSet8DMode16D
                     )
                     2 -> ReverbTabContent(
                         config = reverbConfig,
@@ -247,7 +257,10 @@ fun AudioEffectsBottomSheet(
                         onSpeedChange = onSetPlaybackSpeed,
                         pitch = playbackPitch,
                         onPitchChange = onSetPlaybackPitch,
-                        onReset = onResetSpeedAndPitch
+                        onReset = onResetSpeedAndPitch,
+                        vocalClarityConfig = vocalClarityConfig,
+                        onVocalClarityEnabledChange = onSetVocalClarityEnabled,
+                        onVocalClarityStrengthChange = onSetVocalClarityStrength
                     )
                     5 -> TransitionsTabContent(
                         crossfadeSeconds = crossfadeSeconds,

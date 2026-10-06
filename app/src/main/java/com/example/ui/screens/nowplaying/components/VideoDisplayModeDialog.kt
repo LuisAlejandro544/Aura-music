@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.CropSquare
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.VideocamOff
@@ -26,8 +27,9 @@ import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 
 /**
- * Diálogo modal para alternar entre los 3 modos de visualización de video de fondo:
- * - FULLSCREEN_BACKGROUND: Video cubriendo toda la pantalla detrás con carátula flotando.
+ * Diálogo modal para alternar entre los 4 modos de visualización de video de fondo:
+ * - FULLSCREEN_BACKGROUND: Video rellenando el 100% de la pantalla verticalmente (Zoom/Recorte).
+ * - FULLSCREEN_ADAPTED: Video horizontal completo adaptado al ancho sin cortar rostros.
  * - CARD_CANVAS: Video dentro del marco central de carátula 1:1.
  * - OFF: Desactivado.
  */
@@ -61,7 +63,7 @@ fun VideoDisplayModeDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    text = "Elige cómo visualizar el video asociado a esta canción:",
+                    text = "Elige si deseas rellenar toda la pantalla verticalmente (aunque recorte caras) o ver el cuadro horizontal adaptado:",
                     style = MaterialTheme.typography.bodyMedium.copy(color = TextSecondary)
                 )
                 Spacer(modifier = Modifier.height(4.dp))
@@ -89,6 +91,7 @@ fun VideoDisplayModeDialog(
                             Icon(
                                 imageVector = when (mode) {
                                     VideoDisplayMode.FULLSCREEN_BACKGROUND -> Icons.Default.Wallpaper
+                                    VideoDisplayMode.FULLSCREEN_ADAPTED -> Icons.Default.AspectRatio
                                     VideoDisplayMode.CARD_CANVAS -> Icons.Default.CropSquare
                                     VideoDisplayMode.OFF -> Icons.Default.VideocamOff
                                 },

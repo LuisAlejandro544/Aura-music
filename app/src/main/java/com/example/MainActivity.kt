@@ -43,7 +43,6 @@ import com.example.model.VideoDisplayMode
 import com.example.ui.components.BottomNavBar
 import com.example.ui.components.MiniPlayer
 import com.example.ui.navigation.NavScreen
-import com.example.ui.screens.equalizer.EqualizerScreen
 import com.example.ui.screens.home.HomeScreen
 import com.example.ui.screens.importmusic.ImportMusicScreen
 import com.example.ui.screens.library.LibraryScreen
@@ -75,9 +74,18 @@ class MainActivity : ComponentActivity() {
             val viewModel: MusicViewModel = viewModel()
             musicViewModel = viewModel
 
-            // Procesar Intent de inicio ("Abrir con..." o "Compartir con...")
+            // Procesar Intent de inicio ("Abrir con...", "Compartir con..." o toque en notificación de descarga)
             LaunchedEffect(intent) {
-                viewModel.onIncomingIntent(intent)
+                val downloadedTrackId = intent?.getLongExtra(
+                    com.example.playback.AuraDownloadService.EXTRA_PLAY_DOWNLOADED_TRACK_ID,
+                    -1L
+                ) ?: -1L
+                if (downloadedTrackId > 0L) {
+                    intent?.removeExtra(com.example.playback.AuraDownloadService.EXTRA_PLAY_DOWNLOADED_TRACK_ID)
+                    viewModel.playDownloadedTrackFromNotification(downloadedTrackId)
+                } else {
+                    viewModel.onIncomingIntent(intent)
+                }
             }
 
             val currentTheme by viewModel.currentTheme.collectAsStateWithLifecycle()
@@ -96,10 +104,29 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        AuraApplication.isAppInForeground = true
+    }
+
+    override fun onStop() {
+        AuraApplication.isAppInForeground = false
+        super.onStop()
+    }
+
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        musicViewModel?.onIncomingIntent(intent)
+        val downloadedTrackId = intent.getLongExtra(
+            com.example.playback.AuraDownloadService.EXTRA_PLAY_DOWNLOADED_TRACK_ID,
+            -1L
+        )
+        if (downloadedTrackId > 0L) {
+            intent.removeExtra(com.example.playback.AuraDownloadService.EXTRA_PLAY_DOWNLOADED_TRACK_ID)
+            musicViewModel?.playDownloadedTrackFromNotification(downloadedTrackId)
+        } else {
+            musicViewModel?.onIncomingIntent(intent)
+        }
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
@@ -169,6 +196,8 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
 
     val sleepTimerState by viewModel.sleepTimerState.collectAsStateWithLifecycle()
     val spatial8DConfig by viewModel.spatial8DConfig.collectAsStateWithLifecycle()
+    val vocalClarityConfig by viewModel.vocalClarityConfig.collectAsStateWithLifecycle()
+    val packageUpdateState by viewModel.packageUpdateState.collectAsStateWithLifecycle()
     val reverbConfig by viewModel.reverbConfig.collectAsStateWithLifecycle()
     val playbackSpeed by viewModel.playbackSpeed.collectAsStateWithLifecycle()
     val playbackPitch by viewModel.playbackPitch.collectAsStateWithLifecycle()
@@ -301,14 +330,26 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                 }
             }
         ) { innerPadding ->
-            Box(
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
             ) {
-                // Transición animada fluida entre pantallas del sistema
-                AnimatedContent(
-                    targetState = currentScreen,
+                if (currentScreen !is NavScreen.Onboarding) {
+                    com.example.ui.components.PackageUpdateBanner(
+                        state = packageUpdateState,
+                        onApplyAndRestart = { viewModel.applyPendingPackageUpdateAndRestart() }
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                ) {
+                    // Transición animada fluida entre pantallas del sistema
+                    AnimatedContent(
+                        targetState = currentScreen,
                     transitionSpec = {
                         (fadeIn(animationSpec = tween(240)) + slideInHorizontally(
                             animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
@@ -340,6 +381,7 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                             onAddToPlaylist = { playlistId, trackId -> viewModel.addTrackToPlaylist(playlistId, trackId) },
                             onNavigate = { viewModel.navigateTo(it) },
                             onSelectLibraryTab = { viewModel.setLibraryTab(it) },
+                            onOpenPlaylist = { viewModel.openPlaylist(it) },
                             onEditTrack = { id, t, a, al -> viewModel.updateTrackInfo(id, t, a, al) },
                             onEditTrackDetails = { id, t, a, al, art, removeArt ->
                                 viewModel.updateTrackDetails(id, t, a, al, art, removeArt)
@@ -411,33 +453,6 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                             }
                         )
 
-                        is NavScreen.Equalizer -> {
-                            LaunchedEffect(Unit) {
-                                initialAudioEffectsTab = 0
-                                showGlobalAudioEffectsSheet = true
-                                viewModel.handleBackPress()
-                            }
-                            HomeScreen(
-                                allTracks = allTracks,
-                                favoriteTracks = favoriteTracks,
-                                recentlyAddedTracks = recentlyAddedTracks,
-                                topPlayedTracks = topPlayedTracks,
-                                playlists = playlists,
-                                currentTrack = currentTrack,
-                                isPlaying = isPlaying,
-                                onTrackClick = { track, list -> viewModel.playTrack(track, list) },
-                                onFavoriteToggle = { viewModel.toggleFavorite(it) },
-                                onDeleteTrack = { viewModel.deleteTrack(it) },
-                                onAddToPlaylist = { playlistId, trackId -> viewModel.addTrackToPlaylist(playlistId, trackId) },
-                                onNavigate = { viewModel.navigateTo(it) },
-                                onSelectLibraryTab = { viewModel.setLibraryTab(it) },
-                                onEditTrack = { id, t, a, al -> viewModel.updateTrackInfo(id, t, a, al) },
-                                onEditTrackDetails = { id, t, a, al, art, removeArt ->
-                                    viewModel.updateTrackDetails(id, t, a, al, art, removeArt)
-                                }
-                            )
-                        }
-
                         is NavScreen.PlaylistDetail -> PlaylistDetailScreen(
                             playlist = selectedPlaylist,
                             tracks = selectedPlaylistTracks,
@@ -484,6 +499,7 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                             onOpenOnboarding = { viewModel.reopenOnboarding() }
                         )
                     }
+                }
                 }
             }
         }
@@ -550,9 +566,13 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                 onAddSleepTimerMinutes = { viewModel.addSleepTimerMinutes(it) },
                 spatial8DConfig = spatial8DConfig,
                 onSet8DEnabled = { viewModel.set8DEnabled(it) },
+                onSet8DMode16D = { viewModel.set8DMode16D(it) },
                 onSet8DOrbitSpeed = { viewModel.set8DOrbitSpeed(it) },
                 onSet8DSpatialIntensity = { viewModel.set8DSpatialIntensity(it) },
                 onSet8DRoomDepth = { viewModel.set8DRoomDepth(it) },
+                vocalClarityConfig = vocalClarityConfig,
+                onSetVocalClarityEnabled = { viewModel.setVocalClarityEnabled(it) },
+                onSetVocalClarityStrength = { viewModel.setVocalClarityStrength(it) },
                 reverbConfig = reverbConfig,
                 onSetReverbEnabled = { viewModel.setReverbEnabled(it) },
                 onSetReverbPreset = { viewModel.setReverbPreset(it) },
@@ -617,8 +637,12 @@ fun AuraMusicApp(viewModel: MusicViewModel) {
                 onBandLevelChange = { index, level -> viewModel.setBandLevel(index, level) },
                 onBassBoostChange = { viewModel.setBassBoost(it) },
                 onPresetSelect = { viewModel.applyPreset(it) },
+                vocalClarityConfig = vocalClarityConfig,
+                onSetVocalClarityEnabled = { viewModel.setVocalClarityEnabled(it) },
+                onSetVocalClarityStrength = { viewModel.setVocalClarityStrength(it) },
                 spatial8DConfig = spatial8DConfig,
                 onSet8DEnabled = { viewModel.set8DEnabled(it) },
+                onSet8DMode16D = { viewModel.set8DMode16D(it) },
                 onSet8DOrbitSpeed = { viewModel.set8DOrbitSpeed(it) },
                 onSet8DSpatialIntensity = { viewModel.set8DSpatialIntensity(it) },
                 onSet8DRoomDepth = { viewModel.set8DRoomDepth(it) },

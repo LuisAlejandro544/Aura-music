@@ -592,7 +592,8 @@ object FFmpegNativeEngine {
         inputFile: File,
         outputFile: File,
         isLoop: Boolean,
-        loopStyle: CanvasLoopStyle = CanvasLoopStyle.CROSSFADE
+        loopStyle: CanvasLoopStyle = CanvasLoopStyle.CROSSFADE,
+        preferVerticalCanvasOnHorizontal: Boolean = false
     ): ExecutionResult = withContext(Dispatchers.IO) {
         if (!isAvailable(context)) {
             return@withContext try {
@@ -607,19 +608,19 @@ object FFmpegNativeEngine {
         val isHorizontal = dimensions != null && (dimensions.first > dimensions.second * 1.15f)
 
         val res = when {
-            // Caso 1: Video horizontal que requiere adaptación a lienzo 9:16 para evitar corte de rostros
-            isHorizontal -> {
+            // Caso 1: Video horizontal con lienzo 9:16 pre-renderizado explícito
+            isHorizontal && preferVerticalCanvasOnHorizontal -> {
                 AuraDebugManager.logInfo(TAG, "Detectado video horizontal (${dimensions?.first}x${dimensions?.second}). Adaptando a lienzo 9:16...")
                 createVerticalCanvasFromHorizontalVideo(context, inputFile, outputFile)
             }
-            // Caso 2: Video vertical o cuadrado con repetición en bucle
+            // Caso 2: Video con repetición en bucle (conserva proporción limpia para permitir Rellenar o Adaptado en vivo)
             isLoop -> {
                 when (loopStyle) {
                     CanvasLoopStyle.BOOMERANG -> createBoomerangLoopVideo(context, inputFile, outputFile)
                     CanvasLoopStyle.CROSSFADE -> createSeamlessLoopVideo(context, inputFile, outputFile)
                 }
             }
-            // Caso 3: Video vertical largo sincronizado
+            // Caso 3: Video largo sincronizado (conserva proporción limpia 480p con GOP corto para Rellenar o Adaptado en vivo)
             else -> {
                 optimizeVideoForInstantSync(context, inputFile, outputFile)
             }

@@ -45,10 +45,11 @@ fun NowPlayingTopBar(
     isLyricsActive: Boolean = false,
     onToggleLyrics: () -> Unit = {},
     isABLoopActive: Boolean = false,
+    isVocalClarityActive: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val hasVideo = !currentTrack.videoUri.isNullOrEmpty()
-    val hasActiveEffect = sleepTimerState.isActive || spatial8DConfig.enabled || isABLoopActive
+    val hasActiveEffect = sleepTimerState.isActive || spatial8DConfig.enabled || isABLoopActive || isVocalClarityActive
 
     Row(
         modifier = modifier
@@ -152,6 +153,7 @@ fun NowPlayingTopBar(
                         Icon(
                             imageVector = when (videoDisplayMode) {
                                 VideoDisplayMode.FULLSCREEN_BACKGROUND -> Icons.Default.Fullscreen
+                                VideoDisplayMode.FULLSCREEN_ADAPTED -> Icons.Default.AspectRatio
                                 VideoDisplayMode.CARD_CANVAS -> Icons.Default.CropSquare
                                 VideoDisplayMode.OFF -> Icons.Default.VideocamOff
                             },

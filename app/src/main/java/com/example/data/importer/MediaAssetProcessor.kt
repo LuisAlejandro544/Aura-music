@@ -80,17 +80,19 @@ object MediaAssetProcessor {
                     if (res.isSuccessful) {
                         val stream = res.body?.byteStream()
                         if (stream != null) {
-                            val bitmap = BitmapFactory.decodeStream(stream)
-                            if (bitmap != null && bitmap.width > 30 && bitmap.height > 30) {
+                            val rawBitmap = BitmapFactory.decodeStream(stream)
+                            if (rawBitmap != null && rawBitmap.width > 30 && rawBitmap.height > 30) {
+                                val cleanBitmap = removeHorizontalLetterboxBars(rawBitmap)
                                 FileOutputStream(artFile).use { out ->
                                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                                        bitmap.compress(Bitmap.CompressFormat.WEBP_LOSSLESS, 100, out)
+                                        cleanBitmap.compress(Bitmap.CompressFormat.WEBP_LOSSLESS, 100, out)
                                     } else {
-                                        bitmap.compress(Bitmap.CompressFormat.WEBP, 95, out)
+                                        cleanBitmap.compress(Bitmap.CompressFormat.WEBP, 95, out)
                                     }
                                 }
                                 artworkPath = artFile.absolutePath
-                                bitmap.recycle()
+                                if (cleanBitmap !== rawBitmap) cleanBitmap.recycle()
+                                rawBitmap.recycle()
                             }
                         }
                     }
@@ -110,15 +112,17 @@ object MediaAssetProcessor {
                     MediaMetadataRetriever.OPTION_CLOSEST_SYNC
                 ) ?: frameRetriever.frameAtTime
                 if (frame != null) {
+                    val cleanFrame = removeHorizontalLetterboxBars(frame)
                     val fallbackArtFile = File(storageManager.imagesDir, "art_online_${timestamp}.webp")
                     FileOutputStream(fallbackArtFile).use { out ->
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                            frame.compress(Bitmap.CompressFormat.WEBP_LOSSLESS, 100, out)
+                            cleanFrame.compress(Bitmap.CompressFormat.WEBP_LOSSLESS, 100, out)
                         } else {
-                            frame.compress(Bitmap.CompressFormat.WEBP, 95, out)
+                            cleanFrame.compress(Bitmap.CompressFormat.WEBP, 95, out)
                         }
                     }
                     artworkPath = fallbackArtFile.absolutePath
+                    if (cleanFrame !== frame) cleanFrame.recycle()
                     frame.recycle()
                 }
             } catch (_: Throwable) {
@@ -128,6 +132,67 @@ object MediaAssetProcessor {
         }
 
         return artworkPath
+    }
+
+    /**
+     * Recorta automáticamente las bandas negras horizontales (letterbox superior e inferior)
+     * presentes en miniaturas 4:3 de YouTube (hqdefault / sddefault).
+     */
+    fun removeHorizontalLetterboxBars(source: Bitmap): Bitmap {
+        val w = source.width
+        val h = source.height
+        if (w < 80 || h < 80) return source
+
+        fun isRowDark(y: Int): Boolean {
+            val sampleXs = intArrayOf(
+                (w * 0.15f).toInt(),
+                (w * 0.35f).toInt(),
+                (w * 0.50f).toInt(),
+                (w * 0.65f).toInt(),
+                (w * 0.85f).toInt()
+            )
+            var totalLuma = 0
+            for (x in sampleXs) {
+                val pixel = source.getPixel(x.coerceIn(0, w - 1), y.coerceIn(0, h - 1))
+                val r = (pixel shr 16) and 0xFF
+                val g = (pixel shr 8) and 0xFF
+                val b = pixel and 0xFF
+                totalLuma += (r + g + b) / 3
+            }
+            return (totalLuma / sampleXs.size) < 20
+        }
+
+        if (!isRowDark((h * 0.02f).toInt()) || !isRowDark((h * 0.98f).toInt())) {
+            return source
+        }
+
+        val maxCrop = (h * 0.18f).toInt()
+        val step = (h / 100).coerceAtLeast(1)
+        var topCrop = 0
+        var yTop = step
+        while (yTop <= maxCrop && isRowDark(yTop)) {
+            topCrop = yTop
+            yTop += step
+        }
+
+        var bottomCrop = 0
+        var yBottom = h - 1 - step
+        while (yBottom >= h - maxCrop && isRowDark(yBottom)) {
+            bottomCrop = (h - 1) - yBottom
+            yBottom -= step
+        }
+
+        val symCrop = minOf(topCrop, bottomCrop)
+        if (symCrop < (h * 0.05f).toInt()) return source
+        val finalCrop = (symCrop + 2).coerceAtMost(maxCrop)
+        val newHeight = h - (finalCrop * 2)
+        if (newHeight <= h / 2) return source
+
+        return try {
+            Bitmap.createBitmap(source, 0, finalCrop, w, newHeight)
+        } catch (_: Exception) {
+            source
+        }
     }
 
     /**

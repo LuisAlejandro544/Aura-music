@@ -296,6 +296,44 @@ fun EditTrackDialog(
                         )
 
                         if (hasVideoAttached) {
+                            val editContext = androidx.compose.ui.platform.LocalContext.current
+                            val appPrefs = remember { editContext.getSharedPreferences("aura_music_ui_prefs", android.content.Context.MODE_PRIVATE) }
+                            var selectedFramingMode by remember {
+                                val saved = appPrefs.getString("pref_video_display_mode", com.example.model.VideoDisplayMode.FULLSCREEN_BACKGROUND.name)
+                                val initial = if (saved == com.example.model.VideoDisplayMode.FULLSCREEN_ADAPTED.name) {
+                                    com.example.model.VideoDisplayMode.FULLSCREEN_ADAPTED
+                                } else {
+                                    com.example.model.VideoDisplayMode.FULLSCREEN_BACKGROUND
+                                }
+                                mutableStateOf(initial)
+                            }
+
+                            Text(
+                                text = "Encuadre del Video de Fondo:",
+                                style = MaterialTheme.typography.labelSmall.copy(color = TextPrimary, fontWeight = FontWeight.Bold)
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                FilterChip(
+                                    selected = selectedFramingMode == com.example.model.VideoDisplayMode.FULLSCREEN_BACKGROUND,
+                                    onClick = {
+                                        selectedFramingMode = com.example.model.VideoDisplayMode.FULLSCREEN_BACKGROUND
+                                        appPrefs.edit().putString("pref_video_display_mode", selectedFramingMode.name).apply()
+                                    },
+                                    label = { Text("📱 Rellenar (Recortar)", style = MaterialTheme.typography.labelSmall) }
+                                )
+                                FilterChip(
+                                    selected = selectedFramingMode == com.example.model.VideoDisplayMode.FULLSCREEN_ADAPTED,
+                                    onClick = {
+                                        selectedFramingMode = com.example.model.VideoDisplayMode.FULLSCREEN_ADAPTED
+                                        appPrefs.edit().putString("pref_video_display_mode", selectedFramingMode.name).apply()
+                                    },
+                                    label = { Text("🎬 Adaptado horizontal", style = MaterialTheme.typography.labelSmall) }
+                                )
+                            }
+
                             Text(
                                 text = "Modo de reproducción de video:",
                                 style = MaterialTheme.typography.labelSmall.copy(color = TextPrimary, fontWeight = FontWeight.Bold)

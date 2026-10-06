@@ -157,6 +157,12 @@ object YtDlpNativeEngine {
         context: Context,
         url: String
     ): Result<OnlineVideoAudioImporter.ResolvedMediaInfo> = withContext(Dispatchers.IO) {
+        if (YtDlpAutoUpdater.isYtDlpTemporarilyBlocked()) {
+            val msg = "Descarga por yt-dlp bloqueada temporalmente hasta que se aplique la actualización de paquetes."
+            AuraDebugManager.logWarning(TAG, msg)
+            return@withContext Result.failure(IllegalStateException(msg))
+        }
+
         init(context)
         FFmpegNativeEngine.init(context)
 

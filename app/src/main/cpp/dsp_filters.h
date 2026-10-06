@@ -85,6 +85,107 @@ inline double softClip(double x) {
     return x - (x * x * x) / 6.0;
 }
 
+/**
+ * Procesador C++20 de Clarificación de Voces (Vocal Clarity HD).
+ * Extrae la componente central (Mid) donde reside la voz principal, atenúa el enmascaramiento
+ * de graves fangosos (~220 Hz) y realza las bandas formantes de presencia (1.85 kHz) y
+ * articulación/dicción (3.8 kHz) en 64-bit, con 3 modos estratégicos:
+ * - Modo 0 (Natural): Realce vocal equilibrado conservando todo el cuerpo instrumental.
+ * - Modo 1 (Nítido HD): Mayor articulación de consonantes y enfoque central definido.
+ * - Modo 2 (Enfoque Vocal): Prioridad máxima a la voz atenuando el acompañamiento lateral (Side).
+ */
+class VocalClarityProcessor {
+public:
+    void init(int sampleRate) {
+        mSampleRate = (sampleRate > 0) ? sampleRate : 44100;
+        reconfigureFilters();
+        reset();
+    }
+
+    void reset() {
+        mMudCutFilter.reset();
+        mPresenceFilter.reset();
+        mArticulationFilter.reset();
+    }
+
+    void setEnabled(bool enabled) {
+        if (mEnabled != enabled) {
+            mEnabled = enabled;
+            if (!enabled) reset();
+        }
+    }
+
+    [[nodiscard]] bool isEnabled() const { return mEnabled; }
+
+    void setStrength(double strength) {
+        double clamped = std::clamp(strength, 0.0, 1.0);
+        if (std::abs(mStrength - clamped) > 0.001) {
+            mStrength = clamped;
+            reconfigureFilters();
+        }
+    }
+
+    [[nodiscard]] double getStrength() const { return mStrength; }
+
+    void setMode(int mode) {
+        int clamped = std::clamp(mode, 0, 2);
+        if (mMode != clamped) {
+            mMode = clamped;
+            reconfigureFilters();
+        }
+    }
+
+    [[nodiscard]] int getMode() const { return mMode; }
+
+    inline void processSample(double& sampleL, double& sampleR) {
+        if (!mEnabled || mStrength <= 0.001) return;
+
+        // Descomposición Mid-Side (Mid = centro vocal, Side = apertura instrumental)
+        double mid = (sampleL + sampleR) * 0.5;
+        double side = (sampleL - sampleR) * 0.5;
+
+        // Procesar el canal central con limpieza de frecuencias fangosas y realce de formantes vocales
+        double cleanMid = mMudCutFilter.process(mid);
+        cleanMid = mPresenceFilter.process(cleanMid);
+        cleanMid = mArticulationFilter.process(cleanMid);
+
+        // Atenuación selectiva del canal lateral según el modo elegido para despejar la voz
+        double sideScale = 1.0;
+        if (mMode == 0) {
+            sideScale = 1.0 - (0.10 * mStrength);
+        } else if (mMode == 1) {
+            sideScale = 1.0 - (0.24 * mStrength);
+        } else {
+            sideScale = 1.0 - (0.52 * mStrength);
+        }
+
+        double outSide = side * sideScale;
+        sampleL = cleanMid + outSide;
+        sampleR = cleanMid - outSide;
+    }
+
+private:
+    void reconfigureFilters() {
+        double modeMultiplier = (mMode == 0) ? 0.85 : ((mMode == 1) ? 1.15 : 1.35);
+        double mudCutDb = -3.8 * mStrength * modeMultiplier;
+        double presenceBoostDb = 5.6 * mStrength * modeMultiplier;
+        double articulationBoostDb = 4.2 * mStrength * modeMultiplier;
+
+        mMudCutFilter.configurePeaking(mSampleRate, 220.0, mudCutDb, 1.15);
+        mPresenceFilter.configurePeaking(mSampleRate, 1850.0, presenceBoostDb, 1.25);
+        mArticulationFilter.configurePeaking(mSampleRate, 3800.0, articulationBoostDb, 1.40);
+    }
+
+    int mSampleRate{44100};
+    bool mEnabled{false};
+    double mStrength{0.65};
+    int mMode{1}; // 0 = Natural, 1 = Nítido HD, 2 = Enfoque Vocal
+
+    BiquadPeakingFilter mMudCutFilter{};
+    BiquadPeakingFilter mPresenceFilter{};
+    BiquadPeakingFilter mArticulationFilter{};
+};
+
 } // namespace aura::dsp
 
 #endif // AURAMUSIC_DSP_FILTERS_H

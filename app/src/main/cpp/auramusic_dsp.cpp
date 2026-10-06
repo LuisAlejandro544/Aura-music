@@ -58,8 +58,14 @@ Java_com_example_playback_NativeAudioEngine_nativeProcessPcmBuffer(JNIEnv* env, 
 
 JNIEXPORT void JNICALL
 Java_com_example_playback_NativeAudioEngine_nativeSetEightDEnabled(JNIEnv* /* env */, jobject /* thiz */, jboolean enabled) {
-    LOGI("Aura Music Audio 8D: %s", enabled ? "ACTIVADO" : "DESACTIVADO");
+    LOGI("Aura Music Audio 8D/16D: %s", enabled ? "ACTIVADO" : "DESACTIVADO");
     sDspEngine.setEightDEnabled(enabled == JNI_TRUE);
+}
+
+JNIEXPORT void JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeSetEightD16DMode(JNIEnv* /* env */, jobject /* thiz */, jboolean is16DMode) {
+    LOGI("Aura Music Modo Espacial: %s", is16DMode ? "16D Multi-Orbita" : "8D Clasico");
+    sDspEngine.setEightD16DMode(is16DMode == JNI_TRUE);
 }
 
 JNIEXPORT void JNICALL
@@ -75,6 +81,12 @@ Java_com_example_playback_NativeAudioEngine_nativeSetEightDSpatialIntensity(JNIE
 JNIEXPORT void JNICALL
 Java_com_example_playback_NativeAudioEngine_nativeSetEightDRoomDepth(JNIEnv* /* env */, jobject /* thiz */, jfloat depth) {
     sDspEngine.setEightDRoomDepth(static_cast<double>(depth));
+}
+
+JNIEXPORT void JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeSetVocalClarityParameters(JNIEnv* /* env */, jobject /* thiz */, jboolean enabled, jfloat strength) {
+    LOGI("Aura Music Clarificador Vocal HD: %s (%.0f%%)", enabled ? "ACTIVADO" : "DESACTIVADO", strength * 100.0f);
+    sDspEngine.setVocalClarityParameters(enabled == JNI_TRUE, static_cast<double>(strength));
 }
 
 JNIEXPORT void JNICALL

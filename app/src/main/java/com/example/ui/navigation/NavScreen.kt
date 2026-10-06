@@ -8,7 +8,6 @@ sealed class NavScreen(val route: String) {
     object Home : NavScreen("home")
     object Library : NavScreen("library")
     object Import : NavScreen("import")
-    object Equalizer : NavScreen("equalizer")
     object PlaylistDetail : NavScreen("playlist_detail")
     object Settings : NavScreen("settings")
     object Onboarding : NavScreen("onboarding")

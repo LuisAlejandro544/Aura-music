@@ -17,8 +17,8 @@ AuraMusic/
 │   │   ├── main/
 │   │   │   ├── cpp/                            # Código Nativo C++20 / C17 (DSP y Lanzadores Puros Multi-ABI)
 │   │   │   │   ├── CMakeLists.txt              # Configuración CMake integrada en Gradle (C17 / C++20)
-│   │   │   │   ├── dsp_filters.h               # Módulo C++20: Filtros Biquad IIR, EQ 10 bandas y limitador con reset()
-│   │   │   │   ├── dsp_spatial.h               # Módulo C++20: Motor Audio Espacial 8D Binaural orbital con reset()
+│   │   │   │   ├── dsp_filters.h               # Módulo C++20: Filtros Biquad IIR, EQ 10 bandas, Clarificador Vocal HD Mid-Side y limitador
+│   │   │   │   ├── dsp_spatial.h               # Módulo C++20: Motor Audio Espacial 8D (360°) y 16D (Multi-Órbita contra-rotatoria)
 │   │   │   │   ├── dsp_crossfeed.h             # Módulo C++20: Filtro acústico Crossfeed Bauer / Chu Moy con reset()
 │   │   │   │   ├── dsp_reverb.h                # Módulo C++20: Suite Reverb acústica híbrida con resetBuffers()
 │   │   │   │   ├── auramusic_dsp.h             # Orquestador nativo C++20 con limpieza atómica de buffers (flushDspBuffers)
@@ -35,7 +35,7 @@ AuraMusic/
 │   │   │   ├── assets/                         # Recursos empaquetados en APK
 │   │   │   │   └── bin/.gitkeep                # Directorio para ejecutable yt-dlp aprovisionado en CI/CD o OTA
 │   │   │   ├── java/com/example/
-│   │   │   │   ├── AuraApplication.kt         # Clase Application con inicio de AuraDebugManager
+│   │   │   │   ├── AuraApplication.kt         # Clase Application con inicio de AuraDebugManager y verificación de paquetes
 │   │   │   │   ├── MainActivity.kt             # Actividad principal, insets, animaciones y navegación
 │   │   │   │   ├── debug/                      # Suite Autónoma de Diagnóstico y Telemetría
 │   │   │   │   │   ├── DebugSeverity.kt        # Enum de severidades (CRASH, CRÍTICO, ERROR, WARNING, INFO)
@@ -64,12 +64,12 @@ AuraMusic/
 │   │   │   │   │   │   ├── SampleMusicGenerator.kt # Sintetizador de audio WAV para demos
 │   │   │   │   │   │   ├── VideoAudioExtractor.kt  # Extractor de audio nativo y generador 3 en 1 de Video a Música
 │   │   │   │   │   │   ├── FFmpegNativeEngine.kt   # Motor nativo FFmpeg puro (CLI/JNI): Canvas 9:16, xfade, boomerang
-│   │   │   │   │   │   ├── YtDlpAutoUpdater.kt     # Gestor de actualización en caliente OTA para yt-dlp
+│   │   │   │   │   │   ├── YtDlpAutoUpdater.kt     # Gestor de verificación y actualización OTA en segundo plano con staging y reinicio
 │   │   │   │   │   │   ├── YtDlpNativeEngine.kt    # Extractor nativo local basado en yt-dlp y FFmpeg
 │   │   │   │   │   │   ├── InnerTubeClient.kt      # Cliente InnerTube multi-cliente sin fricción
 │   │   │   │   │   │   ├── InvidiousStreamResolver.kt # Resolvedor de respaldo para restricciones de derechos
 │   │   │   │   │   │   ├── HeadlessWebViewExtractor.kt # Extractor móvil en segundo plano sobre m.youtube.com
-│   │   │   │   │   │   ├── WebStreamExtractor.kt   # Orquestador híbrido de 3 niveles con fallback automático
+│   │   │   │   │   │   ├── WebStreamExtractor.kt   # Orquestador híbrido de 3 niveles con bloqueo preventivo de yt-dlp
 │   │   │   │   │   │   ├── download/
 │   │   │   │   │   │   │   └── ChunkedStreamDownloader.kt # Acelerador HTTP Range Chunked (sin límite de 63 KB/s)
 │   │   │   │   │   │   └── tiktok/
@@ -96,16 +96,18 @@ AuraMusic/
 │   │   │   │   │   ├── Playlist.kt             # Modelo de datos de lista
 │   │   │   │   │   ├── RepeatMode.kt           # Enum de modos de repetición
 │   │   │   │   │   ├── EqualizerConfig.kt      # Modelo de 10 bandas y presets de EQ
-│   │   │   │   │   ├── AudioEffectsConfig.kt   # Modelos para Audio 8D, Temporizador, Bucle A-B y Gapless/Crossfade
+│   │   │   │   │   ├── AudioEffectsConfig.kt   # Modelos para Audio 8D/16D, Clarificador Vocal HD, Temporizador y Bucle A-B
+│   │   │   │   │   ├── PackageUpdateState.kt   # Máquina de estados sellada para verificación/actualización de paquetes en segundo plano
 │   │   │   │   │   ├── HeadphoneConfig.kt      # Configuración de Crossfeed C++20, Balance L/R y gestos
 │   │   │   │   │   ├── VideoDisplayMode.kt     # Enum de modos de visualización de video (Fondo Completo, Carátula, Off)
 │   │   │   │   │   └── ThemePalette.kt         # Enum de temas de color vibrantes
-│   │   │   │   ├── playback/                   # Capa de reproducción de audio modularizada
+│   │   │   │   ├── playback/                   # Capa de reproducción de audio y descargas en segundo plano
 │   │   │   │   │   ├── AuraAudioPlayer.kt      # Orquestador Media3 ExoPlayer y Buffer Flushing
 │   │   │   │   │   ├── AuraMediaPlaybackService.kt # Servicio MediaSessionService y notificación nativa
-│   │   │   │   │   ├── AudioEffectManager.kt   # Gestor de EQ 10 bandas, BassBoost y Audio 8D
+│   │   │   │   │   ├── AuraDownloadService.kt  # Servicio Foreground para descargas y notificaciones nativas de paquetes
+│   │   │   │   │   ├── AudioEffectManager.kt   # Gestor de EQ 10 bandas, BassBoost, Clarificador Vocal HD y Audio 8D/16D
 │   │   │   │   │   ├── HeadphoneController.kt  # Gestor de auriculares, Becoming Noisy y botones físicos
-│   │   │   │   │   ├── NativeAudioEngine.kt    # Puente JNI hacia C++20 (EQ 10 bandas, 8D, Crossfeed y Balance)
+│   │   │   │   │   ├── NativeAudioEngine.kt    # Puente JNI hacia C++20 (EQ 10 bandas, 8D/16D, Vocal Clarity, Crossfeed y Balance)
 │   │   │   │   │   ├── NativeAudioProcessor.kt # Procesador Media3 para buffers PCM con onFlush()
 │   │   │   │   │   └── controllers/            # Controladores modulares desacoplados de reproducción
 │   │   │   │   │       ├── ABLoopController.kt     # Repetidor A-B con ajuste fino y marcado de puntos
@@ -114,31 +116,32 @@ AuraMusic/
 │   │   │   │   │       └── MediaSessionBridge.kt   # Puente Media3 MediaSession y System Media Controls
 │   │   │   │   ├── ui/
 │   │   │   │   │   ├── components/             # Componentes visuales reutilizables
-│   │   │   │   │   │   ├── ArtworkImage.kt     # Renderizador de carátulas (WebP + Procedural)
+│   │   │   │   │   │   ├── ArtworkImage.kt     # Renderizador de carátulas (WebP + Deletterbox + Procedural)
 │   │   │   │   │   │   ├── PlaylistCoverCollage.kt # Renderizador de portada personalizada o collage dinámico (1 a 4 fotos)
-│   │   │   │   │   │   ├── AudioEffectsBottomSheet.kt # Modal unificado orquestador de EQ 10 bandas, 8D, Bucle A-B y efectos
+│   │   │   │   │   │   ├── PackageUpdateBanner.kt # Píldora/banner no intrusivo de verificación, progreso y reinicio de paquetes
+│   │   │   │   │   │   ├── AudioEffectsBottomSheet.kt # Modal unificado orquestador de EQ 10 bandas, 8D/16D, Vocal Clarity y efectos
 │   │   │   │   │   │   ├── audioeffects/       # Pestañas modulares de efectos acústicos
-│   │   │   │   │   │   │   ├── EqualizerTabContent.kt         # Ecualizador 10 bandas ISO, presets y Bass Boost
-│   │   │   │   │   │   │   ├── Spatial8DTabContent.kt         # Motor Audio 8D Espacial y controles de órbita
+│   │   │   │   │   │   │   ├── EqualizerTabContent.kt         # Ecualizador 10 bandas ISO, Clarificador Vocal HD, presets y Bass Boost
+│   │   │   │   │   │   │   ├── Spatial8DTabContent.kt         # Motor Audio 8D / 16D Multi-Órbita limpio sin animaciones
 │   │   │   │   │   │   │   ├── ReverbTabContent.kt            # Suite Reverb híbrida (Presets + personalización)
 │   │   │   │   │   │   │   ├── SleepTimerTabContent.kt        # Temporizador de apagado con fade-out de 10s
-│   │   │   │   │   │   │   ├── PlaybackParametersTabContent.kt# Velocidad y Tono (Pitch Shift) con protección
+│   │   │   │   │   │   │   ├── PlaybackParametersTabContent.kt# Velocidad, Tono (Pitch Shift) y Clarificador Vocal HD
 │   │   │   │   │   │   │   ├── TransitionsTabContent.kt       # Repetidor A-B con ajuste fino, Crossfade 0-12s y Gapless
 │   │   │   │   │   │   │   └── BalanceAndHeadphonesTabContent.kt# Balance L/R y Crossfeed C++20 rápido
 │   │   │   │   │   │   ├── AudioVisualizer.kt  # Visualizador de ondas en tiempo real con degradado dinámico
-│   │   │   │   │   │   ├── BackgroundVideoPlayer.kt # Renderizador de video de fondo sincronizado y 100% despejado
+│   │   │   │   │   │   ├── BackgroundVideoPlayer.kt # Renderizador de video de fondo (Zoom / Fit) 100% despejado
 │   │   │   │   │   │   ├── BottomNavBar.kt     # Barra de navegación limpia (4 pestañas)
-│   │   │   │   │   │   ├── EditTrackDialog.kt  # Modal con Photo Picker y edición de carátula/video
+│   │   │   │   │   │   ├── EditTrackDialog.kt  # Modal con Photo Picker y edición de carátula/video/encuadre
 │   │   │   │   │   │   ├── MiniPlayer.kt       # Mini reproductor tintado con marquesina y Video Canvas miniatura
 │   │   │   │   │   │   ├── ProceduralArtwork.kt # Arte vectorial dinámico en tiempo real
 │   │   │   │   │   │   ├── TrackListItem.kt    # Fila de canción con marquesina en pista activa y menú contextual
-│   │   │   │   │   │   ├── VideoToMusicDialog.kt # Diálogo de conversión Video a Música con interruptor de recorte de silencios
-│   │   │   │   │   │   ├── DownloadFromLinkDialog.kt # Diálogo de descarga web/TikTok/YouTube con recorte de silencios
+│   │   │   │   │   │   ├── VideoToMusicDialog.kt # Diálogo de conversión Video a Música con encuadre y recorte de silencios
+│   │   │   │   │   │   ├── DownloadFromLinkDialog.kt # Diálogo de descarga web/TikTok/YouTube con bloqueo temporal de yt-dlp
 │   │   │   │   │   │   └── SearchLyricsDialog.kt # Diálogo de búsqueda interactiva de letras y recomendación oficial
 │   │   │   │   │   ├── navigation/
 │   │   │   │   │   │   └── NavScreen.kt        # Destinos de navegación y pestañas
 │   │   │   │   │   ├── screens/                # Pantallas principales modulares
-│   │   │   │   │   │   ├── home/HomeScreen.kt  # Pantalla de inicio con saludo y accesos
+│   │   │   │   │   │   ├── home/HomeScreen.kt  # Pantalla de inicio con saludo, Playlist más escuchada y accesos
 │   │   │   │   │   │   ├── library/
 │   │   │   │   │   │   │   ├── LibraryScreen.kt# Biblioteca y orquestador de listas
 │   │   │   │   │   │   │   └── components/     # Componentes modulares de biblioteca
@@ -158,10 +161,9 @@ AuraMusic/
 │   │   │   │   │   │   │       ├── NowPlayingBalanceBar.kt        # Barra de balance estéreo L/R en vivo
 │   │   │   │   │   │   │       ├── NowPlayingQueueSheet.kt        # Hoja modal de cola ("Up Next") con carátulas y marquesina
 │   │   │   │   │   │   │       ├── AudioSpecsDialog.kt            # Diálogo con ficha técnica del archivo
-│   │   │   │   │   │   │       └── VideoDisplayModeDialog.kt      # Diálogo selector de los 3 modos de video
+│   │   │   │   │   │   │       └── VideoDisplayModeDialog.kt      # Diálogo selector de los 4 modos de video
 │   │   │   │   │   │   ├── onboarding/
 │   │   │   │   │   │   │   └── OnboardingScreen.kt # Pantallas independientes de bienvenida, inducción y disclaimer de almacenamiento
-│   │   │   │   │   │   ├── equalizer/EqualizerScreen.kt # Referencia de ecualizador (integrado en modal)
 │   │   │   │   │   │   ├── settings/
 │   │   │   │   │   │   │   ├── SettingsScreen.kt # Pantalla de ajustes y selector de pestañas
 │   │   │   │   │   │   │   └── components/     # Componentes modulares de configuración

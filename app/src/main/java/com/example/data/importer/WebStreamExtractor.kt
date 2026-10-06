@@ -56,6 +56,11 @@ object WebStreamExtractor {
 
         // Opción 1: Solicitado yt-dlp prioritario
         if (preferredEngine == YoutubeExtractionEngine.YTDLP) {
+            if (YtDlpAutoUpdater.isYtDlpTemporarilyBlocked()) {
+                return Result.failure(
+                    IllegalStateException("Las descargas por yt-dlp están bloqueadas temporalmente mientras se actualiza el paquete. Reinicia la app para aplicar los nuevos paquetes.")
+                )
+            }
             val ytdlpResult = YtDlpNativeEngine.resolveStream(context, url)
             if (ytdlpResult.isSuccess) {
                 return ytdlpResult

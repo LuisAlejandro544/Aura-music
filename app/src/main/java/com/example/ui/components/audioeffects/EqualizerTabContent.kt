@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.EqualizerBand
 import com.example.model.EqualizerPreset
+import com.example.model.VocalClarityConfig
 import com.example.ui.theme.BackgroundDark
 import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.TextMuted
@@ -24,11 +25,12 @@ import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 
 /**
- * Pestaña 0 de Efectos de Audio: Ecualizador Paramétrico de 10 Bandas ISO en C++20.
+ * Pestaña 0 de Efectos de Audio: Ecualizador Paramétrico de 10 Bandas ISO en C++20 y Clarificador Vocal HD.
  * Arquitectura: Componente modular de UI que presenta:
  * - Switch maestro de activación del motor DSP C++20.
  * - Selector horizontal de perfiles acústicos (Presets: Rock, Pop, Jazz, etc.).
  * - Control deslizante de refuerzo dinámico de graves (Bass Boost a 60 Hz).
+ * - Clarificador de Voces HD en C++20 (aislamiento Mid-Side y realce de presencia vocal).
  * - 10 deslizadores paramétricos ISO (-15 dB a +15 dB) con filtros IIR Bi-cuadráticos de doble precisión.
  */
 @Composable
@@ -41,7 +43,10 @@ fun EqualizerTabContent(
     onBandLevelChange: (Int, Int) -> Unit,
     onBassBoostChange: (Int) -> Unit,
     onPresetSelect: (EqualizerPreset) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    vocalClarityConfig: VocalClarityConfig = VocalClarityConfig(),
+    onVocalClarityEnabledChange: (Boolean) -> Unit = {},
+    onVocalClarityStrengthChange: (Float) -> Unit = {}
 ) {
     val displayBands = if (bands.isNotEmpty()) bands else EqualizerPreset.DEFAULT_10_BANDS
 
@@ -185,6 +190,81 @@ fun EqualizerTabContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("sheet_bass_boost_slider")
+                )
+            }
+        }
+
+        // Control Estratégico: Clarificador de Voces HD (C++20 Mid-Side)
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = SurfaceCard,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Clarificar Voces HD (C++20 Mid-Side)",
+                            style = MaterialTheme.typography.titleSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                        )
+                        Text(
+                            text = "Aísla el canal vocal central, atenúa resonancias opacas (260 Hz) y realza presencia (2.8–5.2 kHz)",
+                            style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                        )
+                    }
+                    Switch(
+                        checked = vocalClarityConfig.enabled,
+                        onCheckedChange = onVocalClarityEnabledChange,
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = MaterialTheme.colorScheme.primary
+                        ),
+                        modifier = Modifier
+                            .minimumInteractiveComponentSize()
+                            .testTag("eq_vocal_clarity_switch")
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "Intensidad de Claridad Vocal",
+                        style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                    )
+                    Text(
+                        text = "${(vocalClarityConfig.strength * 100).toInt()}%",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    )
+                }
+
+                Slider(
+                    value = vocalClarityConfig.strength,
+                    onValueChange = {
+                        if (!vocalClarityConfig.enabled) onVocalClarityEnabledChange(true)
+                        onVocalClarityStrengthChange(it)
+                    },
+                    valueRange = 0.1f..1.0f,
+                    colors = SliderDefaults.colors(
+                        thumbColor = MaterialTheme.colorScheme.primary,
+                        activeTrackColor = MaterialTheme.colorScheme.primary
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("eq_vocal_clarity_slider")
                 )
             }
         }

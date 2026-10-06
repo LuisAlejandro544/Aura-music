@@ -15,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -78,7 +79,9 @@ fun TrackListItem(
 
         // Título y artista (con marquesina automática cuando la canción está activa/reproduciéndose)
         Column(
-            modifier = Modifier.weight(1f)
+            modifier = Modifier
+                .weight(1f)
+                .clipToBounds()
         ) {
             Text(
                 text = track.title,
@@ -91,6 +94,7 @@ fun TrackListItem(
                 modifier = if (isCurrentTrack) {
                     Modifier
                         .fillMaxWidth()
+                        .clipToBounds()
                         .basicMarquee(
                             iterations = Int.MAX_VALUE,
                             repeatDelayMillis = 1600,

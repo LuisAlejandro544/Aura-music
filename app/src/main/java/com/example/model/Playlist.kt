@@ -10,5 +10,6 @@ data class Playlist(
     val createdAt: Long = System.currentTimeMillis(),
     val trackCount: Int = 0,
     val customArtPath: String? = null,
-    val previewTracks: List<Track> = emptyList()
+    val previewTracks: List<Track> = emptyList(),
+    val totalPlays: Int = 0
 )

@@ -35,9 +35,20 @@ data class ReverbConfig(
 
 data class Spatial8DConfig(
     val enabled: Boolean = false,
-    val orbitSpeedSeconds: Float = 10.0f, // Rango de 4 a 30 segundos por rotación
+    val is16DMode: Boolean = false,        // false = 8D Clásico (Órbita 360°), true = 16D Multi-Órbita (Doble Capa)
+    val orbitSpeedSeconds: Float = 10.0f,  // Rango de 4 a 30 segundos por rotación
     val spatialIntensity: Float = 0.85f,   // Amplitud espacial de 0.0 a 1.0
-    val roomDepth: Float = 0.35f          // Sensación de acústica de sala de 0.0 a 1.0
+    val roomDepth: Float = 0.35f           // Sensación de acústica de sala de 0.0 a 1.0
+)
+
+/**
+ * Configuración del Clarificador de Voces HD en C++20 (VocalClarityProcessor).
+ * Realza el canal central (Mid) y aplica curvas de presencia (2.8 kHz) y articulación (5.2 kHz)
+ * atenuando resonancias opacas (260 Hz) para máxima inteligibilidad vocal.
+ */
+data class VocalClarityConfig(
+    val enabled: Boolean = false,
+    val strength: Float = 0.65f            // Intensidad de claridad vocal de 0.0f a 1.0f
 )
 
 data class SleepTimerState(

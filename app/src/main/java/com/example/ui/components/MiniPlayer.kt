@@ -17,6 +17,7 @@ import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -140,6 +141,7 @@ fun MiniPlayer(
                     modifier = Modifier
                         .weight(1f)
                         .padding(end = 4.dp)
+                        .clipToBounds()
                 ) {
                     Text(
                         text = currentTrack.title,
@@ -151,6 +153,7 @@ fun MiniPlayer(
                         overflow = TextOverflow.Clip,
                         modifier = Modifier
                             .fillMaxWidth()
+                            .clipToBounds()
                             .basicMarquee(
                                 iterations = Int.MAX_VALUE,
                                 repeatDelayMillis = 1600,
@@ -167,6 +170,7 @@ fun MiniPlayer(
                         overflow = TextOverflow.Clip,
                         modifier = Modifier
                             .fillMaxWidth()
+                            .clipToBounds()
                             .basicMarquee(
                                 iterations = Int.MAX_VALUE,
                                 repeatDelayMillis = 2000,

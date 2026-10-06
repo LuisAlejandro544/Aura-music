@@ -92,11 +92,25 @@ fun DownloadFromLinkDialog(
     var selectedLoopStyle by remember {
         mutableStateOf(com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE)
     }
+    val appPrefs = remember { context.getSharedPreferences("aura_music_ui_prefs", android.content.Context.MODE_PRIVATE) }
+    var selectedFramingMode by remember {
+        val saved = appPrefs.getString("pref_video_display_mode", com.example.model.VideoDisplayMode.FULLSCREEN_BACKGROUND.name)
+        val initial = if (saved == com.example.model.VideoDisplayMode.FULLSCREEN_ADAPTED.name) {
+            com.example.model.VideoDisplayMode.FULLSCREEN_ADAPTED
+        } else {
+            com.example.model.VideoDisplayMode.FULLSCREEN_BACKGROUND
+        }
+        mutableStateOf(initial)
+    }
     var trimSilence by remember { mutableStateOf(true) }
+    val packageUpdateState by com.example.data.importer.YtDlpAutoUpdater.packageUpdateState.collectAsState()
+    val isYtDlpBlocked = selectedMode == DownloadSourceMode.YOUTUBE_WEB &&
+            selectedEngine == YoutubeExtractionEngine.YTDLP &&
+            packageUpdateState.isYtDlpTemporarilyLocked
 
-    // Auto-resolución si se recibe una URL inicial compartida desde otra app
-    LaunchedEffect(initialUrl) {
-        if (initialUrl.isNotBlank() && resolvedInfo == null) {
+    // Auto-resolución si se recibe una URL inicial compartida desde otra app (si yt-dlp no está bloqueado)
+    LaunchedEffect(initialUrl, isYtDlpBlocked) {
+        if (initialUrl.isNotBlank() && resolvedInfo == null && !isYtDlpBlocked) {
             isResolving = true
             resolveError = null
             val result = OnlineVideoAudioImporter.resolveMediaLink(
@@ -400,6 +414,66 @@ fun DownloadFromLinkDialog(
                         style = MaterialTheme.typography.labelSmall.copy(color = TextSecondary),
                         modifier = Modifier.padding(top = 2.dp, start = 2.dp)
                     )
+
+                    if (isYtDlpBlocked) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.92f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.6f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("ytdlp_locked_warning_card")
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp)
+                            ) {
+                                val lockTitle = when (val st = packageUpdateState) {
+                                    is com.example.model.PackageUpdateState.Downloading ->
+                                        "Descargando actualización de yt-dlp (${st.progressPercent}%)"
+                                    is com.example.model.PackageUpdateState.RestartRequired ->
+                                        "Paquete yt-dlp (${st.version}) listo para aplicar"
+                                    else -> "Actualizando paquetes de yt-dlp"
+                                }
+                                Text(
+                                    text = lockTitle,
+                                    style = MaterialTheme.typography.labelLarge.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                                    )
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "La descarga de videos por yt-dlp está bloqueada temporalmente hasta que se aplique la actualización. Sal de la app o actualiza ahora.",
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.88f)
+                                    )
+                                )
+                                if (packageUpdateState is com.example.model.PackageUpdateState.RestartRequired) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Button(
+                                        onClick = {
+                                            com.example.data.importer.YtDlpAutoUpdater.applyPendingUpdateAndRestart(context)
+                                        },
+                                        shape = RoundedCornerShape(10.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.primary
+                                        ),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .minimumInteractiveComponentSize()
+                                            .testTag("dialog_apply_ytdlp_restart_btn")
+                                    ) {
+                                        Icon(Icons.Default.SystemUpdateAlt, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Actualizar y Reiniciar ahora", fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -476,7 +550,7 @@ fun DownloadFromLinkDialog(
                                 }
                             }
                         },
-                        enabled = !isResolving && linkUrl.isNotBlank(),
+                        enabled = !isResolving && linkUrl.isNotBlank() && !isYtDlpBlocked,
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary
@@ -494,6 +568,10 @@ fun DownloadFromLinkDialog(
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Text("Inspeccionando enlace...")
+                        } else if (isYtDlpBlocked) {
+                            Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("yt-dlp bloqueado hasta actualizar", fontWeight = FontWeight.Bold)
                         } else {
                             Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
@@ -643,6 +721,44 @@ fun DownloadFromLinkDialog(
                     if (attachAsCanvas) {
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
+                            text = "Encuadre del Video de Fondo:",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            FilterChip(
+                                selected = selectedFramingMode == com.example.model.VideoDisplayMode.FULLSCREEN_BACKGROUND,
+                                onClick = {
+                                    selectedFramingMode = com.example.model.VideoDisplayMode.FULLSCREEN_BACKGROUND
+                                    appPrefs.edit().putString("pref_video_display_mode", selectedFramingMode.name).apply()
+                                },
+                                label = { Text("📱 Rellenar pantalla (Recortar)", style = MaterialTheme.typography.labelSmall) }
+                            )
+                            FilterChip(
+                                selected = selectedFramingMode == com.example.model.VideoDisplayMode.FULLSCREEN_ADAPTED,
+                                onClick = {
+                                    selectedFramingMode = com.example.model.VideoDisplayMode.FULLSCREEN_ADAPTED
+                                    appPrefs.edit().putString("pref_video_display_mode", selectedFramingMode.name).apply()
+                                },
+                                label = { Text("🎬 Adaptado horizontal", style = MaterialTheme.typography.labelSmall) }
+                            )
+                        }
+                        Text(
+                            text = if (selectedFramingMode == com.example.model.VideoDisplayMode.FULLSCREEN_BACKGROUND) {
+                                "El video ocupará el 100% de la pantalla de arriba a abajo aunque se recorten caras o bordes."
+                            } else {
+                                "Muestra el video horizontal completo centrado sin recortar caras."
+                            },
+                            style = MaterialTheme.typography.labelSmall.copy(color = TextSecondary, fontSize = 11.sp)
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
                             text = "Efecto de bucle FFmpeg (para Loops ≤20s):",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontWeight = FontWeight.Bold,
@@ -721,6 +837,9 @@ fun DownloadFromLinkDialog(
 
                         Button(
                             onClick = {
+                                if (attachAsCanvas) {
+                                    appPrefs.edit().putString("pref_video_display_mode", selectedFramingMode.name).apply()
+                                }
                                 val finalTitle = editableTitle.ifBlank { currentInfo.suggestedTitle }
                                 val finalArtist = editableArtist.ifBlank { currentInfo.suggestedArtist }
                                 if (onConfirmDownloadWithLoopStyle != null) {

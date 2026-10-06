@@ -35,5 +35,13 @@ class ExampleRobolectricTest {
 
     manager.set8DRoomDepth(0.45f)
     assertEquals(0.45f, manager.spatial8DConfig.value.roomDepth, 0.001f)
+
+    manager.set8DMode16D(true)
+    org.junit.Assert.assertTrue(manager.spatial8DConfig.value.is16DMode)
+
+    manager.setVocalClarityEnabled(true)
+    manager.setVocalClarityStrength(0.8f)
+    org.junit.Assert.assertTrue(manager.vocalClarityConfig.value.enabled)
+    assertEquals(0.8f, manager.vocalClarityConfig.value.strength, 0.001f)
   }
 }

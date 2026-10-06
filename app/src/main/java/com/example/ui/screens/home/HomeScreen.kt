@@ -56,6 +56,7 @@ fun HomeScreen(
     onAddToPlaylist: (Long, Long) -> Unit,
     onNavigate: (NavScreen) -> Unit,
     onSelectLibraryTab: (LibraryTab) -> Unit,
+    onOpenPlaylist: (Playlist) -> Unit = {},
     onEditTrack: (Long, String, String, String) -> Unit = { _, _, _, _ -> },
     onEditTrackDetails: (Long, String, String, String, android.net.Uri?, Boolean) -> Unit = { _, _, _, _, _, _ -> },
     modifier: Modifier = Modifier
@@ -66,6 +67,13 @@ fun HomeScreen(
             in 12..19 -> "Buenas tardes"
             else -> "Buenas noches"
         }
+    }
+
+    val mostPlayedPlaylist = remember(playlists) {
+        playlists.maxWithOrNull(
+            compareBy<Playlist> { it.totalPlays }
+                .thenBy { it.trackCount }
+        )
     }
 
     LazyColumn(
@@ -225,13 +233,26 @@ fun HomeScreen(
                         modifier = Modifier.weight(1f)
                     )
                     HomeQuickTile(
-                        title = "Ecualizador FX",
-                        subtitle = "Sonido optimizado",
-                        icon = Icons.Default.Tune,
+                        title = mostPlayedPlaylist?.name ?: "Playlists",
+                        subtitle = when {
+                            mostPlayedPlaylist != null && mostPlayedPlaylist.totalPlays > 0 ->
+                                "${mostPlayedPlaylist.trackCount} pistas • ${mostPlayedPlaylist.totalPlays} reprod."
+                            mostPlayedPlaylist != null ->
+                                "${mostPlayedPlaylist.trackCount} pistas"
+                            else -> "Crear lista"
+                        },
+                        icon = Icons.Default.QueueMusic,
                         gradient = Brush.linearGradient(
                             listOf(Color(0xFF10B981), Color(0xFF06B6D4))
                         ),
-                        onClick = { onNavigate(NavScreen.Equalizer) },
+                        onClick = {
+                            if (mostPlayedPlaylist != null) {
+                                onOpenPlaylist(mostPlayedPlaylist)
+                            } else {
+                                onSelectLibraryTab(LibraryTab.PLAYLISTS)
+                                onNavigate(NavScreen.Library)
+                            }
+                        },
                         modifier = Modifier.weight(1f)
                     )
                 }

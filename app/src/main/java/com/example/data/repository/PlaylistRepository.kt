@@ -41,7 +41,8 @@ class PlaylistRepository(
             val playlistTracks = refs.mapNotNull { tracksById[it.trackId] }
             entity.toDomain(
                 trackCount = playlistTracks.size,
-                previewTracks = playlistTracks.take(4)
+                previewTracks = playlistTracks.take(4),
+                totalPlays = playlistTracks.sumOf { it.playCount }
             )
         }
     }

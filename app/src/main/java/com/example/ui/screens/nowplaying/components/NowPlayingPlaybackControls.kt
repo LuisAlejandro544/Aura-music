@@ -16,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -86,6 +87,7 @@ fun NowPlayingPlaybackControls(
                 modifier = Modifier
                     .weight(1f)
                     .padding(end = 8.dp)
+                    .clipToBounds()
             ) {
                 Text(
                     text = currentTrack.title,
@@ -97,6 +99,7 @@ fun NowPlayingPlaybackControls(
                     overflow = TextOverflow.Clip,
                     modifier = Modifier
                         .fillMaxWidth()
+                        .clipToBounds()
                         .basicMarquee(
                             iterations = Int.MAX_VALUE,
                             repeatDelayMillis = 1600,
@@ -108,7 +111,9 @@ fun NowPlayingPlaybackControls(
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clipToBounds()
                 ) {
                     Surface(
                         shape = RoundedCornerShape(4.dp),
@@ -131,6 +136,7 @@ fun NowPlayingPlaybackControls(
                         overflow = TextOverflow.Clip,
                         modifier = Modifier
                             .weight(1f)
+                            .clipToBounds()
                             .basicMarquee(
                                 iterations = Int.MAX_VALUE,
                                 repeatDelayMillis = 2000,

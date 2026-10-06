@@ -18,6 +18,11 @@ import kotlinx.coroutines.launch
  */
 class AuraApplication : Application() {
 
+    companion object {
+        @Volatile
+        var isAppInForeground: Boolean = false
+    }
+
     override fun onCreate() {
         super.onCreate()
         // Inicializar el monitor y el capturador de excepciones no controladas (Crashes)

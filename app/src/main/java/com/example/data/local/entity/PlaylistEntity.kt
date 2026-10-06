@@ -18,7 +18,8 @@ data class PlaylistEntity(
 ) {
     fun toDomain(
         trackCount: Int = 0,
-        previewTracks: List<com.example.model.Track> = emptyList()
+        previewTracks: List<com.example.model.Track> = emptyList(),
+        totalPlays: Int = 0
     ): Playlist = Playlist(
         id = id,
         name = name,
@@ -26,7 +27,8 @@ data class PlaylistEntity(
         createdAt = createdAt,
         trackCount = trackCount,
         customArtPath = customArtPath,
-        previewTracks = previewTracks
+        previewTracks = previewTracks,
+        totalPlays = totalPlays
     )
 
     companion object {

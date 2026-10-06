@@ -12,17 +12,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.model.VocalClarityConfig
 import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 
 /**
- * Pestaña 3 de Efectos de Audio: Control de Velocidad de Música (Speed) y Velocidad/Tono de Voz (Pitch).
- * Arquitectura: Componente modular de UI que presenta:
- * - Botón de restablecimiento instantáneo a 1.0x.
- * - Deslizador fluido de velocidad de reproducción (0.50x a 2.00x) con throttling en ViewModel.
- * - Chips rápidos de velocidad (0.8x, 1.0x, 1.25x, 1.5x, 2.0x).
- * - Deslizador de modulación de tono / velocidad de voz (Pitch Shift de 0.50x a 2.00x) con chips rápidos hasta 2.0x.
+ * Pestaña 3 de Efectos de Audio: Control de Velocidad de Música (Speed), Velocidad/Tono de Voz (Pitch)
+ * y Clarificador de Voces HD en C++20 (Mid-Side).
  */
 @Composable
 fun PlaybackParametersTabContent(
@@ -31,7 +28,10 @@ fun PlaybackParametersTabContent(
     pitch: Float,
     onPitchChange: (Float) -> Unit,
     onReset: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    vocalClarityConfig: VocalClarityConfig = VocalClarityConfig(),
+    onVocalClarityEnabledChange: (Boolean) -> Unit = {},
+    onVocalClarityStrengthChange: (Float) -> Unit = {}
 ) {
     var localSpeed by remember(speed) { mutableFloatStateOf(speed) }
     var localPitch by remember(pitch) { mutableFloatStateOf(pitch) }
@@ -103,7 +103,7 @@ fun PlaybackParametersTabContent(
             ) {
                 quickValues.forEach { s ->
                     val isSelected = (localSpeed - s).let { it > -0.02f && it < 0.02f }
-                    val labelText = if (s == 1.0f || s == 2.0f || s == 0.8f || s == 1.5f) "${s}x" else "${s}x"
+                    val labelText = "${s}x"
                     Surface(
                         shape = RoundedCornerShape(8.dp),
                         color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
@@ -194,6 +194,68 @@ fun PlaybackParametersTabContent(
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(18.dp))
+            HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // 3. Clarificador de Voces HD en C++20 (Aislamiento Mid-Side y Presencia Vocal)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Clarificar Voces HD (C++20)",
+                        style = MaterialTheme.typography.titleSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                    )
+                    Text(
+                        text = "Realza la inteligibilidad de la voz y letra sobre la pista",
+                        style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                    )
+                }
+                Switch(
+                    checked = vocalClarityConfig.enabled,
+                    onCheckedChange = onVocalClarityEnabledChange,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = MaterialTheme.colorScheme.primary
+                    ),
+                    modifier = Modifier
+                        .minimumInteractiveComponentSize()
+                        .testTag("voice_tab_vocal_clarity_switch")
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("Nivel de Claridad Vocal", style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary))
+                Text(
+                    text = "${(vocalClarityConfig.strength * 100).toInt()}%",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                )
+            }
+
+            Slider(
+                value = vocalClarityConfig.strength,
+                onValueChange = {
+                    if (!vocalClarityConfig.enabled) onVocalClarityEnabledChange(true)
+                    onVocalClarityStrengthChange(it)
+                },
+                valueRange = 0.1f..1.0f,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("voice_tab_vocal_clarity_slider")
+            )
         }
     }
 }

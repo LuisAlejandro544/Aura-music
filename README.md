@@ -58,8 +58,12 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
 - **Integración Total en Hoja Modal**: Ya no existe una pantalla separada que interrumpa la navegación; se abre como una pestaña directa en la hoja de efectos desde el Mini Reproductor o Now Playing.
 - **Perfiles Acústicos (Presets)**: Rock, Pop, Electrónica, Jazz, Acústico, Bass Boost y Plano.
 - **Refuerzo de Bajos C++ (Bass Boost)** calibrado a 60 Hz con modulación precisa.
+- **Clarificador de Voces HD en C++20 (`VocalClarityProcessor` Mid-Side)**:
+  - Aislamiento del canal vocal central (*Mid = (L+R) × 0.5*) frente al acompañamiento lateral (*Side = (L-R) × 0.5*).
+  - Limpieza de turbidez vocal mediante atenuación de graves medios a 180 Hz y realce quirúrgico de presencia (2.8 kHz) y articulación de consonantes (5.5 kHz) con filtros Biquad de 64 bits.
+  - Ubicado estratégicamente tanto en la pestaña **Ecualizador** como en **Velocidad/Voz** con presets rápidos (*Sutil 40%*, *Estudio 65%*, *Máximo 100%*).
 
-### 3. Audio 8D Espacial, Repetidor A-B, Eliminación Inteligente de Silencios y Controles Avanzados
+### 3. Audio Espacial 8D y 16D Multi-Órbita, Repetidor A-B, Eliminación Inteligente de Silencios y Controles Avanzados
 - **Eliminación Inteligente de Silencios al Inicio y Final (`AudioSilenceTrimmer`)**:
   - Antes de cada importación (archivos locales, carpetas, conversión *Video a Música*, descargas desde *TikTok/YouTube* o recepción vía *Abrir con... / Compartir con...*), la app presenta un interruptor interactivo para activar o desactivar el recorte inteligente de silencios.
   - Analiza las muestras PCM de los primeros y últimos 25 segundos calculando la energía RMS por ventanas (umbral `-42 dB`) para detectar dónde empieza y termina realmente la música.
@@ -74,9 +78,10 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
     - *Tamaño de Sala / Espacio* (0.1x a 2.0x).
     - *Tiempo de Decaimiento / Resonancia* (100 ms a 6000 ms).
     - *Nivel de Reverberación / Mezcla Húmeda* (-30 dB a +6 dB).
-- **Audio Espacial 8D Binaural para Auriculares**:
-  - Paneo orbital tridimensional continuo en tiempo real (4s a 30s por rotación completa).
-  - Simulación acústica de sombra de cabeza (*Head Shadow Filtering*) y reverberación espacial ambiental.
+- **Audio Espacial 8D y 16D Multi-Órbita Binaural en C++20 (Sin Animaciones Decorativas)**:
+  - **Modo 8D Clásico (Órbita 360°)**: Paneo orbital tridimensional continuo en tiempo real (4s a 30s por rotación completa) con simulación de sombra de cabeza (*Head Shadow Filtering*) y reverberación binaural.
+  - **Modo 16D Multi-Órbita (Doble Capa Contra-Rotatoria)**: Separación espectral en dos capas espaciales independientes en C++20: una órbita interna estable para cuerpo y bajos (< 260 Hz) y una segunda órbita contra-rotatoria a velocidad armónica (1.618x) con modulación figura-8 (Lissajous) y micro-retardo Haas para voces, guitarras y detalles agudos.
+  - Interfaz de estudio limpia sin radares ni logotipos animados que consuman recursos innecesarios.
 - **Control Estable de Velocidad de Música y Velocidad de Voz / Tono hasta 2.0x (Pitch & Speed)**:
   - Modulación fluida de **0.50x a 2.00x** tanto en **Velocidad de la Música** como en **Velocidad de Voz / Tono (Pitch Shift)**, con botones rápidos de un toque (`0.8x`, `1.0x`, `1.25x`, `1.5x`, `2.0x`) en ambos controles.
   - Protegida con *throttling* y recuperación automática ante anomalías de audio para evitar que la canción se pause accidentalmente.
@@ -104,11 +109,11 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
   - El obturador negro de ExoPlayer se desactiva (`setShutterBackgroundColor(TRANSPARENT)`) y se muestra la carátula oficial de la pista como capa base de respaldo (`placeholderTrack`) mientras el decodificador prepara el primer cuadro.
   - **Erradicación Total de Videos Residuales al Cambiar de Canción**: Se eliminó de raíz el problema donde el video de la canción anterior se quedaba congelado en Now Playing y en el Mini Reproductor. Mediante claves reactivas de composición (`key(currentTrack.id, currentTrack.videoUri)`), actualización de player en `AndroidView` y reseteo de `isFirstFrameRendered`, la pista previa se detiene y libera de inmediato, efectuando una transición con fundido suave (*crossfade*) sobre la carátula oficial de la pista entrante.
   - Si la siguiente pista no tiene video, el reproductor de video se desmonta limpiamente mostrando de inmediato la carátula oficial sin retrasos ni imágenes residuales.
-- **Encuadre Inteligente de Videos Horizontales (16:9) y Verticales (9:16) sin Recorte de Rostros (FFmpeg + Runtime)**:
-  - Resuelve el problema donde los videos horizontales (16:9 de YouTube) sufrían cortes laterales severos de hasta el 70% perdiendo rostros y detalles al estirarse en pantallas verticales de móvil (20:9).
-  - **Lienzo Vertical Cinemático 9:16 en FFmpeg (`createVerticalCanvasFromHorizontalVideo`)**: Al procesar videos horizontales, genera automáticamente un lienzo 9:16 vertical donde el video horizontal original se superpone en el centro al 100% de nitidez sin recortar los bordes ni las caras (`scale=480:-2`, `overlay`), con un fondo ambiental difuminado (`boxblur=16:2`) y ligeramente oscurecido.
-  - **Adaptación en Tiempo Real en `BackgroundVideoPlayer`**: Detecta dinámicamente la proporción del video (`onVideoSizeChanged`); en Modo Fondo Completo, si el video es horizontal aplica `RESIZE_MODE_FIT` para exhibir el cuadro completo sin mutilar detalles ni rostros.
-  - **Inspección de Proporción en Ajustes (`StoredMediaSettingsTab`)**: Cada video guardado muestra su etiqueta de orientación (*9:16 Vertical* o *16:9 Panorámico*).
+- **Encuadre Personalizable de Videos Horizontales (16:9) y Verticales (9:16): Rellenar Pantalla vs Adaptado Horizontal**:
+  - Permite al usuario elegir libremente cómo desea ver los videos horizontales tanto **antes de descargar/convertir/editar** como **en tiempo real dentro de Now Playing**:
+    - **Fondo Completo • Rellenar (Zoom / Recortar)**: El video llena el 100% de la pantalla de arriba a abajo (`RESIZE_MODE_ZOOM`) tomando la parte central sin bandas ni líneas divisorias a mitad de pantalla.
+    - **Fondo Completo • Adaptado Horizontal**: Muestra el fotograma horizontal 16:9 completo centrado (`RESIZE_MODE_FIT`) sin recortar rostros ni bordes laterales, desvaneciendo la carátula estática trasera para evitar costuras horizontales.
+  - **Inspección de Proporción y Maquetación Compacta en Ajustes (`StoredMediaSettingsTab`)**: Cada video guardado muestra sus etiquetas (*Sincronizado 480p* / *Loop 480p* y *9:16 Vertical* / *16:9 Panorámico*) en una fila horizontal limpia bajo el título, con marquesina acotada (`clipToBounds`) y recorte automático de franjas negras (`letterbox` 4:3) en miniaturas de YouTube.
 - **Bucle Infinito sin Cortes (Seamless Loop con Crossfade) & Efecto Boomerang / Ping-Pong (`reverse` + `concat`) en FFmpeg**:
   - **Modo Crossfade (`xfade`)**: Para loops cortos de Canvas (≤ 20s), el motor nativo `FFmpegNativeEngine` aplica una transición de fundido cruzado (*crossfade* continuo con `xfade`) entre el final y el inicio del video.
   - **Modo Boomerang / Ping-Pong (`reverse` + `concat`)**: El usuario puede elegir el **Efecto Boomerang** en los diálogos de *Editar Canción*, *Video a Música* y *Descargar desde Enlace*. El motor **FFmpeg** invierte una copia del clip y la concatena (`[0:v]split[f][r];[r]reverse[rev];[f][rev]concat=n=2:v=1:a=0`), creando un ciclo continuo de ida y vuelta matemáticamente perfecto donde el último fotograma coincide exactamente con el primero sin ningún corte brusco en ExoPlayer.
@@ -129,14 +134,20 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
   - Al reproducir desde una Playlist, Álbum o Artista, la cola activa (`queue`) se adapta estrictamente a las pistas de esa lista, permitiendo navegar ordenadamente dentro de ese contenido.
 - **Atajos Inferiores Espaciosos y Equilibrados**:
   - Botonera inferior de Now Playing distribuida uniformemente en 3 módulos compactos (`EQ FX`, `Letras`/`Carátula` y `Cola`), con área táctil superior a 48dp y texto protegido sin desbordamientos ni saltos verticales.
-- **3 Modos de Visualización Seleccionables por el Usuario**:
-  - 🌌 **Fondo Completo (Full Background)**: El video se reproduce ocupando todo el fondo de pantalla de Now Playing detrás de la interfaz gráfica con un velo oscuro/gradiente para máxima legibilidad, mientras la carátula flota al frente con su aura lumínica y sombra.
+- **4 Modos de Visualización Seleccionables por el Usuario (`VideoDisplayMode`)**:
+  - 📱 **Fondo Completo (Rellenar / Recortar)**: El video rellena verticalmente toda la pantalla de Now Playing (`RESIZE_MODE_ZOOM`) sin divisiones horizontales, tomando la parte central aunque recorte laterales.
+  - 🎬 **Fondo Completo (Adaptado Horizontal)**: El video horizontal se muestra completo de lado a lado (`RESIZE_MODE_FIT`) sin recortar caras ni detalles.
   - 🔲 **Lienzo en Carátula (Card Canvas)**: El video se reproduce dentro del marco central de la carátula (relación de aspecto 1:1 estilo marco cinemático).
   - 🖼️ **Solo Carátula**: Muestra únicamente la carátula estática o procedural sin video.
 - **Detección Automática y Forzado Manual**:
   - **Loop Canvas (≤ 10s - 20s)**: Bucle infinito continuo silenciado.
   - **Video Largo Sincronizado (> 20s)**: Sincronizado con la reproducción y los saltos temporales (`seekTo`).
-  - **Selector en Edición y Barra Superior**: Accesible cómodamente desde `NowPlayingTopBar` y `EditTrackDialog`.
+  - **Selector en Descarga, Edición y Barra Superior**: Accesible desde `DownloadFromLinkDialog`, `VideoToMusicDialog`, `EditTrackDialog` y `NowPlayingTopBar`.
+- **Descarga Continua en Segundo Plano con Notificación Nativa (`AuraDownloadService`)**:
+  - Servicio en primer plano (`ForegroundService`) que mantiene viva la descarga por bloques, extracción de carátula WebP y optimización FFmpeg aunque el usuario salga de Aura Music o bloquee el teléfono.
+  - Muestra el progreso en vivo en la barra de notificaciones de Android y, al terminar fuera de la app, avisa con una notificación interactiva que reproduce la canción inmediatamente al tocarla.
+- **Acceso Directo a la Playlist Más Escuchada en Inicio**:
+  - La cuadrícula 2x2 de la pantalla de Inicio destaca automáticamente la Playlist con mayor número de reproducciones acumuladas del usuario (reemplazando el antiguo botón redundante del ecualizador).
 - **Sincronización Instantánea de Favoritos**: El botón de corazón en Now Playing y en la Biblioteca refleja reactivamente el estado en tiempo real (icono relleno en rojo `Color(0xFFEF4444)` al marcar favorito).
 - **Lista de Inicio Estable**: La sección "Populares en tu biblioteca" permanece fija y nunca elimina otras canciones al marcar un favorito.
 
@@ -176,7 +187,11 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
 - **Entorno Python Nativo y Actualización en Caliente OTA Blindada para yt-dlp (`YtDlpNativeEngine` & `YtDlpAutoUpdater`)**:
   - Runtime de CPython nativo (`libpython.so`) con entorno optimizado (`libpython.zip.so`) y motor QuickJS (`libqjs.so`) empaquetados en el APK final para ejecutar scripts de extracción y descifrar firmas dinámicas (`n-sig`) localmente a máxima velocidad.
   - Copia base oficial de `yt-dlp` empaquetada en `assets/bin/yt-dlp` con verificación criptográfica SHA-256 (`SHA2-256SUMS`) para funcionamiento inmediato fuera de línea desde la primera instalación.
-  - **Auto-Actualización OTA con Blindaje Criptográfico Anti-RCE**: Comprueba y descarga en caliente la versión más reciente del extractor oficial de yt-dlp desde GitHub Releases directamente en `files/bin/yt-dlp`, validando su hash SHA-256 y origen de host antes de otorgar permisos de ejecución, previniendo cualquier riesgo de ejecución remota de código arbitrario.
+  - **Verificación y Actualización Transparente de Paquetes al Iniciar (`YtDlpAutoUpdater` & `PackageUpdateBanner`)**:
+    - Al entrar a la app, verifica en segundo plano si los paquetes nativos (`yt-dlp`) están en su última versión, mostrando una notificación nativa silenciosa en la barra de estado (*"Verificando paquetes necesarios..."*) y una píldora no intrusiva dentro de la app.
+    - Cuando detecta una actualización disponible, la notificación nativa y el indicador interno muestran una barra de progreso en tiempo real (*"Descargando actualización de paquetes"*), con blindaje criptográfico SHA-256 (`SHA2-256SUMS`).
+    - Mientras se descarga o está pendiente de aplicar una actualización de `yt-dlp`, las descargas por el motor `yt-dlp` quedan bloqueadas preventivamente (permitiendo usar InnerTube o WebView).
+    - Al finalizar la descarga en staging seguro (`yt-dlp.staged`), recomienda al usuario salir de la app o pulsar **"Actualizar y Reiniciar"** para aplicar el nuevo paquete instantáneamente.
   - **Protección Zip Slip en Motores Nativos**: Tanto `FFmpegNativeEngine` como `YtDlpNativeEngine` validan exhaustivamente las rutas canónicas (`canonicalFile.toPath().startsWith(...)`) al desempaquetar librerías dinámicas, impidiendo cualquier escape de directorio.
   - **Disparador Dual**: Comprobación automática ante errores de extracción de YouTube y botón interactivo manual en *Ajustes > Apariencia & Temas > Motores de Extracción & yt-dlp OTA*.
 - **Arquitectura de Extracción Resiliente de 3 Niveles con Carátula Garantizada**:

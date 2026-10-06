@@ -20,6 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -568,7 +569,11 @@ private fun StoredMediaTrackCard(
 
                 Spacer(modifier = Modifier.width(12.dp))
 
-                Column(modifier = Modifier.weight(1f)) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clipToBounds()
+                ) {
                     Text(
                         text = track.title,
                         style = MaterialTheme.typography.bodyLarge.copy(
@@ -579,6 +584,7 @@ private fun StoredMediaTrackCard(
                         overflow = TextOverflow.Clip,
                         modifier = Modifier
                             .fillMaxWidth()
+                            .clipToBounds()
                             .basicMarquee(
                                 iterations = Int.MAX_VALUE,
                                 repeatDelayMillis = 1800,
@@ -684,7 +690,9 @@ private fun StoredMediaTrackCard(
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 8.dp)
                     ) {
                         Surface(
                             shape = CircleShape,
@@ -701,16 +709,35 @@ private fun StoredMediaTrackCard(
                             }
                         }
                         Spacer(modifier = Modifier.width(8.dp))
-                        Column {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
                                 Text(
                                     text = "Video Canvas",
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         fontWeight = FontWeight.Bold,
                                         color = TextPrimary
-                                    )
+                                    ),
+                                    maxLines = 1,
+                                    softWrap = false
                                 )
-                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "• $videoFileSizeStr",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.secondary
+                                    ),
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
+                            }
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(5.dp)
+                            ) {
                                 Surface(
                                     shape = RoundedCornerShape(4.dp),
                                     color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f)
@@ -722,11 +749,12 @@ private fun StoredMediaTrackCard(
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.secondary
                                         ),
-                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
                                     )
                                 }
                                 if (videoAspectTag != null) {
-                                    Spacer(modifier = Modifier.width(4.dp))
                                     Surface(
                                         shape = RoundedCornerShape(4.dp),
                                         color = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
@@ -738,18 +766,13 @@ private fun StoredMediaTrackCard(
                                                 fontWeight = FontWeight.SemiBold,
                                                 color = MaterialTheme.colorScheme.primary
                                             ),
-                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                            maxLines = 1,
+                                            softWrap = false,
+                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
                                         )
                                     }
                                 }
                             }
-                            Text(
-                                text = "Espacio: $videoFileSizeStr",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.secondary
-                                )
-                            )
                         }
                     }
 

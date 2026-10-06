@@ -97,9 +97,14 @@ fun NowPlayingScreen(
     onAddSleepTimerMinutes: (Int) -> Unit = {},
     spatial8DConfig: Spatial8DConfig = Spatial8DConfig(),
     onSet8DEnabled: (Boolean) -> Unit = {},
+    onSet8DMode16D: (Boolean) -> Unit = {},
     onSet8DOrbitSpeed: (Float) -> Unit = {},
     onSet8DSpatialIntensity: (Float) -> Unit = {},
     onSet8DRoomDepth: (Float) -> Unit = {},
+    // Clarificador de Voces HD C++20 (Mid-Side)
+    vocalClarityConfig: com.example.model.VocalClarityConfig = com.example.model.VocalClarityConfig(),
+    onSetVocalClarityEnabled: (Boolean) -> Unit = {},
+    onSetVocalClarityStrength: (Float) -> Unit = {},
     // Suite Reverb & Filtros Acústicos
     reverbConfig: ReverbConfig = ReverbConfig(),
     onSetReverbEnabled: (Boolean) -> Unit = {},
@@ -237,7 +242,7 @@ fun NowPlayingScreen(
     var showLyrics by remember { mutableStateOf(false) }
 
     val hasVideo = !currentTrack.videoUri.isNullOrEmpty()
-    val isFullscreenVideo = hasVideo && (videoDisplayMode == VideoDisplayMode.FULLSCREEN_BACKGROUND)
+    val isFullscreenVideo = hasVideo && videoDisplayMode.isFullscreen
 
     Box(
         modifier = modifier
@@ -256,7 +261,7 @@ fun NowPlayingScreen(
             }
             .testTag("now_playing_screen")
     ) {
-        // Modo FONDO COMPLETO: Renderiza el video de fondo detrás de toda la pantalla completa
+        // Modo FONDO COMPLETO (Rellenar o Adaptado): Renderiza el video detrás de toda la pantalla
         if (isFullscreenVideo && currentTrack.videoUri != null) {
             key(currentTrack.id, currentTrack.videoUri) {
                 BackgroundVideoPlayer(
@@ -267,7 +272,8 @@ fun NowPlayingScreen(
                     playbackSpeed = playbackSpeed,
                     placeholderTrack = currentTrack,
                     modifier = Modifier.fillMaxSize(),
-                    cornerRadius = 0.dp
+                    cornerRadius = 0.dp,
+                    fitHorizontalInFullscreen = (videoDisplayMode == VideoDisplayMode.FULLSCREEN_ADAPTED)
                 )
             }
 
@@ -330,7 +336,8 @@ fun NowPlayingScreen(
                 onOpenVideoMode = { showVideoModeDialog = true },
                 isLyricsActive = showLyrics,
                 onToggleLyrics = { showLyrics = !showLyrics },
-                isABLoopActive = abLoopState.isLoopingActive
+                isABLoopActive = abLoopState.isLoopingActive,
+                isVocalClarityActive = vocalClarityConfig.enabled
             )
 
             Spacer(modifier = Modifier.weight(0.5f))
@@ -613,12 +620,16 @@ fun NowPlayingScreen(
                 onBandLevelChange = onBandLevelChange,
                 onBassBoostChange = onBassBoostChange,
                 onPresetSelect = onPresetSelect,
+                vocalClarityConfig = vocalClarityConfig,
+                onSetVocalClarityEnabled = onSetVocalClarityEnabled,
+                onSetVocalClarityStrength = onSetVocalClarityStrength,
                 sleepTimerState = sleepTimerState,
                 onStartSleepTimer = onStartSleepTimer,
                 onCancelSleepTimer = onCancelSleepTimer,
                 onAddSleepTimerMinutes = onAddSleepTimerMinutes,
                 spatial8DConfig = spatial8DConfig,
                 onSet8DEnabled = onSet8DEnabled,
+                onSet8DMode16D = onSet8DMode16D,
                 onSet8DOrbitSpeed = onSet8DOrbitSpeed,
                 onSet8DSpatialIntensity = onSet8DSpatialIntensity,
                 onSet8DRoomDepth = onSet8DRoomDepth,

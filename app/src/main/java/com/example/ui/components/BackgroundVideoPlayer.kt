@@ -52,7 +52,8 @@ fun BackgroundVideoPlayer(
     playbackSpeed: Float = 1.0f,
     placeholderTrack: Track? = null,
     modifier: Modifier = Modifier,
-    cornerRadius: androidx.compose.ui.unit.Dp = 24.dp
+    cornerRadius: androidx.compose.ui.unit.Dp = 24.dp,
+    fitHorizontalInFullscreen: Boolean = false
 ) {
     val context = LocalContext.current
     var isFirstFrameRendered by remember(videoUriString) { mutableStateOf(false) }
@@ -64,12 +65,13 @@ fun BackgroundVideoPlayer(
         w > (h * 1.15f)
     }
 
-    // Modo de redimensionado inteligente:
-    // - En Fondo Completo (cornerRadius == 0.dp) con video horizontal: se usa RESIZE_MODE_FIT para
-    //   mostrar el 100% del cuadro sin recortar caras, rostros ni laterales.
-    // - En lienzo de carátula o videos verticales: se usa RESIZE_MODE_ZOOM para relleno armónico.
+    // Modo de redimensionado elegible por el usuario:
+    // - Si fitHorizontalInFullscreen es false (Modo Rellenar / Recortar): usa RESIZE_MODE_ZOOM para que el video
+    //   ocupe el 100% de la pantalla de arriba a abajo sin franjas ni cortes horizontales, tomando la región central.
+    // - Si fitHorizontalInFullscreen es true (Modo Adaptado): usa RESIZE_MODE_FIT en videos horizontales para
+    //   mostrar todo el fotograma sin recortar rostros ni laterales.
     val targetResizeMode = when {
-        cornerRadius == 0.dp && isHorizontalVideo -> AspectRatioFrameLayout.RESIZE_MODE_FIT
+        cornerRadius == 0.dp && isHorizontalVideo && fitHorizontalInFullscreen -> AspectRatioFrameLayout.RESIZE_MODE_FIT
         else -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
     }
 
@@ -157,15 +159,17 @@ fun BackgroundVideoPlayer(
             .border(if (cornerRadius > 0.dp) 1.dp else 0.dp, CardBorder, RoundedCornerShape(cornerRadius)),
         contentAlignment = Alignment.Center
     ) {
-        // Capa 1: Carátula o fondo estético que se muestra mientras el decodificador prepara el primer cuadro
-        // o durante la transición suave entre canciones
-        if (placeholderTrack != null) {
+        // Capa 1: Carátula que se muestra únicamente mientras el decodificador prepara el primer cuadro
+        // (desaparece suavemente al renderizar el video para no generar cortes horizontales detrás del video)
+        if (placeholderTrack != null && videoAlpha < 0.99f) {
             ArtworkImage(
                 track = placeholderTrack,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { alpha = (1f - videoAlpha).coerceIn(0f, 1f) },
                 cornerRadius = cornerRadius
             )
-        } else {
+        } else if (placeholderTrack == null && videoAlpha < 0.99f) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -207,7 +211,7 @@ fun BackgroundVideoPlayer(
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
-                            Color.Black.copy(alpha = if (cornerRadius == 0.dp && isHorizontalVideo) 0.55f else 0.25f),
+                            Color.Black.copy(alpha = if (cornerRadius == 0.dp && isHorizontalVideo && fitHorizontalInFullscreen) 0.45f else 0.25f),
                             Color.Transparent,
                             Color.Black.copy(alpha = if (cornerRadius == 0.dp) 0.65f else 0.45f)
                         )

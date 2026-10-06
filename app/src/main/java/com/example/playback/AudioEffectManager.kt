@@ -9,6 +9,7 @@ import com.example.model.EqualizerPreset
 import com.example.model.ReverbConfig
 import com.example.model.ReverbPreset
 import com.example.model.Spatial8DConfig
+import com.example.model.VocalClarityConfig
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,7 +18,8 @@ import kotlinx.coroutines.flow.asStateFlow
  * Gestor avanzado de efectos acústicos impulsado por el motor nativo C++20 (auramusic_dsp).
  * Controla:
  * - Ecualizador paramétrico de 10 bandas y refuerzo de graves en tiempo real.
- * - Motor de Audio Espacial 8D Binaural.
+ * - Clarificador de Voces HD (aislamiento Mid-Side y realce de presencia vocal en C++20).
+ * - Motor de Audio Espacial 8D (Órbita 360°) y 16D (Multi-Órbita Doble Capa) Binaural.
  * - Suite Reverb Híbrida C++20 (Presets ambientales + Ajuste libre de tamaño, decay y wet).
  * - Crossfeed y balance estéreo fino L/R.
  */
@@ -41,6 +43,9 @@ class AudioEffectManager {
 
     private val _spatial8DConfig = MutableStateFlow(Spatial8DConfig())
     val spatial8DConfig: StateFlow<Spatial8DConfig> = _spatial8DConfig.asStateFlow()
+
+    private val _vocalClarityConfig = MutableStateFlow(VocalClarityConfig())
+    val vocalClarityConfig: StateFlow<VocalClarityConfig> = _vocalClarityConfig.asStateFlow()
 
     private val _reverbConfig = MutableStateFlow(ReverbConfig())
     val reverbConfig: StateFlow<ReverbConfig> = _reverbConfig.asStateFlow()
@@ -133,6 +138,11 @@ class AudioEffectManager {
         NativeAudioEngine.setEightDEnabled(enabled)
     }
 
+    fun set8DMode16D(is16DMode: Boolean) {
+        _spatial8DConfig.value = _spatial8DConfig.value.copy(is16DMode = is16DMode)
+        NativeAudioEngine.setEightD16DMode(is16DMode)
+    }
+
     fun set8DOrbitSpeed(speedSeconds: Float) {
         val clamped = speedSeconds.coerceIn(4f, 30f)
         _spatial8DConfig.value = _spatial8DConfig.value.copy(orbitSpeedSeconds = clamped)
@@ -149,6 +159,20 @@ class AudioEffectManager {
         val clamped = depth.coerceIn(0f, 1f)
         _spatial8DConfig.value = _spatial8DConfig.value.copy(roomDepth = clamped)
         NativeAudioEngine.setEightDRoomDepth(clamped)
+    }
+
+    // --- Control de Clarificador de Voces HD (100% C++20 en tiempo real) ---
+    fun setVocalClarityEnabled(enabled: Boolean) {
+        val cfg = _vocalClarityConfig.value.copy(enabled = enabled)
+        _vocalClarityConfig.value = cfg
+        NativeAudioEngine.setVocalClarityParameters(cfg.enabled, cfg.strength)
+    }
+
+    fun setVocalClarityStrength(strength: Float) {
+        val clamped = strength.coerceIn(0.0f, 1.0f)
+        val cfg = _vocalClarityConfig.value.copy(strength = clamped)
+        _vocalClarityConfig.value = cfg
+        NativeAudioEngine.setVocalClarityParameters(cfg.enabled, cfg.strength)
     }
 
     // --- Control de Suite Reverb Acústica (100% C++20 en tiempo real, sin bloqueo LVREV) ---
@@ -221,7 +245,7 @@ class AudioEffectManager {
     /**
      * Limpieza Atómica de Buffers (Buffer Flushing):
      * Pone a cero los acumuladores de los filtros IIR Bi-cuadráticos (10 bandas),
-     * filtros de graves, líneas de retardo de Crossfeed y colas de Reverb en C++20.
+     * filtros de graves, clarificador vocal, líneas de retardo de Crossfeed y colas de Reverb en C++20.
      * Erradica de forma definitiva cualquier pop o chasquido digital residual y colas de eco.
      */
     fun flushBuffers() {
@@ -235,9 +259,13 @@ class AudioEffectManager {
         }
         NativeAudioEngine.setBassBoost(_bassBoostLevel.value / 1000.0f)
         NativeAudioEngine.setEightDEnabled(_spatial8DConfig.value.enabled)
+        NativeAudioEngine.setEightD16DMode(_spatial8DConfig.value.is16DMode)
         NativeAudioEngine.setEightDOrbitSpeed(_spatial8DConfig.value.orbitSpeedSeconds)
         NativeAudioEngine.setEightDSpatialIntensity(_spatial8DConfig.value.spatialIntensity)
         NativeAudioEngine.setEightDRoomDepth(_spatial8DConfig.value.roomDepth)
+
+        val vc = _vocalClarityConfig.value
+        NativeAudioEngine.setVocalClarityParameters(vc.enabled, vc.strength)
 
         val rev = _reverbConfig.value
         NativeAudioEngine.setReverbParameters(rev.isEnabled, rev.roomSize, rev.decayMs, rev.reverbLevelDb)
