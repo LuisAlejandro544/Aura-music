@@ -1,5 +1,6 @@
 package com.example.ui.screens.nowplaying.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
@@ -15,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -49,7 +51,7 @@ import java.util.Locale
  *   - Fila de utilidades inferiores (EQ FX, selector de diseño, cola de reproducción).
  *   - Píldora inferior "Vista previa de la letra" para acceso directo al Karaoke.
  */
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun NowPlayingCinematicLayout(
     currentTrack: Track,
@@ -61,6 +63,7 @@ fun NowPlayingCinematicLayout(
     lyricsState: LyricsState,
     animatedPrimary: Color,
     animatedSecondary: Color,
+    audioIntensity: Float = 0.15f,
     onTogglePlayPause: () -> Unit,
     onSeekTo: (Long) -> Unit,
     onPlayNext: () -> Unit,
@@ -102,18 +105,28 @@ fun NowPlayingCinematicLayout(
             .fillMaxSize()
             .testTag("now_playing_cinematic_layout")
     ) {
-        // Degradado oscuro superior e inferior para garantizar 100% de contraste
+        // Halo de resplandor ambiental y viñeta dinámica superior/inferior que reacciona
+        // en tiempo real exacto a la paleta cromática del Video Canvas y al ritmo acústico C++20
+        val dynamicBottomGlow = animatedPrimary.copy(
+            alpha = (0.28f + (audioIntensity.coerceIn(0f, 1f) * 0.24f)).coerceIn(0.18f, 0.60f)
+        )
+        val dynamicTopGlow = animatedSecondary.copy(
+            alpha = 0.35f
+        )
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
-                            Color.Black.copy(alpha = 0.55f),
-                            Color.Transparent,
+                            dynamicTopGlow,
                             Color.Black.copy(alpha = 0.40f),
-                            Color.Black.copy(alpha = 0.88f),
-                            BackgroundDark.copy(alpha = 0.98f)
+                            Color.Transparent,
+                            Color.Transparent,
+                            dynamicBottomGlow,
+                            animatedSecondary.copy(alpha = 0.35f),
+                            BackgroundDark.copy(alpha = 0.92f),
+                            BackgroundDark
                         ),
                         startY = 0f,
                         endY = Float.POSITIVE_INFINITY
@@ -216,7 +229,9 @@ fun NowPlayingCinematicLayout(
             if (!activeLyricLine.isNullOrBlank()) {
                 Surface(
                     shape = RoundedCornerShape(16.dp),
-                    color = Color.Black.copy(alpha = 0.50f),
+                    color = Color.Black.copy(alpha = 0.55f),
+                    border = BorderStroke(1.2.dp, animatedPrimary.copy(alpha = 0.65f)),
+                    shadowElevation = 4.dp,
                     modifier = Modifier
                         .padding(bottom = 16.dp)
                         .clip(RoundedCornerShape(16.dp))
@@ -268,7 +283,9 @@ fun NowPlayingCinematicLayout(
                 Spacer(modifier = Modifier.width(14.dp))
 
                 Column(
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier
+                        .weight(1f)
+                        .clipToBounds()
                 ) {
                     Text(
                         text = currentTrack.title,
@@ -278,19 +295,44 @@ fun NowPlayingCinematicLayout(
                             fontSize = 19.sp
                         ),
                         maxLines = 1,
-                        modifier = Modifier.basicMarquee()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clipToBounds()
+                            .basicMarquee()
                     )
                     Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = currentTrack.artist,
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            color = TextSecondary,
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 14.sp
-                        ),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clipToBounds()
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = animatedPrimary.copy(alpha = 0.18f),
+                            modifier = Modifier.padding(end = 6.dp)
+                        ) {
+                            Text(
+                                text = currentTrack.formatBadge(),
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = animatedPrimary,
+                                    fontSize = 10.sp
+                                ),
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                            )
+                        }
+                        Text(
+                            text = currentTrack.artist,
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                color = TextSecondary,
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 14.sp
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
 
                 // Botón de Favorito
@@ -311,7 +353,7 @@ fun NowPlayingCinematicLayout(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // 4. Barra de Progreso (Seekbar Delgada)
+            // 4. Barra de Progreso (Seekbar Delgada con bolita clásica y color reactivo al video)
             Slider(
                 value = currentProgress,
                 onValueChange = { newVal ->
@@ -325,12 +367,32 @@ fun NowPlayingCinematicLayout(
                 },
                 colors = SliderDefaults.colors(
                     thumbColor = Color.White,
-                    activeTrackColor = Color.White,
-                    inactiveTrackColor = Color.White.copy(alpha = 0.22f)
+                    activeTrackColor = animatedPrimary,
+                    inactiveTrackColor = animatedPrimary.copy(alpha = 0.25f)
                 ),
+                thumb = {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        // Halo de luz ambiental reactivo al color del video
+                        Box(
+                            modifier = Modifier
+                                .size(18.dp)
+                                .background(animatedPrimary.copy(alpha = 0.40f), CircleShape)
+                        )
+                        // Bolita clásica sólida blanca
+                        Box(
+                            modifier = Modifier
+                                .size(14.dp)
+                                .shadow(elevation = 3.dp, shape = CircleShape)
+                                .background(Color.White, CircleShape)
+                        )
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(22.dp)
+                    .height(24.dp)
                     .testTag("cinematic_progress_slider")
             )
 
@@ -404,24 +466,38 @@ fun NowPlayingCinematicLayout(
                     )
                 }
 
-                // Botón Play / Pausa Central Circular Blanco de 64dp
-                Surface(
-                    onClick = onTogglePlayPause,
-                    shape = CircleShape,
-                    color = Color.White,
-                    shadowElevation = 8.dp,
-                    modifier = Modifier
-                        .size(64.dp)
-                        .clip(CircleShape)
-                        .testTag("cinematic_play_pause_btn")
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            contentDescription = if (isPlaying) "Pausar" else "Reproducir",
-                            tint = Color.Black,
-                            modifier = Modifier.size(34.dp)
-                        )
+                // Botón Play / Pausa Central Circular Blanco de 64dp con halo y borde reactivo al video
+                Box(contentAlignment = Alignment.Center) {
+                    // Halo reactivo pulsante con el audio y color del video
+                    Box(
+                        modifier = Modifier
+                            .size(74.dp)
+                            .background(
+                                animatedPrimary.copy(
+                                    alpha = if (isPlaying) (0.22f + audioIntensity.coerceIn(0f, 1f) * 0.25f).coerceIn(0.16f, 0.55f) else 0.12f
+                                ),
+                                CircleShape
+                            )
+                    )
+                    Surface(
+                        onClick = onTogglePlayPause,
+                        shape = CircleShape,
+                        color = Color.White,
+                        border = BorderStroke(1.5.dp, animatedPrimary.copy(alpha = 0.65f)),
+                        shadowElevation = 8.dp,
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(CircleShape)
+                            .testTag("cinematic_play_pause_btn")
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                contentDescription = if (isPlaying) "Pausar" else "Reproducir",
+                                tint = Color.Black,
+                                modifier = Modifier.size(34.dp)
+                            )
+                        }
                     }
                 }
 
@@ -533,10 +609,11 @@ fun NowPlayingCinematicLayout(
 
             Spacer(modifier = Modifier.height(6.dp))
 
-            // 7. Tarjeta Deslizable / Acceso Inferior a "Vista previa de la letra"
+            // 7. Tarjeta Deslizable / Acceso Inferior a "Vista previa de la letra" con acento armónico reactivo
             Surface(
                 shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
-                color = Color.White.copy(alpha = 0.08f),
+                color = animatedPrimary.copy(alpha = 0.12f),
+                border = BorderStroke(1.dp, animatedPrimary.copy(alpha = 0.35f)),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(44.dp)

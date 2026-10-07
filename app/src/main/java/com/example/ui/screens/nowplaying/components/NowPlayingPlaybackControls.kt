@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -37,7 +38,7 @@ import com.example.ui.theme.TextSecondary
  * - Barra compacta de Repetidor de Segmento A-B ([A], [B], estado de bucle y botón de limpiar).
  * - Fila de botones de control (Shuffle, Skip Anterior, Play/Pause grande, Skip Siguiente, Repeat).
  */
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun NowPlayingPlaybackControls(
     currentTrack: Track,
@@ -236,6 +237,26 @@ fun NowPlayingPlaybackControls(
                         activeTrackColor = animatedPrimary,
                         inactiveTrackColor = animatedPrimary.copy(alpha = 0.25f)
                     ),
+                    thumb = {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            // Halo exterior reactivo con el color dinámico de la pista
+                            Box(
+                                modifier = Modifier
+                                    .size(18.dp)
+                                    .background(animatedPrimary.copy(alpha = 0.40f), CircleShape)
+                            )
+                            // Bolita clásica sólida blanca
+                            Box(
+                                modifier = Modifier
+                                    .size(14.dp)
+                                    .shadow(elevation = 3.dp, shape = CircleShape)
+                                    .background(Color.White, CircleShape)
+                            )
+                        }
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("now_playing_slider")

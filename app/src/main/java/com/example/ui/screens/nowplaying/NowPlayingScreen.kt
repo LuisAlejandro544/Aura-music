@@ -348,6 +348,7 @@ fun NowPlayingScreen(
                 lyricsState = lyricsState,
                 animatedPrimary = animatedPrimary,
                 animatedSecondary = animatedSecondary,
+                audioIntensity = audioIntensity,
                 onTogglePlayPause = onTogglePlayPause,
                 onSeekTo = onSeekTo,
                 onPlayNext = onPlayNext,

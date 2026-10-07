@@ -27,6 +27,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -35,6 +36,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.LyricsState
@@ -55,6 +57,7 @@ import kotlinx.coroutines.launch
  * - Botón flotante de sincronización ("Volver a la canción") al realizar desplazamiento manual.
  * - Barra de transporte flotante inferior con controles de reproducción, marquesina fluida y seekbar interactiva.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FullScreenLyricsScreen(
     currentTrack: Track?,
@@ -170,27 +173,28 @@ fun FullScreenLyricsScreen(
                 }
 
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(20.dp),
                     color = animatedPrimary.copy(alpha = 0.16f),
-                    border = BorderStroke(1.2.dp, animatedPrimary.copy(alpha = 0.45f))
+                    border = BorderStroke(1.dp, animatedPrimary.copy(alpha = 0.45f))
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Mic,
                             contentDescription = null,
                             tint = animatedPrimary,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(14.dp)
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(5.dp))
                         Text(
-                            text = "KARAOKE EN PANTALLA COMPLETA",
+                            text = "KARAOKE",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontWeight = FontWeight.ExtraBold,
-                                letterSpacing = 1.2.sp,
-                                color = animatedPrimary
+                                letterSpacing = 1.sp,
+                                color = animatedPrimary,
+                                fontSize = 11.sp
                             )
                         )
                     }
@@ -199,13 +203,13 @@ fun FullScreenLyricsScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(
                         onClick = onOpenSearchLyrics,
-                        modifier = Modifier.size(44.dp)
+                        modifier = Modifier.size(40.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Search,
                             contentDescription = "Buscar versión de letras",
                             tint = animatedPrimary,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                     IconButton(
@@ -214,24 +218,24 @@ fun FullScreenLyricsScreen(
                                 arrayOf("text/*", "application/octet-stream", "*/*")
                             )
                         },
-                        modifier = Modifier.size(44.dp)
+                        modifier = Modifier.size(40.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.FileUpload,
                             contentDescription = "Importar archivo local",
                             tint = TextSecondary,
-                            modifier = Modifier.size(21.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                     IconButton(
                         onClick = { showPasteDialog = true },
-                        modifier = Modifier.size(44.dp)
+                        modifier = Modifier.size(40.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Edit,
                             contentDescription = "Editar letra",
                             tint = TextSecondary,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(19.dp)
                         )
                     }
                 }
@@ -453,7 +457,11 @@ fun FullScreenLyricsScreen(
                                 .clip(RoundedCornerShape(10.dp))
                         )
                         Spacer(modifier = Modifier.width(10.dp))
-                        Column(modifier = Modifier.weight(1f)) {
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clipToBounds()
+                        ) {
                             Text(
                                 text = currentTrack?.title ?: "Sin reproducción",
                                 style = MaterialTheme.typography.titleSmall.copy(
@@ -461,12 +469,16 @@ fun FullScreenLyricsScreen(
                                     color = TextPrimary
                                 ),
                                 maxLines = 1,
-                                modifier = Modifier.basicMarquee()
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clipToBounds()
+                                    .basicMarquee()
                             )
                             Text(
                                 text = currentTrack?.artist ?: "Aura Music",
                                 style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
-                                maxLines = 1
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                         IconButton(
@@ -484,7 +496,7 @@ fun FullScreenLyricsScreen(
 
                     Spacer(modifier = Modifier.height(6.dp))
 
-                    // Seekbar / Slider de progreso compacto
+                    // Seekbar / Slider de progreso compacto con bolita clásica
                     val progressRatio = if (durationMs > 0) {
                         (currentPositionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
                     } else 0f
@@ -496,10 +508,28 @@ fun FullScreenLyricsScreen(
                             onSeekTo(target)
                         },
                         colors = SliderDefaults.colors(
-                            thumbColor = animatedPrimary,
+                            thumbColor = Color.White,
                             activeTrackColor = animatedPrimary,
-                            inactiveTrackColor = Color.White.copy(alpha = 0.15f)
+                            inactiveTrackColor = Color.White.copy(alpha = 0.18f)
                         ),
+                        thumb = {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.size(22.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(16.dp)
+                                        .background(animatedPrimary.copy(alpha = 0.40f), CircleShape)
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(13.dp)
+                                        .shadow(elevation = 3.dp, shape = CircleShape)
+                                        .background(Color.White, CircleShape)
+                                )
+                            }
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(28.dp)

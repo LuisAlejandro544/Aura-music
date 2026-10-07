@@ -1,7 +1,9 @@
 package com.example.ui.screens.nowplaying.components
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Tune
@@ -9,6 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -23,6 +26,7 @@ import kotlin.math.abs
 /**
  * Barra de Balance Estéreo Fino L/R en Tiempo Real integrada en Now Playing.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NowPlayingBalanceBar(
     headphoneConfig: HeadphoneConfig,
@@ -94,6 +98,19 @@ fun NowPlayingBalanceBar(
                     activeTrackColor = MaterialTheme.colorScheme.secondary,
                     inactiveTrackColor = Color(0xFF232736)
                 ),
+                thumb = {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.size(20.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(13.dp)
+                                .shadow(elevation = 2.dp, shape = CircleShape)
+                                .background(MaterialTheme.colorScheme.secondary, CircleShape)
+                        )
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(26.dp)
