@@ -75,6 +75,23 @@ class DebugMonitorActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        try {
+            val resourcesImplClass = Class.forName("android.content.res.ResourcesImpl")
+            for (field in resourcesImplClass.declaredFields) {
+                if (field.name == "mAppContext") {
+                    field.isAccessible = true
+                    val currentVal = field.get(null)
+                    if (currentVal === baseContext || currentVal === this) {
+                        field.set(null, applicationContext)
+                    }
+                    break
+                }
+            }
+        } catch (_: Throwable) {}
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

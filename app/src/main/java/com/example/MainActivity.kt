@@ -35,6 +35,35 @@ class MainActivity : ComponentActivity() {
 
     private var musicViewModel: MusicViewModel? = null
 
+    /**
+     * Procesa de forma segura el Intent entrante verificando su acción y limpiando extras tras consumirlos.
+     */
+    private fun handleSafeIncomingIntent(incomingIntent: android.content.Intent?, vm: MusicViewModel) {
+        if (incomingIntent == null) return
+        try {
+            val downloadedTrackId = incomingIntent.getLongExtra(
+                com.example.playback.AuraDownloadService.EXTRA_PLAY_DOWNLOADED_TRACK_ID,
+                -1L
+            )
+            if (downloadedTrackId > 0L) {
+                incomingIntent.removeExtra(com.example.playback.AuraDownloadService.EXTRA_PLAY_DOWNLOADED_TRACK_ID)
+                vm.playDownloadedTrackFromNotification(downloadedTrackId)
+                return
+            }
+
+            val allowedActions = setOf(
+                android.content.Intent.ACTION_VIEW,
+                android.content.Intent.ACTION_SEND,
+                android.content.Intent.ACTION_SEND_MULTIPLE
+            )
+            if (incomingIntent.action in allowedActions) {
+                vm.onIncomingIntent(incomingIntent)
+            }
+        } catch (_: Exception) {
+            // Ignorar parcelas malformadas o excepciones de deserialización de Intents externos
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -45,16 +74,7 @@ class MainActivity : ComponentActivity() {
 
             // Procesar Intent de inicio ("Abrir con...", "Compartir con..." o toque en notificación de descarga)
             LaunchedEffect(intent) {
-                val downloadedTrackId = intent?.getLongExtra(
-                    com.example.playback.AuraDownloadService.EXTRA_PLAY_DOWNLOADED_TRACK_ID,
-                    -1L
-                ) ?: -1L
-                if (downloadedTrackId > 0L) {
-                    intent?.removeExtra(com.example.playback.AuraDownloadService.EXTRA_PLAY_DOWNLOADED_TRACK_ID)
-                    viewModel.playDownloadedTrackFromNotification(downloadedTrackId)
-                } else {
-                    viewModel.onIncomingIntent(intent)
-                }
+                handleSafeIncomingIntent(intent, viewModel)
             }
 
             val currentTheme by viewModel.currentTheme.collectAsStateWithLifecycle()
@@ -80,21 +100,39 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         AuraApplication.isAppInForeground = false
+        val pkgState = com.example.data.importer.YtDlpAutoUpdater.packageUpdateState.value
+        if (pkgState is com.example.model.PackageUpdateState.Checking ||
+            pkgState is com.example.model.PackageUpdateState.UpToDate ||
+            pkgState is com.example.model.PackageUpdateState.Idle
+        ) {
+            com.example.playback.AuraDownloadService.dismissPackageNotification(applicationContext)
+        }
         super.onStop()
+    }
+
+    override fun onDestroy() {
+        musicViewModel = null
+        super.onDestroy()
+        try {
+            val resourcesImplClass = Class.forName("android.content.res.ResourcesImpl")
+            for (field in resourcesImplClass.declaredFields) {
+                if (field.name == "mAppContext") {
+                    field.isAccessible = true
+                    val currentVal = field.get(null)
+                    if (currentVal === baseContext || currentVal === this) {
+                        field.set(null, applicationContext)
+                    }
+                    break
+                }
+            }
+        } catch (_: Throwable) {}
     }
 
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        val downloadedTrackId = intent.getLongExtra(
-            com.example.playback.AuraDownloadService.EXTRA_PLAY_DOWNLOADED_TRACK_ID,
-            -1L
-        )
-        if (downloadedTrackId > 0L) {
-            intent.removeExtra(com.example.playback.AuraDownloadService.EXTRA_PLAY_DOWNLOADED_TRACK_ID)
-            musicViewModel?.playDownloadedTrackFromNotification(downloadedTrackId)
-        } else {
-            musicViewModel?.onIncomingIntent(intent)
+        musicViewModel?.let { vm ->
+            handleSafeIncomingIntent(intent, vm)
         }
     }
 

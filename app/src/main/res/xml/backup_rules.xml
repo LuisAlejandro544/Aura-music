@@ -6,8 +6,8 @@
    See https://developer.android.com/about/versions/12/backup-restore
 -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+    <include domain="sharedpref" path="."/>
+    <exclude domain="file" path="bin"/>
+    <exclude domain="file" path="env"/>
+    <exclude domain="file" path="aura_debug_logs.json"/>
 </full-backup-content>

@@ -7,6 +7,7 @@ import androidx.documentfile.provider.DocumentFile
 import com.example.data.importer.AudioMetadataParser
 import com.example.data.importer.AudioSilenceTrimmer
 import com.example.data.importer.FFmpegNativeEngine
+import com.example.data.importer.IncomingMediaHandler
 import com.example.data.importer.LyricsManager
 import com.example.data.importer.SampleMusicGenerator
 import com.example.data.importer.VideoAudioExtractor
@@ -183,6 +184,9 @@ class SafTrackImporter(private val trackDao: TrackDao) {
         trimSilence: Boolean = false,
         loopStyle: FFmpegNativeEngine.CanvasLoopStyle = FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE
     ): Track? = withContext(Dispatchers.IO) {
+        if (!IncomingMediaHandler.isSafeExternalUri(context, videoUri)) {
+            return@withContext null
+        }
         val storageManager = AppStorageManager(context)
         val extractedTrack = VideoAudioExtractor.convertVideoToTrack(
             context = context,
@@ -215,6 +219,9 @@ class SafTrackImporter(private val trackDao: TrackDao) {
         trimSilence: Boolean = false
     ): Track? = withContext(Dispatchers.IO) {
         try {
+            if (!IncomingMediaHandler.isSafeExternalUri(context, uri)) {
+                return@withContext null
+            }
             try {
                 context.contentResolver.takePersistableUriPermission(
                     uri,

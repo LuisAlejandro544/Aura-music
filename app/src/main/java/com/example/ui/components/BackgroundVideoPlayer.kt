@@ -75,9 +75,26 @@ fun BackgroundVideoPlayer(
         else -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
     }
 
-    // Instancia de ExoPlayer dedicada a renderizado visual silenciado por videoUriString
+    // Listener recordado para poder desregistrarlo limpiamente al liberar el reproductor
+    val videoListener = remember(videoUriString) {
+        object : Player.Listener {
+            override fun onRenderedFirstFrame() {
+                isFirstFrameRendered = true
+            }
+
+            override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
+                if (videoSize.width > 0 && videoSize.height > 0) {
+                    videoDimensions = Pair(videoSize.width, videoSize.height)
+                }
+            }
+        }
+    }
+
+    var playerViewRef by remember(videoUriString) { mutableStateOf<PlayerView?>(null) }
+
+    // Instancia de ExoPlayer dedicada a renderizado visual silenciado por videoUriString (usando applicationContext para no filtrar la Activity)
     val videoPlayer = remember(videoUriString) {
-        ExoPlayer.Builder(context).build().apply {
+        ExoPlayer.Builder(context.applicationContext).build().apply {
             volume = 0f // Silenciado: el audio proviene exclusivamente del motor DSP principal
             repeatMode = if (isVideoLoop) Player.REPEAT_MODE_ALL else Player.REPEAT_MODE_OFF
 
@@ -94,17 +111,7 @@ fun BackgroundVideoPlayer(
                 seekTo(currentPositionMs)
             }
 
-            addListener(object : Player.Listener {
-                override fun onRenderedFirstFrame() {
-                    isFirstFrameRendered = true
-                }
-
-                override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
-                    if (videoSize.width > 0 && videoSize.height > 0) {
-                        videoDimensions = Pair(videoSize.width, videoSize.height)
-                    }
-                }
-            })
+            addListener(videoListener)
 
             prepare()
             if (isPlaying) {
@@ -138,12 +145,18 @@ fun BackgroundVideoPlayer(
         }
     }
 
-    // Liberación estricta de recursos de códec y hardware al cambiar de video o desmontar
+    // Liberación estricta de recursos de códec, Surface y referencias de vista al cambiar de video o desmontar
     DisposableEffect(videoPlayer) {
         onDispose {
-            videoPlayer.stop()
-            videoPlayer.clearMediaItems()
-            videoPlayer.release()
+            try {
+                playerViewRef?.player = null
+                playerViewRef = null
+                videoPlayer.removeListener(videoListener)
+                videoPlayer.clearVideoSurface()
+                videoPlayer.stop()
+                videoPlayer.clearMediaItems()
+                videoPlayer.release()
+            } catch (_: Throwable) {}
         }
     }
 
@@ -181,6 +194,7 @@ fun BackgroundVideoPlayer(
         AndroidView(
             factory = { ctx ->
                 PlayerView(ctx).apply {
+                    playerViewRef = this
                     player = videoPlayer
                     useController = false
                     resizeMode = targetResizeMode
@@ -192,6 +206,7 @@ fun BackgroundVideoPlayer(
                 }
             },
             update = { playerView ->
+                playerViewRef = playerView
                 if (playerView.player != videoPlayer) {
                     playerView.player = videoPlayer
                 }

@@ -502,6 +502,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         super.onCleared()
+        com.example.ui.theme.ArtworkColorExtractor.releaseRetriever()
         navigationCoordinator.release()
         effectsCoordinator.release()
         headphoneCoordinator.release()

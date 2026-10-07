@@ -36,11 +36,44 @@ class AppStorageManager(private val context: Context) {
     val videosDir: File = File(baseDir, "videos").apply { if (!exists()) mkdirs() }
 
     /**
+     * Resuelve y valida de forma segura un archivo hijo dentro de un directorio base permitido,
+     * bloqueando cualquier intento de Path Traversal ('../', enlaces simbólicos o barras).
+     */
+    private fun resolveSafeChildFile(parentDir: File, rawFileName: String): File {
+        val cleanName = rawFileName
+            .replace("/", "_")
+            .replace("\\", "_")
+            .replace("..", "_")
+            .trim()
+            .ifBlank { "file_${System.currentTimeMillis()}" }
+
+        val targetFile = File(parentDir, cleanName)
+        val canonicalParent = parentDir.canonicalFile.toPath()
+        val canonicalTarget = targetFile.canonicalFile.toPath()
+        if (!canonicalTarget.startsWith(canonicalParent)) {
+            throw SecurityException("Intento de Path Traversal bloqueado: '$rawFileName' escapa de '${parentDir.name}'")
+        }
+        return targetFile
+    }
+
+    /**
+     * Verifica si un archivo reside estrictamente dentro del directorio permitido usando su ruta canónica.
+     */
+    private fun isInsideDirectoryCanonical(file: File, allowedDir: File): Boolean {
+        return try {
+            file.canonicalFile.toPath().startsWith(allowedDir.canonicalFile.toPath())
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /**
      * Guarda una carátula comprimiéndola a formato WebP sin pérdida de calidad (Lossless)
      * en un hilo secundario (Dispatchers.IO).
      */
     suspend fun saveCoverAsWebp(key: String, bitmap: Bitmap): File = withContext(Dispatchers.IO) {
-        val file = File(imagesDir, "cover_$key.webp")
+        val safeKey = key.replace(Regex("[^a-zA-Z0-9_-]"), "_").take(80).ifBlank { "${System.currentTimeMillis()}" }
+        val file = resolveSafeChildFile(imagesDir, "cover_$safeKey.webp")
         FileOutputStream(file).use { outStream ->
             val format = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 Bitmap.CompressFormat.WEBP_LOSSLESS
@@ -68,10 +101,10 @@ class AppStorageManager(private val context: Context) {
     }
 
     /**
-     * Guarda una pista de audio en la carpeta songs/
+     * Guarda una pista de audio en la carpeta songs/ con protección contra Path Traversal.
      */
     suspend fun saveSongFile(fileName: String, inputStream: InputStream): File = withContext(Dispatchers.IO) {
-        val file = File(songsDir, fileName)
+        val file = resolveSafeChildFile(songsDir, fileName)
         FileOutputStream(file).use { outStream ->
             inputStream.copyTo(outStream)
         }
@@ -333,18 +366,18 @@ class AppStorageManager(private val context: Context) {
         try {
             if (!albumArtPath.isNullOrEmpty()) {
                 val artFile = File(albumArtPath)
-                if (artFile.exists() && artFile.startsWith(imagesDir)) {
+                if (artFile.exists() && isInsideDirectoryCanonical(artFile, imagesDir)) {
                     artFile.delete()
                 }
             }
             if (!videoPath.isNullOrEmpty()) {
                 val vidFile = File(videoPath)
-                if (vidFile.exists() && vidFile.startsWith(videosDir)) {
+                if (vidFile.exists() && isInsideDirectoryCanonical(vidFile, videosDir)) {
                     vidFile.delete()
                 }
             }
-            File(lyricsDir, "track_$trackId.lrc").takeIf { it.exists() }?.delete()
-            File(metadataDir, "track_$trackId.json").takeIf { it.exists() }?.delete()
+            resolveSafeChildFile(lyricsDir, "track_$trackId.lrc").takeIf { it.exists() }?.delete()
+            resolveSafeChildFile(metadataDir, "track_$trackId.json").takeIf { it.exists() }?.delete()
         } catch (ignored: Exception) {}
     }
 }

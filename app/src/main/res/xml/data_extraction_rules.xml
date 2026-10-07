@@ -5,15 +5,15 @@
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <include domain="sharedpref" path="."/>
+        <exclude domain="file" path="bin"/>
+        <exclude domain="file" path="env"/>
+        <exclude domain="file" path="aura_debug_logs.json"/>
     </cloud-backup>
-    <!--
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <include domain="sharedpref" path="."/>
+        <exclude domain="file" path="bin"/>
+        <exclude domain="file" path="env"/>
+        <exclude domain="file" path="aura_debug_logs.json"/>
     </device-transfer>
-    -->
 </data-extraction-rules>

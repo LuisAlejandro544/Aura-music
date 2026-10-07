@@ -7,11 +7,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LibraryMusic
-import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.LibraryMusic
-import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -105,11 +105,11 @@ fun BottomNavBar(
             onClick = { onNavigate(NavScreen.Settings) },
             icon = {
                 Icon(
-                    imageVector = if (currentScreen is NavScreen.Settings) Icons.Filled.Palette else Icons.Outlined.Palette,
-                    contentDescription = "Temas y Ajustes"
+                    imageVector = if (currentScreen is NavScreen.Settings) Icons.Filled.Settings else Icons.Outlined.Settings,
+                    contentDescription = "Configuración y Ajustes"
                 )
             },
-            label = { Text("Temas") },
+            label = { Text("Ajustes") },
             colors = NavigationBarItemDefaults.colors(
                 selectedIconColor = Color.White,
                 selectedTextColor = MaterialTheme.colorScheme.primary,

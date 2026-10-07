@@ -16,6 +16,7 @@ import com.example.model.HeadsetButtonAction
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -318,5 +319,6 @@ class HeadphoneController(
             context.unregisterReceiver(becomingNoisyReceiver)
         } catch (ignored: Throwable) {}
         clickJob?.cancel()
+        scope.cancel()
     }
 }

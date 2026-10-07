@@ -39,6 +39,9 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
 - **Transparencia y Gestión de Medios Almacenados en Ajustes**:
   - Pestaña dedicada **"Medios"** en los Ajustes del sistema (`StoredMediaSettingsTab`) con panel de transparencia total sobre las carátulas WebP y Videos Canvas MP4 guardados en disco (`images/` y `videos/`).
   - Muestra qué archivo pertenece a qué canción, su tamaño exacto en KB/MB y botones con confirmación para borrar la carátula o el video canvas individualmente, liberando espacio físico de inmediato.
+- **Apartado "Ajustes" con Navegación por Menús Independientes a Pantalla Completa (`SettingsScreen` & `SettingsSubMenuScreen`)**:
+  - La pantalla de Configuración & Ajustes (accesible desde el botón **"Ajustes"** en la barra de navegación inferior) elimina la antigua barra superior de pestañas para ofrecer un menú vertical directo y limpio de tarjetas navegables (con el mismo diseño estilizado de *Diseño del Reproductor* e indicador `>`) para *Diseño del Reproductor*, *Aura Dinámica & Video en Mini Reproductor*, *Paleta Base Predeterminada*, *Auriculares & Acústica DSP*, *Medios & Almacenamiento*, *Motores Nativos & Diagnóstico* y *Bienvenida & Guía*.
+  - Al tocar cualquiera de estos apartados, **en lugar de desplegar un modal emergente**, se abre una **pantalla independiente a pantalla completa** (`SettingsSubMenuScreen`) con animación fluida, barra superior de retorno y soporte nativo del botón atrás (`BackHandler`).
 
 ### 2. Ecualizador C++20 Integrado en Modal (Sin Apartados Aislados)
 - **10 Bandas Paramétricas ISO con Nombres Intuitivos**:

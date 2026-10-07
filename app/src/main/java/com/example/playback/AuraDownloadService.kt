@@ -124,7 +124,9 @@ class AuraDownloadService : Service() {
                     .setContentTitle("Verificando paquetes necesarios")
                     .setContentText(message)
                     .setProgress(0, 0, true)
-                    .setOngoing(true)
+                    .setOngoing(false)
+                    .setAutoCancel(true)
+                    .setTimeoutAfter(18_000L) // Se auto-descarta en el sistema si el proceso entra en Doze/Freezer
                     .setOnlyAlertOnce(true)
                     .setContentIntent(buildOpenAppPendingIntent(appContext))
                     .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -142,7 +144,9 @@ class AuraDownloadService : Service() {
                     .setSmallIcon(R.mipmap.ic_launcher)
                     .setContentTitle("Paquetes necesarios al día")
                     .setContentText("Versión verificada: $version")
+                    .setOngoing(false)
                     .setAutoCancel(true)
+                    .setTimeoutAfter(3_500L) // El sistema Android la retira automáticamente en 3.5s incluso con la app cerrada
                     .setOnlyAlertOnce(true)
                     .setContentIntent(buildOpenAppPendingIntent(appContext))
                     .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -163,7 +167,8 @@ class AuraDownloadService : Service() {
                     .setContentText("Actualizando motor yt-dlp ($version) • $clamped%")
                     .setSubText("$clamped%")
                     .setProgress(100, clamped, false)
-                    .setOngoing(true)
+                    .setOngoing(clamped < 100)
+                    .setTimeoutAfter(45_000L) // Si la conexión se congela fuera de la app, se limpia tras 45s sin actividad
                     .setOnlyAlertOnce(true)
                     .setContentIntent(buildOpenAppPendingIntent(appContext))
                     .setCategory(NotificationCompat.CATEGORY_PROGRESS)
@@ -262,7 +267,7 @@ class AuraDownloadService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         createNotificationChannels()
 
         val database = AppDatabase.getInstance(applicationContext)
@@ -381,6 +386,7 @@ class AuraDownloadService : Service() {
             } finally {
                 if (activeTaskCount.decrementAndGet() <= 0) {
                     activeTaskCount.set(0)
+                    pendingTasks.clear()
                     try {
                         stopForeground(STOP_FOREGROUND_REMOVE)
                     } catch (_: Exception) {}
@@ -395,8 +401,24 @@ class AuraDownloadService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        pendingTasks.clear()
         serviceScope.cancel()
         super.onDestroy()
+
+        // Mitigar la fuga de memoria del sistema Android OEM (ResourcesImpl.mAppContext -> ContextImpl -> AuraDownloadService)
+        try {
+            val resourcesImplClass = Class.forName("android.content.res.ResourcesImpl")
+            for (field in resourcesImplClass.declaredFields) {
+                if (field.name == "mAppContext") {
+                    field.isAccessible = true
+                    val currentVal = field.get(null)
+                    if (currentVal === baseContext || currentVal === this) {
+                        field.set(null, applicationContext)
+                    }
+                    break
+                }
+            }
+        } catch (_: Throwable) {}
     }
 
     private fun createNotificationChannels() {
@@ -447,7 +469,7 @@ class AuraDownloadService : Service() {
             progress.phase.ifBlank { "Procesando..." }
         }
 
-        return NotificationCompat.Builder(this, CHANNEL_ID_PROGRESS)
+        return NotificationCompat.Builder(applicationContext, CHANNEL_ID_PROGRESS)
             .setSmallIcon(android.R.drawable.stat_sys_download)
             .setContentTitle("Descargando: $title")
             .setContentText(progress.phase.ifBlank { subText })
@@ -492,7 +514,7 @@ class AuraDownloadService : Service() {
                 "${track.artist} • Listo en tu biblioteca"
             }
 
-            val builder = NotificationCompat.Builder(this, CHANNEL_ID_COMPLETE)
+            val builder = NotificationCompat.Builder(applicationContext, CHANNEL_ID_COMPLETE)
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setContentTitle("¡Descarga completada! • ${track.title}")
                 .setContentText(contentText)
@@ -503,7 +525,11 @@ class AuraDownloadService : Service() {
 
             val artPath = track.albumArtPath
             if (!artPath.isNullOrBlank() && File(artPath).exists()) {
-                val bitmap = BitmapFactory.decodeFile(artPath)
+                val opts = BitmapFactory.Options().apply {
+                    inSampleSize = 2
+                    inPreferredConfig = android.graphics.Bitmap.Config.RGB_565
+                }
+                val bitmap = BitmapFactory.decodeFile(artPath, opts)
                 if (bitmap != null) {
                     builder.setLargeIcon(bitmap)
                 }
@@ -530,7 +556,7 @@ class AuraDownloadService : Service() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
-            val notification = NotificationCompat.Builder(this, CHANNEL_ID_COMPLETE)
+            val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID_COMPLETE)
                 .setSmallIcon(android.R.drawable.stat_notify_error)
                 .setContentTitle("Error en la descarga")
                 .setContentText("No se pudo completar la descarga de \"$title\"")

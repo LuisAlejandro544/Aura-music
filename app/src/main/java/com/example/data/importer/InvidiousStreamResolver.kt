@@ -1,5 +1,6 @@
 package com.example.data.importer
 
+import android.net.Uri
 import com.example.debug.AuraDebugManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -33,6 +34,44 @@ object InvidiousStreamResolver {
         "https://inv.tux.pizza"
     )
 
+    private val SAFE_VIDEO_ID_REGEX = Regex("^[a-zA-Z0-9_-]{11}$")
+
+    /**
+     * Valida que una URL devuelta por un servidor externo sea estrictamente HTTPS
+     * y no apunte a direcciones privadas, loopback o de red interna (Prevención de SSRF / Open Redirect).
+     */
+    private fun isSafeExternalHttpsUrl(rawUrl: String?, baseInstance: String? = null): String? {
+        if (rawUrl.isNullOrBlank()) return null
+        val normalized = when {
+            rawUrl.startsWith("//") -> "https:$rawUrl"
+            rawUrl.startsWith("/") && !baseInstance.isNullOrBlank() -> "${baseInstance.trimEnd('/')}$rawUrl"
+            else -> rawUrl.trim()
+        }
+        return try {
+            val uri = Uri.parse(normalized)
+            val scheme = uri.scheme?.lowercase() ?: return null
+            if (scheme != "https") return null
+
+            val host = uri.host?.lowercase() ?: return null
+            if (host == "localhost" ||
+                host.endsWith(".local") ||
+                host.endsWith(".internal") ||
+                host.startsWith("127.") ||
+                host.startsWith("10.") ||
+                host.startsWith("192.168.") ||
+                host.startsWith("169.254.") ||
+                host == "0.0.0.0" ||
+                host.startsWith("[::1]") ||
+                Regex("^172\\.(1[6-9]|2[0-9]|3[0-1])\\..*").matches(host)
+            ) {
+                return null
+            }
+            normalized
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     /**
      * Resuelve los flujos de audio y video consultando los espejos en secuencia rápida.
      */
@@ -40,8 +79,13 @@ object InvidiousStreamResolver {
         videoId: String,
         originalUrl: String
     ): OnlineVideoAudioImporter.ResolvedMediaInfo? = withContext(Dispatchers.IO) {
+        val cleanVideoId = videoId.trim()
+        if (!SAFE_VIDEO_ID_REGEX.matches(cleanVideoId)) {
+            AuraDebugManager.logWarning("InvidiousResolver", "ID de video inválido rechazado: $videoId")
+            return@withContext null
+        }
         for (baseInstance in INSTANCES) {
-            val resolved = queryInstance(baseInstance, videoId, originalUrl)
+            val resolved = queryInstance(baseInstance, cleanVideoId, originalUrl)
             if (resolved != null) {
                 return@withContext resolved
             }
@@ -73,11 +117,15 @@ object InvidiousStreamResolver {
             val author = json.optString("author", "Música Online")
             val durationSeconds = json.optLong("lengthSeconds", 0L)
 
-            // Miniatura en alta calidad
+            // Miniatura en alta calidad validada bajo HTTPS
             var coverUrl = "https://img.youtube.com/vi/$videoId/maxresdefault.jpg"
             val thumbnails = json.optJSONArray("videoThumbnails")
             if (thumbnails != null && thumbnails.length() > 0) {
-                coverUrl = thumbnails.getJSONObject(0).optString("url", coverUrl)
+                val candidateThumb = thumbnails.getJSONObject(0).optString("url", "")
+                val safeThumb = isSafeExternalHttpsUrl(candidateThumb, baseInstance)
+                if (safeThumb != null) {
+                    coverUrl = safeThumb
+                }
             }
 
             val adaptiveFormats = json.optJSONArray("adaptiveFormats")
@@ -94,9 +142,10 @@ object InvidiousStreamResolver {
                     val format = adaptiveFormats.getJSONObject(i)
                     val mimeType = format.optString("type", "").lowercase()
                     val bitrate = format.optLong("bitrate", 0L)
-                    val url = format.optString("url", "")
+                    val rawUrl = format.optString("url", "")
+                    val url = isSafeExternalHttpsUrl(rawUrl, baseInstance) ?: continue
 
-                    if (url.isNotBlank() && !url.contains(".m3u8") && !url.contains(".mpd")) {
+                    if (!url.contains(".m3u8") && !url.contains(".mpd")) {
                         if (mimeType.contains("audio/")) {
                             val bonus = if (mimeType.contains("mp4")) 50000L else 0L
                             if (bitrate + bonus >= maxAudioBitrate) {
@@ -133,9 +182,10 @@ object InvidiousStreamResolver {
             if (formatStreams != null) {
                 for (i in 0 until formatStreams.length()) {
                     val format = formatStreams.getJSONObject(i)
-                    val url = format.optString("url", "")
+                    val rawUrl = format.optString("url", "")
+                    val url = isSafeExternalHttpsUrl(rawUrl, baseInstance) ?: continue
                     val mimeType = format.optString("type", "").lowercase()
-                    if (url.isNotBlank() && !url.contains(".m3u8")) {
+                    if (!url.contains(".m3u8")) {
                         if (bestVideoUrl == null && (mimeType.contains("video/") || mimeType.isBlank())) {
                             bestVideoUrl = url
                         }

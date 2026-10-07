@@ -22,6 +22,7 @@ import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -581,6 +582,7 @@ class AuraAudioPlayer(
     fun release() {
         stopProgressTracking()
         fadeController.cancel()
+        playerScope.cancel()
         mediaSessionBridge?.release()
         mediaSessionBridge = null
         effectManager.flushBuffers()

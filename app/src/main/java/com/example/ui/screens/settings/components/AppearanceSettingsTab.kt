@@ -12,118 +12,167 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.DashboardCustomize
+import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.PermMedia
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
-import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.AuraTheme
 import com.example.model.NowPlayingDesignMode
-import com.example.ui.screens.nowplaying.components.NowPlayingDesignSelectorDialog
-import androidx.compose.material.icons.filled.DashboardCustomize
-import androidx.compose.material.icons.filled.ChevronRight
 import com.example.ui.theme.CardBorder
 import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
+import kotlinx.coroutines.launch
 
 /**
- * Pestaña de Apariencia & Temas de Aura Music.
- * Arquitectura: Módulo de UI que renderiza dentro del LazyColumn:
- * - Tarjeta del Aura Dinámica de Carátula.
- * - Tarjetas de selección para cada tema visual (Nebula Violet, Cyber Mint, Sunset Ember, Ocean Abyss).
- * - Tarjeta de Ficha Técnica, Arquitectura y Privacidad.
+ * Contenido modular de la pantalla de Ajustes de Aura Music (< 500 líneas).
+ * Proporciona:
+ * 1. [mainSettingsMenuContent]: Menú principal de navegación de Ajustes con tarjetas estilo "Diseño del Reproductor"
+ *    que abren pantallas independientes a pantalla completa (sin modales).
+ * 2. [visualCustomizationSettingsContent]: Pantalla dedicada de Aura Dinámica y Video en Mini Reproductor.
+ * 3. [themePaletteSettingsContent]: Pantalla dedicada de Paleta Base Predeterminada y Material You.
+ * 4. [enginesAndDiagnosticsSettingsContent]: Pantalla dedicada de Motores Nativos, yt-dlp OTA, Aura Monitor y Bienvenida.
+ * 5. [appearanceSettingsTab]: Compatibilidad de renderizado para pruebas y vistas integradas.
  */
-fun LazyListScope.appearanceSettingsTab(
+
+fun LazyListScope.mainSettingsMenuContent(
     currentTheme: AuraTheme,
-    onSelectTheme: (AuraTheme) -> Unit,
     isDynamicArtworkColorEnabled: Boolean,
-    onToggleDynamicArtworkColor: (Boolean) -> Unit,
-    isMiniPlayerVideoEnabled: Boolean = true,
-    onToggleMiniPlayerVideo: (Boolean) -> Unit = {},
-    nowPlayingDesignMode: NowPlayingDesignMode = NowPlayingDesignMode.AUTO,
-    onSetNowPlayingDesignMode: (NowPlayingDesignMode) -> Unit = {},
-    onOpenOnboarding: () -> Unit = {}
+    isMiniPlayerVideoEnabled: Boolean,
+    nowPlayingDesignMode: NowPlayingDesignMode,
+    isHeadphoneConnected: Boolean,
+    connectedDeviceName: String,
+    mediaCount: Int,
+    onOpenPlayerDesign: () -> Unit,
+    onOpenVisualBehavior: () -> Unit,
+    onOpenThemePalettes: () -> Unit,
+    onOpenHeadphones: () -> Unit,
+    onOpenStoredMedia: () -> Unit,
+    onOpenEnginesAndDiagnostics: () -> Unit,
+    onOpenOnboarding: () -> Unit
 ) {
-    // Opción: Estilo de Diseño del Reproductor (Now Playing)
+    // 1. Diseño del Reproductor
     item {
-        var showDesignSelector by remember { mutableStateOf(false) }
-
-        Card(
-            shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = SurfaceCard),
-            border = BorderStroke(1.dp, CardBorder),
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(18.dp))
-                .clickable { showDesignSelector = true }
-                .testTag("now_playing_design_card")
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(18.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.DashboardCustomize,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Diseño del Reproductor",
-                            style = MaterialTheme.typography.titleSmall.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = TextPrimary
-                            )
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "${nowPlayingDesignMode.label} • ${nowPlayingDesignMode.description}",
-                        style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(10.dp))
-
-                Icon(
-                    imageVector = Icons.Default.ChevronRight,
-                    contentDescription = null,
-                    tint = TextSecondary,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-        }
-
-        if (showDesignSelector) {
-            NowPlayingDesignSelectorDialog(
-                currentDesignMode = nowPlayingDesignMode,
-                animatedPrimary = MaterialTheme.colorScheme.primary,
-                onSetDesignMode = onSetNowPlayingDesignMode,
-                onDismissRequest = { showDesignSelector = false }
-            )
-        }
-
+        SettingsNavigationCard(
+            icon = Icons.Default.DashboardCustomize,
+            title = "Diseño del Reproductor",
+            subtitle = "${nowPlayingDesignMode.label} • ${nowPlayingDesignMode.description}",
+            iconTint = MaterialTheme.colorScheme.primary,
+            onClick = onOpenPlayerDesign,
+            testTag = "now_playing_design_card"
+        )
         Spacer(modifier = Modifier.height(12.dp))
     }
 
+    // 2. Aura Dinámica y Video en Mini Reproductor
+    item {
+        val auraStatus = if (isDynamicArtworkColorEnabled) "Aura Dinámica activa" else "Aura Dinámica desactivada"
+        val miniVideoStatus = if (isMiniPlayerVideoEnabled) "Video en Mini Reproductor activo" else "Solo carátula en Mini Reproductor"
+        SettingsNavigationCard(
+            icon = Icons.Default.Videocam,
+            title = "Aura Dinámica & Video en Mini Reproductor",
+            subtitle = "$auraStatus • $miniVideoStatus",
+            iconTint = MaterialTheme.colorScheme.secondary,
+            onClick = onOpenVisualBehavior,
+            testTag = "settings_nav_visual_behavior"
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+    }
+
+    // 3. Paleta Base Predeterminada & Material You
+    item {
+        SettingsNavigationCard(
+            icon = Icons.Default.Palette,
+            title = "Paleta Base Predeterminada",
+            subtitle = "${currentTheme.title} • ${currentTheme.description}",
+            iconTint = MaterialTheme.colorScheme.primary,
+            onClick = onOpenThemePalettes,
+            testTag = "settings_nav_theme_palettes"
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+    }
+
+    // 4. Auriculares, Acústica DSP & Gestos
+    item {
+        SettingsNavigationCard(
+            icon = Icons.Default.Headphones,
+            title = "Auriculares & Acústica DSP",
+            subtitle = if (isHeadphoneConnected) {
+                "Conectado ($connectedDeviceName) • Crossfeed C++20, Balance L/R y Gestos"
+            } else {
+                "Crossfeed Bauer/Chu Moy en C++20, Balance Estéreo L/R, Seguridad y Botones"
+            },
+            iconTint = MaterialTheme.colorScheme.secondary,
+            badgeText = if (isHeadphoneConnected) "ON" else null,
+            badgeColor = MaterialTheme.colorScheme.secondary,
+            onClick = onOpenHeadphones,
+            testTag = "settings_tab_headphones"
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+    }
+
+    // 5. Medios y Almacenamiento Guardado
+    item {
+        SettingsNavigationCard(
+            icon = Icons.Default.PermMedia,
+            title = "Medios & Almacenamiento",
+            subtitle = "Inspecciona y libera espacio de carátulas WebP y videos Canvas MP4 guardados en tu teléfono",
+            iconTint = MaterialTheme.colorScheme.primary,
+            badgeText = if (mediaCount > 0) "$mediaCount" else null,
+            badgeColor = MaterialTheme.colorScheme.primary,
+            onClick = onOpenStoredMedia,
+            testTag = "settings_tab_stored_media"
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+    }
+
+    // 6. Motores Nativos, yt-dlp OTA & Aura Monitor
+    item {
+        SettingsNavigationCard(
+            icon = Icons.Default.Build,
+            title = "Motores Nativos, yt-dlp OTA & Diagnóstico",
+            subtitle = "Arquitectura C++20/FFmpeg, actualización OTA de yt-dlp y telemetría en vivo Aura Monitor",
+            iconTint = MaterialTheme.colorScheme.secondary,
+            onClick = onOpenEnginesAndDiagnostics,
+            testTag = "settings_nav_engines_diagnostics"
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+    }
+
+    // 7. Bienvenida & Guía de la Aplicación
+    item {
+        SettingsNavigationCard(
+            icon = Icons.Default.Info,
+            title = "Bienvenida & Guía de la Aplicación",
+            subtitle = "Consulta la guía interactiva de funciones y el aviso sobre almacenamiento de Video Canvas",
+            iconTint = MaterialTheme.colorScheme.primary,
+            onClick = onOpenOnboarding,
+            testTag = "open_onboarding_btn"
+        )
+    }
+}
+
+fun LazyListScope.visualCustomizationSettingsContent(
+    isDynamicArtworkColorEnabled: Boolean,
+    onToggleDynamicArtworkColor: (Boolean) -> Unit,
+    isMiniPlayerVideoEnabled: Boolean,
+    onToggleMiniPlayerVideo: (Boolean) -> Unit
+) {
     // Opción Avanzada: Aura Dinámica de Carátula
     item {
         Card(
@@ -179,7 +228,7 @@ fun LazyListScope.appearanceSettingsTab(
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(14.dp))
     }
 
     // Opción: Video en Mini Reproductor
@@ -236,31 +285,17 @@ fun LazyListScope.appearanceSettingsTab(
                 )
             }
         }
-
-        Spacer(modifier = Modifier.height(20.dp))
     }
+}
 
-    // Selector de Temas Visuales
+fun LazyListScope.themePaletteSettingsContent(
+    currentTheme: AuraTheme,
+    onSelectTheme: (AuraTheme) -> Unit
+) {
     item {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = Icons.Default.Palette,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.secondary
-            )
-            Spacer(modifier = Modifier.width(10.dp))
-            Text(
-                text = "Paleta Base Predeterminada",
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary
-                )
-            )
-        }
-        Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = "Se utiliza en la biblioteca, menús y cuando una pista no tiene colores específicos.",
-            style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+            style = MaterialTheme.typography.bodyMedium.copy(color = TextSecondary)
         )
         Spacer(modifier = Modifier.height(12.dp))
     }
@@ -268,9 +303,9 @@ fun LazyListScope.appearanceSettingsTab(
     items(AuraTheme.values().size) { index ->
         val theme = AuraTheme.values()[index]
         val isSelected = theme == currentTheme
-        val context = androidx.compose.ui.platform.LocalContext.current
+        val context = LocalContext.current
         val (displayPrimary, displaySecondary) = if (theme.isDynamic && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-            val dyn = androidx.compose.material3.dynamicDarkColorScheme(context)
+            val dyn = dynamicDarkColorScheme(context)
             Pair(dyn.primary, dyn.secondary)
         } else {
             Pair(theme.primaryColor, theme.secondaryColor)
@@ -297,7 +332,6 @@ fun LazyListScope.appearanceSettingsTab(
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Círculos de color del tema
                 Row(horizontalArrangement = Arrangement.spacedBy((-6).dp)) {
                     Box(
                         modifier = Modifier
@@ -353,11 +387,13 @@ fun LazyListScope.appearanceSettingsTab(
             }
         }
     }
+}
 
-    // Información de Privacidad y Arquitectura Local
+fun LazyListScope.enginesAndDiagnosticsSettingsContent(
+    onOpenOnboarding: () -> Unit = {}
+) {
     item {
-        val context = androidx.compose.ui.platform.LocalContext.current
-        Spacer(modifier = Modifier.height(24.dp))
+        val context = LocalContext.current
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 imageVector = Icons.Default.Shield,
@@ -539,52 +575,33 @@ fun LazyListScope.appearanceSettingsTab(
                 }
             }
         }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Acceso directo a Pantalla de Bienvenida, Inducción y Avisos
-        Card(
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = SurfaceCard),
-            border = BorderStroke(1.dp, CardBorder),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(18.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Info,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.secondary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Bienvenida & Guía de la Aplicación",
-                        style = MaterialTheme.typography.titleSmall.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = TextPrimary
-                        )
-                    )
-                }
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = "Vuelve a consultar la pantalla de bienvenida, el resumen de lo que ofrece Aura Music y el aviso importante sobre almacenamiento de Video Canvas.",
-                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
-                )
-                Spacer(modifier = Modifier.height(14.dp))
-                OutlinedButton(
-                    onClick = onOpenOnboarding,
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.secondary),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("open_onboarding_btn")
-                ) {
-                    Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Ver Bienvenida y Disclaimer", fontWeight = FontWeight.Bold)
-                }
-            }
-        }
     }
+}
+
+fun LazyListScope.appearanceSettingsTab(
+    currentTheme: AuraTheme,
+    onSelectTheme: (AuraTheme) -> Unit,
+    isDynamicArtworkColorEnabled: Boolean,
+    onToggleDynamicArtworkColor: (Boolean) -> Unit,
+    isMiniPlayerVideoEnabled: Boolean = true,
+    onToggleMiniPlayerVideo: (Boolean) -> Unit = {},
+    nowPlayingDesignMode: NowPlayingDesignMode = NowPlayingDesignMode.AUTO,
+    onSetNowPlayingDesignMode: (NowPlayingDesignMode) -> Unit = {},
+    onOpenOnboarding: () -> Unit = {}
+) {
+    playerDesignSettingsContent(
+        currentDesignMode = nowPlayingDesignMode,
+        onSetDesignMode = onSetNowPlayingDesignMode
+    )
+    visualCustomizationSettingsContent(
+        isDynamicArtworkColorEnabled = isDynamicArtworkColorEnabled,
+        onToggleDynamicArtworkColor = onToggleDynamicArtworkColor,
+        isMiniPlayerVideoEnabled = isMiniPlayerVideoEnabled,
+        onToggleMiniPlayerVideo = onToggleMiniPlayerVideo
+    )
+    themePaletteSettingsContent(
+        currentTheme = currentTheme,
+        onSelectTheme = onSelectTheme
+    )
+    enginesAndDiagnosticsSettingsContent(onOpenOnboarding = onOpenOnboarding)
 }

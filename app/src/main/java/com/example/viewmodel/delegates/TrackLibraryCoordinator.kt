@@ -51,12 +51,19 @@ class TrackLibraryCoordinator(
             AuraDownloadService.downloadProgress.collect { progress ->
                 _downloadProgress.value = progress
                 _isImporting.value = progress.isDownloading
+                if (!progress.isDownloading && progress.phase.isBlank()) {
+                    // Si la descarga terminó con error o se canceló sin emitir completedEvent, liberar callback
+                    // (En caso de éxito completedEvents se emite inmediatamente antes o en el mismo ciclo)
+                }
             }
         }
 
         coroutineScope.launch {
             AuraDownloadService.statusMessages.collect { msg ->
                 _importStatusMessage.value = msg
+                if (msg.startsWith("Error al descargar")) {
+                    pendingDownloadSuccessCallback = null
+                }
             }
         }
 

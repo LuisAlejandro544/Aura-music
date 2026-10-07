@@ -157,9 +157,12 @@ app/
 │   │       │   │   │       ├── AudioSpecsDialog.kt
 │   │       │   │   │       └── VideoDisplayModeDialog.kt
 │   │       │   │   ├── settings/
-│   │       │   │   │   ├── SettingsScreen.kt
+│   │       │   │   │   ├── SettingsScreen.kt   # Orquestador de Ajustes y navegación a pantallas completas
 │   │       │   │   │   └── components/
-│   │       │   │   │       ├── StoredMediaSettingsTab.kt # Pestaña Medios modularizada
+│   │       │   │   │       ├── AppearanceSettingsTab.kt       # Menú principal de Ajustes y secciones dedicadas
+│   │       │   │   │       ├── SettingsSubScreenComponents.kt # Tarjetas navegables y contenedor de pantalla completa
+│   │       │   │   │       ├── PlayerDesignSettingsContent.kt # Pantalla dedicada de Diseño del Reproductor
+│   │       │   │   │       ├── StoredMediaSettingsTab.kt      # Pestaña Medios modularizada
 │   │       │   │   │       └── media/
 │   │       │   │   │           ├── StoredMediaFormatUtils.kt
 │   │       │   │   │           ├── StoredMediaSummaryHeader.kt
@@ -212,15 +215,25 @@ app/
    - No se permite la instalación de binarios ejecutables sin validación de integridad previa.
 
 2. **Desactivación Global de Verificación TLS/SSL en yt-dlp (`YtDlpNativeEngine.kt`)**:
-   - Eliminado el argumento permisivo `--no-check-certificates`.
-   - Inyección rigurosa del almacén de certificados CA oficial (`cert.pem` embebido local en `/usr/etc/tls/cert.pem` o los certificados del sistema Android en `/system/etc/security/cacerts`).
+   - Eliminado el argumento permisivo `--no-check-certificates` tanto en la ejecución inicial como en el bloque de reintento ante errores SSL.
+   - Inyección rigurosa y reconstrucción bajo demanda (`forceRebuild = true`) del almacén de certificados CA oficial (`cert.pem` embebido local en `/usr/etc/tls/cert.pem`, Conscrypt APEX `/apex/com.android.conscrypt/cacerts` y `/system/etc/security/cacerts`).
 
-3. **Riesgo de Colisión de Nombres y Extensiones en SAF (`SafTrackImporter.kt`)**:
+3. **Blindaje de Memoria Nativa C++20 y Sincronización Thread-Safe (`auramusic_dsp.cpp`)**:
+   - Validación estricta de capacidad en `DirectByteBuffer` mediante `GetDirectBufferCapacity(byteBuffer)` previniendo lecturas o escrituras fuera de límites (*Buffer Over-read / Over-write*).
+   - Sincronización mediante `std::mutex` (`sDspMutex`) entre el hilo de audio PCM de ExoPlayer y los ajustes en tiempo real de la interfaz.
+
+4. **Protección contra Path Traversal, File Stealing y SSRF (`AppStorageManager.kt`, `IncomingMediaHandler.kt`, `InvidiousStreamResolver.kt`, `TikTokMediaResolver.kt`)**:
+   - Resolución canónica obligatoria (`resolveSafeChildFile` e `isInsideDirectoryCanonical`) en `AppStorageManager.kt` al guardar y eliminar canciones, carátulas, letras y metadatos.
+   - Bloqueo de ataques *File Stealing* por enlaces simbólicos o URIs que apunten al sandbox privado interno (`dataDir`, `filesDir`, `cacheDir`) en `IncomingMediaHandler.kt` y eliminación del esquema inseguro `file://` en `AndroidManifest.xml`.
+   - Exclusión de binarios ejecutables (`bin/`, `env/`) y logs en `backup_rules.xml` y `data_extraction_rules.xml`.
+   - Validación estricta de esquema `https://` y bloqueo de direcciones IP privadas/loopback (anti-SSRF) en `InvidiousStreamResolver.kt` y `TikTokMediaResolver.kt`.
+
+5. **Riesgo de Colisión de Nombres y Extensiones en SAF (`SafTrackImporter.kt`)**:
    - Normalización de nombres de archivo y sanitización contra secuencias de escape y caracteres peligrosos (`..`, `/`, `\`).
    - Mapeo estricto del MIME Type hacia extensiones de audio permitidas (`mp3`, `m4a`, `flac`, `wav`, `ogg`, `opus`, `aac`).
    - Desambiguación con sufijos UUID aleatorios (`_a1b2c3`) para evitar sobreescritura accidental de pistas previas.
 
-4. **Prevención de Inyección de Opciones (Flag Injection) en FFmpeg (`FFmpegNativeEngine.kt`)**:
+6. **Prevención de Inyección de Opciones (Flag Injection) en FFmpeg (`FFmpegNativeEngine.kt`)**:
    - Sanitización de rutas canónicas de entrada y salida mediante `sanitizeFilePath()`.
    - Rechazo de rutas que comiencen con `-` o contengan saltos de línea/espacios sospechosos.
    - Inserción del delimitador POSIX `--` antes de argumentos posicionales en invocaciones nativas para neutralizar la interpretación accidental de rutas como banderas de línea de comandos.

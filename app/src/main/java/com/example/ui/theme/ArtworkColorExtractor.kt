@@ -312,10 +312,7 @@ object ArtworkColorExtractor {
         )
     }
 
-    fun clearCache() {
-        memoryCache.evictAll()
-        lastVideoTrackId = null
-        lastVideoColors = null
+    fun releaseRetriever() {
         synchronized(retrieverLock) {
             try {
                 cachedRetriever?.release()
@@ -324,5 +321,12 @@ object ArtworkColorExtractor {
             cachedVideoUri = null
             cachedVideoDurationMs = 0L
         }
+    }
+
+    fun clearCache() {
+        memoryCache.evictAll()
+        lastVideoTrackId = null
+        lastVideoColors = null
+        releaseRetriever()
     }
 }

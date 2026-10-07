@@ -6,8 +6,10 @@ import com.example.data.importer.FFmpegNativeEngine
 import com.example.data.importer.YtDlpAutoUpdater
 import com.example.data.importer.YtDlpNativeEngine
 import com.example.debug.AuraDebugManager
+import com.example.ui.theme.ArtworkColorExtractor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 /**
@@ -23,6 +25,8 @@ class AuraApplication : Application() {
         var isAppInForeground: Boolean = false
     }
 
+    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     override fun onCreate() {
         super.onCreate()
         // Inicializar el monitor y el capturador de excepciones no controladas (Crashes)
@@ -30,7 +34,7 @@ class AuraApplication : Application() {
         AuraDebugManager.logInfo("Application", "Aura Music iniciada correctamente.")
 
         // Inicialización asíncrona en segundo plano de los motores nativos (FFmpeg puro y entorno Python)
-        CoroutineScope(Dispatchers.IO).launch {
+        applicationScope.launch {
             try {
                 FFmpegNativeEngine.init(applicationContext)
                 YtDlpNativeEngine.init(applicationContext)
@@ -44,9 +48,10 @@ class AuraApplication : Application() {
 
     override fun onLowMemory() {
         super.onLowMemory()
+        ArtworkColorExtractor.clearCache()
         AuraDebugManager.logWarning(
             "Memory",
-            "Dispositivo en estado crítico de memoria baja (onLowMemory). Se recomienda liberar recursos."
+            "Dispositivo en estado crítico de memoria baja (onLowMemory). Se liberaron cachés de color y metadatos."
         )
     }
 
@@ -54,18 +59,21 @@ class AuraApplication : Application() {
         super.onTrimMemory(level)
         when {
             level >= ComponentCallbacks2.TRIM_MEMORY_COMPLETE -> {
+                ArtworkColorExtractor.clearCache()
                 AuraDebugManager.logWarning(
                     "Memory",
-                    "Memoria del sistema bajo presión crítica (TRIM_MEMORY level: $level)."
+                    "Memoria del sistema bajo presión crítica (TRIM_MEMORY level: $level). Cachés liberadas."
                 )
             }
             level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL -> {
+                ArtworkColorExtractor.clearCache()
                 AuraDebugManager.logWarning(
                     "Memory",
-                    "Memoria del sistema bajo presión alta (TRIM_MEMORY level: $level)."
+                    "Memoria del sistema bajo presión alta (TRIM_MEMORY level: $level). Cachés liberadas."
                 )
             }
             level == ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN -> {
+                ArtworkColorExtractor.releaseRetriever()
                 AuraDebugManager.logInfo(
                     "Memory",
                     "Interfaz oculta en segundo plano (TRIM_MEMORY_UI_HIDDEN level: 20). Transición normal a reposo."

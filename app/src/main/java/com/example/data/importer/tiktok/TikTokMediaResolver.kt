@@ -1,5 +1,6 @@
 package com.example.data.importer.tiktok
 
+import android.net.Uri
 import com.example.data.importer.OnlineVideoAudioImporter
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -11,16 +12,48 @@ import java.net.URLEncoder
  *
  * Responsabilidades:
  * - Resolución de enlaces de videos de TikTok sin marcas de agua mediante endpoints públicos de alta fidelidad (TikWM, Tiklydown).
+ * - Validación estricta de esquema HTTPS y bloqueo de direcciones locales/privadas (prevención de SSRF / Open Redirect).
  * - Extracción y limpieza heurística de títulos, autores y portadas originales.
  * - Desbloqueo de videos de cualquier duración para demuxing y generación de Video Canvas sin recortes.
  */
 object TikTokMediaResolver {
 
     /**
+     * Valida que una URL sea estrictamente HTTPS y no apunte a rangos de red interna o loopback.
+     */
+    private fun sanitizeHttpsUrl(rawUrl: String?): String? {
+        if (rawUrl.isNullOrBlank()) return null
+        val normalized = if (rawUrl.startsWith("//")) "https:$rawUrl" else rawUrl.trim()
+        return try {
+            val uri = Uri.parse(normalized)
+            if (uri.scheme?.lowercase() != "https") return null
+            val host = uri.host?.lowercase() ?: return null
+            if (host == "localhost" ||
+                host.endsWith(".local") ||
+                host.endsWith(".internal") ||
+                host.startsWith("127.") ||
+                host.startsWith("10.") ||
+                host.startsWith("192.168.") ||
+                host.startsWith("169.254.") ||
+                host == "0.0.0.0" ||
+                host.startsWith("[::1]") ||
+                Regex("^172\\.(1[6-9]|2[0-9]|3[0-1])\\..*").matches(host)
+            ) {
+                return null
+            }
+            normalized
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
      * Resuelve videos de TikTok utilizando el endpoint público de alta fidelidad TikWM sin marca de agua.
      */
     fun resolve(tikTokUrl: String, httpClient: OkHttpClient): Result<OnlineVideoAudioImporter.ResolvedMediaInfo> {
-        val encodedUrl = URLEncoder.encode(tikTokUrl, "UTF-8")
+        val safeInputUrl = sanitizeHttpsUrl(tikTokUrl)
+            ?: return Result.failure(IllegalArgumentException("El enlace debe ser una URL HTTPS válida."))
+        val encodedUrl = URLEncoder.encode(safeInputUrl, "UTF-8")
         val apiEndpoints = listOf(
             "https://www.tikwm.com/api/?url=$encodedUrl&hd=1",
             "https://api.tiklydown.eu.org/api/download?url=$encodedUrl"
@@ -49,7 +82,6 @@ object TikTokMediaResolver {
 
                         // Información de audio y artista
                         val musicInfo = data.optJSONObject("music_info")
-                        val musicUrl = musicInfo?.optString("play") ?: data.optString("music")
                         val musicTitle = musicInfo?.optString("title")
                         val musicAuthor = musicInfo?.optString("author")
                         val authorObj = data.optJSONObject("author")
@@ -67,16 +99,16 @@ object TikTokMediaResolver {
                             else -> "TikTok Creator"
                         }
 
-                        if (videoPlayUrl.isNotBlank()) {
-                            val resolvedVideo = if (videoPlayUrl.startsWith("//")) "https:$videoPlayUrl" else videoPlayUrl
+                        val resolvedVideo = sanitizeHttpsUrl(videoPlayUrl)
+                        if (resolvedVideo != null) {
                             return Result.success(
                                 OnlineVideoAudioImporter.ResolvedMediaInfo(
-                                    originalUrl = tikTokUrl,
+                                    originalUrl = safeInputUrl,
                                     suggestedTitle = title,
                                     suggestedArtist = artist,
                                     videoUrl = resolvedVideo,
                                     audioUrl = null,
-                                    coverUrl = if (coverUrl.startsWith("//")) "https:$coverUrl" else coverUrl.ifBlank { null },
+                                    coverUrl = sanitizeHttpsUrl(coverUrl),
                                     durationSeconds = duration
                                 )
                             )

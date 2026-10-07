@@ -5,6 +5,8 @@ import android.content.Intent
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
+import com.example.debug.AuraDebugManager
+import java.io.File
 
 /**
  * Representa el tipo de medio detectado inteligentemente desde un Intent del sistema Android
@@ -54,6 +56,49 @@ enum class DetectedMediaType {
 object IncomingMediaHandler {
 
     /**
+     * Verifica que una URI recibida desde un Intent externo no apunte maliciosamente
+     * al directorio privado interno de Aura Music (prevención de ataques de File Stealing / Symlink).
+     */
+    fun isSafeExternalUri(context: Context, uri: Uri): Boolean {
+        return try {
+            val scheme = uri.scheme?.lowercase() ?: return false
+            if (scheme != "content" && scheme != "file") {
+                return false
+            }
+
+            // Si es content://, rechazar autoridades pertenecientes al propio paquete si alguien intenta forzar acceso interno
+            if (scheme == "content") {
+                val authority = uri.authority?.lowercase() ?: ""
+                val pkg = context.packageName.lowercase()
+                if (authority.startsWith(pkg)) {
+                    AuraDebugManager.logWarning("IncomingMediaHandler", "Rechazada URI content:// que apunta al propio paquete: $uri")
+                    return false
+                }
+            }
+
+            // Si es file:// o contiene ruta en sistema de archivos, resolver ruta canónica y bloquear acceso al sandbox privado
+            val path = uri.path
+            if (!path.isNullOrBlank()) {
+                val canonicalTarget = File(path).canonicalFile.toPath()
+                val privateDataDir = context.applicationInfo.dataDir?.let { File(it).canonicalFile.toPath() }
+                val filesDir = context.filesDir.canonicalFile.toPath()
+                val cacheDir = context.cacheDir.canonicalFile.toPath()
+
+                if ((privateDataDir != null && canonicalTarget.startsWith(privateDataDir)) ||
+                    canonicalTarget.startsWith(filesDir) ||
+                    canonicalTarget.startsWith(cacheDir)
+                ) {
+                    AuraDebugManager.logWarning("IncomingMediaHandler", "Bloqueado intento de File Stealing hacia ruta interna privada: $canonicalTarget")
+                    return false
+                }
+            }
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /**
      * Procesa un [Intent] recibido y retorna el [IncomingMedia] detectado, o `null` si no corresponde.
      */
     fun parseIntent(context: Context, intent: Intent): IncomingMedia? {
@@ -69,7 +114,11 @@ object IncomingMediaHandler {
                     return IncomingMedia.WebLink(dataUri.toString())
                 }
 
-                // 2. Si es un archivo de contenido o fichero local
+                // 2. Validar que la URI de archivo o contenido no apunte al sandbox interno privado
+                if (!isSafeExternalUri(context, dataUri)) {
+                    return null
+                }
+
                 val mediaType = detectMediaType(context, dataUri, intent.type)
                 val fileName = AudioMetadataParser.getFileName(context, dataUri)
 
@@ -84,6 +133,9 @@ object IncomingMediaHandler {
                 // Caso A: Archivo compartido vía EXTRA_STREAM
                 val streamUri = extractStreamUri(intent)
                 if (streamUri != null) {
+                    if (!isSafeExternalUri(context, streamUri)) {
+                        return null
+                    }
                     val mediaType = detectMediaType(context, streamUri, intent.type)
                     val fileName = AudioMetadataParser.getFileName(context, streamUri)
                     return if (mediaType == DetectedMediaType.VIDEO) {
@@ -104,7 +156,7 @@ object IncomingMediaHandler {
             }
 
             Intent.ACTION_SEND_MULTIPLE -> {
-                val uris = extractMultipleStreamUris(intent)
+                val uris = extractMultipleStreamUris(intent).filter { isSafeExternalUri(context, it) }
                 if (uris.isNotEmpty()) {
                     // Filtrar solo audios válidos
                     val audioUris = uris.filter { uri ->
