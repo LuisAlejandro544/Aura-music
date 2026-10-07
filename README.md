@@ -323,7 +323,19 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
 - **Portada Collage Oficial en WebP**:
   - Genera automáticamente una portada oficial en collage de 1 a 4 canciones en formato WebP Lossless en `images/`, integrándose como una pista completa en la biblioteca de Aura Music bajo el álbum *"Aura Mixtapes"*.
 
-### 14. Suite de Diagnóstico Autónoma: Aura Monitor 🛠️ & LeakCanary
+### 14. Modo Bit-Perfect 1:1, Salida AAudio de Ultra-Baja Latencia, Formatos Especiales (DSD/APE/Chiptune) y Widget Interactivo 🔊🎛️
+- **Modo Bit-Perfect Direct Bypass & Motor Nativo AAudio en ISO C++20 (`dsp_bitperfect.h`)**:
+  - **Bypass Puro 1:1**: Permite desactivar con un interruptor toda modificación matemática de fase, ecualización o espacialización para enviar los samples PCM puros de la pista (copia bit a bit 1:1) con medición en tiempo real de rango dinámico (dB) y pico de señal.
+  - **Puente Hardware AAudio (`AAudioStreamBuilder`)**: Sonda y abre flujos nativos de baja latencia (`AAUDIO_PERFORMANCE_MODE_LOW_LATENCY`) con soporte de direccionamiento exclusivo hacia DACs USB externos y auriculares Hi-Res, reportando la tasa de muestreo nativa del hardware y la latencia exacta en milisegundos.
+  - **Presets Hi-Res Configurables**: Selector en *Ajustes > Auriculares & Acústica DSP* entre *Nativo 1:1 (Sin Resampling)*, *Hi-Res 96 kHz / 24-bit* y *Ultra Hi-Res 192 kHz / 32-bit Float*, junto con telemetría detallada en la ficha técnica de cada canción (`AudioSpecsDialog`).
+- **Decodificación Nativa de Formatos Especiales (`SpecialAudioFormatDecoder`)**:
+  - Soporte directo al importar o abrir archivos audiófilos y retro: **DSD Super Audio CD** (`.dsf`, `.dff`), **Monkey's Audio** (`.ape`), **WavPack** (`.wv`), **Apple Lossless / AIFF** (`.alac`, `.aiff`), **Musepack** (`.mpc`) y módulos **Chiptune / Tracker** (`.mod`, `.xm`, `.it`, `.s3m`).
+  - Conversión sin pérdida automatizada mediante `FFmpegNativeEngine` hacia contenedor maestro local en `songs/`, con insignias dedicadas (`DSD`, `APE`, `MOD/XM`, `ALAC`, `WAV`) en la biblioteca y el reproductor.
+- **Widget Interactivo de Pantalla de Inicio y Soporte Android Auto (`AuraMusicWidgetProvider`)**:
+  - Widget redimensionable para el escritorio de Android con estética Dark Luxury Neo-Glass, carátula redondeada o arte procedural en vivo, insignia dinámica del motor (`BIT-PERFECT AAUDIO` / `C++20 DSP`) y controles directos (*Anterior*, *Play/Pausa*, *Siguiente*) que funcionan incluso con la aplicación cerrada.
+  - Integración declarada con **Android Auto** (`automotive_app_desc.xml`) para control desde la pantalla del vehículo.
+
+### 15. Suite de Diagnóstico Autónoma: Aura Monitor 🛠️ & LeakCanary
 - **Aura Monitor (App Debug Propia con Navegación Modular por Pestañas)**:
   - Cuenta con su propio icono independiente en el cajón de aplicaciones del teléfono móvil (tarea aislada con `taskAffinity` y `singleTask`) y también es accesible desde **Ajustes > Arquitectura y Privacidad > Abrir Aura Monitor**.
   - 📋 **Pestaña 1: Incidentes & Logs**:

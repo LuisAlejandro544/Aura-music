@@ -3,4 +3,12 @@
     <string name="debug_monitor_app_name">Aura Monitor</string>
     <string name="notification_channel_name">Reproducción Multimedia</string>
     <string name="notification_channel_desc">Controles del reproductor de música en barra de notificaciones y pantalla de bloqueo</string>
+    <string name="widget_description">Controles de reproducción directa Aura Music con Material You, carátula y estado Bit-Perfect C++20</string>
+    <string name="widget_album_art_desc">Carátula de la canción en reproducción</string>
+    <string name="widget_default_badge">AURA DSP C++20</string>
+    <string name="widget_default_title">Aura Music</string>
+    <string name="widget_default_artist">Toca para reproducir tu biblioteca</string>
+    <string name="widget_prev_desc">Canción anterior</string>
+    <string name="widget_play_pause_desc">Reproducir o pausar</string>
+    <string name="widget_next_desc">Siguiente canción</string>
 </resources>

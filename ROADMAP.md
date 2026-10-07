@@ -292,12 +292,17 @@ Este documento traza las fases de evolución técnica y funcional para convertir
 
 ---
 
-## 🔊 Fase 7: Modo Bit-Perfect y Salida de Ultra-Baja Latencia (Siguiente Paso 🔄)
+## 🔊 Fase 7: Modo Bit-Perfect, AAudio Ultra-Baja Latencia, Decodificación DSD/APE/Chiptune, Widgets y Android Auto (Completada ✅)
 
-- [ ] **Integración con Google Oboe / AAudio**:
-  - Modo exclusivo para saltarse el mezclador del sistema Android (*AudioFlinger*).
-  - Reproducción directa hacia DACs USB externos en 24-bit/32-bit a 96 kHz o 192 kHz.
-- [ ] **Decodificación Nativa de Formatos Especiales**:
-  - Soporte de archivos DSD (.dsf / .dff), Monkey's Audio (.ape) y módulos chiptune (.mod, .xm).
-- [ ] **Widgets de Pantalla de Inicio**:
-  - Widgets interactivos con Material You y controles de reproducción directa.
+- [x] **Integración con Google Oboe / AAudio y Modo Bit-Perfect Direct Bypass (`dsp_bitperfect.h`)**:
+  - Motor nativo en ISO C++20 con puente directo a la API `AAudio` del NDK (`AAudioStreamBuilder`) en modo de rendimiento `AAUDIO_PERFORMANCE_MODE_LOW_LATENCY` y uso compartido exclusivo/adaptativo para DACs USB y auriculares Hi-Res.
+  - **Modo Bit-Perfect Direct Bypass (`BitPerfectController`)**: Omite toda alteración matemática de fase o ganancia (EQ de 10 bandas, Bass Boost, Reverb, 8D/16D y Crossfeed) entregando una copia 1:1 bit a bit del flujo PCM original con telemetría en vivo (rango dinámico en dB, picos de señal y latencia en milisegundos).
+  - Presets de resolución Hi-Res seleccionables en *Ajustes > Auriculares & Acústica DSP*: *Nativo 1:1 (Sin Resampling)*, *Hi-Res 96 kHz / 24-bit* y *Ultra Hi-Res 192 kHz / 32-bit Float*, además de modo exclusivo para DAC USB externo.
+  - Ficha técnica de pista (`AudioSpecsDialog`) enriquecida con diagnóstico de hardware AAudio, estado Bit-Perfect, tasa de muestreo nativa y latencia real en ms.
+- [x] **Decodificación Nativa de Formatos Especiales (`SpecialAudioFormatDecoder.kt`)**:
+  - Soporte integral en `SafTrackImporter`, `IncomingMediaHandler`, `AudioMetadataParser` y `Track.formatBadge()` para archivos audiófilos y retro: **DSD** (`.dsf`, `.dff`), **Monkey's Audio** (`.ape`), **WavPack** (`.wv`), **ALAC / AIFF** (`.alac`, `.aiff`), **Musepack** (`.mpc`) y módulos **Chiptune / Tracker** (`.mod`, `.xm`, `.it`, `.s3m`).
+  - Decodificación nativa automática en segundo plano mediante `FFmpegNativeEngine` (DoP / DSD64/128, `libmodplug`/tracker y APE) hacia contenedor maestro sin pérdida (`.wav` / `.m4a` Hi-Res) en `songs/` cuando el extractor base del sistema requiere transcodificación transparente.
+- [x] **Widgets Interactivos de Pantalla de Inicio y Soporte Android Auto (`AuraMusicWidgetProvider`)**:
+  - Widget redimensionable para la pantalla de inicio y pantalla de bloqueo con estética Dark Luxury Neo-Glass y Material You (`widget_aura_player.xml`).
+  - Muestra la carátula redondeada en alta resolución (o arte procedural matemático si la pista no tiene portada), título, artista, insignia dinámica en tiempo real (`BIT-PERFECT AAUDIO`, `DSD`, `FLAC`, `C++20 DSP`) y controles directos de reproducción (*Anterior*, *Play/Pausa*, *Siguiente*) sincronizados reactivamente con `AuraAudioPlayer`.
+  - Descriptor oficial `automotive_app_desc.xml` registrado en `AndroidManifest.xml` habilitando integración multimedia con consolas de vehículos compatibles con **Android Auto**.

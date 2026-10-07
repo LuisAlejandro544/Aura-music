@@ -204,7 +204,10 @@ object IncomingMediaHandler {
             ?: ""
 
         val videoExtensions = listOf(".mp4", ".mkv", ".webm", ".avi", ".mov", ".3gp", ".m4v", ".flv", ".ts", ".wmv")
-        val audioExtensions = listOf(".mp3", ".m4a", ".flac", ".wav", ".ogg", ".opus", ".aac", ".wma", ".mid", ".midi", ".amr")
+        val audioExtensions = listOf(
+            ".mp3", ".m4a", ".flac", ".wav", ".ogg", ".opus", ".aac", ".wma", ".mid", ".midi", ".amr",
+            ".dsf", ".dff", ".ape", ".wv", ".alac", ".aiff", ".aif", ".mpc", ".mod", ".xm", ".it", ".s3m"
+        )
 
         if (videoExtensions.any { fileName.endsWith(it) }) {
             // Nota: Algunos archivos .m4a o .mp4 solo contienen pistas de audio (sin video)

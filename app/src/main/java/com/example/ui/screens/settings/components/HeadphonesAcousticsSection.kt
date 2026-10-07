@@ -37,8 +37,21 @@ fun LazyListScope.headphonesAcousticsSection(
     onSetCrossfeedEnabled: (Boolean) -> Unit,
     onSetCrossfeedStrength: (Int) -> Unit,
     onSetBalanceControlEnabled: (Boolean) -> Unit,
-    onSetStereoBalance: (Float) -> Unit
+    onSetStereoBalance: (Float) -> Unit,
+    onSetBitPerfectEnabled: (Boolean) -> Unit = {},
+    onSetLowLatencyEnabled: (Boolean) -> Unit = {},
+    onSetUsbDacExclusiveEnabled: (Boolean) -> Unit = {},
+    onSetHiResTargetMode: (Int) -> Unit = {}
 ) {
+    // Sección Fase 7: Modo Bit-Perfect, AAudio Ultra-Baja Latencia y Prioridad DAC USB
+    bitPerfectSettingsSection(
+        headphoneConfig = headphoneConfig,
+        onSetBitPerfectEnabled = onSetBitPerfectEnabled,
+        onSetLowLatencyEnabled = onSetLowLatencyEnabled,
+        onSetUsbDacExclusiveEnabled = onSetUsbDacExclusiveEnabled,
+        onSetHiResTargetMode = onSetHiResTargetMode
+    )
+
     // Tarjeta Filtro Crossfeed C++20
     item {
         Card(

@@ -136,6 +136,11 @@ class AuraAudioPlayer(
         player.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 _isPlaying.value = isPlaying
+                com.example.widget.AuraMusicWidgetProvider.pushPlaybackState(
+                    context = context,
+                    track = _currentTrack.value,
+                    isPlaying = isPlaying
+                )
                 if (isPlaying) {
                     startProgressTracking()
                 } else {
@@ -190,6 +195,20 @@ class AuraAudioPlayer(
             onPlayNext = { playNext() },
             onPlayPrevious = { playPrevious() }
         )
+
+        // Vincular callbacks directos para el Widget de Pantalla de Inicio
+        com.example.widget.AuraMusicWidgetProvider.onTogglePlayPauseCallback = {
+            togglePlayPause()
+            true
+        }
+        com.example.widget.AuraMusicWidgetProvider.onPlayNextCallback = {
+            playNext()
+            true
+        }
+        com.example.widget.AuraMusicWidgetProvider.onPlayPreviousCallback = {
+            playPrevious()
+            true
+        }
     }
 
     private fun ensurePlaybackServiceStarted() {
@@ -207,6 +226,11 @@ class AuraAudioPlayer(
         _duration.value = track.durationMs
         abLoopController.reset()
         effectManager.flushBuffers()
+        com.example.widget.AuraMusicWidgetProvider.pushPlaybackState(
+            context = context,
+            track = track,
+            isPlaying = true
+        )
 
         val player = exoPlayer ?: return
         try {

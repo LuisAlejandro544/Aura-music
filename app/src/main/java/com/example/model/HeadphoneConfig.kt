@@ -26,12 +26,24 @@ enum class CrossfeedStrengthPreset(val mode: Int, val title: String, val subtitl
     INTENSE(2, "Intenso (Monitores de Estudio)", "Mayor alimentación cruzada (340 µs) para eliminar fatiga auditiva extrema")
 }
 
+enum class HiResTargetPreset(val mode: Int, val title: String, val subtitle: String) {
+    NATIVE_1_1(0, "Nativo 1:1 (Sin Resampling)", "Conserva exactamente la tasa de muestreo original de cada archivo"),
+    HIRES_96K(1, "Hi-Res 96 kHz / 24-bit", "Optimiza la tubería acústica hacia resolución de estudio de 96 kHz"),
+    ULTRA_192K(2, "Ultra Hi-Res 192 kHz / 32-bit", "Máxima resolución para DACs USB-C externos de alta gama")
+}
+
 data class HeadphoneConfig(
     // Acústica DSP C++20
     val isCrossfeedEnabled: Boolean = false,
     val crossfeedStrength: Int = 1, // 0 = Sutil, 1 = Moderado, 2 = Intenso
     val isBalanceControlEnabled: Boolean = false,
     val stereoBalance: Float = 0.0f, // -1.0f (100% L) .. 0.0f (Centro) .. +1.0f (100% R)
+
+    // Fase 7: Modo Bit-Perfect, AAudio Ultra-Baja Latencia y DAC USB Exclusivo
+    val isBitPerfectEnabled: Boolean = false,
+    val isLowLatencyAAudioEnabled: Boolean = true,
+    val isUsbDacExclusiveEnabled: Boolean = true,
+    val hiResTargetMode: Int = 0, // 0 = Nativo 1:1, 1 = 96 kHz/24-bit, 2 = 192 kHz/32-bit
 
     // Automatizaciones y Seguridad
     val isBecomingNoisyGuardEnabled: Boolean = true,

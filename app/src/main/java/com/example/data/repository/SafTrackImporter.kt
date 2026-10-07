@@ -152,7 +152,11 @@ class SafTrackImporter(private val trackDao: TrackDao) {
         if (type != null && type.startsWith("audio/")) return true
         val name = file.name?.lowercase() ?: ""
         return name.endsWith(".mp3") || name.endsWith(".wav") || name.endsWith(".flac") ||
-                name.endsWith(".ogg") || name.endsWith(".m4a") || name.endsWith(".aac")
+                name.endsWith(".ogg") || name.endsWith(".m4a") || name.endsWith(".aac") ||
+                name.endsWith(".opus") || name.endsWith(".dsf") || name.endsWith(".dff") ||
+                name.endsWith(".ape") || name.endsWith(".wv") || name.endsWith(".alac") ||
+                name.endsWith(".aiff") || name.endsWith(".aif") || name.endsWith(".mod") ||
+                name.endsWith(".xm") || name.endsWith(".it") || name.endsWith(".s3m")
     }
 
     /**
@@ -260,7 +264,7 @@ class SafTrackImporter(private val trackDao: TrackDao) {
                         mime?.contains("webm") == true -> "webm"
                         else -> null
                     }
-                    val allowedExtensions = setOf("mp3", "m4a", "flac", "wav", "ogg", "opus", "aac", "webm")
+                    val allowedExtensions = com.example.data.importer.SpecialAudioFormatDecoder.ALL_SUPPORTED_AUDIO_EXTENSIONS
                     val safeExt = when {
                         rawExt != null && rawExt in allowedExtensions -> rawExt
                         mimeMappedExt != null -> mimeMappedExt

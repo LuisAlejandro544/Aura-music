@@ -164,5 +164,10 @@ Este archivo define el contexto de diseño, directrices técnicas y restriccione
     - **Karaoke con Letras LRC Continuas Concatenadas**: Concatenación automática de las letras sincronizadas (.lrc) sumando el offset temporal acumulado de cada capítulo, permitiendo auto-scroll continuo y karaoke fluido a lo largo de todo el mix continuo.
     - **Portada Oficial en Collage WebP**: Generación automática de portada en collage de 1 a 4 fotos comprimida en WebP Lossless en `images/`, registrándose como pista completa en Room bajo el álbum *"Aura Mixtapes"*.
 
-21. **Idioma de Comunicación**:
+21. **Modo Bit-Perfect, AAudio Ultra-Baja Latencia, Formatos Especiales (DSD/APE/Chiptune), Widgets y Android Auto**:
+    - `dsp_bitperfect.h`: Submódulo C++20 que integra la API nativa `AAudio` del NDK (`libaaudio.so`) para sondeo y apertura de streams de ultra-baja latencia (`AAUDIO_PERFORMANCE_MODE_LOW_LATENCY`), modo exclusivo para DAC USB y bypass Bit-Perfect 1:1 (omitiendo procesamiento DSP cuando está activo para pureza absoluta de señal).
+    - `SpecialAudioFormatDecoder.kt`: Decodificación y transcodificación sin pérdida mediante `FFmpegNativeEngine` para formatos especiales (`.dsf`, `.dff`, `.ape`, `.wv`, `.alac`, `.aiff`, `.mpc`, `.mod`, `.xm`, `.it`, `.s3m`), integrado en `AudioMetadataParser`, `SafTrackImporter` e `IncomingMediaHandler`.
+    - `AuraMusicWidgetProvider.kt`: Widget interactivo de pantalla de inicio y bloqueo (`widget_aura_player.xml`) sincronizado en tiempo real con `AuraAudioPlayer`, mostrando carátula WebP o arte procedural, insignia activa de formato/Bit-Perfect y controles directos de reproducción. Incluye soporte de Android Auto (`automotive_app_desc.xml`).
+
+22. **Idioma de Comunicación**:
    - La documentación, comentarios en código, cadenas de usuario (`strings.xml`) y mensajes de commit deben redactarse en **español**.

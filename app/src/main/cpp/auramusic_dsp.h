@@ -15,6 +15,7 @@
 #include "dsp_spatial.h"
 #include "dsp_crossfeed.h"
 #include "dsp_reverb.h"
+#include "dsp_bitperfect.h"
 
 /**
  * Aura Music - Motor Nativo de Procesamiento Digital de Señales (DSP)
@@ -47,6 +48,7 @@ public:
 
         mSampleRate = newSampleRate;
         mChannels = newChannels;
+        mBitPerfectController.updateActiveStreamFormat(mSampleRate, mChannels, 16);
 
         for (int i = 0; i < 10; ++i) {
             mFiltersL[i].configurePeaking(mSampleRate, EQ_FREQUENCIES_HZ[i], mBandGainsDb[i]);
@@ -113,6 +115,67 @@ public:
 
     [[nodiscard]] bool isDjAutomixEnabled() const {
         return mDjAutomixFilter.isEnabled();
+    }
+
+    // --- Configuración de Modo Bit-Perfect y Salida AAudio Ultra-Baja Latencia ---
+    void setBitPerfectMode(bool enabled) {
+        mBitPerfectController.setBitPerfectEnabled(enabled);
+    }
+
+    [[nodiscard]] bool isBitPerfectMode() const {
+        return mBitPerfectController.isBitPerfectEnabled();
+    }
+
+    void setLowLatencyMode(bool enabled) {
+        mBitPerfectController.setLowLatencyEnabled(enabled);
+    }
+
+    [[nodiscard]] bool isLowLatencyMode() const {
+        return mBitPerfectController.isLowLatencyEnabled();
+    }
+
+    void setUsbDacExclusiveMode(bool enabled) {
+        mBitPerfectController.setUsbDacExclusiveMode(enabled);
+    }
+
+    [[nodiscard]] bool isUsbDacExclusiveMode() const {
+        return mBitPerfectController.isUsbDacExclusiveMode();
+    }
+
+    void setHiResTargetMode(int mode) {
+        mBitPerfectController.setHiResTargetMode(mode);
+    }
+
+    [[nodiscard]] int getHiResTargetMode() const {
+        return mBitPerfectController.getHiResTargetMode();
+    }
+
+    [[nodiscard]] float getEstimatedLatencyMs() const {
+        return mBitPerfectController.getEstimatedLatencyMs();
+    }
+
+    [[nodiscard]] int getActiveSampleRate() const {
+        return mBitPerfectController.getActiveSampleRate();
+    }
+
+    [[nodiscard]] int getActiveBitDepth() const {
+        return mBitPerfectController.getActiveBitDepth();
+    }
+
+    [[nodiscard]] int getFramesPerBurst() const {
+        return mBitPerfectController.getFramesPerBurst();
+    }
+
+    [[nodiscard]] int getHardwareSampleRate() const {
+        return mBitPerfectController.getHardwareSampleRate();
+    }
+
+    [[nodiscard]] std::string getBitPerfectStatusSummary() const {
+        return mBitPerfectController.getStatusSummary();
+    }
+
+    void refreshHardwareCapabilities() {
+        mBitPerfectController.probeHardwareCapabilities();
     }
 
     void setReverbParameters(bool enabled, float roomSize, int decayMs, float levelDb) {
@@ -261,6 +324,12 @@ public:
             size_t bandIdx = std::min(NUM_BANDS - 1, frameIdx / samplesPerBand);
             bandEnergy[bandIdx] += std::abs(monoSample);
 
+            // Si el Modo Bit-Perfect Direct 1:1 está activo, omitimos toda alteración de bits en el flujo PCM
+            // pero mantenemos la telemetría espectral pasiva para el visualizador y luces ambientales.
+            if (mBitPerfectController.isBitPerfectEnabled()) {
+                continue;
+            }
+
             // Modificaciones DSP si están activas
             if (mEnabled) {
                 if (mBassBoostStrength > 0.001) {
@@ -368,6 +437,7 @@ private:
     ReverbProcessor mReverbProcessor{};
     VolumeNormalizerProcessor mVolumeNormalizer{};
     DjAutomixFilter mDjAutomixFilter{};
+    BitPerfectController mBitPerfectController{};
 
     bool mBalanceEnabled{false};
     double mStereoBalance{0.0};
@@ -460,6 +530,39 @@ Java_com_example_playback_NativeAudioEngine_nativeSetVolumeNormalization(JNIEnv*
 
 JNIEXPORT void JNICALL
 Java_com_example_playback_NativeAudioEngine_nativeSetDjAutomixTransition(JNIEnv* env, jobject thiz, jboolean enabled, jfloat progress);
+
+JNIEXPORT void JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeSetBitPerfectMode(JNIEnv* env, jobject thiz, jboolean enabled);
+
+JNIEXPORT jboolean JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeIsBitPerfectMode(JNIEnv* env, jobject thiz);
+
+JNIEXPORT void JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeSetLowLatencyMode(JNIEnv* env, jobject thiz, jboolean enabled);
+
+JNIEXPORT void JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeSetUsbDacExclusiveMode(JNIEnv* env, jobject thiz, jboolean enabled);
+
+JNIEXPORT void JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeSetHiResTargetMode(JNIEnv* env, jobject thiz, jint mode);
+
+JNIEXPORT jfloat JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeGetEstimatedLatencyMs(JNIEnv* env, jobject thiz);
+
+JNIEXPORT jint JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeGetActiveSampleRate(JNIEnv* env, jobject thiz);
+
+JNIEXPORT jint JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeGetActiveBitDepth(JNIEnv* env, jobject thiz);
+
+JNIEXPORT jint JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeGetFramesPerBurst(JNIEnv* env, jobject thiz);
+
+JNIEXPORT jint JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeGetHardwareSampleRate(JNIEnv* env, jobject thiz);
+
+JNIEXPORT jstring JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeGetBitPerfectStatusSummary(JNIEnv* env, jobject thiz);
 
 #ifdef __cplusplus
 }

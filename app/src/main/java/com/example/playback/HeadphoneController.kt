@@ -186,6 +186,28 @@ class HeadphoneController(
         // Sincronizar Balance Estéreo C++20
         NativeAudioEngine.setBalanceEnabled(newConfig.isBalanceControlEnabled)
         NativeAudioEngine.setStereoBalance(newConfig.stereoBalance)
+
+        // Sincronizar Modo Bit-Perfect, AAudio Ultra-Baja Latencia y DAC USB
+        NativeAudioEngine.setBitPerfectMode(newConfig.isBitPerfectEnabled)
+        NativeAudioEngine.setLowLatencyMode(newConfig.isLowLatencyAAudioEnabled)
+        NativeAudioEngine.setUsbDacExclusiveMode(newConfig.isUsbDacExclusiveEnabled)
+        NativeAudioEngine.setHiResTargetMode(newConfig.hiResTargetMode)
+    }
+
+    fun setBitPerfectEnabled(enabled: Boolean) {
+        updateConfig(_config.value.copy(isBitPerfectEnabled = enabled))
+    }
+
+    fun setLowLatencyAAudioEnabled(enabled: Boolean) {
+        updateConfig(_config.value.copy(isLowLatencyAAudioEnabled = enabled))
+    }
+
+    fun setUsbDacExclusiveEnabled(enabled: Boolean) {
+        updateConfig(_config.value.copy(isUsbDacExclusiveEnabled = enabled))
+    }
+
+    fun setHiResTargetMode(mode: Int) {
+        updateConfig(_config.value.copy(hiResTargetMode = mode.coerceIn(0, 2)))
     }
 
     fun setCrossfeedEnabled(enabled: Boolean) {

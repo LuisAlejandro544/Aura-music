@@ -43,6 +43,22 @@ class HeadphoneSettingsCoordinator(
         headphoneController.setStereoBalance(balance)
     }
 
+    fun setBitPerfectEnabled(enabled: Boolean) {
+        headphoneController.setBitPerfectEnabled(enabled)
+    }
+
+    fun setLowLatencyAAudioEnabled(enabled: Boolean) {
+        headphoneController.setLowLatencyAAudioEnabled(enabled)
+    }
+
+    fun setUsbDacExclusiveEnabled(enabled: Boolean) {
+        headphoneController.setUsbDacExclusiveEnabled(enabled)
+    }
+
+    fun setHiResTargetMode(mode: Int) {
+        headphoneController.setHiResTargetMode(mode)
+    }
+
     fun setBecomingNoisyGuardEnabled(enabled: Boolean) {
         headphoneController.setBecomingNoisyGuardEnabled(enabled)
     }

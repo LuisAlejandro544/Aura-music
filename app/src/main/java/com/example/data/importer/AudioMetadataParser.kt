@@ -19,12 +19,47 @@ object AudioMetadataParser {
 
     suspend fun parseUri(context: Context, uri: Uri, folderName: String = ""): Track? =
         withContext(Dispatchers.IO) {
+            val rawFileName = getFileName(context, uri) ?: "Audio_${System.currentTimeMillis()}"
+            val fileExt = getFileExtension(context, uri)?.lowercase() ?: ""
+
+            // Si es un formato especial (DSD .dsf/.dff, Monkey's Audio .ape, WavPack .wv, Chiptune .mod/.xm)
+            // que requiere decodificación asistida por FFmpeg antes de pasarlo a MediaMetadataRetriever:
+            var effectiveUri = uri
+            var forcedSpecialMime: String? = null
+            if (SpecialAudioFormatDecoder.isSpecialFormat(rawFileName)) {
+                val decoded = SpecialAudioFormatDecoder.decodeSpecialUriIfNeeded(context, uri, fileExt)
+                if (decoded != null) {
+                    effectiveUri = Uri.fromFile(decoded.first)
+                    forcedSpecialMime = decoded.second
+                }
+            }
+
             val retriever = MediaMetadataRetriever()
             try {
-                retriever.setDataSource(context, uri)
+                try {
+                    retriever.setDataSource(context, effectiveUri)
+                } catch (_: Exception) {
+                    // En caso de un módulo tracker o DSD crudo sin transcodificar aún
+                    val fallbackSize = getFileSizeFormatted(context, effectiveUri).ifBlank { getFileSizeFormatted(context, uri) }
+                    return@withContext Track(
+                        id = 0,
+                        title = rawFileName.substringBeforeLast("."),
+                        artist = "Formato Especial Hi-Res",
+                        album = fileExt.uppercase().ifBlank { "Hi-Res Audio" },
+                        durationMs = 180_000L,
+                        uriString = effectiveUri.toString(),
+                        albumArtPath = null,
+                        mimeType = forcedSpecialMime ?: SpecialAudioFormatDecoder.resolveSpecialMimeType(fileExt),
+                        dateAdded = System.currentTimeMillis(),
+                        isFavorite = false,
+                        playCount = 0,
+                        folderName = folderName,
+                        fileSizeFormatted = fallbackSize
+                    )
+                }
 
                 // Extraer nombre de archivo por si el título está vacío
-                val fileName = getFileName(context, uri) ?: "Audio_${System.currentTimeMillis()}"
+                val fileName = rawFileName
 
                 val title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
                     ?.takeIf { it.isNotBlank() }
@@ -41,7 +76,8 @@ object AudioMetadataParser {
                 val durationStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
                 val durationMs = durationStr?.toLongOrNull() ?: 0L
 
-                val mimeType = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_MIMETYPE)
+                val mimeType = forcedSpecialMime
+                    ?: retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_MIMETYPE)
                     ?: context.contentResolver.getType(uri)
                     ?: "audio/mpeg"
 
@@ -49,11 +85,13 @@ object AudioMetadataParser {
                 val storageManager = com.example.data.storage.AppStorageManager(context)
                 val embeddedArt = retriever.embeddedPicture
                 val albumArtPath = if (embeddedArt != null && embeddedArt.isNotEmpty()) {
-                    val webpFile = storageManager.saveCoverBytesAsWebp("${uri.toString().hashCode()}", embeddedArt)
+                    val webpFile = storageManager.saveCoverBytesAsWebp("${effectiveUri.toString().hashCode()}", embeddedArt)
                     webpFile?.absolutePath
                 } else null
 
-                val fileSizeFormatted = getFileSizeFormatted(context, uri)
+                val fileSizeFormatted = getFileSizeFormatted(context, effectiveUri).ifBlank {
+                    getFileSizeFormatted(context, uri)
+                }
 
                 Track(
                     id = 0,
@@ -61,7 +99,7 @@ object AudioMetadataParser {
                     artist = artist,
                     album = album,
                     durationMs = durationMs,
-                    uriString = uri.toString(),
+                    uriString = effectiveUri.toString(),
                     albumArtPath = albumArtPath,
                     mimeType = mimeType,
                     dateAdded = System.currentTimeMillis(),

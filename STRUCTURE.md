@@ -44,6 +44,7 @@ app/
 │   │   │   ├── dsp_spatial.h                   # Paneo 8D y Audio Espacial 16D Multi-Órbita
 │   │   │   ├── dsp_crossfeed.h                 # Filtro Crossfeed acústico binaural Chu Moy
 │   │   │   ├── dsp_reverb.h                    # Reverb digital Schroeder con líneas de retardo
+│   │   │   ├── dsp_bitperfect.h                # Motor Bit-Perfect 1:1 y salida AAudio Ultra-Baja Latencia
 │   │   │   ├── native_ffmpeg_launcher.c        # Invocación directa POSIX a FFmpeg
 │   │   │   ├── native_quickjs_cli.c            # Intérprete QuickJS C99
 │   │   │   └── native_python_launcher.c        # Embebedor CPython 3.11
@@ -89,8 +90,12 @@ app/
 │   │       │       ├── SampleMusicGenerator.kt # Generador procedural de pistas demo
 │   │       │       ├── download/
 │   │       │       │   └── ChunkedStreamDownloader.kt # Descarga acelerada HTTP Range multi-bloque
-│   │       │       └── tiktok/
-│   │       │           └── TikTokMediaResolver.kt # Extracción libre de audio/video TikTok
+│   │       │       ├── tiktok/
+│   │       │       │   └── TikTokMediaResolver.kt # Extracción libre de audio/video TikTok
+│   │       │       └── SpecialAudioFormatDecoder.kt # Decodificador nativo DSD, APE, WavPack y Chiptune
+│   │       │
+│   │       ├── widget/                         # Widgets Interactivos de Escritorio
+│   │       │   └── AuraMusicWidgetProvider.kt  # AppWidgetProvider con Material You, carátula y Bit-Perfect
 │   │       │
 │   │       ├── playback/                       # Capa de Audio y Reproducción ExoPlayer
 │   │       │   ├── AuraAudioPlayer.kt          # Fachada del reproductor de audio

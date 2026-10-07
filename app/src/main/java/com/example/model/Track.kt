@@ -39,15 +39,24 @@ data class Track(
     }
 
     /**
-     * Retorna una etiqueta de audio moderna (ej. FLAC, MP3, WAV, HI-RES)
+     * Retorna una etiqueta de audio moderna (ej. DSD, APE, FLAC, WAV, ALAC, MOD/XM, HI-RES)
      */
     fun formatBadge(): String {
+        val lowerUri = uriString.lowercase()
+        val lowerMime = mimeType.lowercase()
         return when {
-            mimeType.contains("flac", ignoreCase = true) || uriString.endsWith(".flac", ignoreCase = true) -> "FLAC"
-            mimeType.contains("wav", ignoreCase = true) || uriString.endsWith(".wav", ignoreCase = true) -> "WAV"
-            mimeType.contains("ogg", ignoreCase = true) || uriString.endsWith(".ogg", ignoreCase = true) -> "OGG"
-            mimeType.contains("aac", ignoreCase = true) || uriString.endsWith(".aac", ignoreCase = true) -> "AAC"
-            mimeType.contains("m4a", ignoreCase = true) || uriString.endsWith(".m4a", ignoreCase = true) -> "M4A"
+            lowerMime.contains("dsd") || lowerUri.endsWith(".dsf") || lowerUri.endsWith(".dff") -> "DSD HI-RES"
+            lowerMime.contains("ape") || lowerMime.contains("monkeys-audio") || lowerUri.endsWith(".ape") -> "APE LOSSLESS"
+            lowerMime.contains("alac") || lowerUri.endsWith(".alac") -> "ALAC"
+            lowerMime.contains("aiff") || lowerUri.endsWith(".aiff") || lowerUri.endsWith(".aif") -> "AIFF"
+            lowerMime.contains("wavpack") || lowerUri.endsWith(".wv") -> "WV LOSSLESS"
+            lowerUri.endsWith(".mod") || lowerUri.endsWith(".xm") || lowerUri.endsWith(".it") || lowerUri.endsWith(".s3m") -> "CHIPTUNE"
+            lowerMime.contains("flac") || lowerUri.endsWith(".flac") -> "FLAC"
+            lowerMime.contains("wav") || lowerUri.endsWith(".wav") -> "WAV"
+            lowerMime.contains("opus") || lowerUri.endsWith(".opus") -> "OPUS"
+            lowerMime.contains("ogg") || lowerUri.endsWith(".ogg") -> "OGG"
+            lowerMime.contains("aac") || lowerUri.endsWith(".aac") -> "AAC"
+            lowerMime.contains("m4a") || lowerUri.endsWith(".m4a") -> "M4A"
             else -> "MP3"
         }
     }

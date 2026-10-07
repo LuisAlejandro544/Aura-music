@@ -194,6 +194,74 @@ Java_com_example_playback_NativeAudioEngine_nativeSetDjAutomixTransition(JNIEnv*
     sDspEngine.setDjAutomixTransition(enabled == JNI_TRUE, static_cast<float>(progress));
 }
 
+JNIEXPORT void JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeSetBitPerfectMode(JNIEnv* /* env */, jobject /* thiz */, jboolean enabled) {
+    LOGI("Aura Music Modo Bit-Perfect Direct 1:1: %s", enabled ? "ACTIVADO" : "DESACTIVADO");
+    std::lock_guard<std::mutex> lock(sDspMutex);
+    sDspEngine.setBitPerfectMode(enabled == JNI_TRUE);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeIsBitPerfectMode(JNIEnv* /* env */, jobject /* thiz */) {
+    std::lock_guard<std::mutex> lock(sDspMutex);
+    return sDspEngine.isBitPerfectMode() ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT void JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeSetLowLatencyMode(JNIEnv* /* env */, jobject /* thiz */, jboolean enabled) {
+    LOGI("Aura Music Salida AAudio Ultra-Baja Latencia: %s", enabled ? "ACTIVADA" : "DESACTIVADA");
+    std::lock_guard<std::mutex> lock(sDspMutex);
+    sDspEngine.setLowLatencyMode(enabled == JNI_TRUE);
+}
+
+JNIEXPORT void JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeSetUsbDacExclusiveMode(JNIEnv* /* env */, jobject /* thiz */, jboolean enabled) {
+    std::lock_guard<std::mutex> lock(sDspMutex);
+    sDspEngine.setUsbDacExclusiveMode(enabled == JNI_TRUE);
+}
+
+JNIEXPORT void JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeSetHiResTargetMode(JNIEnv* /* env */, jobject /* thiz */, jint mode) {
+    std::lock_guard<std::mutex> lock(sDspMutex);
+    sDspEngine.setHiResTargetMode(static_cast<int>(mode));
+}
+
+JNIEXPORT jfloat JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeGetEstimatedLatencyMs(JNIEnv* /* env */, jobject /* thiz */) {
+    std::lock_guard<std::mutex> lock(sDspMutex);
+    return sDspEngine.getEstimatedLatencyMs();
+}
+
+JNIEXPORT jint JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeGetActiveSampleRate(JNIEnv* /* env */, jobject /* thiz */) {
+    std::lock_guard<std::mutex> lock(sDspMutex);
+    return sDspEngine.getActiveSampleRate();
+}
+
+JNIEXPORT jint JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeGetActiveBitDepth(JNIEnv* /* env */, jobject /* thiz */) {
+    std::lock_guard<std::mutex> lock(sDspMutex);
+    return sDspEngine.getActiveBitDepth();
+}
+
+JNIEXPORT jint JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeGetFramesPerBurst(JNIEnv* /* env */, jobject /* thiz */) {
+    std::lock_guard<std::mutex> lock(sDspMutex);
+    return sDspEngine.getFramesPerBurst();
+}
+
+JNIEXPORT jint JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeGetHardwareSampleRate(JNIEnv* /* env */, jobject /* thiz */) {
+    std::lock_guard<std::mutex> lock(sDspMutex);
+    return sDspEngine.getHardwareSampleRate();
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeGetBitPerfectStatusSummary(JNIEnv* env, jobject /* thiz */) {
+    std::lock_guard<std::mutex> lock(sDspMutex);
+    return env->NewStringUTF(sDspEngine.getBitPerfectStatusSummary().c_str());
+}
+
 }
 
 

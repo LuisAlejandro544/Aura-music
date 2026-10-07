@@ -33,6 +33,18 @@ fun AudioSpecsDialog(
                 if (currentTrack.fileSizeFormatted.isNotBlank()) {
                     AudioDetailItem("Tamaño", currentTrack.fileSizeFormatted)
                 }
+                AudioDetailItem(
+                    "Salida Hardware",
+                    if (com.example.playback.NativeAudioEngine.isBitPerfectMode()) {
+                        "Bit-Perfect Direct 1:1 (DAC Bypass)"
+                    } else {
+                        "AAudio Low-Latency (${String.format("%.1f", com.example.playback.NativeAudioEngine.getEstimatedLatencyMs())} ms)"
+                    }
+                )
+                AudioDetailItem(
+                    "Muestreo / Profundidad",
+                    "${com.example.playback.NativeAudioEngine.getActiveSampleRate() / 1000.0} kHz / ${com.example.playback.NativeAudioEngine.getActiveBitDepth()}-bit"
+                )
                 AudioDetailItem("Origen", if (currentTrack.folderName.isNotBlank()) currentTrack.folderName else "Almacenamiento Local")
                 if (!currentTrack.videoUri.isNullOrEmpty()) {
                     AudioDetailItem("Video Canvas", if (currentTrack.isVideoLoop) "Loop Continuo (≤ 10s)" else "Sincronizado con Audio (> 10s)")
