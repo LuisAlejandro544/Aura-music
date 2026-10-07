@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Nombre en el launcher para la versión Beta (Codename Nebula) -->
+    <string name="app_name">Aura Beta</string>
+</resources>

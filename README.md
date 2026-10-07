@@ -365,12 +365,27 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
 
 ### Compilación Local con Aprovisionamiento Nativo Puro y Firma en Gradle (Cero `.sh`):
 ```bash
-# Ejecutar compilación completa (aprovisiona motores nativos puros, firma debug.keystore y ensambla el APK)
+# Ejecutar compilación Debug (con Aura Monitor y LeakCanary en 4 ABIs)
 gradle :app:assembleDebug
+
+# Ejecutar compilación Beta ("Aura Beta", com.auramusic.beta, Codename Nebula, 3 APKs móviles sin Debug)
+gradle :app:assembleBeta
 ```
 
-### GitHub Actions (Activación Manual y Caché de Dependencias Nativas en Gradle):
-- **Compilación de APK (`.github/workflows/build-debug-apk.yml`)**:
+### GitHub Actions (Compilación Debug y Canal Beta `Nebula`):
+- **Compilación de APK Beta — `Aura Beta` (`.github/workflows/build-beta-apk.yml`)**:
+  - **Identidad Beta**: Nombre en el launcher **`Aura Beta`**, identificador de paquete **`com.auramusic.beta`** (almacenamiento en `Android/data/com.auramusic.beta/files/`), versión **`v0.1.0-beta.1a`**, codename **`Nebula`** y código estratégico **`NEBULA-00101A`** (`versionCode = 100101`).
+  - **Limpio de Herramientas Debug (Excepto Actualizador OTA `yt-dlp`)**: Elimina por completo `DebugMonitorActivity` ("Aura Monitor") del Manifiesto y Ajustes (`BuildConfig.ENABLE_DEBUG_MONITOR = false`) y excluye `LeakCanary`, manteniendo **100% activo el actualizador OTA en caliente de `yt-dlp`**.
+  - **100% Sin Caché y Basado en el Flujo Probado de Debug**: Compila siempre desde cero (`--no-build-cache --rerun-tasks`) sin depender de `actions/cache`.
+  - **Exclusivo para Móviles (3 APKs) y Sin Arquitecturas de PC**: Elimina `x86` y `x86_64` y genera 3 APKs:
+    1. `AuraBeta-v0.1.0-beta.1a-Nebula-arm64-v8a.apk` (64 bits).
+    2. `AuraBeta-v0.1.0-beta.1a-Nebula-armeabi-v7a.apk` (32 bits).
+    3. `AuraBeta-v0.1.0-beta.1a-Nebula-universal.apk` (Universal 32 + 64 bits).
+  - **Firma desde GitHub Secrets**: Busca automáticamente en `secrets` las variables `BETA_KEYSTORE_BASE64` (o `KEYSTORE_BASE64`), `BETA_KEYSTORE_PASSWORD` (o `STORE_PASSWORD`), `BETA_KEY_ALIAS` (o `KEY_ALIAS`) y `BETA_KEY_PASSWORD` (o `KEY_PASSWORD`).
+  - **Regla de Activación Dual (Manual vs Pre-Release con Tag `-beta`)**:
+    - Si se activa **manualmente (`workflow_dispatch`)**, genera y sube los 3 APKs únicamente a los **Artifacts** de la ejecución (no los sube a ningún Release).
+    - Si se activa por un **Pre-Release con su respectivo Tag `-beta`** (ej. `v0.1.0-beta.1a`), adjunta los 3 APKs y `SHA256SUMS.txt` a los **Assets del Pre-Release** e inyecta automáticamente las notas y la tabla explicativa de APKs desde **`chanelog-beta.md`**.
+- **Compilación de APK Debug (`.github/workflows/build-debug-apk.yml`)**:
   - Se activa manualmente desde la pestaña **Actions -> Run workflow** (`workflow_dispatch`).
   - **Caché Inteligente de Dependencias Nativas**: Mediante `actions/cache@v4`, almacena y restaura instantáneamente los binarios de FFmpeg, CPython 3.11, QuickJS y yt-dlp (`app/src/main/jniLibs` y `app/src/main/assets/bin`) basados en el hash de `app/build.gradle.kts`, `gradle/libs.versions.toml` y `app/src/main/cpp/*`.
   - **Compilación Autónoma en Gradle ante Cache Miss**: Si no existe la caché o si se activa el parámetro `force_rebuild_native`, el runner ejecuta `./gradlew :app:provisionNativeDeps` para resolver los artefactos nativos reales y compilar los lanzadores PIE puros para las 4 arquitecturas (`arm64-v8a`, `armeabi-v7a`, `x86_64`, `x86`) con el Android NDK sin utilizar ningún script `.sh`.
@@ -383,4 +398,4 @@ gradle :app:assembleDebug
 
 ## 📦 Distribución
 
-Aura Music está preparado para distribuirse libremente como APK independiente en tiendas como **Uptodown**, repositorios independientes o instalación manual directa en teléfonos Android.
+Aura Music (`Aura Beta` • `com.auramusic.beta`) está preparado para distribuirse libremente como APK independiente en tiendas como **Uptodown**, GitHub Pre-Releases (`chanelog-beta.md`) o instalación manual directa en teléfonos Android.

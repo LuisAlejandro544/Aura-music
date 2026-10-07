@@ -2,6 +2,7 @@ package com.example.debug
 
 import android.content.Context
 import android.util.Log
+import com.example.BuildConfig
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -12,10 +13,10 @@ import java.io.FileWriter
 
 /**
  * Gestor Central de Diagnóstico, Depuración y Monitor de Crashes para Aura Music.
- * - Captura excepciones no controladas mediante [Thread.UncaughtExceptionHandler] (CRASH).
- * - Registra anomalías en reproducción de audio, JNI C++20, almacenamiento y memoria.
- * - Persiste los registros en JSON en el almacenamiento privado de la app.
- * - Conecta con la actividad autónoma [DebugMonitorActivity] para inspección en el móvil.
+ * - En compilaciones Debug (`BuildConfig.ENABLE_DEBUG_MONITOR == true`):
+ *   Captura excepciones no controladas, registra anomalías y persiste logs para Aura Monitor.
+ * - En compilaciones Beta y Release (`BuildConfig.ENABLE_DEBUG_MONITOR == false`):
+ *   Se desactiva por completo la persistencia y captura de diagnóstico (modo silencioso No-Op).
  */
 object AuraDebugManager {
 
@@ -32,6 +33,7 @@ object AuraDebugManager {
     private val lock = Any()
 
     fun init(context: Context) {
+        if (!BuildConfig.ENABLE_DEBUG_MONITOR) return
         synchronized(lock) {
             if (appContext != null) return
             appContext = context.applicationContext
@@ -57,6 +59,7 @@ object AuraDebugManager {
     }
 
     fun logCrash(throwable: Throwable, thread: Thread = Thread.currentThread()) {
+        if (!BuildConfig.ENABLE_DEBUG_MONITOR) return
         val entry = DebugLogEntry(
             severity = DebugSeverity.CRASH,
             tag = "UncaughtCrash",
@@ -69,6 +72,7 @@ object AuraDebugManager {
     }
 
     fun logCritical(tag: String, message: String, throwable: Throwable? = null) {
+        if (!BuildConfig.ENABLE_DEBUG_MONITOR) return
         val entry = DebugLogEntry(
             severity = DebugSeverity.CRITICAL,
             tag = tag,
@@ -81,6 +85,7 @@ object AuraDebugManager {
     }
 
     fun logError(tag: String, message: String, throwable: Throwable? = null) {
+        if (!BuildConfig.ENABLE_DEBUG_MONITOR) return
         val entry = DebugLogEntry(
             severity = DebugSeverity.ERROR,
             tag = tag,
@@ -93,6 +98,7 @@ object AuraDebugManager {
     }
 
     fun logWarning(tag: String, message: String, throwable: Throwable? = null) {
+        if (!BuildConfig.ENABLE_DEBUG_MONITOR) return
         val entry = DebugLogEntry(
             severity = DebugSeverity.WARNING,
             tag = tag,
@@ -105,6 +111,7 @@ object AuraDebugManager {
     }
 
     fun logInfo(tag: String, message: String) {
+        if (!BuildConfig.ENABLE_DEBUG_MONITOR) return
         val entry = DebugLogEntry(
             severity = DebugSeverity.INFO,
             tag = tag,

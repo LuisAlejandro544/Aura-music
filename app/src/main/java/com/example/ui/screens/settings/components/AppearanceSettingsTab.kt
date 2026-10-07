@@ -141,12 +141,22 @@ fun LazyListScope.mainSettingsMenuContent(
         Spacer(modifier = Modifier.height(12.dp))
     }
 
-    // 6. Motores Nativos, yt-dlp OTA & Aura Monitor
+    // 6. Motores Nativos, yt-dlp OTA & Diagnóstico (Aura Monitor solo en Debug)
     item {
+        val enginesTitle = if (com.example.BuildConfig.ENABLE_DEBUG_MONITOR) {
+            "Motores Nativos, yt-dlp OTA & Diagnóstico"
+        } else {
+            "Motores Nativos & Actualizador yt-dlp OTA"
+        }
+        val enginesSubtitle = if (com.example.BuildConfig.ENABLE_DEBUG_MONITOR) {
+            "Arquitectura C++20/FFmpeg, actualización OTA de yt-dlp y telemetría en vivo Aura Monitor"
+        } else {
+            "Arquitectura C++20/FFmpeg, actualización en caliente de yt-dlp (OTA) y versión ${com.example.BuildConfig.VERSION_NAME} (${com.example.BuildConfig.APP_CODENAME})"
+        }
         SettingsNavigationCard(
             icon = Icons.Default.Build,
-            title = "Motores Nativos, yt-dlp OTA & Diagnóstico",
-            subtitle = "Arquitectura C++20/FFmpeg, actualización OTA de yt-dlp y telemetría en vivo Aura Monitor",
+            title = enginesTitle,
+            subtitle = enginesSubtitle,
             iconTint = MaterialTheme.colorScheme.secondary,
             onClick = onOpenEnginesAndDiagnostics,
             testTag = "settings_nav_engines_diagnostics"
@@ -424,13 +434,14 @@ fun LazyListScope.enginesAndDiagnosticsSettingsContent(
                 SettingDetailRow("Acceso a Archivos", "SAF (Storage Access Framework)")
                 SettingDetailRow("Escaneo Automático", "Desactivado (100% bajo control del usuario)")
                 SettingDetailRow("Motor Multimedia", if (com.example.data.importer.FFmpegNativeEngine.isAvailable(context)) "FFmpeg puro nativo (Activo)" else "FFmpeg puro nativo (Fallback MediaMuxer)")
-                SettingDetailRow("Versión", "1.1 (Aura Music Edition)")
+                SettingDetailRow("Versión", "${com.example.BuildConfig.VERSION_NAME} (${com.example.BuildConfig.APP_CODENAME})")
+                SettingDetailRow("Código de Build", "${com.example.BuildConfig.APP_BUILD_CODE} (#${com.example.BuildConfig.VERSION_CODE})")
             }
         }
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Tarjeta de Motores Multimedia: FFmpeg Puro & yt-dlp OTA
+        // Tarjeta de Motores Multimedia: FFmpeg Puro & yt-dlp OTA (Activa en Debug, Beta y Release)
         Card(
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = SurfaceCard),
@@ -526,52 +537,54 @@ fun LazyListScope.enginesAndDiagnosticsSettingsContent(
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        // Acceso directo a Aura Monitor: EXCLUSIVO de compilación Debug (Eliminado en APK Beta y Release)
+        if (com.example.BuildConfig.ENABLE_DEBUG_MONITOR) {
+            Spacer(modifier = Modifier.height(20.dp))
 
-        // Acceso directo a Aura Monitor (Diagnóstico & Telemetría)
-        Card(
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = SurfaceCard),
-            border = BorderStroke(1.dp, CardBorder),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(18.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Build,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Aura Monitor (Telemetría & Diagnóstico)",
-                        style = MaterialTheme.typography.titleSmall.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = TextPrimary
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = SurfaceCard),
+                border = BorderStroke(1.dp, CardBorder),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Build,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
                         )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Aura Monitor (Telemetría & Diagnóstico)",
+                            style = MaterialTheme.typography.titleSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Inspecciona el consumo de RAM en tiempo real (Java, C++ Nativo, PSS), la carga de procesador, los hilos de ejecución activos y el registro detallado de incidentes.",
+                        style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
                     )
-                }
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = "Inspecciona el consumo de RAM en tiempo real (Java, C++ Nativo, PSS), la carga de procesador, los hilos de ejecución activos y el registro detallado de incidentes.",
-                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
-                )
-                Spacer(modifier = Modifier.height(14.dp))
-                Button(
-                    onClick = {
-                        val intent = android.content.Intent(context, com.example.debug.DebugMonitorActivity::class.java)
-                        context.startActivity(intent)
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("open_aura_monitor_btn")
-                ) {
-                    Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Abrir Aura Monitor", fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Button(
+                        onClick = {
+                            val intent = android.content.Intent(context, com.example.debug.DebugMonitorActivity::class.java)
+                            context.startActivity(intent)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("open_aura_monitor_btn")
+                    ) {
+                        Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Abrir Aura Monitor", fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }

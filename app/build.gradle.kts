@@ -33,17 +33,27 @@ android {
   namespace = "com.example"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
+  val isBetaTaskRequested = gradle.startParameter.taskNames.any {
+    it.contains("Beta", ignoreCase = true)
+  }
+
   defaultConfig {
-    applicationId = "com.aistudio.musicplayer.aurasound"
+    applicationId = if (isBetaTaskRequested) "com.auramusic.beta" else "com.aistudio.musicplayer.aurasound"
     minSdk = 26
     targetSdk = 36
-    versionCode = 1
-    versionName = "1.0"
+    versionCode = 100101
+    versionName = "v0.1.0-beta.1a"
+
+    buildConfigField("String", "APP_CODENAME", "\"Nebula\"")
+    buildConfigField("String", "APP_BUILD_CODE", "\"NEBULA-00101A\"")
+    buildConfigField("boolean", "ENABLE_DEBUG_MONITOR", "true")
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-    ndk {
-      abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+    if (!isBetaTaskRequested) {
+      ndk {
+        abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+      }
     }
 
     externalNativeBuild {
@@ -51,6 +61,19 @@ android {
         cppFlags += "-std=c++20"
         arguments += "-DANDROID_STL=c++_shared"
       }
+    }
+  }
+
+  // En compilación Beta generamos exactamente 3 APKs móviles: arm64-v8a, armeabi-v7a y universal (sin arquitecturas de PC)
+  val isBetaSplitEnabled = gradle.startParameter.taskNames.any {
+    it.contains("Beta", ignoreCase = true)
+  }
+  splits {
+    abi {
+      isEnable = isBetaSplitEnabled
+      reset()
+      include("arm64-v8a", "armeabi-v7a")
+      isUniversalApk = true
     }
   }
 
@@ -77,6 +100,27 @@ android {
       keyAlias = "androiddebugkey"
       keyPassword = "android"
     }
+    create("betaConfig") {
+      val betaKeystorePath = System.getenv("BETA_KEYSTORE_PATH")
+        ?: System.getenv("KEYSTORE_PATH")
+        ?: "${rootDir}/beta-release.keystore"
+      val betaStoreFile = file(betaKeystorePath)
+      val betaStorePassword = System.getenv("BETA_KEYSTORE_PASSWORD") ?: System.getenv("STORE_PASSWORD")
+      val betaKeyAlias = System.getenv("BETA_KEY_ALIAS") ?: System.getenv("KEY_ALIAS")
+      val betaKeyPassword = System.getenv("BETA_KEY_PASSWORD") ?: System.getenv("KEY_PASSWORD")
+
+      if (betaStoreFile.exists() && !betaStorePassword.isNullOrBlank() && !betaKeyAlias.isNullOrBlank() && !betaKeyPassword.isNullOrBlank()) {
+        storeFile = betaStoreFile
+        storePassword = betaStorePassword
+        keyAlias = betaKeyAlias
+        keyPassword = betaKeyPassword
+      } else {
+        storeFile = file("${rootDir}/debug.keystore")
+        storePassword = "android"
+        keyAlias = "androiddebugkey"
+        keyPassword = "android"
+      }
+    }
   }
 
   buildTypes {
@@ -85,8 +129,27 @@ android {
       isMinifyEnabled = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig = signingConfigs.getByName("release")
+      buildConfigField("boolean", "ENABLE_DEBUG_MONITOR", "false")
     }
-    debug { signingConfig = signingConfigs.getByName("debugConfig") }
+    create("beta") {
+      applicationIdSuffix = ""
+      // Para la versión Beta el identificador es com.auramusic.beta -> Android/data/com.auramusic.beta
+      isDebuggable = false
+      isCrunchPngs = false
+      isMinifyEnabled = false
+      proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+      signingConfig = signingConfigs.getByName("betaConfig")
+      matchingFallbacks += listOf("release", "debug")
+      buildConfigField("String", "APP_CODENAME", "\"Nebula\"")
+      buildConfigField("String", "APP_BUILD_CODE", "\"NEBULA-00101A\"")
+      buildConfigField("boolean", "ENABLE_DEBUG_MONITOR", "false")
+    }
+    debug {
+      signingConfig = signingConfigs.getByName("debugConfig")
+      buildConfigField("String", "APP_CODENAME", "\"Nebula\"")
+      buildConfigField("String", "APP_BUILD_CODE", "\"NEBULA-00101A-DBG\"")
+      buildConfigField("boolean", "ENABLE_DEBUG_MONITOR", "true")
+    }
   }
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11
@@ -165,6 +228,9 @@ abstract class EnsureDebugKeystoreTask : DefaultTask() {
 abstract class ProvisionNativeDepsTask : DefaultTask() {
   @get:Input
   abstract val provisionVersion: Property<String>
+
+  @get:Input
+  abstract val mobileOnlyAbis: Property<Boolean>
 
   @get:InputDirectory
   abstract val cppDirectory: DirectoryProperty
@@ -262,7 +328,15 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
     val assetsBinDir = assetsBinDirectory.get().asFile
     val tempBuildDir = tempBuildDirectory.get().asFile
 
-    val abis = listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
+    val isMobileOnly = mobileOnlyAbis.getOrElse(false)
+    val abis = if (isMobileOnly) {
+      // Eliminar arquitecturas de PC residuales para que el APK universal Beta solo incluya arm64-v8a y armeabi-v7a
+      File(jniLibsDir, "x86").deleteRecursively()
+      File(jniLibsDir, "x86_64").deleteRecursively()
+      listOf("arm64-v8a", "armeabi-v7a")
+    } else {
+      listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
+    }
     val clangTargets = mapOf(
       "arm64-v8a" to Pair("aarch64-linux-android26-clang", listOf("-march=armv8-a")),
       "armeabi-v7a" to Pair("armv7a-linux-androideabi26-clang", listOf("-march=armv7-a", "-mfloat-abi=softfp", "-mfpu=neon")),
@@ -557,6 +631,9 @@ val ensureDebugKeystore = tasks.register<EnsureDebugKeystoreTask>("ensureDebugKe
 val provisionNativeDeps = tasks.register<ProvisionNativeDepsTask>("provisionNativeDeps") {
   dependsOn(ensureDebugKeystore)
   provisionVersion.set("v2.0-pure-multiabi")
+  val betaMode = gradle.startParameter.taskNames.any { it.contains("Beta", ignoreCase = true) } ||
+    System.getenv("AURA_BETA_MOBILE_ONLY") == "true"
+  mobileOnlyAbis.set(betaMode)
   cppDirectory.set(layout.projectDirectory.dir("src/main/cpp"))
   pythonRuntimeFiles.from(pythonNativeRuntime)
   ffmpegRuntimeFiles.from(ffmpegNativeRuntime)

@@ -1,0 +1,230 @@
+name: Compilar APK Beta (Aura Beta - Codename Nebula)
+
+# Flujo de compilación del APK Beta ("Aura Beta" • com.auramusic.beta • Codename Nebula)
+# - Se activa manualmente (workflow_dispatch) O al publicar un Pre-Release con tag "-beta".
+# - Compila 100% limpio SIN CACHÉ tomando como referencia la arquitectura de build-debug-apk.yml.
+# - Elimina arquitecturas de PC (x86 / x86_64) y genera 3 APKs móviles: arm64-v8a, armeabi-v7a y universal.
+# - Elimina Aura Monitor y LeakCanary, manteniendo el actualizador OTA de yt-dlp activo.
+# - Si se activa manualmente (workflow_dispatch), publica los 3 APKs en Artifacts pero NO los sube a ningún Release.
+# - Si se activa por un Release, valida que sea un Pre-Release con tag "-beta" y adjunta los 3 APKs + el contenido de chanelog-beta.md.
+on:
+  workflow_dispatch:
+    inputs:
+      version_tag:
+        description: 'Versión Beta estratégica (ej: v0.1.0-beta.1a)'
+        required: false
+        type: string
+        default: 'v0.1.0-beta.1a'
+      codename:
+        description: 'Codename de la serie Beta'
+        required: false
+        type: string
+        default: 'Nebula'
+  release:
+    types: [published, created, prereleased]
+
+permissions:
+  contents: write
+
+jobs:
+  build-beta-apk:
+    name: Compilación Limpia (Sin Caché) de 3 APKs Aura Beta (Nebula)
+    runs-on: ubuntu-latest
+    # Si es disparado por un evento 'release', exigir que sea un Pre-Release y que su tag contenga '-beta'
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'release' && github.event.release.prerelease == true && contains(github.event.release.tag_name, '-beta'))
+
+    steps:
+      - name: 📥 1. Descargar todo el código del proyecto
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: 🏷️ 2. Determinar Versión, Tag y Codename Estratégico (Nebula)
+        id: meta
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            RAW_TAG="${{ github.event.release.tag_name }}"
+            CODENAME="Nebula"
+          else
+            RAW_TAG="${{ inputs.version_tag || 'v0.1.0-beta.1a' }}"
+            CODENAME="${{ inputs.codename || 'Nebula' }}"
+          fi
+          echo "VERSION_TAG=$RAW_TAG" >> $GITHUB_ENV
+          echo "APP_CODENAME=$CODENAME" >> $GITHUB_ENV
+          echo "✅ Compilando Aura Beta -> Tag: $RAW_TAG | Codename: $CODENAME | Paquete: com.auramusic.beta"
+
+      - name: ☕ 3. Configurar Java JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: 🤖 4. Configurar Android SDK y Aceptar Licencias
+        run: |
+          echo "=== Configurando entorno Android SDK ==="
+          export ANDROID_HOME="/usr/local/lib/android/sdk"
+          export ANDROID_SDK_ROOT="/usr/local/lib/android/sdk"
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
+          echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
+
+          echo "Aceptando licencias del SDK..."
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+
+      - name: 🛠️ 5. Instalar CMake, NDK y Herramientas de Compilación Nativa C++20
+        run: |
+          echo "=== Instalando herramientas de sistema y NDK ==="
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends file curl unzip tar xz-utils build-essential
+
+          echo "Instalando CMake 3.22.1..."
+          sdkmanager --install "cmake;3.22.1" || true
+
+          echo "Instalando NDK de Android..."
+          sdkmanager --install "ndk;28.2.13676358" || sdkmanager --install "ndk;25.1.8937393" || true
+
+          NDK_PATH=$(ls -1vd "$ANDROID_HOME/ndk/"* 2>/dev/null | tail -n 1 || true)
+          if [ -n "$NDK_PATH" ] && [ -d "$NDK_PATH" ]; then
+            echo "ANDROID_NDK_ROOT=$NDK_PATH" >> $GITHUB_ENV
+            echo "ANDROID_NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
+            echo "NDK_ROOT=$NDK_PATH" >> $GITHUB_ENV
+            echo "NDK_PATH=$NDK_PATH" >> $GITHUB_ENV
+
+            LLVM_BIN="$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin"
+            if [ -d "$LLVM_BIN" ]; then
+              echo "$LLVM_BIN" >> $GITHUB_PATH
+            fi
+            echo "✅ NDK configurado para Gradle y CMake: $NDK_PATH"
+          fi
+
+      - name: 🔧 6. Preparar Gradle Wrapper (Cero Caché)
+        run: |
+          if [ ! -f "./gradlew" ]; then
+            gradle wrapper || true
+          fi
+          if [ -f "./gradlew" ]; then
+            chmod +x ./gradlew
+          fi
+
+      - name: 🔐 7. Configurar Firma desde GitHub Secrets (Keystore, Alias y Contraseñas)
+        env:
+          SECRET_BETA_KEYSTORE_BASE64: ${{ secrets.BETA_KEYSTORE_BASE64 }}
+          SECRET_KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          SECRET_BETA_KEYSTORE_PASSWORD: ${{ secrets.BETA_KEYSTORE_PASSWORD }}
+          SECRET_STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          SECRET_BETA_KEY_ALIAS: ${{ secrets.BETA_KEY_ALIAS }}
+          SECRET_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          SECRET_BETA_KEY_PASSWORD: ${{ secrets.BETA_KEY_PASSWORD }}
+          SECRET_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          echo "=== Buscando credenciales de firma en GitHub Secrets ==="
+          KS_B64="${SECRET_BETA_KEYSTORE_BASE64:-$SECRET_KEYSTORE_BASE64}"
+          KS_PASS="${SECRET_BETA_KEYSTORE_PASSWORD:-$SECRET_STORE_PASSWORD}"
+          K_ALIAS="${SECRET_BETA_KEY_ALIAS:-$SECRET_KEY_ALIAS}"
+          K_PASS="${SECRET_BETA_KEY_PASSWORD:-$SECRET_KEY_PASSWORD}"
+
+          KEYSTORE_FILE="$GITHUB_WORKSPACE/beta-release.keystore"
+
+          if [ -n "$KS_B64" ] && [ -n "$KS_PASS" ] && [ -n "$K_ALIAS" ] && [ -n "$K_PASS" ]; then
+            echo "$KS_B64" | tr -d '[:space:]' | base64 -d > "$KEYSTORE_FILE"
+            echo "BETA_KEYSTORE_PATH=$KEYSTORE_FILE" >> $GITHUB_ENV
+            echo "BETA_KEYSTORE_PASSWORD=$KS_PASS" >> $GITHUB_ENV
+            echo "BETA_KEY_ALIAS=$K_ALIAS" >> $GITHUB_ENV
+            echo "BETA_KEY_PASSWORD=$K_PASS" >> $GITHUB_ENV
+            echo "✅ Firma oficial cargada desde GitHub Secrets (Alias: $K_ALIAS)."
+          else
+            echo "⚠️ No se encontraron todos los Secrets de firma personalizada; se restaurará debug.keystore.base64 de respaldo para no abortar la compilación."
+          fi
+
+      - name: ⚙️ 8. Aprovisionar Motores Nativos Puros Solo para Móvil (arm64-v8a y armeabi-v7a, Sin Caché)
+        env:
+          AURA_BETA_MOBILE_ONLY: "true"
+        run: |
+          echo "=== Limpiando cualquier residuo de arquitecturas de PC (x86 / x86_64) ==="
+          rm -rf app/src/main/jniLibs/x86 app/src/main/jniLibs/x86_64
+
+          echo "=== Ejecutando tarea Gradle :app:provisionNativeDeps (Sin Caché, Solo Móvil 32/64 bits) ==="
+          ./gradlew :app:provisionNativeDeps --no-daemon --no-build-cache --rerun-tasks --stacktrace
+
+      - name: 🔍 9. Auditar Binarios Nativos Móviles Ensamblados (arm64-v8a, armeabi-v7a y yt-dlp)
+        run: |
+          echo "=== Auditoría de módulos JNI móviles generados (app/src/main/jniLibs) ==="
+          ls -lhR app/src/main/jniLibs/ || true
+          echo ""
+          echo "=== Auditoría de ejecutables en Assets (app/src/main/assets/bin) ==="
+          ls -lh app/src/main/assets/bin/ || true
+
+      - name: 🚀 10. Compilar los 3 APKs de Aura Beta (arm64-v8a, armeabi-v7a y Universal) Sin Caché
+        env:
+          AURA_BETA_MOBILE_ONLY: "true"
+        run: |
+          echo "Iniciando compilación limpia de Aura Beta ($VERSION_TAG - $APP_CODENAME)..."
+          ./gradlew :app:assembleBeta --no-daemon --no-build-cache --stacktrace
+
+      - name: 📂 11. Organizar y Renombrar Estratégicamente los 3 APKs + Sumas SHA-256
+        run: |
+          mkdir -p dist-beta
+          echo "=== Localizando los 3 APKs generados en app/build/outputs/apk/beta/ ==="
+          ls -lh app/build/outputs/apk/beta/
+
+          ARM64_APK=$(find app/build/outputs/apk/beta -name "*arm64-v8a*.apk" | head -n 1)
+          ARMV7_APK=$(find app/build/outputs/apk/beta -name "*armeabi-v7a*.apk" | head -n 1)
+          UNIV_APK=$(find app/build/outputs/apk/beta -name "*universal*.apk" | head -n 1)
+
+          if [ -z "$ARM64_APK" ] || [ -z "$ARMV7_APK" ] || [ -z "$UNIV_APK" ]; then
+            echo "❌ Error: No se encontraron los 3 APKs esperados."
+            exit 1
+          fi
+
+          cp "$ARM64_APK" "dist-beta/AuraBeta-${VERSION_TAG}-${APP_CODENAME}-arm64-v8a.apk"
+          cp "$ARMV7_APK" "dist-beta/AuraBeta-${VERSION_TAG}-${APP_CODENAME}-armeabi-v7a.apk"
+          cp "$UNIV_APK"  "dist-beta/AuraBeta-${VERSION_TAG}-${APP_CODENAME}-universal.apk"
+
+          cd dist-beta
+          sha256sum *.apk > SHA256SUMS.txt
+          echo "=== APKs Beta listos para distribución ==="
+          ls -lh
+          cat SHA256SUMS.txt
+
+      - name: 📦 12. Publicar los 3 APKs en GitHub Actions Artifacts (Siempre disponible)
+        uses: actions/upload-artifact@v4
+        with:
+          name: AuraBeta-${{ env.VERSION_TAG }}-${{ env.APP_CODENAME }}-APKs
+          path: |
+            dist-beta/*.apk
+            dist-beta/SHA256SUMS.txt
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: 🚀 13. Subir los 3 APKs y Notas de chanelog-beta.md al Pre-Release (SOLO si no es manual)
+        # Regla estricta: Si el action se ejecutó manualmente (workflow_dispatch), NO se sube a ningún Release.
+        # Solo se sube cuando es activado por un Pre-Release con su respectivo Tag (-beta).
+        if: github.event_name == 'release' && github.event.release.prerelease == true && contains(github.event.release.tag_name, '-beta')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "=== Publicando los 3 APKs en los Assets del Pre-Release ${{ github.event.release.tag_name }} ==="
+          gh release upload "${{ github.event.release.tag_name }}" \
+            dist-beta/AuraBeta-${VERSION_TAG}-${APP_CODENAME}-arm64-v8a.apk \
+            dist-beta/AuraBeta-${VERSION_TAG}-${APP_CODENAME}-armeabi-v7a.apk \
+            dist-beta/AuraBeta-${VERSION_TAG}-${APP_CODENAME}-universal.apk \
+            dist-beta/SHA256SUMS.txt \
+            --clobber
+
+          if [ -f "chanelog-beta.md" ]; then
+            echo "=== Actualizando descripción del Pre-Release con chanelog-beta.md ==="
+            gh release edit "${{ github.event.release.tag_name }}" \
+              --prerelease \
+              --notes-file chanelog-beta.md
+          fi
+          echo "🎉 Pre-Release actualizado exitosamente con los 3 APKs y la guía de chanelog-beta.md."
+
+      - name: 🧹 14. Limpiar archivo temporal de firma por seguridad
+        if: always()
+        run: |
+          rm -f "$GITHUB_WORKSPACE/beta-release.keystore"

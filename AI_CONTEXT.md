@@ -169,5 +169,11 @@ Este archivo define el contexto de diseño, directrices técnicas y restriccione
     - `SpecialAudioFormatDecoder.kt`: Decodificación y transcodificación sin pérdida mediante `FFmpegNativeEngine` para formatos especiales (`.dsf`, `.dff`, `.ape`, `.wv`, `.alac`, `.aiff`, `.mpc`, `.mod`, `.xm`, `.it`, `.s3m`), integrado en `AudioMetadataParser`, `SafTrackImporter` e `IncomingMediaHandler`.
     - `AuraMusicWidgetProvider.kt`: Widget interactivo de pantalla de inicio y bloqueo (`widget_aura_player.xml`) sincronizado en tiempo real con `AuraAudioPlayer`, mostrando carátula WebP o arte procedural, insignia activa de formato/Bit-Perfect y controles directos de reproducción. Incluye soporte de Android Auto (`automotive_app_desc.xml`).
 
-22. **Idioma de Comunicación**:
+22. **Canal de Distribución APK Beta (`Aura Beta` • `com.auramusic.beta` • Codename `Nebula`)**:
+    - En la compilación `beta`, el nombre en el launcher es **`Aura Beta`**, el `applicationId` es **`com.auramusic.beta`** (almacenando datos en `Android/data/com.auramusic.beta/files/`), la versión inicial es **`v0.1.0-beta.1a`**, el codename es **`Nebula`** y el código interno de build es **`NEBULA-00101A`** (`versionCode = 100101`).
+    - El APK Beta elimina por completo Aura Monitor (`DebugMonitorActivity` vía `app/src/beta/AndroidManifest.xml` y `BuildConfig.ENABLE_DEBUG_MONITOR = false`) y `LeakCanary`, pero **mantiene 100% activo el actualizador OTA de `yt-dlp` (`YtDlpAutoUpdater`)**.
+    - El workflow `.github/workflows/build-beta-apk.yml` compila **sin caché**, elimina las arquitecturas de PC (`x86`, `x86_64`), firma con los valores de GitHub Secrets (`BETA_KEYSTORE_BASE64`, `BETA_KEYSTORE_PASSWORD`, `BETA_KEY_ALIAS`, `BETA_KEY_PASSWORD`) y genera **3 APKs móviles** (`arm64-v8a`, `armeabi-v7a` y `universal`).
+    - Si el workflow Beta se ejecuta manualmente (`workflow_dispatch`), solo sube los 3 APKs a *Artifacts* (nunca a un Release). Si se activa por un **Pre-Release con tag `-beta`**, sube los 3 APKs a los *Assets* del Pre-Release con el texto de **`chanelog-beta.md`**.
+
+23. **Idioma de Comunicación**:
    - La documentación, comentarios en código, cadenas de usuario (`strings.xml`) y mensajes de commit deben redactarse en **español**.

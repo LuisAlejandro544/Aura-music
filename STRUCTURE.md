@@ -11,8 +11,8 @@ El proyecto sigue una arquitectura reactiva y desacoplada organizada en capas:
 1. **Capa Nativa (C++20 / NDK)**: Motores de procesamiento de audio digital DSP en tiempo real (Ecualizador paramétrico de 10 bandas IIR, Audio 8D/16D Multi-Órbita, Clarificador de Voces Mid-Side HD, Reverb Schroeder/Moorer y Crossfeed Chu Moy) + binarios nativos optimizados de FFmpeg y QuickJS/CPython.
 2. **Capa de Datos & Almacenamiento (Data & Storage)**:
    - Base de datos SQLite reactiva con **Room**.
-   - Acceso al almacenamiento estructurado en `Android/data/com.aistudio.musicplayer.aurasound/files/` (`songs/`, `images/`, `lyrics/`, `metadata/`, `videos/`).
-   - Motores de importación, sincronización de letras LRCLIB, extracción FFmpeg y descarga resiliente (Chunked Range Download, InnerTube, Invidious y fallback `yt-dlp` blindado).
+   - Acceso al almacenamiento estructurado en `Android/data/com.aistudio.musicplayer.aurasound/files/` (Debug) y `Android/data/com.auramusic.beta/files/` (APK Beta `Aura Beta` • Codename `Nebula`) con subcarpetas (`songs/`, `images/`, `lyrics/`, `metadata/`, `videos/`).
+   - Motores de importación, sincronización de letras LRCLIB, extracción FFmpeg y descarga resiliente (Chunked Range Download, InnerTube, Invidious y fallback `yt-dlp` blindado con actualización OTA activa en Debug y Beta).
 3. **Capa de Control & Reproducción (Playback Layer)**:
    - `AuraAudioPlayer` con ExoPlayer/Media3, modularizado con controladores especializados (`PlayerQueueController`, `AudioFadeController`, `ABLoopController`, `MediaSessionBridge`).
    - `NativeAudioEngine` conectando buffers de audio PCM en C++20 vía JNI.
