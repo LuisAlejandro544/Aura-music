@@ -126,7 +126,8 @@ app/
 │   │       │   ├── DownloadProgress.kt
 │   │       │   ├── PackageUpdateState.kt
 │   │       │   ├── ThemePalette.kt
-│   │       │   └── VideoDisplayMode.kt
+│   │       │   ├── VideoDisplayMode.kt
+│   │       │   └── NowPlayingDesignMode.kt          # Modos de diseño: Clásico, Cinemático Canvas y Auto
 │   │       │
 │   │       ├── ui/                             # Capa de Interfaz de Usuario (Compose M3)
 │   │       │   ├── AuraMusicAppContent.kt      # Orquestador del Scaffold y navegación principal
@@ -145,6 +146,8 @@ app/
 │   │       │   │   │   ├── NowPlayingScreen.kt
 │   │       │   │   │   └── components/
 │   │       │   │   │       ├── FullScreenLyricsScreen.kt # Modo Karaoke Inmersivo a Pantalla Completa
+│   │       │   │   │       ├── NowPlayingCinematicLayout.kt # Diseño Cinemático Canvas (Estilo Spotify)
+│   │       │   │   │       ├── NowPlayingDesignSelectorDialog.kt # Selector de Diseño de Reproductor
 │   │       │   │   │       ├── NowPlayingArtworkCard.kt
 │   │       │   │   │       ├── NowPlayingLyricsCard.kt
 │   │       │   │   │       ├── NowPlayingPlaybackControls.kt

@@ -3,6 +3,7 @@ package com.example.viewmodel.delegates
 import android.content.SharedPreferences
 import com.example.data.repository.MusicRepository
 import com.example.model.AuraTheme
+import com.example.model.NowPlayingDesignMode
 import com.example.model.Playlist
 import com.example.model.Track
 import com.example.model.VideoDisplayMode
@@ -87,6 +88,16 @@ class NavigationCoordinator(
     )
     val videoDisplayMode: StateFlow<VideoDisplayMode> = _videoDisplayMode.asStateFlow()
 
+    private val _nowPlayingDesignMode = MutableStateFlow(
+        try {
+            val savedDesign = appPrefs.getString("pref_now_playing_design_mode", NowPlayingDesignMode.AUTO.name)
+            NowPlayingDesignMode.valueOf(savedDesign ?: NowPlayingDesignMode.AUTO.name)
+        } catch (_: Exception) {
+            NowPlayingDesignMode.AUTO
+        }
+    )
+    val nowPlayingDesignMode: StateFlow<NowPlayingDesignMode> = _nowPlayingDesignMode.asStateFlow()
+
     private val prefsChangeListener = SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
         when (key) {
             "pref_aura_theme" -> {
@@ -106,6 +117,12 @@ class NavigationCoordinator(
             }
             "pref_mini_player_video_enabled" -> {
                 _isMiniPlayerVideoEnabled.value = prefs.getBoolean(key, false)
+            }
+            "pref_now_playing_design_mode" -> {
+                val design = prefs.getString(key, NowPlayingDesignMode.AUTO.name)
+                try {
+                    _nowPlayingDesignMode.value = NowPlayingDesignMode.valueOf(design ?: NowPlayingDesignMode.AUTO.name)
+                } catch (_: Exception) {}
             }
         }
     }
@@ -245,6 +262,11 @@ class NavigationCoordinator(
     fun setVideoDisplayMode(mode: VideoDisplayMode) {
         _videoDisplayMode.value = mode
         appPrefs.edit().putString("pref_video_display_mode", mode.name).apply()
+    }
+
+    fun setNowPlayingDesignMode(mode: NowPlayingDesignMode) {
+        _nowPlayingDesignMode.value = mode
+        appPrefs.edit().putString("pref_now_playing_design_mode", mode.name).apply()
     }
 
     fun updateSelectedPlaylistMetadata(id: Long, name: String, description: String, artPath: String?) {

@@ -171,6 +171,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val videoDisplayMode = navigationCoordinator.videoDisplayMode
     val isVideoCanvasActive: StateFlow<Boolean> = videoDisplayMode.map { it != VideoDisplayMode.OFF }
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    val nowPlayingDesignMode = navigationCoordinator.nowPlayingDesignMode
 
     // Estados de importación y progreso de descargas
     val isImporting = trackLibraryCoordinator.isImporting
@@ -307,6 +308,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         if (!active) setVideoDisplayMode(VideoDisplayMode.OFF)
         else if (videoDisplayMode.value == VideoDisplayMode.OFF) setVideoDisplayMode(VideoDisplayMode.FULLSCREEN_BACKGROUND)
     }
+    fun setNowPlayingDesignMode(mode: NowPlayingDesignMode) = navigationCoordinator.setNowPlayingDesignMode(mode)
+    fun cycleNowPlayingDesignMode() = setNowPlayingDesignMode(nowPlayingDesignMode.value.next())
 
     // --- Reproducción ---
     fun playTrack(track: Track, fromList: List<Track>? = null) {

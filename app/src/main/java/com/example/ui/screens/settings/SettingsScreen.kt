@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.sp
 import com.example.model.AuraTheme
 import com.example.model.HeadphoneConfig
 import com.example.model.HeadsetButtonAction
+import com.example.model.NowPlayingDesignMode
 import com.example.model.Track
 import com.example.ui.screens.settings.components.*
 import com.example.ui.theme.SurfaceCard
@@ -41,6 +42,8 @@ fun SettingsScreen(
     onToggleDynamicArtworkColor: (Boolean) -> Unit = {},
     isMiniPlayerVideoEnabled: Boolean = true,
     onToggleMiniPlayerVideo: (Boolean) -> Unit = {},
+    nowPlayingDesignMode: NowPlayingDesignMode = NowPlayingDesignMode.AUTO,
+    onSetNowPlayingDesignMode: (NowPlayingDesignMode) -> Unit = {},
     // Configuración de Auriculares
     headphoneConfig: HeadphoneConfig = HeadphoneConfig(),
     onUpdateHeadphoneConfig: (HeadphoneConfig) -> Unit = {},
@@ -159,6 +162,8 @@ fun SettingsScreen(
                 onToggleDynamicArtworkColor = onToggleDynamicArtworkColor,
                 isMiniPlayerVideoEnabled = isMiniPlayerVideoEnabled,
                 onToggleMiniPlayerVideo = onToggleMiniPlayerVideo,
+                nowPlayingDesignMode = nowPlayingDesignMode,
+                onSetNowPlayingDesignMode = onSetNowPlayingDesignMode,
                 onOpenOnboarding = onOpenOnboarding
             )
         }

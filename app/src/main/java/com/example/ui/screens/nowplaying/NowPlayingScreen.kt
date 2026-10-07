@@ -41,6 +41,7 @@ import com.example.ui.components.BackgroundVideoPlayer
 import com.example.ui.components.EditTrackDialog
 import com.example.ui.components.SearchLyricsDialog
 import com.example.model.LyricSearchResult
+import com.example.model.NowPlayingDesignMode
 import com.example.ui.screens.nowplaying.components.*
 import com.example.ui.theme.ArtworkColorExtractor
 import com.example.ui.theme.BackgroundDark
@@ -167,6 +168,9 @@ fun NowPlayingScreen(
     activeMixtapeChapter: com.example.model.MixtapeChapter? = null,
     mixtapeChapterIndex: Int = -1,
     mixtapeTotalChapters: Int = 0,
+    nowPlayingDesignMode: NowPlayingDesignMode = NowPlayingDesignMode.AUTO,
+    onSetNowPlayingDesignMode: (NowPlayingDesignMode) -> Unit = {},
+    collectionContextTitle: String = "Tu Biblioteca",
     modifier: Modifier = Modifier
 ) {
     BackHandler {
@@ -251,9 +255,19 @@ fun NowPlayingScreen(
     var showVideoModeDialog by remember { mutableStateOf(false) }
     var showLyrics by remember { mutableStateOf(false) }
     var isFullScreenLyricsOpen by remember { mutableStateOf(false) }
+    var showDesignSelectorDialog by remember { mutableStateOf(false) }
 
     val hasVideo = !currentTrack.videoUri.isNullOrEmpty()
     val isFullscreenVideo = hasVideo && videoDisplayMode.isFullscreen
+
+    // Determinación del diseño visual activo (Automático o forzado por el usuario)
+    val isCinematicActive = remember(nowPlayingDesignMode, isFullscreenVideo, currentTrack.videoUri) {
+        when (nowPlayingDesignMode) {
+            NowPlayingDesignMode.CINEMATIC_CANVAS -> true
+            NowPlayingDesignMode.CLASSIC -> false
+            NowPlayingDesignMode.AUTO -> isFullscreenVideo && !currentTrack.videoUri.isNullOrEmpty()
+        }
+    }
 
     Box(
         modifier = modifier
@@ -323,33 +337,65 @@ fun NowPlayingScreen(
                 )
         )
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.statusBars)
-                .windowInsetsPadding(WindowInsets.navigationBars)
-                .padding(horizontal = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Barra Superior
-            NowPlayingTopBar(
+        if (isCinematicActive && !showLyrics) {
+            NowPlayingCinematicLayout(
                 currentTrack = currentTrack,
-                sleepTimerState = sleepTimerState,
-                spatial8DConfig = spatial8DConfig,
-                videoDisplayMode = videoDisplayMode,
+                isPlaying = isPlaying,
+                currentPositionMs = currentPositionMs,
+                durationMs = durationMs,
+                shuffleEnabled = shuffleEnabled,
+                repeatMode = repeatMode,
+                lyricsState = lyricsState,
                 animatedPrimary = animatedPrimary,
+                animatedSecondary = animatedSecondary,
+                onTogglePlayPause = onTogglePlayPause,
+                onSeekTo = onSeekTo,
+                onPlayNext = onPlayNext,
+                onPlayPrevious = onPlayPrevious,
+                onToggleShuffle = onToggleShuffle,
+                onCycleRepeat = onCycleRepeat,
+                onToggleFavorite = onToggleFavorite,
                 onCollapse = onCollapse,
                 onOpenEffects = {
                     effectsInitialTab = 1
                     showEffectsSheet = true
                 },
+                onOpenQueue = { showQueueSheet = true },
+                onOpenDesignSelector = { showDesignSelectorDialog = true },
+                onOpenLyrics = { showLyrics = true },
+                onOpenFullScreenLyrics = { isFullScreenLyricsOpen = true },
                 onOpenDetails = { showDetailsDialog = true },
-                onOpenVideoMode = { showVideoModeDialog = true },
-                isLyricsActive = showLyrics,
-                onToggleLyrics = { showLyrics = !showLyrics },
-                isABLoopActive = abLoopState.isLoopingActive,
-                isVocalClarityActive = vocalClarityConfig.enabled
+                collectionContextTitle = collectionContextTitle
             )
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .windowInsetsPadding(WindowInsets.navigationBars)
+                    .padding(horizontal = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Barra Superior
+                NowPlayingTopBar(
+                    currentTrack = currentTrack,
+                    sleepTimerState = sleepTimerState,
+                    spatial8DConfig = spatial8DConfig,
+                    videoDisplayMode = videoDisplayMode,
+                    animatedPrimary = animatedPrimary,
+                    onCollapse = onCollapse,
+                    onOpenEffects = {
+                        effectsInitialTab = 1
+                        showEffectsSheet = true
+                    },
+                    onOpenDetails = { showDetailsDialog = true },
+                    onOpenVideoMode = { showVideoModeDialog = true },
+                    isLyricsActive = showLyrics,
+                    onToggleLyrics = { showLyrics = !showLyrics },
+                    isABLoopActive = abLoopState.isLoopingActive,
+                    isVocalClarityActive = vocalClarityConfig.enabled,
+                    onOpenDesignSelector = { showDesignSelectorDialog = true }
+                )
 
             Spacer(modifier = Modifier.weight(0.5f))
 
@@ -551,6 +597,7 @@ fun NowPlayingScreen(
 
             Spacer(modifier = Modifier.weight(0.5f))
         }
+    }
 
         // Hoja Inferior: Cola de Reproducción (Up Next)
         if (showQueueSheet) {
@@ -718,6 +765,16 @@ fun NowPlayingScreen(
                 onImportLyricsUri = onImportLyricsUri,
                 onSaveCustomLyrics = onSaveCustomLyrics,
                 onFetchOnlineLyrics = onFetchOnlineLyrics
+            )
+        }
+
+        // Diálogo para seleccionar el diseño del reproductor (Clásico vs Cinemático Canvas)
+        if (showDesignSelectorDialog) {
+            NowPlayingDesignSelectorDialog(
+                currentDesignMode = nowPlayingDesignMode,
+                animatedPrimary = animatedPrimary,
+                onSetDesignMode = onSetNowPlayingDesignMode,
+                onDismissRequest = { showDesignSelectorDialog = false }
             )
         }
     }

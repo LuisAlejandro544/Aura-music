@@ -70,6 +70,8 @@ Este archivo define el contexto de diseño, directrices técnicas y restriccione
      - `FULLSCREEN_ADAPTED`: El video horizontal se adapta al ancho completo (`RESIZE_MODE_FIT`) sin recortar caras.
      - `CARD_CANVAS`: El video se reproduce dentro del marco central de la carátula (1:1).
      - `OFF`: Desactivado; solo se muestra la carátula estática.
+   - **Selección de Diseños del Reproductor (`NowPlayingDesignMode`)**:
+     - El usuario puede alternar libremente entre el **Modo Clásico** (carátula grande 1:1, visualizador de 28 bandas y controles tradicionales), el **Modo Cinemático Canvas** (estilo Spotify con video de fondo completo despejado, minicarátula de 54dp, frase lírica flotante, controles en el tercio inferior con botón Play/Pausa de 64dp y acceso a vista previa de letras) o el modo **Automático Inteligente** (conmuta al estilo cinemático al haber Video Canvas activo). La preferencia se persiste en `pref_now_playing_design_mode`.
    - **Armonización Cromática Sin Interferencia**: Cuando el video está activo, el resplandor ambiental (*ambient aura*), visualizador y acentos se extraen de un fotograma clave del video en lugar de la carátula, garantizando que el color de la carátula estática no choque con la imagen en movimiento del video.
    - El reproductor de video de fondo opera con `volume = 0.0f` para no contaminar el procesador PCM ni el motor DSP C++20 de audio principal.
    - **Sincronización Reactiva de Favoritos**: El corazón en Now Playing refleja instantáneamente el estado de `isFavorite` (rojo al estar marcado) sincronizándose con Room y ExoPlayer. La lista de inicio "Populares en tu biblioteca" permanece estable y nunca oculta canciones al marcar favoritos.

@@ -147,5 +147,6 @@ Este documento define el protocolo de trabajo para los agentes de software y des
 - [x] ¿La Normalización de Volumen Inteligente (Loudness Normalizer Spotify / EBU R128) en C++20 (`VolumeNormalizerProcessor`) nivela la energía entre canciones con modos Sutil (-18 LUFS), Estándar (-14 LUFS) y Alto (-11 LUFS) sin distorsión?
 - [x] ¿El Automix Inteligente DJ con Curva de Ecualización en X (`DjAutomixFilter`) atenúa subgraves (<120 Hz) durante la mezcla y detecta el outro acústico (<0.07f) para transiciones fluidas de discoteca?
 - [x] ¿El Modo Karaoke a Pantalla Completa Inmersivo (`FullScreenLyricsScreen`) proporciona una experiencia visual tipo Spotify / Apple Music Sing con resaltado neón, escala dinámica, auto-scroll interactivo y barra de transporte flotante?
+- [x] ¿El usuario puede seleccionar libremente entre los diseños del reproductor (Modo Clásico con carátula 1:1 vs Modo Cinemático Canvas estilo Spotify con video de fondo completo, minicarátula lateral, frase lírica flotante y controles en el tercio inferior, o selección Automática Inteligente) con persistencia en preferencias?
 - [x] ¿Los 5 archivos Markdown (`README.md`, `ROADMAP.md`, `STRUCTURE.md`, `AI_CONTEXT.md`, `AGENTS.md`) están actualizados y en español?
 

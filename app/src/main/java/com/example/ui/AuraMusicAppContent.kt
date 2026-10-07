@@ -88,6 +88,7 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
     val abLoopState by viewModel.abLoopState.collectAsStateWithLifecycle()
     val videoDisplayMode by viewModel.videoDisplayMode.collectAsStateWithLifecycle()
     val isVideoCanvasActive by viewModel.isVideoCanvasActive.collectAsStateWithLifecycle()
+    val nowPlayingDesignMode by viewModel.nowPlayingDesignMode.collectAsStateWithLifecycle()
     val isDynamicArtworkColorEnabled by viewModel.isDynamicArtworkColorEnabled.collectAsStateWithLifecycle()
     val isMiniPlayerVideoEnabled by viewModel.isMiniPlayerVideoEnabled.collectAsStateWithLifecycle()
     val headphoneConfig by viewModel.headphoneConfig.collectAsStateWithLifecycle()
@@ -384,6 +385,8 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
                                 onToggleDynamicArtworkColor = { viewModel.toggleDynamicArtworkColor(it) },
                                 isMiniPlayerVideoEnabled = isMiniPlayerVideoEnabled,
                                 onToggleMiniPlayerVideo = { viewModel.toggleMiniPlayerVideoEnabled() },
+                                nowPlayingDesignMode = nowPlayingDesignMode,
+                                onSetNowPlayingDesignMode = { viewModel.setNowPlayingDesignMode(it) },
                                 headphoneConfig = headphoneConfig,
                                 onUpdateHeadphoneConfig = { viewModel.updateHeadphoneConfig(it) },
                                 onSetCrossfeedEnabled = { viewModel.setCrossfeedEnabled(it) },
@@ -457,6 +460,9 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
                 },
                 isVideoCanvasActive = isVideoCanvasActive,
                 videoDisplayMode = videoDisplayMode,
+                nowPlayingDesignMode = nowPlayingDesignMode,
+                onSetNowPlayingDesignMode = { viewModel.setNowPlayingDesignMode(it) },
+                collectionContextTitle = selectedPlaylist?.name ?: currentTrack?.album ?: "Tu Biblioteca",
                 isDynamicArtworkColorEnabled = isDynamicArtworkColorEnabled,
                 onToggleVideoCanvas = { viewModel.toggleVideoCanvas() },
                 onSetVideoDisplayMode = { viewModel.setVideoDisplayMode(it) },

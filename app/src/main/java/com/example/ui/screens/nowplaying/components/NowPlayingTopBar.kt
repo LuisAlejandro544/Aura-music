@@ -46,6 +46,7 @@ fun NowPlayingTopBar(
     onToggleLyrics: () -> Unit = {},
     isABLoopActive: Boolean = false,
     isVocalClarityActive: Boolean = false,
+    onOpenDesignSelector: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val hasVideo = !currentTrack.videoUri.isNullOrEmpty()
@@ -130,6 +131,23 @@ fun NowPlayingTopBar(
                     tint = TextSecondary,
                     modifier = Modifier.size(20.dp)
                 )
+            }
+
+            // Botón de Selector de Diseño del Reproductor
+            if (onOpenDesignSelector != null) {
+                IconButton(
+                    onClick = onOpenDesignSelector,
+                    modifier = Modifier
+                        .size(38.dp)
+                        .testTag("now_playing_design_selector_btn")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.DashboardCustomize,
+                        contentDescription = "Cambiar diseño del reproductor",
+                        tint = animatedPrimary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
 
             // Botón de Modo de Video (tamaño ergonómico y robusto de alto contraste, cero deformación)

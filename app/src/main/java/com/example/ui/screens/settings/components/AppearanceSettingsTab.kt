@@ -29,6 +29,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.AuraTheme
+import com.example.model.NowPlayingDesignMode
+import com.example.ui.screens.nowplaying.components.NowPlayingDesignSelectorDialog
+import androidx.compose.material.icons.filled.DashboardCustomize
+import androidx.compose.material.icons.filled.ChevronRight
 import com.example.ui.theme.CardBorder
 import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.TextPrimary
@@ -48,8 +52,78 @@ fun LazyListScope.appearanceSettingsTab(
     onToggleDynamicArtworkColor: (Boolean) -> Unit,
     isMiniPlayerVideoEnabled: Boolean = true,
     onToggleMiniPlayerVideo: (Boolean) -> Unit = {},
+    nowPlayingDesignMode: NowPlayingDesignMode = NowPlayingDesignMode.AUTO,
+    onSetNowPlayingDesignMode: (NowPlayingDesignMode) -> Unit = {},
     onOpenOnboarding: () -> Unit = {}
 ) {
+    // Opción: Estilo de Diseño del Reproductor (Now Playing)
+    item {
+        var showDesignSelector by remember { mutableStateOf(false) }
+
+        Card(
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = SurfaceCard),
+            border = BorderStroke(1.dp, CardBorder),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(18.dp))
+                .clickable { showDesignSelector = true }
+                .testTag("now_playing_design_card")
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(18.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.DashboardCustomize,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Diseño del Reproductor",
+                            style = MaterialTheme.typography.titleSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "${nowPlayingDesignMode.label} • ${nowPlayingDesignMode.description}",
+                        style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(10.dp))
+
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = null,
+                    tint = TextSecondary,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
+
+        if (showDesignSelector) {
+            NowPlayingDesignSelectorDialog(
+                currentDesignMode = nowPlayingDesignMode,
+                animatedPrimary = MaterialTheme.colorScheme.primary,
+                onSetDesignMode = onSetNowPlayingDesignMode,
+                onDismissRequest = { showDesignSelector = false }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+    }
+
     // Opción Avanzada: Aura Dinámica de Carátula
     item {
         Card(
