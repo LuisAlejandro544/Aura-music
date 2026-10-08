@@ -380,6 +380,47 @@ object YtDlpNativeEngine {
                 retryErrThread.join()
             }
 
+            // Reintento automático inmediato ante fallos transitorios (ej. conexión efímera o firma temporal)
+            if (exitCode != 0 || jsonOutput.isBlank()) {
+                AuraDebugManager.logWarning(TAG, "Primer intento de yt-dlp finalizó con código $exitCode. Ejecutando reintento automático inmediato...")
+                jsonOutput.clear()
+                errorLog.clear()
+
+                val secondPb = ProcessBuilder(cmdList)
+                    .directory(File(nativeDir))
+                    .redirectErrorStream(false)
+                secondPb.environment().putAll(processBuilder.environment())
+
+                val secondProcess = secondPb.start()
+                val secondOutThread = Thread {
+                    try {
+                        BufferedReader(InputStreamReader(secondProcess.inputStream)).use { r ->
+                            var l: String?
+                            while (r.readLine().also { l = it } != null) {
+                                jsonOutput.append(l)
+                            }
+                        }
+                    } catch (_: Exception) {}
+                }
+                secondOutThread.start()
+
+                val secondErrThread = Thread {
+                    try {
+                        BufferedReader(InputStreamReader(secondProcess.errorStream)).use { r ->
+                            var l: String?
+                            while (r.readLine().also { l = it } != null) {
+                                errorLog.append(l).append("\n")
+                            }
+                        }
+                    } catch (_: Exception) {}
+                }
+                secondErrThread.start()
+
+                exitCode = secondProcess.waitFor()
+                secondOutThread.join()
+                secondErrThread.join()
+            }
+
             if (exitCode != 0 || jsonOutput.isBlank()) {
                 AuraDebugManager.logWarning(TAG, "yt-dlp terminó con código $exitCode. Error: ${errorLog.takeLast(300)}")
                 return@withContext Result.failure(

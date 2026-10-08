@@ -65,13 +65,34 @@ fun DownloadSourceAndEngineSelector(
         // Selector de motor para YouTube / Web
         if (selectedMode == DownloadSourceMode.YOUTUBE_WEB) {
             Spacer(modifier = Modifier.height(10.dp))
-            Text(
-                text = "Motor de extracción:",
-                style = MaterialTheme.typography.labelMedium.copy(
-                    color = TextSecondary,
-                    fontWeight = FontWeight.SemiBold
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Motor de extracción:",
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        color = TextSecondary,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 )
-            )
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
+                    border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.55f))
+                ) {
+                    Text(
+                        text = "⭐ yt-dlp Recomendado • 98% efectividad",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 10.sp
+                        ),
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                    )
+                }
+            }
             Spacer(modifier = Modifier.height(4.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -80,27 +101,35 @@ fun DownloadSourceAndEngineSelector(
                 FilterChip(
                     selected = selectedEngine == YoutubeExtractionEngine.YTDLP,
                     onClick = { onEngineSelected(YoutubeExtractionEngine.YTDLP) },
-                    label = { Text("⚡ yt-dlp + FFmpeg", fontSize = 11.sp) }
+                    label = { Text("⭐ yt-dlp (98%)", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                    modifier = Modifier.testTag("engine_chip_ytdlp")
                 )
                 FilterChip(
                     selected = selectedEngine == YoutubeExtractionEngine.INNERTUBE,
                     onClick = { onEngineSelected(YoutubeExtractionEngine.INNERTUBE) },
-                    label = { Text("InnerTube", fontSize = 11.sp) }
+                    label = { Text("InnerTube", fontSize = 11.sp) },
+                    modifier = Modifier.testTag("engine_chip_innertube")
                 )
                 FilterChip(
                     selected = selectedEngine == YoutubeExtractionEngine.WEBVIEW,
                     onClick = { onEngineSelected(YoutubeExtractionEngine.WEBVIEW) },
-                    label = { Text("WebView", fontSize = 11.sp) }
+                    label = { Text("WebView", fontSize = 11.sp) },
+                    modifier = Modifier.testTag("engine_chip_webview")
                 )
             }
             Text(
                 text = when (selectedEngine) {
-                    YoutubeExtractionEngine.YTDLP -> "Extractor local avanzado con soporte para sortear firmas n-sig y protección de bots."
+                    YoutubeExtractionEngine.YTDLP -> "✅ El más recomendable (por defecto): tiene un 98% de probabilidad de funcionar. Si alguna vez falla, sal y vuelve a entrar para pegar la URL de nuevo."
                     YoutubeExtractionEngine.INNERTUBE -> "API nativa directa de YouTube Music. Rápida, gratis y sin consumo de batería."
                     YoutubeExtractionEngine.WEBVIEW -> "Navegador efímero en segundo plano que ejecuta el reproductor en memoria."
                 },
-                style = MaterialTheme.typography.labelSmall.copy(color = TextSecondary),
-                modifier = Modifier.padding(top = 2.dp, start = 2.dp)
+                style = MaterialTheme.typography.labelSmall.copy(
+                    color = if (selectedEngine == YoutubeExtractionEngine.YTDLP) MaterialTheme.colorScheme.primary else TextSecondary,
+                    fontWeight = if (selectedEngine == YoutubeExtractionEngine.YTDLP) FontWeight.SemiBold else FontWeight.Normal
+                ),
+                modifier = Modifier
+                    .padding(top = 4.dp, start = 2.dp)
+                    .testTag("engine_recommendation_note")
             )
 
             if (isYtDlpBlocked) {

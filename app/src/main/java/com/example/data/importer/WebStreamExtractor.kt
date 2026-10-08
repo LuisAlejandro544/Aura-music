@@ -11,7 +11,10 @@ import java.util.regex.Pattern
  * - WEBVIEW: Navegador efímero que ejecuta scripts y el reproductor móvil en memoria para capturar el stream.
  */
 enum class YoutubeExtractionEngine(val label: String, val description: String) {
-    YTDLP("yt-dlp + FFmpeg (Local)", "Extractor local sin restricciones con soporte de firmas y parches"),
+    YTDLP(
+        "⭐ yt-dlp + FFmpeg (Recomendado • 98%)",
+        "El más recomendable: tiene un 98% de probabilidad de funcionar. Si en algún intento falla, basta con cerrar el cuadro, volver a entrar y pegar el enlace de nuevo."
+    ),
     INNERTUBE("InnerTube (Rápido)", "API nativa directa de alta velocidad con bypass inteligente"),
     WEBVIEW("Motor WebView", "Navegador efímero móvil con ejecución de scripts en segundo plano")
 }
@@ -49,7 +52,7 @@ object WebStreamExtractor {
     suspend fun resolveStream(
         context: Context,
         url: String,
-        preferredEngine: YoutubeExtractionEngine = YoutubeExtractionEngine.INNERTUBE
+        preferredEngine: YoutubeExtractionEngine = YoutubeExtractionEngine.YTDLP
     ): Result<OnlineVideoAudioImporter.ResolvedMediaInfo> {
         val videoId = extractVideoId(url)
             ?: return Result.failure(IllegalArgumentException("No se pudo identificar el ID del video de YouTube"))

@@ -44,7 +44,7 @@ object OnlineVideoAudioImporter {
     suspend fun resolveMediaLink(
         linkUrl: String,
         context: Context? = null,
-        engine: YoutubeExtractionEngine = YoutubeExtractionEngine.INNERTUBE
+        engine: YoutubeExtractionEngine = YoutubeExtractionEngine.YTDLP
     ): Result<ResolvedMediaInfo> = withContext(Dispatchers.IO) {
         val cleanUrl = linkUrl.trim()
         if (cleanUrl.isBlank()) {
