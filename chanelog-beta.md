@@ -6,7 +6,7 @@
 > **Codename de la Serie Beta:** **Nebula**  
 > **Repositorio & Releases Oficiales:** [https://github.com/LuisAlejandro544/Aura-music/releases](https://github.com/LuisAlejandro544/Aura-music/releases)  
 > **Requisitos del Sistema:** Android 8.0 Oreo (API 26) hasta Android 15+ (API 36)  
-> **Estado de Depuración:** Producción Beta Limpia *(Sin Aura Monitor ni LeakCanary; con Actualizador OTA de `yt-dlp` y Actualizador de APK 100% activos)*
+> **Estado de Depuración:** Producción Beta Limpia *(Sin Aura Monitor, sin generador de audios de prueba ni LeakCanary; con Actualizador OTA de `yt-dlp` y Actualizador de APK 100% activos)*
 
 ---
 

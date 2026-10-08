@@ -31,6 +31,7 @@ import com.example.ui.theme.TextPrimary
 fun BottomNavBar(
     currentScreen: NavScreen,
     onNavigate: (NavScreen) -> Unit,
+    showSettingsBadge: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     NavigationBar(
@@ -104,10 +105,20 @@ fun BottomNavBar(
             selected = currentScreen is NavScreen.Settings,
             onClick = { onNavigate(NavScreen.Settings) },
             icon = {
-                Icon(
-                    imageVector = if (currentScreen is NavScreen.Settings) Icons.Filled.Settings else Icons.Outlined.Settings,
-                    contentDescription = "Configuración y Ajustes"
-                )
+                BadgedBox(
+                    badge = {
+                        if (showSettingsBadge && currentScreen !is NavScreen.Settings) {
+                            Badge(
+                                containerColor = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                ) {
+                    Icon(
+                        imageVector = if (currentScreen is NavScreen.Settings) Icons.Filled.Settings else Icons.Outlined.Settings,
+                        contentDescription = "Configuración y Ajustes"
+                    )
+                }
             },
             label = { Text("Ajustes") },
             colors = NavigationBarItemDefaults.colors(

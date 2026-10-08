@@ -11,6 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -101,13 +102,36 @@ fun NowPlayingBalanceBar(
                 thumb = {
                     Box(
                         contentAlignment = Alignment.Center,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(18.dp)
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(13.dp)
+                                .size(18.dp)
+                                .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.30f), CircleShape)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(12.dp)
                                 .shadow(elevation = 2.dp, shape = CircleShape)
-                                .background(MaterialTheme.colorScheme.secondary, CircleShape)
+                                .background(Color.White, CircleShape)
+                        )
+                    }
+                },
+                track = {
+                    val fraction = ((headphoneConfig.stereoBalance + 1f) / 2f).coerceIn(0f, 1f)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(Color(0xFF232736))
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(fraction)
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(MaterialTheme.colorScheme.secondary)
                         )
                     }
                 },

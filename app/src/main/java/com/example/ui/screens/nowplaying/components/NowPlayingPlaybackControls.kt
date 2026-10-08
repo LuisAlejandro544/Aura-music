@@ -240,20 +240,37 @@ fun NowPlayingPlaybackControls(
                     thumb = {
                         Box(
                             contentAlignment = Alignment.Center,
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(20.dp)
                         ) {
                             // Halo exterior reactivo con el color dinámico de la pista
                             Box(
                                 modifier = Modifier
-                                    .size(18.dp)
-                                    .background(animatedPrimary.copy(alpha = 0.40f), CircleShape)
+                                    .size(20.dp)
+                                    .background(animatedPrimary.copy(alpha = 0.35f), CircleShape)
                             )
-                            // Bolita clásica sólida blanca
+                            // Bolita clásica circular sólida blanca conectada a la barra
                             Box(
                                 modifier = Modifier
-                                    .size(14.dp)
+                                    .size(13.dp)
                                     .shadow(elevation = 3.dp, shape = CircleShape)
                                     .background(Color.White, CircleShape)
+                            )
+                        }
+                    },
+                    track = {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(4.dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(Color.White.copy(alpha = 0.22f))
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(sliderValue.coerceIn(0f, 1f))
+                                    .fillMaxHeight()
+                                    .clip(RoundedCornerShape(2.dp))
+                                    .background(animatedPrimary)
                             )
                         }
                     },

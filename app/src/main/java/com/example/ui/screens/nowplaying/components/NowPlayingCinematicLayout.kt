@@ -353,7 +353,7 @@ fun NowPlayingCinematicLayout(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // 4. Barra de Progreso (Seekbar Delgada con bolita clásica y color reactivo al video)
+            // 4. Barra de Progreso (Seekbar continua con bolita clásica sin cortes ni huecos M3)
             Slider(
                 value = currentProgress,
                 onValueChange = { newVal ->
@@ -368,25 +368,42 @@ fun NowPlayingCinematicLayout(
                 colors = SliderDefaults.colors(
                     thumbColor = Color.White,
                     activeTrackColor = animatedPrimary,
-                    inactiveTrackColor = animatedPrimary.copy(alpha = 0.25f)
+                    inactiveTrackColor = Color.White.copy(alpha = 0.24f)
                 ),
                 thumb = {
                     Box(
                         contentAlignment = Alignment.Center,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(20.dp)
                     ) {
-                        // Halo de luz ambiental reactivo al color del video
+                        // Halo sutil reactivo al color del video
                         Box(
                             modifier = Modifier
-                                .size(18.dp)
-                                .background(animatedPrimary.copy(alpha = 0.40f), CircleShape)
+                                .size(20.dp)
+                                .background(animatedPrimary.copy(alpha = 0.35f), CircleShape)
                         )
-                        // Bolita clásica sólida blanca
+                        // Bolita clásica circular blanca pura conectada a la barra
                         Box(
                             modifier = Modifier
-                                .size(14.dp)
+                                .size(13.dp)
                                 .shadow(elevation = 3.dp, shape = CircleShape)
                                 .background(Color.White, CircleShape)
+                        )
+                    }
+                },
+                track = {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(Color.White.copy(alpha = 0.24f))
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(currentProgress.coerceIn(0f, 1f))
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(animatedPrimary)
                         )
                     }
                 },

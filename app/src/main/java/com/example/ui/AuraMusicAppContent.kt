@@ -18,6 +18,7 @@ import com.example.model.VideoDisplayMode
 import com.example.ui.components.BottomNavBar
 import com.example.ui.components.MiniPlayer
 import com.example.ui.components.PackageUpdateBanner
+import com.example.ui.components.SettingsDiscoveryBanner
 import com.example.ui.navigation.NavScreen
 import com.example.ui.screens.home.HomeScreen
 import com.example.ui.screens.importmusic.ImportMusicScreen
@@ -41,6 +42,7 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
     val context = LocalContext.current
 
     val currentScreen by viewModel.currentScreen.collectAsStateWithLifecycle()
+    val hasVisitedSettings by viewModel.hasVisitedSettings.collectAsStateWithLifecycle()
     val isNowPlayingExpanded by viewModel.isNowPlayingExpanded.collectAsStateWithLifecycle()
 
     // Estados de reproducción Media3
@@ -221,7 +223,8 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
 
                         BottomNavBar(
                             currentScreen = currentScreen,
-                            onNavigate = { viewModel.navigateTo(it) }
+                            onNavigate = { viewModel.navigateTo(it) },
+                            showSettingsBadge = !hasVisitedSettings
                         )
                     }
                 }
@@ -236,6 +239,11 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
                     PackageUpdateBanner(
                         state = packageUpdateState,
                         onApplyAndRestart = { viewModel.applyPendingPackageUpdateAndRestart() }
+                    )
+                    SettingsDiscoveryBanner(
+                        visible = !hasVisitedSettings && currentScreen !is NavScreen.Settings,
+                        onExploreSettings = { viewModel.navigateTo(NavScreen.Settings) },
+                        onDismiss = { viewModel.markSettingsVisited() }
                     )
                 }
 

@@ -49,6 +49,7 @@ android {
     buildConfigField("String", "APP_CODENAME", "\"Nebula\"")
     buildConfigField("String", "APP_BUILD_CODE", "\"NEBULA-00101A\"")
     buildConfigField("boolean", "ENABLE_DEBUG_MONITOR", "true")
+    buildConfigField("boolean", "ENABLE_DEMO_TRACKS", "true")
     val githubRepoSlug = (System.getenv("GITHUB_REPOSITORY")?.trim()?.takeIf { it.isNotEmpty() }) ?: "LuisAlejandro544/Aura-music"
     buildConfigField("String", "GITHUB_REPO_SLUG", "\"$githubRepoSlug\"")
     buildConfigField("String", "GITHUB_RELEASES_URL", "\"https://github.com/LuisAlejandro544/Aura-music/releases\"")
@@ -136,6 +137,7 @@ android {
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig = signingConfigs.getByName("release")
       buildConfigField("boolean", "ENABLE_DEBUG_MONITOR", "false")
+      buildConfigField("boolean", "ENABLE_DEMO_TRACKS", "false")
     }
     create("beta") {
       applicationIdSuffix = ""
@@ -150,12 +152,14 @@ android {
       buildConfigField("String", "APP_CODENAME", "\"Nebula\"")
       buildConfigField("String", "APP_BUILD_CODE", "\"NEBULA-00101A\"")
       buildConfigField("boolean", "ENABLE_DEBUG_MONITOR", "false")
+      buildConfigField("boolean", "ENABLE_DEMO_TRACKS", "false")
     }
     debug {
       signingConfig = signingConfigs.getByName("debugConfig")
       buildConfigField("String", "APP_CODENAME", "\"Nebula\"")
       buildConfigField("String", "APP_BUILD_CODE", "\"NEBULA-00101A-DBG\"")
       buildConfigField("boolean", "ENABLE_DEBUG_MONITOR", "true")
+      buildConfigField("boolean", "ENABLE_DEMO_TRACKS", "true")
     }
   }
     compileOptions {

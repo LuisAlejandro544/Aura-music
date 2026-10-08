@@ -159,6 +159,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     // Estados de navegación y UI
     val isOnboardingCompleted = navigationCoordinator.isOnboardingCompleted
+    val hasVisitedSettings = navigationCoordinator.hasVisitedSettings
     val currentScreen = navigationCoordinator.currentScreen
     val selectedPlaylist = navigationCoordinator.selectedPlaylist
     val selectedPlaylistTracks = navigationCoordinator.selectedPlaylistTracks
@@ -287,6 +288,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     // --- Navegación ---
     fun navigateTo(screen: NavScreen) = navigationCoordinator.navigateTo(screen)
+    fun markSettingsVisited() = navigationCoordinator.markSettingsVisited()
     fun completeOnboarding() = navigationCoordinator.completeOnboarding()
     fun reopenOnboarding() = navigationCoordinator.reopenOnboarding()
     fun handleBackPress(): Boolean = navigationCoordinator.handleBackPress()

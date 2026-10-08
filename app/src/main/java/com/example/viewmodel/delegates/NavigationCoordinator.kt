@@ -32,6 +32,11 @@ class NavigationCoordinator(
     )
     val isOnboardingCompleted: StateFlow<Boolean> = _isOnboardingCompleted.asStateFlow()
 
+    private val _hasVisitedSettings = MutableStateFlow(
+        appPrefs.getBoolean("pref_has_visited_settings", false)
+    )
+    val hasVisitedSettings: StateFlow<Boolean> = _hasVisitedSettings.asStateFlow()
+
     private val _currentScreen = MutableStateFlow<NavScreen>(
         if (appPrefs.getBoolean("pref_onboarding_completed", false)) NavScreen.Home else NavScreen.Onboarding
     )
@@ -124,6 +129,9 @@ class NavigationCoordinator(
                     _nowPlayingDesignMode.value = NowPlayingDesignMode.valueOf(design ?: NowPlayingDesignMode.AUTO.name)
                 } catch (_: Exception) {}
             }
+            "pref_has_visited_settings" -> {
+                _hasVisitedSettings.value = prefs.getBoolean(key, false)
+            }
         }
     }
 
@@ -132,10 +140,18 @@ class NavigationCoordinator(
     }
 
     fun navigateTo(screen: NavScreen) {
+        if (screen is NavScreen.Settings && !_hasVisitedSettings.value) {
+            markSettingsVisited()
+        }
         if (_currentScreen.value != screen) {
             screenBackStack.add(screen)
             _currentScreen.value = screen
         }
+    }
+
+    fun markSettingsVisited() {
+        _hasVisitedSettings.value = true
+        appPrefs.edit().putBoolean("pref_has_visited_settings", true).apply()
     }
 
     fun completeOnboarding() {

@@ -345,20 +345,22 @@ fun ImportMusicScreen(
             Spacer(modifier = Modifier.height(12.dp))
         }
 
-        // Opción 3: Probar con canciones demo
-        item {
-            ImportActionCard(
-                title = "Cargar Canciones Demo Synthwave",
-                description = "Añade pistas de demostración con audio sintetizado para probar el reproductor y el ecualizador ahora mismo.",
-                buttonText = "Añadir Demos",
-                icon = Icons.Default.ElectricBolt,
-                accentGradient = Brush.horizontalGradient(
-                    listOf(Color(0xFFF97316), Color(0xFFF43F5E))
-                ),
-                onClick = onSeedDemoTracks,
-                testTag = "import_demos_btn"
-            )
-            Spacer(modifier = Modifier.height(20.dp))
+        // Opción 3: Probar con canciones demo (Exclusivo en compilación Debug; oculto en APK Beta)
+        if (com.example.BuildConfig.ENABLE_DEMO_TRACKS) {
+            item {
+                ImportActionCard(
+                    title = "Cargar Canciones Demo Synthwave",
+                    description = "Añade pistas de demostración con audio sintetizado para probar el reproductor y el ecualizador ahora mismo.",
+                    buttonText = "Añadir Demos",
+                    icon = Icons.Default.ElectricBolt,
+                    accentGradient = Brush.horizontalGradient(
+                        listOf(Color(0xFFF97316), Color(0xFFF43F5E))
+                    ),
+                    onClick = onSeedDemoTracks,
+                    testTag = "import_demos_btn"
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+            }
         }
 
         // Resumen de la biblioteca actual y opción de reinicio
@@ -567,10 +569,14 @@ fun ImportMusicScreen(
         )
     }
 
-    // Cierre automático del diálogo al finalizar la descarga exitosamente
-    LaunchedEffect(downloadProgress.isDownloading) {
-        if (!downloadProgress.isDownloading && showDownloadFromLinkDialog && isImporting) {
+    // Cierre garantizado del diálogo al finalizar la descarga o cuando se importa la pista
+    var wasDownloadingInModal by remember { mutableStateOf(false) }
+    LaunchedEffect(downloadProgress.isDownloading, allTracks.size) {
+        if (downloadProgress.isDownloading && showDownloadFromLinkDialog) {
+            wasDownloadingInModal = true
+        } else if (!downloadProgress.isDownloading && wasDownloadingInModal) {
             showDownloadFromLinkDialog = false
+            wasDownloadingInModal = false
         }
     }
 
@@ -578,11 +584,18 @@ fun ImportMusicScreen(
         com.example.ui.components.DownloadFromLinkDialog(
             initialMode = downloadDialogMode,
             downloadProgress = downloadProgress,
-            onDismiss = { showDownloadFromLinkDialog = false },
+            onDismiss = {
+                showDownloadFromLinkDialog = false
+                wasDownloadingInModal = false
+            },
             onConfirmDownload = { info, title, artist, attachCanvas, trimSilence ->
+                showDownloadFromLinkDialog = false
+                wasDownloadingInModal = false
                 onDownloadFromLink(info, title, artist, attachCanvas, trimSilence)
             },
             onConfirmDownloadWithLoopStyle = { info, title, artist, attachCanvas, trimSilence, loopStyle ->
+                showDownloadFromLinkDialog = false
+                wasDownloadingInModal = false
                 onDownloadFromLinkWithLoopStyle(info, title, artist, attachCanvas, trimSilence, loopStyle)
             }
         )

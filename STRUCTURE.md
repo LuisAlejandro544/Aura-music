@@ -17,11 +17,14 @@ El proyecto sigue una arquitectura reactiva y desacoplada organizada en capas:
    - `AuraAudioPlayer` con ExoPlayer/Media3, modularizado con controladores especializados (`PlayerQueueController`, `AudioFadeController`, `ABLoopController`, `MediaSessionBridge`).
    - `NativeAudioEngine` conectando buffers de audio PCM en C++20 vía JNI.
 4. **Capa de Lógica de Negocio & Estado (ViewModel Layer)**:
-   - `MusicViewModel` modularizado y ultra liviano (< 400 líneas), orquestado por coordinadores y delegados especializados:
-     - `TrackLibraryCoordinator`: CRUD de pistas y playlists, importación SAF de archivos/carpetas y canciones de muestra.
+   - `MusicViewModel` modularizado y ultra liviano, orquestado por coordinadores y delegados especializados:
+     - `AudioEffectsCoordinator`: Ecualizador C++20 de 10 bandas, Audio 8D/16D, Clarificador de Voces HD, Reverb, Normalizador EBU R128, Automix DJ y Sleep Timer.
+     - `NavigationCoordinator`: Rutas de navegación, temas visuales, modo de diseño del reproductor y selección de colecciones.
+     - `TrackLibraryCoordinator`: CRUD de pistas y playlists, importación SAF de archivos/carpetas, Video a Música y descargas en segundo plano con `AuraDownloadService`.
      - `LyricsCoordinator`: Gestión de letras locales y remotas LRCLIB.
      - `IncomingMediaCoordinator`: Recepción "Abrir con..." y "Compartir con...".
-     - `HeadphoneSettingsCoordinator`: Detección acústica de auriculares, guardado y balance estéreo.
+     - `HeadphoneSettingsCoordinator`: Detección acústica de auriculares, modo Bit-Perfect/AAudio, guardado y balance estéreo.
+     - `MixtapeCoordinator`: Fusión continua de canciones en FFmpeg y capítulos reactivos en tiempo real.
 5. **Capa de Presentación (UI con Jetpack Compose & Material 3)**:
    - Pantallas modulares (`HomeScreen`, `LibraryScreen`, `NowPlayingScreen`, `SettingsScreen`, `ImportMusicScreen`, `OnboardingScreen`, `PlaylistDetailScreen`).
    - Host global modularizado (`AuraMusicAppContent`, `GlobalDialogsHost`).
@@ -72,6 +75,9 @@ app/
 │   │       │   ├── storage/
 │   │       │   │   └── AppStorageManager.kt    # Manejo de disco en Android/data/.../files/
 │   │       │   │
+│   │       │   ├── updater/
+│   │       │   │   └── AppReleaseUpdater.kt    # Actualizador automático de versiones APK desde GitHub Releases
+│   │       │   │
 │   │       │   └── importer/                   # Motores de Descarga, Conversión y Medios
 │   │       │       ├── mixtape/                    # Motor de Fusión y Capítulos de Mixtape
 │   │       │       │   └── MixtapeEngine.kt        # Fusión FFmpeg acrossfade, collage WebP y capítulos
@@ -112,24 +118,29 @@ app/
 │   │       │       └── MediaSessionBridge.kt   # Notificación nativa System Media Controls
 │   │       │
 │   │       ├── viewmodel/                      # Capa ViewModel y Coordinadores
-│   │       │   ├── MusicViewModel.kt           # ViewModel principal desacoplado (< 400 líneas)
+│   │       │   ├── MusicViewModel.kt           # ViewModel principal desacoplado
 │   │       │   └── delegates/
-│   │       │       ├── TrackLibraryCoordinator.kt       # Operaciones de pistas y playlists
+│   │       │       ├── AudioEffectsCoordinator.kt       # Coordinador de efectos C++20 y Sleep Timer
+│   │       │       ├── NavigationCoordinator.kt         # Coordinador de navegación, temas y modos visuales
+│   │       │       ├── TrackLibraryCoordinator.kt       # Operaciones de pistas, playlists y descargas
 │   │       │       ├── LyricsCoordinator.kt             # Coordinación de letras sincronizadas
 │   │       │       ├── IncomingMediaCoordinator.kt      # Recepción de Intents externos
-│   │       │       ├── HeadphoneSettingsCoordinator.kt  # Ajustes de acústica y auriculares
+│   │       │       ├── HeadphoneSettingsCoordinator.kt  # Ajustes de acústica, Bit-Perfect y auriculares
 │   │       │       └── MixtapeCoordinator.kt            # Coordinador reactivo de Mixtapes y capítulos
 │   │       │
 │   │       ├── model/                          # Modelos de Dominio y Datos
 │   │       │   ├── Track.kt
 │   │       │   ├── Playlist.kt
+│   │       │   ├── AppUpdateModels.kt               # Modelos de estado y metadatos de actualización APK
 │   │       │   ├── MixtapeModels.kt                 # Modelos de capítulos y metadatos de Mixtape
 │   │       │   ├── LyricsState.kt
+│   │       │   ├── LyricSearchResult.kt
 │   │       │   ├── EqualizerConfig.kt
 │   │       │   ├── AudioEffectsConfig.kt
 │   │       │   ├── HeadphoneConfig.kt
 │   │       │   ├── DownloadProgress.kt
 │   │       │   ├── PackageUpdateState.kt
+│   │       │   ├── RepeatMode.kt
 │   │       │   ├── ThemePalette.kt
 │   │       │   ├── VideoDisplayMode.kt
 │   │       │   └── NowPlayingDesignMode.kt          # Modos de diseño: Clásico, Cinemático Canvas y Auto
@@ -194,6 +205,7 @@ app/
 │   │       │       ├── SearchLyricsDialog.kt
 │   │       │       ├── VideoToMusicDialog.kt
 │   │       │       ├── PackageUpdateBanner.kt
+│   │       │       ├── SettingsDiscoveryBanner.kt # Aviso de recomendación de Ajustes para nuevos usuarios
 │   │       │       ├── AudioEffectsBottomSheet.kt
 │   │       │       ├── audioeffects/           # Pestañas de efectos de audio
 │   │       │       ├── DownloadFromLinkDialog.kt # Diálogo de descarga modularizado

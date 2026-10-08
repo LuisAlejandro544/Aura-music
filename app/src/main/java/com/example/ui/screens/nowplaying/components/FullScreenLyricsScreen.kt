@@ -510,23 +510,40 @@ fun FullScreenLyricsScreen(
                         colors = SliderDefaults.colors(
                             thumbColor = Color.White,
                             activeTrackColor = animatedPrimary,
-                            inactiveTrackColor = Color.White.copy(alpha = 0.18f)
+                            inactiveTrackColor = Color.White.copy(alpha = 0.22f)
                         ),
                         thumb = {
                             Box(
                                 contentAlignment = Alignment.Center,
-                                modifier = Modifier.size(22.dp)
+                                modifier = Modifier.size(20.dp)
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .size(16.dp)
-                                        .background(animatedPrimary.copy(alpha = 0.40f), CircleShape)
+                                        .size(18.dp)
+                                        .background(animatedPrimary.copy(alpha = 0.35f), CircleShape)
                                 )
                                 Box(
                                     modifier = Modifier
-                                        .size(13.dp)
+                                        .size(12.dp)
                                         .shadow(elevation = 3.dp, shape = CircleShape)
                                         .background(Color.White, CircleShape)
+                                )
+                            }
+                        },
+                        track = {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(4.dp)
+                                    .clip(RoundedCornerShape(2.dp))
+                                    .background(Color.White.copy(alpha = 0.22f))
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth(progressRatio.coerceIn(0f, 1f))
+                                        .fillMaxHeight()
+                                        .clip(RoundedCornerShape(2.dp))
+                                        .background(animatedPrimary)
                                 )
                             }
                         },

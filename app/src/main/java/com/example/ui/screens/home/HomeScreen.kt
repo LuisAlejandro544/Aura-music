@@ -157,7 +157,11 @@ fun HomeScreen(
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "Aura Music respeta tu privacidad: no escanea tu teléfono automáticamente. Importa tus archivos o prueba con canciones demo.",
+                            text = if (com.example.BuildConfig.ENABLE_DEMO_TRACKS) {
+                                "Aura Music respeta tu privacidad: no escanea tu teléfono automáticamente. Importa tus archivos o prueba con canciones demo."
+                            } else {
+                                "Aura Music respeta tu privacidad: no escanea tu teléfono automáticamente. Importa tus archivos o descarga tu música favorita para empezar."
+                            },
                             style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
