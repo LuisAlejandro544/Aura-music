@@ -5,6 +5,7 @@ import android.content.ComponentCallbacks2
 import com.example.data.importer.FFmpegNativeEngine
 import com.example.data.importer.YtDlpAutoUpdater
 import com.example.data.importer.YtDlpNativeEngine
+import com.example.data.updater.AppReleaseUpdater
 import com.example.debug.AuraDebugManager
 import com.example.ui.theme.ArtworkColorExtractor
 import kotlinx.coroutines.CoroutineScope
@@ -40,6 +41,8 @@ class AuraApplication : Application() {
                 YtDlpNativeEngine.init(applicationContext)
                 // Chequeo en caliente OTA de yt-dlp sin bloquear la interfaz
                 YtDlpAutoUpdater.checkAndUpdate(applicationContext, forceDownload = false)
+                // Búsqueda silenciosa de nueva versión APK en GitHub Releases (Pre-Releases -beta)
+                AppReleaseUpdater.checkForUpdates(applicationContext, manualCheck = false)
             } catch (e: Exception) {
                 AuraDebugManager.logWarning("Application", "Aviso en inicialización de motores nativos: ${e.message}")
             }

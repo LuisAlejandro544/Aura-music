@@ -47,6 +47,9 @@ android {
     buildConfigField("String", "APP_CODENAME", "\"Nebula\"")
     buildConfigField("String", "APP_BUILD_CODE", "\"NEBULA-00101A\"")
     buildConfigField("boolean", "ENABLE_DEBUG_MONITOR", "true")
+    val githubRepoSlug = (System.getenv("GITHUB_REPOSITORY")?.trim()?.takeIf { it.isNotEmpty() }) ?: "LuisAlejandro544/Aura-music"
+    buildConfigField("String", "GITHUB_REPO_SLUG", "\"$githubRepoSlug\"")
+    buildConfigField("String", "GITHUB_RELEASES_URL", "\"https://github.com/LuisAlejandro544/Aura-music/releases\"")
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

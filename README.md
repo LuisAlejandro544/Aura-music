@@ -385,6 +385,10 @@ gradle :app:assembleBeta
   - **Regla de Activación Dual (Manual vs Pre-Release con Tag `-beta`)**:
     - Si se activa **manualmente (`workflow_dispatch`)**, genera y sube los 3 APKs únicamente a los **Artifacts** de la ejecución (no los sube a ningún Release).
     - Si se activa por un **Pre-Release con su respectivo Tag `-beta`** (ej. `v0.1.0-beta.1a`), adjunta los 3 APKs y `SHA256SUMS.txt` a los **Assets del Pre-Release** e inyecta automáticamente las notas y la tabla explicativa de APKs desde **`chanelog-beta.md`**.
+  - **Actualizador Automático de Versiones APK en la App (`AppReleaseUpdater` & `AppUpdateDialog`)**:
+    - Conectado por defecto al repositorio oficial **`LuisAlejandro544/Aura-music`** (`https://github.com/LuisAlejandro544/Aura-music/releases` y API `https://api.github.com/repos/LuisAlejandro544/Aura-music/releases`).
+    - Filtra los Pre-Releases `-beta` y compara semánticamente cualquier formato de tag dinámico (`v0.1.0-beta.1a` vs `v0.1.0-beta.2d` vs `v0.2.0-beta.1m`) desglosando versión, número de revisión beta y letra estratégica (`a`, `d`, `m`, `s`, `u`).
+    - Detecta automáticamente la arquitectura del teléfono (`Build.SUPPORTED_ABIS`) para descargar el APK exacto (`arm64-v8a`, `armeabi-v7a` o `universal`), valida su integridad SHA-256 contra `SHA256SUMS.txt`, presenta las notas de `chanelog-beta.md` y lanza el instalador de Android mediante `FileProvider` conservando todos los datos en `Android/data/com.auramusic.beta/`.
 - **Compilación de APK Debug (`.github/workflows/build-debug-apk.yml`)**:
   - Se activa manualmente desde la pestaña **Actions -> Run workflow** (`workflow_dispatch`).
   - **Caché Inteligente de Dependencias Nativas**: Mediante `actions/cache@v4`, almacena y restaura instantáneamente los binarios de FFmpeg, CPython 3.11, QuickJS y yt-dlp (`app/src/main/jniLibs` y `app/src/main/assets/bin`) basados en el hash de `app/build.gradle.kts`, `gradle/libs.versions.toml` y `app/src/main/cpp/*`.

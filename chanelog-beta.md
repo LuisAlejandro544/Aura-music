@@ -4,8 +4,9 @@
 > **Nombre en Launcher:** `Aura Beta`  
 > **Identificador de Paquete (`Android/data/`):** `com.auramusic.beta`  
 > **Codename de la Serie Beta:** **Nebula**  
+> **Repositorio & Releases Oficiales:** [https://github.com/LuisAlejandro544/Aura-music/releases](https://github.com/LuisAlejandro544/Aura-music/releases)  
 > **Requisitos del Sistema:** Android 8.0 Oreo (API 26) hasta Android 15+ (API 36)  
-> **Estado de Depuración:** Producción Beta Limpia *(Sin Aura Monitor ni LeakCanary; con Actualizador OTA de `yt-dlp` 100% activo)*
+> **Estado de Depuración:** Producción Beta Limpia *(Sin Aura Monitor ni LeakCanary; con Actualizador OTA de `yt-dlp` y Actualizador de APK 100% activos)*
 
 ---
 
@@ -54,6 +55,8 @@
   - Arquitectura resiliente de 3 niveles (**InnerTube Nativo `<300ms`** + **Bypass Invidious** + **WebView Móvil con cascada de carátulas**) + motor **CPython 3.11 / QuickJS / `yt-dlp`**.
   - **Acelerador HTTP Range Multi-Bloque**: Descarga pistas y videos a máxima velocidad (10–40 MB/s) eliminando el estrangulamiento de red, con vinculación automática de **Video Canvas en 480p** y carátula **WebP Lossless**.
   - Continúa descargando en segundo plano con notificación nativa interactiva aunque salgas de la aplicación.
+- **Actualizador Automático de Versiones APK (`AppReleaseUpdater`)**:
+  - Consulta automáticamente los Pre-Releases `-beta` de GitHub sin importar cómo cambie el tag (`v0.1.0-beta.1a` → `v0.1.0-beta.2d` → `v0.2.0-beta.1m`), detecta el procesador de tu teléfono (`arm64-v8a` o `armeabi-v7a`) para bajar el APK exacto entre los 3 disponibles, verifica su suma `SHA-256` contra `SHA256SUMS.txt`, muestra las novedades de `chanelog-beta.md` en pantalla y lanza el instalador de Android conservando intactas tus canciones y playlists en `Android/data/com.auramusic.beta/`.
 - **Actualizador Automático en Caliente de `yt-dlp` (OTA con Verificación SHA-256)**:
   - Integrado y activo en **Aura Beta**: verifica al iniciar la app (y desde *Ajustes > Motores Nativos & Actualizador yt-dlp OTA*) si existe una nueva versión oficial de `yt-dlp`, descargándola y validándola criptográficamente con `SHA2-256SUMS` para que las descargas web nunca dejen de funcionar sin necesidad de reinstalar el APK.
 - **Conversor "Video a Música" 3 en 1 (Sin PC)**:

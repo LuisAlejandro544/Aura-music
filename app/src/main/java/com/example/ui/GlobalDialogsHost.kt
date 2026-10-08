@@ -12,9 +12,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.data.updater.AppReleaseUpdater
+import com.example.model.AppUpdateState
 import com.example.model.DownloadProgress
 import com.example.model.HeadphoneConfig
 import com.example.model.SleepTimerState
+import com.example.ui.components.AppUpdateDialog
 import com.example.ui.components.AudioEffectsBottomSheet
 import com.example.ui.components.DownloadFromLinkDialog
 import com.example.ui.components.SearchLyricsDialog
@@ -24,6 +27,7 @@ import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import com.example.viewmodel.MusicViewModel
+import kotlinx.coroutines.launch
 
 /**
  * Hospedador modular de diálogos globales y hojas modulares para Aura Music.
@@ -59,6 +63,35 @@ fun GlobalDialogsHost(
     abLoopState: com.example.model.ABLoopState,
     headphoneConfig: HeadphoneConfig
 ) {
+    // 0. Modal de Actualización Automática de APK (GitHub Pre-Releases -beta / Releases)
+    val appContext = androidx.compose.ui.platform.LocalContext.current
+    val appUpdateState by AppReleaseUpdater.updateState.collectAsState()
+    val dialogScope = rememberCoroutineScope()
+    if (appUpdateState is AppUpdateState.UpdateAvailable ||
+        appUpdateState is AppUpdateState.Downloading ||
+        appUpdateState is AppUpdateState.ReadyToInstall
+    ) {
+        val currentReleaseInfo = when (val st = appUpdateState) {
+            is AppUpdateState.UpdateAvailable -> st.releaseInfo
+            is AppUpdateState.Downloading -> st.releaseInfo
+            is AppUpdateState.ReadyToInstall -> st.releaseInfo
+            else -> null
+        }
+        AppUpdateDialog(
+            updateState = appUpdateState,
+            onStartDownload = {
+                currentReleaseInfo?.let { info ->
+                    dialogScope.launch {
+                        AppReleaseUpdater.downloadAndInstallUpdate(appContext, info)
+                    }
+                }
+            },
+            onDismiss = { tagToSkip ->
+                AppReleaseUpdater.dismissCurrentUpdateDialog(appContext, tagToSkip)
+            }
+        )
+    }
+
     // 1. Modal de Búsqueda y Edición de Letras (.LRC / LRCLIB)
     val currentTrackForLyrics = viewModel.currentTrack.collectAsState().value
     val currentTheme = viewModel.currentTheme.collectAsState().value

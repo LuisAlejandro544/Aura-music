@@ -12,7 +12,7 @@ El proyecto sigue una arquitectura reactiva y desacoplada organizada en capas:
 2. **Capa de Datos & Almacenamiento (Data & Storage)**:
    - Base de datos SQLite reactiva con **Room**.
    - Acceso al almacenamiento estructurado en `Android/data/com.aistudio.musicplayer.aurasound/files/` (Debug) y `Android/data/com.auramusic.beta/files/` (APK Beta `Aura Beta` • Codename `Nebula`) con subcarpetas (`songs/`, `images/`, `lyrics/`, `metadata/`, `videos/`).
-   - Motores de importación, sincronización de letras LRCLIB, extracción FFmpeg y descarga resiliente (Chunked Range Download, InnerTube, Invidious y fallback `yt-dlp` blindado con actualización OTA activa en Debug y Beta).
+   - Motores de importación, sincronización de letras LRCLIB, extracción FFmpeg, descarga resiliente (Chunked Range Download, InnerTube, Invidious y fallback `yt-dlp` blindado con actualización OTA activa en Debug y Beta) y actualizador automático de versiones APK (`AppReleaseUpdater` con comparador semántico de tags dinámicos `-beta`, selección por arquitectura móvil y verificación SHA-256).
 3. **Capa de Control & Reproducción (Playback Layer)**:
    - `AuraAudioPlayer` con ExoPlayer/Media3, modularizado con controladores especializados (`PlayerQueueController`, `AudioFadeController`, `ABLoopController`, `MediaSessionBridge`).
    - `NativeAudioEngine` conectando buffers de audio PCM en C++20 vía JNI.

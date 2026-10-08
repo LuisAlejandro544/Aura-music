@@ -144,14 +144,14 @@ fun LazyListScope.mainSettingsMenuContent(
     // 6. Motores Nativos, yt-dlp OTA & Diagnóstico (Aura Monitor solo en Debug)
     item {
         val enginesTitle = if (com.example.BuildConfig.ENABLE_DEBUG_MONITOR) {
-            "Motores Nativos, yt-dlp OTA & Diagnóstico"
+            "Motores Nativos, Actualizador APK & Diagnóstico"
         } else {
-            "Motores Nativos & Actualizador yt-dlp OTA"
+            "Motores Nativos & Actualizador OTA (APK / yt-dlp)"
         }
         val enginesSubtitle = if (com.example.BuildConfig.ENABLE_DEBUG_MONITOR) {
-            "Arquitectura C++20/FFmpeg, actualización OTA de yt-dlp y telemetría en vivo Aura Monitor"
+            "Actualizador automático de APK (${com.example.BuildConfig.VERSION_NAME} • ${com.example.BuildConfig.APP_CODENAME}), yt-dlp OTA y Aura Monitor"
         } else {
-            "Arquitectura C++20/FFmpeg, actualización en caliente de yt-dlp (OTA) y versión ${com.example.BuildConfig.VERSION_NAME} (${com.example.BuildConfig.APP_CODENAME})"
+            "Actualizador de versiones APK (${com.example.BuildConfig.VERSION_NAME} • ${com.example.BuildConfig.APP_CODENAME}), yt-dlp OTA y C++20/FFmpeg"
         }
         SettingsNavigationCard(
             icon = Icons.Default.Build,
@@ -438,6 +438,11 @@ fun LazyListScope.enginesAndDiagnosticsSettingsContent(
                 SettingDetailRow("Código de Build", "${com.example.BuildConfig.APP_BUILD_CODE} (#${com.example.BuildConfig.VERSION_CODE})")
             }
         }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // Tarjeta del Actualizador Automático de Versiones APK (GitHub Releases / Pre-Releases -beta)
+        AppReleaseUpdateSettingsCard()
 
         Spacer(modifier = Modifier.height(20.dp))
 
