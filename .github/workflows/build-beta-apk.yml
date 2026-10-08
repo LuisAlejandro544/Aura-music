@@ -191,13 +191,35 @@ jobs:
           ls -lh
           cat SHA256SUMS.txt
 
-      - name: 📦 12. Publicar los 3 APKs en GitHub Actions Artifacts (Siempre disponible)
+      - name: 📦 12A. Publicar APK ARM 64-bits (arm64-v8a) en Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: AuraBeta-${{ env.VERSION_TAG }}-${{ env.APP_CODENAME }}-APKs
-          path: |
-            dist-beta/*.apk
-            dist-beta/SHA256SUMS.txt
+          name: AuraBeta-${{ env.VERSION_TAG }}-${{ env.APP_CODENAME }}-arm64-v8a.apk
+          path: dist-beta/AuraBeta-${{ env.VERSION_TAG }}-${{ env.APP_CODENAME }}-arm64-v8a.apk
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: 📦 12B. Publicar APK ARM 32-bits (armeabi-v7a) en Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: AuraBeta-${{ env.VERSION_TAG }}-${{ env.APP_CODENAME }}-armeabi-v7a.apk
+          path: dist-beta/AuraBeta-${{ env.VERSION_TAG }}-${{ env.APP_CODENAME }}-armeabi-v7a.apk
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: 📦 12C. Publicar APK Universal (32+64 bits) en Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: AuraBeta-${{ env.VERSION_TAG }}-${{ env.APP_CODENAME }}-universal.apk
+          path: dist-beta/AuraBeta-${{ env.VERSION_TAG }}-${{ env.APP_CODENAME }}-universal.apk
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: 📦 12D. Publicar Sumas SHA-256 en Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: AuraBeta-${{ env.VERSION_TAG }}-${{ env.APP_CODENAME }}-SHA256SUMS.txt
+          path: dist-beta/SHA256SUMS.txt
           retention-days: 30
           if-no-files-found: error
 

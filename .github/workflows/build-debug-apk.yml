@@ -146,10 +146,10 @@ jobs:
           echo "Iniciando compilación de Aura Music Debug APK..."
           ./gradlew :app:assembleDebug --no-daemon --stacktrace
 
-      - name: 📦 12. Publicar APK Debug como Artefacto Descargable
+      - name: 📦 12. Publicar APK Debug Individual como Artefacto Descargable
         uses: actions/upload-artifact@v4
         with:
-          name: AuraMusic-Debug-APK
-          path: app/build/outputs/apk/debug/*.apk
+          name: AuraMusic-Debug.apk
+          path: app/build/outputs/apk/debug/app-debug.apk
           retention-days: 14
           if-no-files-found: error
