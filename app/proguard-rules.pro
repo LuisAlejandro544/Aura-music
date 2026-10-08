@@ -41,10 +41,30 @@
     public static ** valueOf(java.lang.String);
 }
 
-# 6. Preservar metadatos de Kotlin, Coroutines y anotaciones
--keepattributes *Annotation*,InnerClasses,EnclosingMethod,Signature,SourceFile,LineNumberTable
+# 6. Optimización agresiva de R8, poda de @kotlin.Metadata (no se usa kotlin-reflect) y eliminación de chequeos Intrinsics redundantes
+-optimizationpasses 5
+-allowaccessmodification
+-repackageclasses 'aura'
+
+-assumenosideeffects class kotlin.jvm.internal.Intrinsics {
+    public static void checkNotNull(java.lang.Object);
+    public static void checkNotNull(java.lang.Object, java.lang.String);
+    public static void checkExpressionValueIsNotNull(java.lang.Object, java.lang.String);
+    public static void checkNotNullExpressionValue(java.lang.Object, java.lang.String);
+    public static void checkReturnedValueIsNotNull(java.lang.Object, java.lang.String);
+    public static void checkReturnedValueIsNotNull(java.lang.Object, java.lang.String, java.lang.String);
+    public static void checkFieldIsNotNull(java.lang.Object, java.lang.String);
+    public static void checkFieldIsNotNull(java.lang.Object, java.lang.String, java.lang.String);
+    public static void checkParameterIsNotNull(java.lang.Object, java.lang.String);
+    public static void checkNotNullParameter(java.lang.Object, java.lang.String);
+}
+
+# 7. Preservar únicamente anotaciones de runtime e información mínima sin retener tablas pesadas ni metadatos de reflexión Kotlin
+-keepattributes *Annotation*,InnerClasses,EnclosingMethod,Signature
+-dontwarn kotlin.Metadata
 -dontwarn okio.**
 -dontwarn retrofit2.**
 -dontwarn kotlinx.coroutines.**
 -dontwarn com.google.errorprone.annotations.**
+
 
