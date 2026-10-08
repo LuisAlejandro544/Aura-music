@@ -95,13 +95,36 @@ object YtDlpAutoUpdater {
     }
 
     /**
-     * Obtiene el archivo ejecutable / paquete yt-dlp local si existe.
+     * Obtiene el archivo ejecutable / paquete yt-dlp activo:
+     * - Si existe una actualización OTA descargada en `files/bin/yt-dlp`, devuelve esa versión actualizada.
+     * - En caso contrario, devuelve directamente `nativeLibraryDir/libytdlp.so` sin duplicar 3MB en `filesDir`.
      */
     fun getYtDlpFile(context: Context): File {
         val binDir = File(context.filesDir, "bin")
         if (!binDir.exists()) {
             binDir.mkdirs()
         }
+        val otaFile = File(binDir, "yt-dlp")
+        if (otaFile.exists() && otaFile.length() > 50_000L) {
+            return otaFile
+        }
+        val nativeYtdlpZipSo = File(context.applicationInfo.nativeLibraryDir, "libytdlp.zip.so")
+        if (nativeYtdlpZipSo.exists() && nativeYtdlpZipSo.length() > 50_000L) {
+            return nativeYtdlpZipSo
+        }
+        val nativeYtdlp = File(context.applicationInfo.nativeLibraryDir, "libytdlp.so")
+        if (nativeYtdlp.exists() && nativeYtdlp.length() > 50_000L) {
+            return nativeYtdlp
+        }
+        return otaFile
+    }
+
+    /**
+     * Destino en almacenamiento privado (`files/bin/yt-dlp`) donde se instalan las actualizaciones OTA.
+     */
+    private fun getOtaTargetYtDlpFile(context: Context): File {
+        val binDir = File(context.filesDir, "bin")
+        if (!binDir.exists()) binDir.mkdirs()
         return File(binDir, "yt-dlp")
     }
 
@@ -127,7 +150,7 @@ object YtDlpAutoUpdater {
             val stagedFile = getStagedYtDlpFile(context)
             val stagedVersionFile = getStagedVersionFile(context)
             if (stagedFile.exists() && stagedFile.length() > 100_000L) {
-                val targetFile = getYtDlpFile(context)
+                val targetFile = getOtaTargetYtDlpFile(context)
                 val versionFile = File(context.filesDir, "bin/ytdlp_version.txt")
                 val newVer = if (stagedVersionFile.exists()) {
                     stagedVersionFile.readText().trim().ifBlank { "Actualizado" }

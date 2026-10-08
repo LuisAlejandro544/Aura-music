@@ -5,18 +5,43 @@
 # For more details, see
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
-# Reglas seguras de R8 / ProGuard para Aura Music y Aura Beta
-# Preserva intactas todas las clases, modelos, entidades Room, ViewModels, UI y puentes JNI de la app
--keep class com.example.** { *; }
--keep interface com.example.** { *; }
--keep enum com.example.** { *; }
+# Reglas quirúrgicas de R8 / ProGuard para Aura Music y Aura Beta (Opción 1: Poda automática de material-icons-extended)
+# Permite que R8 elimine los ~9,900 iconos no referenciados de androidx.compose.material:material-icons-extended
+# y el código muerto de librerías, preservando al 100% los componentes críticos, JNI C++20, Room y modelos de datos.
 
-# Preservar métodos nativos JNI C++20 (libauramusic_dsp.so)
+# 1. Preservar el puente JNI hacia el motor nativo C++20 (libauramusic_dsp.so)
+-keep class com.example.playback.NativeAudioEngine { *; }
 -keepclasseswithmembernames class * {
     native <methods>;
 }
 
-# Preservar metadatos de Kotlin, Coroutines y Serialización / Moshi / Room
+# 2. Preservar Entidades, DAOs y Base de Datos Room
+-keep class * extends androidx.room.RoomDatabase { *; }
+-keep @androidx.room.Entity class * { *; }
+-keep @androidx.room.Dao class * { *; }
+-keep class com.example.data.local.** { *; }
+
+# 3. Preservar Modelos de Dominio, Serialización JSON / Moshi y Estados
+-keep class com.example.model.** { *; }
+-keep class com.example.debug.DebugLogEntry { *; }
+-keep class com.example.debug.DeviceDiagnosticInfo { *; }
+-keep class com.example.debug.PerformanceDiagnosticModels** { *; }
+
+# 4. Preservar Componentes del Sistema registrados en AndroidManifest (Activities, Services, Widget, Application)
+-keep class com.example.AuraApplication { *; }
+-keep class com.example.MainActivity { *; }
+-keep class com.example.debug.DebugMonitorActivity { *; }
+-keep class com.example.playback.AuraMediaPlaybackService { *; }
+-keep class com.example.playback.AuraDownloadService { *; }
+-keep class com.example.widget.AuraMusicWidgetProvider { *; }
+
+# 5. Preservar Enums para serialización segura y preferencias
+-keepclassmembers enum * {
+    public static **[] values();
+    public static ** valueOf(java.lang.String);
+}
+
+# 6. Preservar metadatos de Kotlin, Coroutines y anotaciones
 -keepattributes *Annotation*,InnerClasses,EnclosingMethod,Signature,SourceFile,LineNumberTable
 -dontwarn okio.**
 -dontwarn retrofit2.**

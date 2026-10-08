@@ -50,7 +50,7 @@ object YtDlpNativeEngine {
             val pythonEnvDir = File(context.filesDir, "env/python")
             val versionMarker = File(pythonEnvDir, ".version")
 
-            val currentSignature = if (pythonZip.exists()) "${pythonZip.length()}_${pythonZip.lastModified()}" else "none"
+            val currentSignature = if (pythonZip.exists()) "direct_zipimport_v2_${pythonZip.length()}_${pythonZip.lastModified()}" else "none"
 
             if (pythonZip.exists()) {
                 val needExtraction = !pythonEnvDir.exists() ||
@@ -58,36 +58,53 @@ object YtDlpNativeEngine {
                         versionMarker.readText().trim() != currentSignature
 
                 if (needExtraction) {
-                    AuraDebugManager.logInfo(TAG, "Desempaquetando entorno Python optimizado en almacenamiento privado...")
+                    AuraDebugManager.logInfo(TAG, "Preparando módulos C nativos de Python (stdlib se lee directo desde nativeLibraryDir/libpython.zip.so sin extraer a disco)...")
                     if (pythonEnvDir.exists()) {
                         pythonEnvDir.deleteRecursively()
                     }
                     pythonEnvDir.mkdirs()
 
-                    extractZip(pythonZip, pythonEnvDir)
+                    // Solo extraer los módulos C nativos (modules/*.so) que dlopen requiere en disco;
+                    // NUNCA extraer stdlib.zip ni archivos .pyc para ahorrar ~15MB en el teléfono.
+                    extractOnlyNativeModules(pythonZip, pythonEnvDir)
                     versionMarker.writeText(currentSignature)
-                    AuraDebugManager.logInfo(TAG, "Entorno Python optimizado inicializado correctamente.")
+                    AuraDebugManager.logInfo(TAG, "Módulos C de Python inicializados con lectura directa desde libpython.zip.so.")
+                } else {
+                    // Limpiar cualquier stdlib.zip o carpeta stdlib residual de versiones anteriores
+                    File(pythonEnvDir, "stdlib.zip").takeIf { it.exists() }?.delete()
+                    File(pythonEnvDir, "stdlib").takeIf { it.exists() }?.deleteRecursively()
                 }
             }
 
-            // Inicializar script de yt-dlp base si no existe
-            val ytdlpFile = YtDlpAutoUpdater.getYtDlpFile(context)
-            if (!ytdlpFile.exists() || ytdlpFile.length() < 1000L) {
+            // Evitar duplicar yt-dlp en filesDir/bin/yt-dlp si ya existe nativeLibraryDir/libytdlp.zip.so
+            // y no se ha descargado una actualización OTA más reciente.
+            val nativeYtdlpSo = File(nativeLibDir, "libytdlp.zip.so").takeIf { it.exists() }
+                ?: File(nativeLibDir, "libytdlp.so")
+            val otaYtdlpFile = File(context.filesDir, "bin/yt-dlp")
+            val versionFile = File(context.filesDir, "bin/ytdlp_version.txt")
+
+            if (nativeYtdlpSo.exists() && nativeYtdlpSo.length() > 50_000L) {
+                // Si la copia en files/bin/yt-dlp era simplemente la copia base duplicada (no OTA), la eliminamos para ahorrar ~3MB
+                val recordedVer = if (versionFile.exists()) runCatching { versionFile.readText().trim() }.getOrDefault("") else ""
+                if (otaYtdlpFile.exists() && (recordedVer.isEmpty() || recordedVer.contains("base", ignoreCase = true))) {
+                    runCatching { otaYtdlpFile.delete() }
+                }
+                if (!versionFile.exists()) {
+                    versionFile.parentFile?.mkdirs()
+                    versionFile.writeText("v.base (nativo)")
+                }
+            } else if (!otaYtdlpFile.exists() || otaYtdlpFile.length() < 1000L) {
+                // Respaldo exclusivo si algún entorno no empaquetó libytdlp.so en nativeLibraryDir
                 try {
                     context.assets.open("bin/yt-dlp").use { input ->
-                        ytdlpFile.parentFile?.mkdirs()
-                        FileOutputStream(ytdlpFile).use { output ->
+                        otaYtdlpFile.parentFile?.mkdirs()
+                        FileOutputStream(otaYtdlpFile).use { output ->
                             input.copyTo(output)
                         }
                     }
-                    ytdlpFile.setExecutable(true, false)
-                    File(context.filesDir, "bin/ytdlp_version.txt").writeText("v.base (empaquetado)")
-                    AuraDebugManager.logInfo(TAG, "Script base yt-dlp copiado desde assets a almacenamiento ejecutable.")
-                } catch (e: Exception) {
-                    AuraDebugManager.logWarning(TAG, "No se pudo copiar el yt-dlp base desde assets: ${e.message}")
-                }
-            } else {
-                ytdlpFile.setExecutable(true, false)
+                    otaYtdlpFile.setExecutable(true, false)
+                    versionFile.writeText("v.base (empaquetado)")
+                } catch (_: Exception) {}
             }
 
             // Limpiar copias duplicadas antiguas de python/python3 en filesDir/bin (se usa directamente nativeLibraryDir/libpython.so)
@@ -236,11 +253,12 @@ object YtDlpNativeEngine {
         val errorLog = StringBuilder()
 
         try {
+            val nativeDir = context.applicationInfo.nativeLibraryDir
+            val directPythonZipSo = File(nativeDir, "libpython.zip.so")
             val stdlibZip = File(pythonEnvDir, "stdlib.zip")
             val stdlibDir = File(pythonEnvDir, "stdlib")
             val modulesDir = File(pythonEnvDir, "modules")
             val ffmpegEnvDir = File(context.filesDir, "env/ffmpeg")
-            val nativeDir = context.applicationInfo.nativeLibraryDir
 
             val processBuilder = ProcessBuilder(cmdList)
                 .directory(File(nativeDir))
@@ -248,7 +266,7 @@ object YtDlpNativeEngine {
 
             processBuilder.environment().apply {
                 this["PYTHONHOME"] = pythonEnvDir.absolutePath
-                this["PYTHONPATH"] = "${stdlibZip.absolutePath}:${stdlibDir.absolutePath}:${modulesDir.absolutePath}:${pythonEnvDir.absolutePath}:${pythonEnvDir.absolutePath}/usr/lib/python3.11:${context.filesDir.absolutePath}/bin"
+                this["PYTHONPATH"] = "${directPythonZipSo.absolutePath}:${stdlibZip.absolutePath}:${stdlibDir.absolutePath}:${modulesDir.absolutePath}:${pythonEnvDir.absolutePath}:${pythonEnvDir.absolutePath}/usr/lib/python3.11:${context.filesDir.absolutePath}/bin"
                 this["PYTHONNOUSERSITE"] = "1"
                 this["HOME"] = pythonEnvDir.absolutePath
                 this["LD_LIBRARY_PATH"] = "$nativeDir:${modulesDir.absolutePath}:${pythonEnvDir.absolutePath}/usr/lib:${ffmpegEnvDir.absolutePath}/usr/lib"
@@ -601,32 +619,37 @@ object YtDlpNativeEngine {
         }
     }
 
-    private fun extractZip(zipFile: File, destDir: File) {
+    /**
+     * Extrae únicamente los módulos C nativos (modules/.so) necesarios para dlopen(),
+     * omitiendo por completo stdlib.zip y los archivos .pyc ya que CPython los importa
+     * directamente desde nativeLibraryDir/libpython.zip.so vía zipimport.
+     */
+    private fun extractOnlyNativeModules(zipFile: File, destDir: File) {
         val canonicalDestDir = destDir.canonicalFile
-        val zip = ZipFile(zipFile)
-        val entries = zip.entries()
-        while (entries.hasMoreElements()) {
-            val entry = entries.nextElement()
-            val entryFile = File(destDir, entry.name)
-            val canonicalEntryFile = entryFile.canonicalFile
-            if (!canonicalEntryFile.toPath().startsWith(canonicalDestDir.toPath())) {
-                throw SecurityException("Violación de seguridad Zip Slip: '${entry.name}' intenta escapar de '${destDir.path}'")
-            }
+        ZipFile(zipFile).use { zip ->
+            val entries = zip.entries()
+            while (entries.hasMoreElements()) {
+                val entry = entries.nextElement()
+                if (entry.isDirectory) continue
+                val name = entry.name.trimStart('/')
+                // Solo extraer módulos C nativos (.so) o configuración de certificados si existiera
+                val isNativeModule = name.startsWith("modules/") && name.endsWith(".so")
+                if (!isNativeModule) continue
 
-            if (entry.isDirectory) {
-                entryFile.mkdirs()
-            } else {
+                val entryFile = File(destDir, name)
+                val canonicalEntryFile = entryFile.canonicalFile
+                if (!canonicalEntryFile.toPath().startsWith(canonicalDestDir.toPath())) {
+                    throw SecurityException("Violación de seguridad Zip Slip: '${entry.name}' intenta escapar de '${destDir.path}'")
+                }
+
                 entryFile.parentFile?.mkdirs()
                 zip.getInputStream(entry).use { input ->
                     FileOutputStream(entryFile).use { output ->
                         input.copyTo(output)
                     }
                 }
-                if (entryFile.name.endsWith(".so") || entryFile.name.contains("bin")) {
-                    entryFile.setExecutable(true, false)
-                }
+                entryFile.setExecutable(true, false)
             }
         }
-        zip.close()
     }
 }

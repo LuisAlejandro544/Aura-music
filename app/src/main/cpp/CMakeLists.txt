@@ -11,12 +11,22 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Opciones de optimización para procesamiento de señal de audio
+# Opciones de optimización de tamaño, inlining y eliminación de secciones muertas para procesamiento de señal de audio C++20
 add_compile_options(
-    -O3
+    -Os
+    -flto
     -ffast-math
+    -fvisibility=hidden
+    -ffunction-sections
+    -fdata-sections
     -Wall
     -Wextra
+)
+
+add_link_options(
+    -flto
+    -Wl,--gc-sections
+    -Wl,--exclude-libs,ALL
 )
 
 # Definir la librería compartida nativa de audio

@@ -1,10 +1,12 @@
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
 import java.io.BufferedInputStream
+import java.io.ByteArrayOutputStream
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URI
 import java.security.MessageDigest
 import java.util.Base64
+import java.util.zip.Deflater
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import java.util.zip.ZipInputStream
@@ -128,8 +130,9 @@ android {
 
   buildTypes {
     release {
-      isCrunchPngs = false
-      isMinifyEnabled = false
+      isCrunchPngs = true
+      isMinifyEnabled = true
+      isShrinkResources = true
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig = signingConfigs.getByName("release")
       buildConfigField("boolean", "ENABLE_DEBUG_MONITOR", "false")
@@ -171,6 +174,7 @@ android {
   }
   packaging {
     jniLibs {
+      // Compresión activa de librerías nativas (.so) en el APK para minimizar el peso de descarga (~20-23MB)
       useLegacyPackaging = true
       keepDebugSymbols += "**/*.zip.so"
       pickFirsts += "**/libc++_shared.so"
@@ -371,9 +375,58 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
     assetsBinDir.mkdirs()
 
     // -------------------------------------------------------------------------
-    // 1. Aprovisionamiento Puro de yt-dlp con Verificación SHA-256
+    // 1. Aprovisionamiento Puro de yt-dlp con Verificación SHA-256 y Re-compresión Deflate Nivel 9
     // -------------------------------------------------------------------------
     val ytdlpTarget = File(assetsBinDir, "yt-dlp")
+    val recompressedYtdlpCache = File(tempBuildDir, "yt-dlp.deflate9")
+
+    /**
+     * Re-comprime cualquier zip ejecutable (con o sin shebang '#!/usr/bin/env python3')
+     * utilizando Deflater.BEST_COMPRESSION (Nivel 9) manteniendo intactos todos los módulos.
+     */
+    fun recompressExecutableZipMax(sourceFile: File, destFile: File): Boolean {
+      return try {
+        val rawBytes = sourceFile.readBytes()
+        // Localizar firma PK\x03\x04 del archivo ZIP embebido después del shebang
+        var zipOffset = -1
+        for (i in 0 until minOf(rawBytes.size - 4, 512)) {
+          if (rawBytes[i] == 0x50.toByte() && rawBytes[i + 1] == 0x4B.toByte() &&
+              rawBytes[i + 2] == 0x03.toByte() && rawBytes[i + 3] == 0x04.toByte()) {
+            zipOffset = i
+            break
+          }
+        }
+        if (zipOffset < 0) {
+          sourceFile.copyTo(destFile, overwrite = true)
+          return true
+        }
+        val headerPrefix = rawBytes.copyOfRange(0, zipOffset)
+        val outBos = ByteArrayOutputStream(rawBytes.size)
+        outBos.write(headerPrefix)
+        ZipOutputStream(outBos).use { zos ->
+          zos.setLevel(Deflater.BEST_COMPRESSION)
+          ZipFile(sourceFile).use { zf ->
+            val entries = zf.entries()
+            val seen = mutableSetOf<String>()
+            while (entries.hasMoreElements()) {
+              val entry = entries.nextElement()
+              if (entry.isDirectory || !seen.add(entry.name)) continue
+              val newEntry = ZipEntry(entry.name)
+              zos.putNextEntry(newEntry)
+              zf.getInputStream(entry).use { it.copyTo(zos) }
+              zos.closeEntry()
+            }
+          }
+        }
+        destFile.parentFile?.mkdirs()
+        destFile.writeBytes(outBos.toByteArray())
+        true
+      } catch (_: Throwable) {
+        sourceFile.copyTo(destFile, overwrite = true)
+        false
+      }
+    }
+
     if (!ytdlpTarget.exists() || ytdlpTarget.length() < 1_000_000L) {
       val tmpYtdlp = File(tempBuildDir, "yt-dlp.tmp")
       val tmpSha = File(tempBuildDir, "SHA2-256SUMS")
@@ -388,12 +441,12 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
             ?.trim()?.split("\\s+".toRegex())?.firstOrNull()?.lowercase()
           val actualHash = sha256Hex(tmpYtdlp).lowercase()
           if (expectedHash == null || expectedHash == actualHash) {
-            tmpYtdlp.copyTo(ytdlpTarget, overwrite = true)
+            recompressExecutableZipMax(tmpYtdlp, ytdlpTarget)
             verified = true
-            logger.lifecycle("🔒 [Aura Gradle] yt-dlp oficial verificado con SHA-256 ($actualHash).")
+            logger.lifecycle("🔒 [Aura Gradle] yt-dlp oficial verificado con SHA-256 ($actualHash) y re-comprimido con Deflate Nivel 9 (${ytdlpTarget.length() / 1024} KB).")
           }
         } else {
-          tmpYtdlp.copyTo(ytdlpTarget, overwrite = true)
+          recompressExecutableZipMax(tmpYtdlp, ytdlpTarget)
           verified = true
         }
       }
@@ -401,10 +454,16 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
         File(cppDir, "aura_ytdlp_fallback.py").copyTo(ytdlpTarget, overwrite = true)
       }
       ytdlpTarget.setExecutable(true, false)
+    } else if (!recompressedYtdlpCache.exists()) {
+      // Asegurar que cualquier copia existente de yt-dlp esté re-comprimida a Deflate Nivel 9
+      if (recompressExecutableZipMax(ytdlpTarget, recompressedYtdlpCache) && recompressedYtdlpCache.length() > 500_000L) {
+        recompressedYtdlpCache.copyTo(ytdlpTarget, overwrite = true)
+      }
+      ytdlpTarget.setExecutable(true, false)
     }
 
     // -------------------------------------------------------------------------
-    // 2. Compilación de QuickJS C99 Puro (Fabrice Bellard) para las 4 ABIs
+    // 2. Compilación de QuickJS C99 Puro (Fabrice Bellard) con banderas -Os -flto -fvisibility=hidden -Wl,--gc-sections
     // -------------------------------------------------------------------------
     val qjsTarGz = File(tempBuildDir, "quickjs.tar.gz")
     val qjsSrcDir = File(tempBuildDir, "qjs_src")
@@ -421,11 +480,23 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
 
     val qjsCFiles = listOf("quickjs.c", "quickjs-libc.c", "cutils.c", "libbf.c", "libregexp.c", "libunicode.c", "qjs.c")
     val fallbackQjsC = File(cppDir, "native_quickjs_cli.c")
+    val sizeOptFlags = listOf(
+      "-Os", "-flto", "-fvisibility=hidden", "-ffunction-sections", "-fdata-sections",
+      "-Wl,--gc-sections", "-Wl,--exclude-libs,ALL"
+    )
 
     for (abi in abis) {
       val abiDir = File(jniLibsDir, abi).apply { mkdirs() }
       // Eliminar cualquier libc++_shared.so residual para evitar colisión con CMake
       File(abiDir, "libc++_shared.so").delete()
+
+      // Empaquetar yt-dlp como libytdlp.zip.so en nativeLibraryDir y eliminar de assets para evitar duplicación en filesDir
+      File(abiDir, "libytdlp.so").delete()
+      val ytdlpNativeSo = File(abiDir, "libytdlp.zip.so")
+      if (ytdlpTarget.exists() && ytdlpTarget.length() > 0L) {
+        ytdlpTarget.copyTo(ytdlpNativeSo, overwrite = true)
+        ytdlpNativeSo.setExecutable(true, false)
+      }
 
       val qjsSo = File(abiDir, "libqjs.so")
       val compilerInfo = findCompilerForAbi(abi)
@@ -433,14 +504,14 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
         val (clangBin, archFlags) = compilerInfo
         var compiled = false
         if (qjsSourcesReady) {
-          val cmd = mutableListOf(clangBin, "-pie", "-fPIE", "-O3") + archFlags + listOf(
+          val cmd = mutableListOf(clangBin, "-pie", "-fPIE") + sizeOptFlags + archFlags + listOf(
             "-DCONFIG_VERSION=\"2024-01-13\"", "-DCONFIG_BIGNUM", "-D_GNU_SOURCE"
           ) + qjsCFiles.map { File(qjsSrcDir, it).absolutePath } + listOf("-lm", "-ldl", "-o", qjsSo.absolutePath)
           val code = ProcessBuilder(cmd).directory(qjsSrcDir).start().waitFor()
           compiled = (code == 0 && qjsSo.exists() && qjsSo.length() > 50_000L)
         }
         if (!compiled) {
-          val cmd = mutableListOf(clangBin, "-pie", "-fPIE", "-O3") + archFlags +
+          val cmd = mutableListOf(clangBin, "-pie", "-fPIE") + sizeOptFlags + archFlags +
             listOf(fallbackQjsC.absolutePath, "-lm", "-ldl", "-o", qjsSo.absolutePath)
           ProcessBuilder(cmd).start().waitFor()
         }
@@ -450,13 +521,51 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
 
     // -------------------------------------------------------------------------
     // 3. Aprovisionamiento de CPython 3.11 Nativo Puro Multi-ABI + Lanzador PIE
+    //    - Poda de tests y paquetes de escritorio de stdlib.zip
+    //    - Poda de módulos C nativos que yt-dlp nunca usa (sqlite3, tkinter, tests, etc.)
+    //    - Empaquetado de stdlib en la raíz de libpython.zip.so con Deflate Nivel 9 para lectura directa (zipimport) sin extraer a disco
     // -------------------------------------------------------------------------
     val resolvedPythonFiles = try { pythonRuntimeFiles.files } catch (_: Throwable) { emptySet<File>() }
     val stdlibPycZip = resolvedPythonFiles.firstOrNull { it.name.contains("stdlib") }
     val pythonLauncherC = File(cppDir, "native_python_launcher.c")
 
+    // Paquetes y directorios de escritorio/test en stdlib que yt-dlp jamás utiliza en Android
+    val prunedStdlibPrefixes = listOf(
+      "test/", "tests/", "unittest/", "tkinter/", "idlelib/", "turtledemo/",
+      "pydoc_data/", "distutils/tests/", "distutils/command/wininst",
+      "lib2to3/tests/", "ensurepip/", "venv/", "curses/", "dbm/", "msilib/"
+    )
+    val prunedStdlibExact = setOf("turtle.pyc", "turtle.py", "doctest.pyc", "doctest.py", "pdb.pyc")
+
+    fun shouldPruneStdlibEntry(entryName: String): Boolean {
+      val clean = entryName.trimStart('/')
+      if (clean in prunedStdlibExact) return true
+      if (prunedStdlibPrefixes.any { clean.startsWith(it) }) return true
+      if (clean.contains("/test/") || clean.contains("/tests/")) return true
+      return false
+    }
+
+    // Módulos C nativos (.so) y librerías compartidas que yt-dlp nunca usa (bases de datos, tests, GUI, audioop, codecs CJK pesados)
+    val prunedNativeSharedLibs = setOf(
+      "libsqlite3_chaquopy.so", "libsqlite3.so"
+    )
+    val prunedPythonCModules = listOf(
+      "_sqlite3", "_tkinter", "_test", "_ctypes_test", "_xxtestfuzz", "xxlimited",
+      "_curses", "_dbm", "_gdbm", "nis", "ossaudiodev", "spwd", "syslog",
+      "audioop", "_codecs_cn", "_codecs_hk", "_codecs_iso2022", "_codecs_jp", "_codecs_kr", "_codecs_tw",
+      "_decimal"
+    )
+
+    fun shouldPrunePythonCModule(fileName: String): Boolean {
+      val lower = fileName.lowercase()
+      return prunedPythonCModules.any { lower == "$it.so" || lower.startsWith("${it}.") }
+    }
+
     for (abi in abis) {
       val abiDir = File(jniLibsDir, abi).apply { mkdirs() }
+      // Limpiar posibles librerías compartidas podadas de ejecuciones previas
+      prunedNativeSharedLibs.forEach { File(abiDir, it).delete() }
+
       val abiTargetZip = resolvedPythonFiles.firstOrNull {
         it.name.endsWith("-$abi.zip") || (it.name.contains(abi) && !it.name.contains("stdlib"))
       }
@@ -471,7 +580,7 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
             if (entry.isDirectory) continue
             val simpleName = File(entry.name).name
             if ((entry.name.startsWith("jniLibs/") || simpleName.startsWith("lib")) && simpleName.endsWith(".so")) {
-              if (simpleName != "libc++_shared.so") {
+              if (simpleName != "libc++_shared.so" && simpleName !in prunedNativeSharedLibs) {
                 val destSo = File(abiDir, simpleName)
                 zip.getInputStream(entry).use { input ->
                   FileOutputStream(destSo).use { output -> input.copyTo(output) }
@@ -487,21 +596,25 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
                     if (rEntry.isDirectory) continue
                     val modName = File(rEntry.name).name
                     if (modName.endsWith(".so")) {
-                      val modBytes = zis.readBytes()
                       val normalized = modName
                         .replace(".chaquopy.so", ".so")
                         .replace(Regex("\\.cpython-\\d+.*\\.so$"), ".so")
-                      File(extractedModulesDir, normalized).writeBytes(modBytes)
+                      if (!shouldPrunePythonCModule(normalized)) {
+                        val modBytes = zis.readBytes()
+                        File(extractedModulesDir, normalized).writeBytes(modBytes)
+                      }
                     }
                   }
                 }
               }
             } else if (simpleName.endsWith(".so") && !simpleName.startsWith("lib")) {
-              val modBytes = zip.getInputStream(entry).use { it.readBytes() }
               val normalized = simpleName
                 .replace(".chaquopy.so", ".so")
                 .replace(Regex("\\.cpython-\\d+.*\\.so$"), ".so")
-              File(extractedModulesDir, normalized).writeBytes(modBytes)
+              if (!shouldPrunePythonCModule(normalized)) {
+                val modBytes = zip.getInputStream(entry).use { it.readBytes() }
+                File(extractedModulesDir, normalized).writeBytes(modBytes)
+              }
             }
           }
         }
@@ -514,46 +627,70 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
           }
         }
 
-        // Construir libpython.zip.so combinando stdlib.zip (sin duplicar archivos sueltos en stdlib/) + site.py + módulos C únicos (.so)
+        // Construir libpython.zip.so con compresión Deflate Nivel 9:
+        // - Los archivos .pyc de stdlib van directamente en la raíz de libpython.zip.so (con tests podados)
+        //   para que CPython los importe directamente vía zipimport desde nativeLibraryDir/libpython.zip.so
+        //   SIN extraer stdlib.zip al almacenamiento del teléfono.
+        // - Los módulos C nativos podados van en 'modules/*.so' (únicos que se extraen para dlopen).
         ZipOutputStream(FileOutputStream(pythonZipSo)).use { zos ->
+          zos.setLevel(Deflater.BEST_COMPRESSION)
+          val addedEntries = mutableSetOf<String>()
+
           if (stdlibPycZip != null && stdlibPycZip.exists()) {
-            zos.putNextEntry(ZipEntry("stdlib.zip"))
-            stdlibPycZip.inputStream().use { it.copyTo(zos) }
-            zos.closeEntry()
+            ZipFile(stdlibPycZip).use { stdZip ->
+              val stdEntries = stdZip.entries()
+              while (stdEntries.hasMoreElements()) {
+                val sEntry = stdEntries.nextElement()
+                if (sEntry.isDirectory) continue
+                val entryName = sEntry.name.trimStart('/')
+                if (shouldPruneStdlibEntry(entryName)) continue
+                if (addedEntries.add(entryName)) {
+                  zos.putNextEntry(ZipEntry(entryName))
+                  stdZip.getInputStream(sEntry).use { it.copyTo(zos) }
+                  zos.closeEntry()
+                }
+              }
+            }
           }
 
           val sitePyContent = """
             import sys, os
-            env_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            stdlib_zip = os.path.join(env_dir, 'stdlib.zip')
-            modules_dir = os.path.join(env_dir, 'modules')
-            if os.path.exists(stdlib_zip) and stdlib_zip not in sys.path:
-                sys.path.insert(0, stdlib_zip)
-            if os.path.exists(modules_dir) and modules_dir not in sys.path:
-                sys.path.insert(0, modules_dir)
-          """.trimIndent().toByteArray()
-          zos.putNextEntry(ZipEntry("stdlib/site.py"))
-          zos.write(sitePyContent)
-          zos.closeEntry()
-
-          extractedModulesDir.listFiles()?.forEach { modFile ->
-            zos.putNextEntry(ZipEntry("modules/${modFile.name}"))
-            modFile.inputStream().use { it.copyTo(zos) }
+            for p in list(sys.path):
+                if p.endswith('libpython.zip.so'):
+                    break
+            """.trimIndent().toByteArray()
+          if (addedEntries.add("site.py")) {
+            zos.putNextEntry(ZipEntry("site.py"))
+            zos.write(sitePyContent)
             zos.closeEntry()
+          }
+
+          extractedModulesDir.listFiles()?.sortedBy { it.name }?.forEach { modFile ->
+            val modEntryName = "modules/${modFile.name}"
+            if (addedEntries.add(modEntryName)) {
+              zos.putNextEntry(ZipEntry(modEntryName))
+              modFile.inputStream().use { it.copyTo(zos) }
+              zos.closeEntry()
+            }
           }
         }
       }
 
-      // Compilar lanzador PIE nativo libpython.so con rpath $ORIGIN y cero llamadas a sh
+      // Compilar lanzador PIE nativo libpython.so con -Os -flto -fvisibility=hidden -Wl,--gc-sections y rpath $ORIGIN
       val pythonSo = File(abiDir, "libpython.so")
       val compilerInfo = findCompilerForAbi(abi)
       if (compilerInfo != null) {
         val (clangBin, archFlags) = compilerInfo
-        val cmd = mutableListOf(clangBin, "-pie", "-fPIE", "-O3") + archFlags +
+        val cmd = mutableListOf(clangBin, "-pie", "-fPIE") + sizeOptFlags + archFlags +
           listOf("-Wl,-rpath,\$ORIGIN", pythonLauncherC.absolutePath, "-ldl", "-o", pythonSo.absolutePath)
         ProcessBuilder(cmd).start().waitFor()
         pythonSo.setExecutable(true, false)
       }
+    }
+
+    // Eliminar cualquier copia duplicada de yt-dlp en assets/bin si ya está en jniLibs como libytdlp.zip.so
+    if (abis.all { File(jniLibsDir, "$it/libytdlp.zip.so").exists() }) {
+      ytdlpTarget.delete()
     }
 
     // -------------------------------------------------------------------------
@@ -590,7 +727,7 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
       val compilerInfo = findCompilerForAbi(abi)
       if (compilerInfo != null) {
         val (clangBin, archFlags) = compilerInfo
-        val cmd = mutableListOf(clangBin, "-pie", "-fPIE", "-O3") + archFlags +
+        val cmd = mutableListOf(clangBin, "-pie", "-fPIE") + sizeOptFlags + archFlags +
           listOf("-Wl,-rpath,\$ORIGIN", ffmpegLauncherC.absolutePath, "-ldl", "-o", ffmpegSo.absolutePath)
         ProcessBuilder(cmd).start().waitFor()
         ffmpegSo.setExecutable(true, false)
@@ -599,11 +736,17 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
 
     // -------------------------------------------------------------------------
     // 5. Optimización Profunda de Símbolos ELF con llvm-strip --strip-unneeded
+    //    (Excluyendo archivos zip empaquetados como libpython.zip.so y libytdlp.so)
     // -------------------------------------------------------------------------
     val llvmStrip = toolchainBin?.let { File(it, "llvm-strip") }?.takeIf { it.canExecute() }
     if (llvmStrip != null) {
       jniLibsDir.walkTopDown()
-        .filter { it.isFile && it.name.endsWith(".so") && !it.name.endsWith(".zip.so") }
+        .filter {
+          it.isFile &&
+          it.name.endsWith(".so") &&
+          !it.name.endsWith(".zip.so") &&
+          it.name != "libytdlp.so"
+        }
         .forEach { soFile ->
           ProcessBuilder(llvmStrip.absolutePath, "--strip-unneeded", soFile.absolutePath).start().waitFor()
         }
@@ -625,7 +768,7 @@ val ensureDebugKeystore = tasks.register<EnsureDebugKeystoreTask>("ensureDebugKe
 
 val provisionNativeDeps = tasks.register<ProvisionNativeDepsTask>("provisionNativeDeps") {
   dependsOn(ensureDebugKeystore)
-  provisionVersion.set("v2.0-pure-multiabi")
+  provisionVersion.set("v2.1-deflate9-direct-zipimport")
   val betaMode = gradle.startParameter.taskNames.any { it.contains("Beta", ignoreCase = true) } ||
     System.getenv("AURA_BETA_MOBILE_ONLY") == "true"
   mobileOnlyAbis.set(betaMode)
