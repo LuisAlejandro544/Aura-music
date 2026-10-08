@@ -111,9 +111,12 @@ fun GlobalDialogsHost(
 
     // 2. Hoja modal de efectos de audio global (Ecualizador, 8D/16D, Reverb, etc.)
     if (showGlobalAudioEffectsSheet) {
+        val eqScopeMode by viewModel.eqScopeMode.collectAsState()
         AudioEffectsBottomSheet(
             onDismissRequest = onDismissAudioEffectsSheet,
             isEqEnabled = isEqEnabled,
+            eqScopeMode = eqScopeMode,
+            onSetEqScopeMode = { viewModel.setEqScopeMode(it) },
             eqBands = eqBands,
             bassBoostLevel = bassBoostLevel,
             currentPreset = currentPreset,

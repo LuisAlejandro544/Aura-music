@@ -74,6 +74,7 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
     val bassBoostLevel by viewModel.bassBoostLevel.collectAsStateWithLifecycle()
     val currentPreset by viewModel.currentPreset.collectAsStateWithLifecycle()
     val isEqEnabled by viewModel.isEqEnabled.collectAsStateWithLifecycle()
+    val eqScopeMode by viewModel.eqScopeMode.collectAsStateWithLifecycle()
 
     val sleepTimerState by viewModel.sleepTimerState.collectAsStateWithLifecycle()
     val spatial8DConfig by viewModel.spatial8DConfig.collectAsStateWithLifecycle()
@@ -522,6 +523,8 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
                 onAdjustABPointB = { viewModel.adjustABPointB(it) },
                 onClearABLoop = { viewModel.clearABLoop() },
                 isEqEnabled = isEqEnabled,
+                eqScopeMode = eqScopeMode,
+                onSetEqScopeMode = { viewModel.setEqScopeMode(it) },
                 eqBands = eqBands,
                 bassBoostLevel = bassBoostLevel,
                 currentPreset = currentPreset,

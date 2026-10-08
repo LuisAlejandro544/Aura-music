@@ -4,6 +4,22 @@ package com.example.model
  * Modelo de configuración y presets para el ecualizador paramétrico de 10 bandas
  * y mejora acústica impulsada por el motor DSP C++20.
  */
+/**
+ * Define el alcance de aplicación de los cambios en el Ecualizador:
+ * - [GLOBAL_ALL_TRACKS]: El ecualizador y sus ajustes se mantienen para todas las canciones siguientes.
+ * - [CURRENT_TRACK_ONLY]: El ecualizador y sus cambios aplican únicamente a la canción actual y se desactivan/restauran al pasar a la siguiente.
+ */
+enum class EqualizerScopeMode(val title: String, val subtitle: String) {
+    GLOBAL_ALL_TRACKS(
+        title = "Para todas las siguientes",
+        subtitle = "Mantiene este ajuste del ecualizador en toda tu música"
+    ),
+    CURRENT_TRACK_ONLY(
+        title = "Solo esta canción",
+        subtitle = "Aplica el cambio ahora y vuelve al estado base en la siguiente pista"
+    )
+}
+
 data class EqualizerBand(
     val index: Int,
     val centerFreqHz: Int,

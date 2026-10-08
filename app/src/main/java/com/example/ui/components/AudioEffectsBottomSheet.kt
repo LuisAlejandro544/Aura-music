@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import com.example.model.ABLoopState
 import com.example.model.EqualizerBand
 import com.example.model.EqualizerPreset
+import com.example.model.EqualizerScopeMode
 import com.example.model.HeadphoneConfig
 import com.example.model.ReverbConfig
 import com.example.model.ReverbPreset
@@ -47,8 +48,10 @@ import com.example.ui.theme.TextSecondary
 @Composable
 fun AudioEffectsBottomSheet(
     onDismissRequest: () -> Unit,
-    // Ecualizador de 10 bandas C++20
-    isEqEnabled: Boolean = true,
+    // Ecualizador de 10 bandas C++20 (desactivado por defecto)
+    isEqEnabled: Boolean = false,
+    eqScopeMode: EqualizerScopeMode = EqualizerScopeMode.GLOBAL_ALL_TRACKS,
+    onSetEqScopeMode: (EqualizerScopeMode) -> Unit = {},
     eqBands: List<EqualizerBand> = emptyList(),
     bassBoostLevel: Int = 0,
     currentPreset: EqualizerPreset = EqualizerPreset.PRESETS.first(),
@@ -113,9 +116,11 @@ fun AudioEffectsBottomSheet(
 ) {
     var selectedTab by remember(initialTab) { mutableIntStateOf(initialTab.coerceIn(0, 6)) }
     val keyboardController = LocalSoftwareKeyboardController.current
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
+        sheetState = sheetState,
         containerColor = BackgroundDark,
         tonalElevation = 8.dp,
         modifier = modifier.testTag("audio_effects_bottom_sheet")
@@ -123,8 +128,9 @@ fun AudioEffectsBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .imePadding()
                 .padding(horizontal = 20.dp)
-                .padding(bottom = 36.dp)
+                .padding(bottom = 24.dp)
         ) {
             // Cabecera
             Row(
@@ -225,6 +231,8 @@ fun AudioEffectsBottomSheet(
                 when (selectedTab) {
                     0 -> EqualizerTabContent(
                         isEnabled = isEqEnabled,
+                        eqScopeMode = eqScopeMode,
+                        onEqScopeModeChange = onSetEqScopeMode,
                         bands = eqBands,
                         bassBoostLevel = bassBoostLevel,
                         currentPreset = currentPreset,

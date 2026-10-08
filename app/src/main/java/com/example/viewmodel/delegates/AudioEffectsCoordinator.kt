@@ -29,6 +29,7 @@ class AudioEffectsCoordinator(
     val bassBoostLevel = effectManager.bassBoostLevel
     val currentPreset = effectManager.currentPreset
     val isEqEnabled = effectManager.isEnabled
+    val eqScopeMode = effectManager.eqScopeMode
     val spatial8DConfig = effectManager.spatial8DConfig
     val vocalClarityConfig = effectManager.vocalClarityConfig
     val reverbConfig = effectManager.reverbConfig
@@ -43,6 +44,9 @@ class AudioEffectsCoordinator(
 
     // Acciones de Ecualizador
     fun setEqEnabled(enabled: Boolean) = effectManager.setEnabled(enabled)
+
+    fun setEqScopeMode(mode: com.example.model.EqualizerScopeMode) =
+        effectManager.setEqScopeMode(mode, audioPlayer.currentTrack.value?.id)
 
     fun setBandLevel(bandIndex: Int, levelMb: Int) = effectManager.setBandLevel(bandIndex, levelMb)
 

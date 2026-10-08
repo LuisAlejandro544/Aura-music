@@ -422,7 +422,7 @@ private:
     int mSampleRate{44100};
     int mChannels{2};
     bool mInitialized{false};
-    bool mEnabled{true};
+    bool mEnabled{false};
     double mBassBoostStrength{0.0};
     std::array<double, 10> mBandGainsDb{};
 

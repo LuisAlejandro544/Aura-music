@@ -235,7 +235,8 @@ fun NowPlayingCinematicLayout(
                     modifier = Modifier
                         .padding(bottom = 16.dp)
                         .clip(RoundedCornerShape(16.dp))
-                        .clickable { onOpenLyrics() }
+                        .clickable { onOpenFullScreenLyrics() }
+                        .testTag("cinematic_floating_lyric_pill")
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -593,9 +594,9 @@ fun NowPlayingCinematicLayout(
                     )
                 }
 
-                // Letras Sincronizadas
+                // Letras Sincronizadas (Karaoke a Pantalla Completa)
                 IconButton(
-                    onClick = onOpenLyrics,
+                    onClick = onOpenFullScreenLyrics,
                     modifier = Modifier
                         .size(48.dp)
                         .testTag("cinematic_lyrics_icon_btn")

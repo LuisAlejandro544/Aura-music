@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.sp
 import com.example.model.ABLoopState
 import com.example.model.EqualizerBand
 import com.example.model.EqualizerPreset
+import com.example.model.EqualizerScopeMode
 import com.example.model.HeadphoneConfig
 import com.example.model.RepeatMode
 import com.example.model.ReverbConfig
@@ -135,8 +136,10 @@ fun NowPlayingScreen(
     onAdjustABPointA: (Long) -> Unit = {},
     onAdjustABPointB: (Long) -> Unit = {},
     onClearABLoop: () -> Unit = {},
-    // Parámetros de Ecualizador C++20 integrados
-    isEqEnabled: Boolean = true,
+    // Parámetros de Ecualizador C++20 integrados (desactivado por defecto)
+    isEqEnabled: Boolean = false,
+    eqScopeMode: EqualizerScopeMode = EqualizerScopeMode.GLOBAL_ALL_TRACKS,
+    onSetEqScopeMode: (EqualizerScopeMode) -> Unit = {},
     eqBands: List<EqualizerBand> = emptyList(),
     bassBoostLevel: Int = 0,
     currentPreset: EqualizerPreset = EqualizerPreset.PRESETS.first(),
@@ -676,6 +679,8 @@ fun NowPlayingScreen(
             AudioEffectsBottomSheet(
                 onDismissRequest = { showEffectsSheet = false },
                 isEqEnabled = isEqEnabled,
+                eqScopeMode = eqScopeMode,
+                onSetEqScopeMode = onSetEqScopeMode,
                 eqBands = eqBands,
                 bassBoostLevel = bassBoostLevel,
                 currentPreset = currentPreset,

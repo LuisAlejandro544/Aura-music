@@ -44,4 +44,41 @@ class ExampleRobolectricTest {
     org.junit.Assert.assertTrue(manager.vocalClarityConfig.value.enabled)
     assertEquals(0.8f, manager.vocalClarityConfig.value.strength, 0.001f)
   }
+
+  @Test
+  fun `equalizer is disabled by default and supports per-track or global scope`() {
+    val manager = com.example.playback.AudioEffectManager()
+    org.junit.Assert.assertFalse(manager.isEnabled.value)
+    assertEquals(
+        com.example.model.EqualizerScopeMode.GLOBAL_ALL_TRACKS,
+        manager.eqScopeMode.value
+    )
+
+    // Modo global: el cambio persiste al pasar de canción
+    manager.setEnabled(true)
+    val rockPreset = com.example.model.EqualizerPreset.PRESETS[1]
+    manager.applyPreset(rockPreset)
+    org.junit.Assert.assertTrue(manager.isEnabled.value)
+    assertEquals(rockPreset.name, manager.currentPreset.value.name)
+
+    manager.onTrackChanged(101L)
+    org.junit.Assert.assertTrue(manager.isEnabled.value)
+    assertEquals(rockPreset.name, manager.currentPreset.value.name)
+
+    // Modo solo para esta canción: los nuevos cambios se revierten al pasar a la siguiente pista
+    manager.setEqScopeMode(com.example.model.EqualizerScopeMode.CURRENT_TRACK_ONLY, 101L)
+    val popPreset = com.example.model.EqualizerPreset.PRESETS[2]
+    manager.applyPreset(popPreset)
+    manager.setBassBoost(750)
+    assertEquals(popPreset.name, manager.currentPreset.value.name)
+    assertEquals(750, manager.bassBoostLevel.value)
+
+    manager.onTrackChanged(102L)
+    assertEquals(
+        com.example.model.EqualizerScopeMode.GLOBAL_ALL_TRACKS,
+        manager.eqScopeMode.value
+    )
+    assertEquals(rockPreset.name, manager.currentPreset.value.name)
+    assertEquals(rockPreset.bassBoost, manager.bassBoostLevel.value)
+  }
 }

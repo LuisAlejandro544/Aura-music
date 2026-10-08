@@ -139,6 +139,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val bassBoostLevel = effectsCoordinator.bassBoostLevel
     val currentPreset = effectsCoordinator.currentPreset
     val isEqEnabled = effectsCoordinator.isEqEnabled
+    val eqScopeMode = effectsCoordinator.eqScopeMode
     val spatial8DConfig = effectsCoordinator.spatial8DConfig
     val vocalClarityConfig = effectsCoordinator.vocalClarityConfig
     val reverbConfig = effectsCoordinator.reverbConfig
@@ -431,6 +432,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     // --- Efectos de Audio ---
     fun setEqEnabled(enabled: Boolean) = effectsCoordinator.setEqEnabled(enabled)
+    fun setEqScopeMode(mode: EqualizerScopeMode) = effectsCoordinator.setEqScopeMode(mode)
     fun setBandLevel(bandIndex: Int, levelMb: Int) = effectsCoordinator.setBandLevel(bandIndex, levelMb)
     fun setBassBoost(level: Int) = effectsCoordinator.setBassBoost(level)
     fun applyPreset(preset: EqualizerPreset) = effectsCoordinator.applyPreset(preset)

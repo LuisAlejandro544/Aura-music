@@ -221,10 +221,14 @@ class AuraAudioPlayer(
     }
 
     fun playTrack(track: Track) {
+        val previousTrackId = _currentTrack.value?.id
         _currentTrack.value = track
         _currentPosition.value = 0L
         _duration.value = track.durationMs
         abLoopController.reset()
+        if (previousTrackId != track.id) {
+            effectManager.onTrackChanged(track.id)
+        }
         effectManager.flushBuffers()
         com.example.widget.AuraMusicWidgetProvider.pushPlaybackState(
             context = context,

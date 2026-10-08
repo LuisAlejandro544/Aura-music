@@ -58,7 +58,9 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
     - `16 kHz`: **Aire / Agudos** (apertura Hi-Fi y espacialidad).
   - Filtros IIR Bi-cuadráticos (*Peaking Biquads*) en coma flotante de 64 bits con limitador suave anti-clipping.
   - Rango de ganancia de `-15 dB` a `+15 dB`.
-- **Integración Total en Hoja Modal**: Ya no existe una pantalla separada que interrumpa la navegación; se abre como una pestaña directa en la hoja de efectos desde el Mini Reproductor o Now Playing.
+- **Integración Total en Hoja Modal y Desactivado por Defecto**: Ya no existe una pantalla separada que interrumpa la navegación; se abre como una pestaña directa en la hoja de efectos desde el Mini Reproductor o Now Playing, iniciando **desactivado por defecto** para respetar la señal pura original hasta que el usuario decida activarlo.
+- **Alcance de Aplicación Seleccionable (`EqualizerScopeMode`: Solo esta canción vs. Todas las siguientes)**:
+  - Permite al usuario elegir directamente en el panel del ecualizador si desea aplicar los cambios de ecualización **🌐 Para todas las canciones** (persistiendo en las siguientes pistas) o **🎵 Solo esta canción** (guardando una instantánea de la configuración previa y restaurándola automáticamente en cuanto cambie o avance a la siguiente pista).
 - **Perfiles Acústicos (Presets)**: Rock, Pop, Electrónica, Jazz, Acústico, Bass Boost y Plano.
 - **Refuerzo de Bajos C++ (Bass Boost)** calibrado a 60 Hz con modulación precisa.
 - **Clarificador de Voces HD en C++20 (`VocalClarityProcessor` Mid-Side)**:

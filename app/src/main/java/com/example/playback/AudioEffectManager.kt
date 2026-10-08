@@ -6,6 +6,7 @@ import android.media.audiofx.Equalizer
 import android.media.audiofx.PresetReverb
 import com.example.model.EqualizerBand
 import com.example.model.EqualizerPreset
+import com.example.model.EqualizerScopeMode
 import com.example.model.ReverbConfig
 import com.example.model.ReverbPreset
 import com.example.model.Spatial8DConfig
@@ -17,7 +18,7 @@ import kotlinx.coroutines.flow.asStateFlow
 /**
  * Gestor avanzado de efectos acústicos impulsado por el motor nativo C++20 (auramusic_dsp).
  * Controla:
- * - Ecualizador paramétrico de 10 bandas y refuerzo de graves en tiempo real.
+ * - Ecualizador paramétrico de 10 bandas (desactivado por defecto) y alcance configurable (Solo esta canción vs Para todas las siguientes).
  * - Clarificador de Voces HD (aislamiento Mid-Side y realce de presencia vocal en C++20).
  * - Motor de Audio Espacial 8D (Órbita 360°) y 16D (Multi-Órbita Doble Capa) Binaural.
  * - Suite Reverb Híbrida C++20 (Presets ambientales + Ajuste libre de tamaño, decay y wet).
@@ -29,8 +30,19 @@ class AudioEffectManager {
     private var hardwareBassBoost: BassBoost? = null
     private var currentSessionId: Int = 0
 
-    private val _isEnabled = MutableStateFlow(true)
+    // Por defecto el ecualizador inicia desactivado (false)
+    private val _isEnabled = MutableStateFlow(false)
     val isEnabled: StateFlow<Boolean> = _isEnabled.asStateFlow()
+
+    private val _eqScopeMode = MutableStateFlow(EqualizerScopeMode.GLOBAL_ALL_TRACKS)
+    val eqScopeMode: StateFlow<EqualizerScopeMode> = _eqScopeMode.asStateFlow()
+
+    // Snapshot del estado global para restaurar cuando el usuario elige "Solo esta canción"
+    private var savedGlobalEnabled: Boolean = false
+    private var savedGlobalBands: List<EqualizerBand> = EqualizerPreset.DEFAULT_10_BANDS
+    private var savedGlobalBassBoost: Int = 0
+    private var savedGlobalPreset: EqualizerPreset = EqualizerPreset.PRESETS.first()
+    private var activeCustomTrackId: Long? = null
 
     private val _bands = MutableStateFlow<List<EqualizerBand>>(EqualizerPreset.DEFAULT_10_BANDS)
     val bands: StateFlow<List<EqualizerBand>> = _bands.asStateFlow()
@@ -54,8 +66,8 @@ class AudioEffectManager {
     val volumeNormalizationConfig: StateFlow<com.example.model.VolumeNormalizationConfig> = _volumeNormalizationConfig.asStateFlow()
 
     init {
-        // Inicializar motor DSP nativo C++20 con valores iniciales
-        NativeAudioEngine.setDspEnabled(true)
+        // Inicializar motor DSP nativo C++20 con el ecualizador desactivado por defecto
+        NativeAudioEngine.setDspEnabled(false)
         syncWithNativeEngine()
     }
 
@@ -86,8 +98,84 @@ class AudioEffectManager {
         syncWithNativeEngine()
     }
 
+    fun setEqScopeMode(mode: EqualizerScopeMode, currentTrackId: Long? = null) {
+        if (_eqScopeMode.value == mode) return
+        if (mode == EqualizerScopeMode.CURRENT_TRACK_ONLY) {
+            // Guardar el estado base actual para restaurarlo cuando cambie la canción
+            savedGlobalEnabled = _isEnabled.value
+            savedGlobalBands = _bands.value
+            savedGlobalBassBoost = _bassBoostLevel.value
+            savedGlobalPreset = _currentPreset.value
+            activeCustomTrackId = currentTrackId
+        } else {
+            // Al pasar a modo "Para todas las siguientes", el estado actual se consolida como global
+            savedGlobalEnabled = _isEnabled.value
+            savedGlobalBands = _bands.value
+            savedGlobalBassBoost = _bassBoostLevel.value
+            savedGlobalPreset = _currentPreset.value
+            activeCustomTrackId = null
+        }
+        _eqScopeMode.value = mode
+    }
+
+    /**
+     * Notifica al gestor que ha cambiado la canción en reproducción.
+     * Si el alcance del ecualizador está en [EqualizerScopeMode.CURRENT_TRACK_ONLY] y el ID de pista cambió,
+     * restaura automáticamente el estado global previo (desactivado por defecto) para las siguientes canciones.
+     */
+    fun onTrackChanged(newTrackId: Long?) {
+        if (newTrackId == null) return
+        if (_eqScopeMode.value == EqualizerScopeMode.CURRENT_TRACK_ONLY) {
+            if (activeCustomTrackId == null || activeCustomTrackId != newTrackId) {
+                // Restaurar el estado base previo y reiniciar el alcance para la nueva canción
+                applyInternalEqState(
+                    enabled = savedGlobalEnabled,
+                    bands = savedGlobalBands,
+                    bassBoost = savedGlobalBassBoost,
+                    preset = savedGlobalPreset
+                )
+                _eqScopeMode.value = EqualizerScopeMode.GLOBAL_ALL_TRACKS
+            }
+            activeCustomTrackId = newTrackId
+        } else {
+            activeCustomTrackId = newTrackId
+        }
+    }
+
+    private fun applyInternalEqState(
+        enabled: Boolean,
+        bands: List<EqualizerBand>,
+        bassBoost: Int,
+        preset: EqualizerPreset
+    ) {
+        _isEnabled.value = enabled
+        _bands.value = bands
+        _bassBoostLevel.value = bassBoost
+        _currentPreset.value = preset
+
+        NativeAudioEngine.setDspEnabled(enabled)
+        bands.forEach { band ->
+            NativeAudioEngine.setBandGain(band.index, band.levelMb / 100.0f)
+        }
+        NativeAudioEngine.setBassBoost(bassBoost / 1000.0f)
+
+        try {
+            hardwareEqualizer?.enabled = enabled
+            bands.forEach { band ->
+                if (band.index < (hardwareEqualizer?.numberOfBands ?: 0)) {
+                    hardwareEqualizer?.setBandLevel(band.index.toShort(), band.levelMb.toShort())
+                }
+            }
+            hardwareBassBoost?.enabled = enabled
+            hardwareBassBoost?.takeIf { it.strengthSupported }?.setStrength(bassBoost.toShort())
+        } catch (ignored: Exception) {}
+    }
+
     fun setEnabled(enabled: Boolean) {
         _isEnabled.value = enabled
+        if (_eqScopeMode.value == EqualizerScopeMode.GLOBAL_ALL_TRACKS) {
+            savedGlobalEnabled = enabled
+        }
         NativeAudioEngine.setDspEnabled(enabled)
         try {
             hardwareEqualizer?.enabled = enabled
@@ -102,6 +190,9 @@ class AudioEffectManager {
             val clamped = levelMb.coerceIn(-1500, 1500)
             currentList[index] = currentList[index].copy(levelMb = clamped)
             _bands.value = currentList
+            if (_eqScopeMode.value == EqualizerScopeMode.GLOBAL_ALL_TRACKS) {
+                savedGlobalBands = currentList
+            }
 
             // Actualizar ganancia en dB en el motor nativo C++20 (-15.0 dB a +15.0 dB)
             val gainDb = clamped / 100.0f
@@ -119,6 +210,9 @@ class AudioEffectManager {
     fun setBassBoost(level: Int) {
         val clamped = level.coerceIn(0, 1000)
         _bassBoostLevel.value = clamped
+        if (_eqScopeMode.value == EqualizerScopeMode.GLOBAL_ALL_TRACKS) {
+            savedGlobalBassBoost = clamped
+        }
 
         // Actualizar nivel normalizado en C++20 (0.0 a 1.0)
         NativeAudioEngine.setBassBoost(clamped / 1000.0f)
@@ -130,6 +224,9 @@ class AudioEffectManager {
 
     fun applyPreset(preset: EqualizerPreset) {
         _currentPreset.value = preset
+        if (_eqScopeMode.value == EqualizerScopeMode.GLOBAL_ALL_TRACKS) {
+            savedGlobalPreset = preset
+        }
         preset.bandLevels.forEachIndexed { index, level ->
             setBandLevel(index, level)
         }
