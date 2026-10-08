@@ -44,35 +44,37 @@ object FFmpegNativeEngine {
     )
 
     /**
-     * Inicializa el entorno nativo de bibliotecas dinámicas de FFmpeg si aún no se ha extraído.
+     * Inicializa el entorno nativo de bibliotecas dinámicas de FFmpeg directamente desde [nativeLibraryDir],
+     * purgando cualquier carpeta residual antigua (`env/ffmpeg`) para no duplicar binarios en el teléfono.
      */
     @Synchronized
     fun init(context: Context) {
         if (isInitialized) return
 
         try {
+            val legacyFfmpegEnvDir = File(context.filesDir, "env/ffmpeg")
+            if (legacyFfmpegEnvDir.exists()) {
+                legacyFfmpegEnvDir.deleteRecursively()
+                AuraDebugManager.logInfo(TAG, "Carpeta residual antigua env/ffmpeg eliminada para ahorrar almacenamiento.")
+            }
+
             val nativeLibDir = File(context.applicationInfo.nativeLibraryDir)
             val ffmpegZip = File(nativeLibDir, "libffmpeg.zip.so")
-            val ffmpegEnvDir = File(context.filesDir, "env/ffmpeg")
-            val versionMarker = File(ffmpegEnvDir, ".version")
 
-            val currentSignature = if (ffmpegZip.exists()) "${ffmpegZip.length()}_${ffmpegZip.lastModified()}" else "none"
-
-            if (ffmpegZip.exists()) {
-                val needExtraction = !ffmpegEnvDir.exists() ||
+            // Soporte de respaldo solo si algún entorno legado provee exclusivamente libffmpeg.zip.so sin librerías directas
+            val hasDirectLibs = File(nativeLibDir, "libavcodec.so").exists() || File(nativeLibDir, "libffmpegkit.so").exists()
+            if (!hasDirectLibs && ffmpegZip.exists()) {
+                val versionMarker = File(legacyFfmpegEnvDir, ".version")
+                val currentSignature = "${ffmpegZip.length()}_${ffmpegZip.lastModified()}"
+                val needExtraction = !legacyFfmpegEnvDir.exists() ||
                         !versionMarker.exists() ||
                         versionMarker.readText().trim() != currentSignature
 
                 if (needExtraction) {
-                    AuraDebugManager.logInfo(TAG, "Desempaquetando librerías nativas de FFmpeg en almacenamiento privado...")
-                    if (ffmpegEnvDir.exists()) {
-                        ffmpegEnvDir.deleteRecursively()
-                    }
-                    ffmpegEnvDir.mkdirs()
-
-                    extractZip(ffmpegZip, ffmpegEnvDir)
+                    if (legacyFfmpegEnvDir.exists()) legacyFfmpegEnvDir.deleteRecursively()
+                    legacyFfmpegEnvDir.mkdirs()
+                    extractZip(ffmpegZip, legacyFfmpegEnvDir)
                     versionMarker.writeText(currentSignature)
-                    AuraDebugManager.logInfo(TAG, "Entorno nativo de FFmpeg inicializado correctamente.")
                 }
             }
 

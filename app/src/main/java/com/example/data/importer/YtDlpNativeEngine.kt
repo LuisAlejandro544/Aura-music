@@ -90,16 +90,14 @@ object YtDlpNativeEngine {
                 ytdlpFile.setExecutable(true, false)
             }
 
-            // Asegurar alias ejecutables python3 / python en filesDir/bin apuntando al motor PIE nativo
-            val pythonNative = File(nativeLibDir, "libpython.so")
-            if (pythonNative.exists()) {
-                val binDir = File(context.filesDir, "bin").apply { mkdirs() }
+            // Limpiar copias duplicadas antiguas de python/python3 en filesDir/bin (se usa directamente nativeLibraryDir/libpython.so)
+            val binDir = File(context.filesDir, "bin")
+            if (binDir.exists()) {
                 listOf("python3", "python").forEach { aliasName ->
                     val aliasFile = File(binDir, aliasName)
-                    if (!aliasFile.exists() || aliasFile.length() != pythonNative.length()) {
+                    if (aliasFile.exists()) {
                         try {
-                            pythonNative.copyTo(aliasFile, overwrite = true)
-                            aliasFile.setExecutable(true, false)
+                            aliasFile.delete()
                         } catch (_: Exception) {}
                     }
                 }

@@ -5,17 +5,21 @@
 # For more details, see
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# Reglas seguras de R8 / ProGuard para Aura Music y Aura Beta
+# Preserva intactas todas las clases, modelos, entidades Room, ViewModels, UI y puentes JNI de la app
+-keep class com.example.** { *; }
+-keep interface com.example.** { *; }
+-keep enum com.example.** { *; }
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Preservar métodos nativos JNI C++20 (libauramusic_dsp.so)
+-keepclasseswithmembernames class * {
+    native <methods>;
+}
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Preservar metadatos de Kotlin, Coroutines y Serialización / Moshi / Room
+-keepattributes *Annotation*,InnerClasses,EnclosingMethod,Signature,SourceFile,LineNumberTable
+-dontwarn okio.**
+-dontwarn retrofit2.**
+-dontwarn kotlinx.coroutines.**
+-dontwarn com.google.errorprone.annotations.**
+

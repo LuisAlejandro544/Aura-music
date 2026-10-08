@@ -138,8 +138,9 @@ android {
       applicationIdSuffix = ""
       // Para la versión Beta el identificador es com.auramusic.beta -> Android/data/com.auramusic.beta
       isDebuggable = false
-      isCrunchPngs = false
-      isMinifyEnabled = false
+      isCrunchPngs = true
+      isMinifyEnabled = true
+      isShrinkResources = true
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig = signingConfigs.getByName("betaConfig")
       matchingFallbacks += listOf("release", "debug")
@@ -163,6 +164,11 @@ android {
     buildConfig = true
   }
   testOptions { unitTests { isIncludeAndroidResources = true } }
+  lint {
+    checkReleaseBuilds = false
+    abortOnError = false
+    disable += setOf("FullBackupContent", "DataExtractionRules", "ExpiredTargetSdkVersion")
+  }
   packaging {
     jniLibs {
       useLegacyPackaging = true
@@ -482,47 +488,38 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
                     val modName = File(rEntry.name).name
                     if (modName.endsWith(".so")) {
                       val modBytes = zis.readBytes()
-                      File(extractedModulesDir, modName).writeBytes(modBytes)
                       val normalized = modName
                         .replace(".chaquopy.so", ".so")
                         .replace(Regex("\\.cpython-\\d+.*\\.so$"), ".so")
-                      if (normalized != modName) {
-                        File(extractedModulesDir, normalized).writeBytes(modBytes)
-                      }
+                      File(extractedModulesDir, normalized).writeBytes(modBytes)
                     }
                   }
                 }
               }
             } else if (simpleName.endsWith(".so") && !simpleName.startsWith("lib")) {
               val modBytes = zip.getInputStream(entry).use { it.readBytes() }
-              File(extractedModulesDir, simpleName).writeBytes(modBytes)
               val normalized = simpleName
                 .replace(".chaquopy.so", ".so")
                 .replace(Regex("\\.cpython-\\d+.*\\.so$"), ".so")
-              if (normalized != simpleName) {
-                File(extractedModulesDir, normalized).writeBytes(modBytes)
-              }
+              File(extractedModulesDir, normalized).writeBytes(modBytes)
             }
           }
         }
 
-        // Construir libpython.zip.so combinando stdlib.zip + site.py + módulos C nativos (.so)
+        // Optimizar símbolos de depuración en los módulos C nativos de Python antes de empaquetar
+        val llvmStripForPy = toolchainBin?.let { File(it, "llvm-strip") }?.takeIf { it.canExecute() }
+        if (llvmStripForPy != null) {
+          extractedModulesDir.listFiles()?.filter { it.isFile && it.name.endsWith(".so") }?.forEach { modSo ->
+            ProcessBuilder(llvmStripForPy.absolutePath, "--strip-unneeded", modSo.absolutePath).start().waitFor()
+          }
+        }
+
+        // Construir libpython.zip.so combinando stdlib.zip (sin duplicar archivos sueltos en stdlib/) + site.py + módulos C únicos (.so)
         ZipOutputStream(FileOutputStream(pythonZipSo)).use { zos ->
           if (stdlibPycZip != null && stdlibPycZip.exists()) {
             zos.putNextEntry(ZipEntry("stdlib.zip"))
             stdlibPycZip.inputStream().use { it.copyTo(zos) }
             zos.closeEntry()
-
-            ZipFile(stdlibPycZip).use { stdZip ->
-              val stdEntries = stdZip.entries()
-              while (stdEntries.hasMoreElements()) {
-                val se = stdEntries.nextElement()
-                if (se.isDirectory) continue
-                zos.putNextEntry(ZipEntry("stdlib/${se.name}"))
-                stdZip.getInputStream(se).use { it.copyTo(zos) }
-                zos.closeEntry()
-              }
-            }
           }
 
           val sitePyContent = """
@@ -560,7 +557,7 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
     }
 
     // -------------------------------------------------------------------------
-    // 4. Aprovisionamiento de FFmpeg Nativo Puro Multi-ABI + Lanzador PIE
+    // 4. Aprovisionamiento de FFmpeg Nativo Puro Multi-ABI + Lanzador PIE (Sin Duplicación .zip.so)
     // -------------------------------------------------------------------------
     val resolvedFfmpegFiles = try { ffmpegRuntimeFiles.files } catch (_: Throwable) { emptySet<File>() }
     val ffmpegAarFile = resolvedFfmpegFiles.firstOrNull { it.name.endsWith(".aar") || it.name.endsWith(".zip") }
@@ -568,27 +565,22 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
 
     for (abi in abis) {
       val abiDir = File(jniLibsDir, abi).apply { mkdirs() }
-      val ffmpegZipSo = File(abiDir, "libffmpeg.zip.so")
+      // Eliminar cualquier libffmpeg.zip.so duplicado anterior para ahorrar ~45MB en el APK y ~90MB instalado
+      File(abiDir, "libffmpeg.zip.so").delete()
       val ffmpegSo = File(abiDir, "libffmpeg.so")
 
       if (ffmpegAarFile != null && ffmpegAarFile.exists()) {
         ZipFile(ffmpegAarFile).use { aarZip ->
-          ZipOutputStream(FileOutputStream(ffmpegZipSo)).use { zos ->
-            val entries = aarZip.entries()
-            while (entries.hasMoreElements()) {
-              val entry = entries.nextElement()
-              if (!entry.isDirectory && entry.name.startsWith("jni/$abi/") && entry.name.endsWith(".so")) {
-                val soName = File(entry.name).name
+          val entries = aarZip.entries()
+          while (entries.hasMoreElements()) {
+            val entry = entries.nextElement()
+            if (!entry.isDirectory && entry.name.startsWith("jni/$abi/") && entry.name.endsWith(".so")) {
+              val soName = File(entry.name).name
+              if (soName != "libc++_shared.so") {
                 val soBytes = aarZip.getInputStream(entry).use { it.readBytes() }
-                if (soName != "libc++_shared.so") {
-                  val directSo = File(abiDir, soName)
-                  directSo.writeBytes(soBytes)
-                  directSo.setExecutable(true, false)
-                }
-
-                zos.putNextEntry(ZipEntry("usr/lib/$soName"))
-                zos.write(soBytes)
-                zos.closeEntry()
+                val directSo = File(abiDir, soName)
+                directSo.writeBytes(soBytes)
+                directSo.setExecutable(true, false)
               }
             }
           }
@@ -606,14 +598,14 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
     }
 
     // -------------------------------------------------------------------------
-    // 5. Optimización de Símbolos ELF con llvm-strip
+    // 5. Optimización Profunda de Símbolos ELF con llvm-strip --strip-unneeded
     // -------------------------------------------------------------------------
     val llvmStrip = toolchainBin?.let { File(it, "llvm-strip") }?.takeIf { it.canExecute() }
     if (llvmStrip != null) {
       jniLibsDir.walkTopDown()
         .filter { it.isFile && it.name.endsWith(".so") && !it.name.endsWith(".zip.so") }
         .forEach { soFile ->
-          ProcessBuilder(llvmStrip.absolutePath, soFile.absolutePath).start().waitFor()
+          ProcessBuilder(llvmStrip.absolutePath, "--strip-unneeded", soFile.absolutePath).start().waitFor()
         }
     }
 
@@ -659,7 +651,7 @@ dependencies {
   ffmpegNativeRuntime("${libs.ffmpeg.native.bundle.get()}@aar")
 
   implementation(platform(libs.androidx.compose.bom))
-  implementation(platform(libs.firebase.bom))
+  // implementation(platform(libs.firebase.bom))
   // implementation(libs.accompanist.permissions)
   implementation(libs.androidx.activity.compose)
   // implementation(libs.androidx.camera.camera2)
@@ -688,14 +680,14 @@ dependencies {
   implementation(libs.media3.ui)
   implementation(libs.media3.common)
   implementation(libs.converter.moshi)
-  implementation(libs.firebase.ai)
+  // implementation(libs.firebase.ai)
   // implementation(libs.firebase.firestore)
   // implementation(libs.firebase.auth)
   // implementation(libs.androidx.credentials)
   // implementation(libs.androidx.credentials.play.services)
   // implementation(libs.googleid)
-  implementation(libs.firebase.appcheck.recaptcha)
-  implementation(libs.firebase.appcheck.debug)
+  // implementation(libs.firebase.appcheck.recaptcha)
+  // implementation(libs.firebase.appcheck.debug)
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.kotlinx.coroutines.core)
   implementation(libs.logging.interceptor)

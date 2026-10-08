@@ -6,12 +6,14 @@
 <data-extraction-rules>
     <cloud-backup>
         <include domain="sharedpref" path="."/>
+        <include domain="file" path="."/>
         <exclude domain="file" path="bin"/>
         <exclude domain="file" path="env"/>
         <exclude domain="file" path="aura_debug_logs.json"/>
     </cloud-backup>
     <device-transfer>
         <include domain="sharedpref" path="."/>
+        <include domain="file" path="."/>
         <exclude domain="file" path="bin"/>
         <exclude domain="file" path="env"/>
         <exclude domain="file" path="aura_debug_logs.json"/>

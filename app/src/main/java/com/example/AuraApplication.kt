@@ -34,9 +34,10 @@ class AuraApplication : Application() {
         AuraDebugManager.init(this)
         AuraDebugManager.logInfo("Application", "Aura Music iniciada correctamente.")
 
-        // Inicialización asíncrona en segundo plano de los motores nativos (FFmpeg puro y entorno Python)
+        // Inicialización asíncrona en segundo plano de los motores nativos (FFmpeg puro y entorno Python) y limpieza de residuos
         applicationScope.launch {
             try {
+                com.example.data.storage.AppStorageManager.cleanupResidualFiles(applicationContext)
                 FFmpegNativeEngine.init(applicationContext)
                 YtDlpNativeEngine.init(applicationContext)
                 // Chequeo en caliente OTA de yt-dlp sin bloquear la interfaz

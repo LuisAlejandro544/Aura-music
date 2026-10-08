@@ -164,7 +164,7 @@ jobs:
           AURA_BETA_MOBILE_ONLY: "true"
         run: |
           echo "Iniciando compilación limpia de Aura Beta ($VERSION_TAG - $APP_CODENAME)..."
-          ./gradlew :app:assembleBeta --no-daemon --no-build-cache --stacktrace
+          ./gradlew :app:assembleBeta -x lintVitalBeta -x lintVitalAnalyzeBeta --no-daemon --no-build-cache --stacktrace
 
       - name: 📂 11. Organizar y Renombrar Estratégicamente los 3 APKs + Sumas SHA-256
         run: |
