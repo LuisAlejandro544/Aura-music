@@ -80,7 +80,6 @@ int main(int argc, char **argv) {
         "libavcodec.so",
         "libavformat.so",
         "libavfilter.so",
-        "libavdevice.so",
         NULL
     };
 

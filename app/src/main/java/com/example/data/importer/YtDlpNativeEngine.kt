@@ -50,25 +50,32 @@ object YtDlpNativeEngine {
             val pythonEnvDir = File(context.filesDir, "env/python")
             val versionMarker = File(pythonEnvDir, ".version")
 
-            val currentSignature = if (pythonZip.exists()) "direct_zipimport_v2_${pythonZip.length()}_${pythonZip.lastModified()}" else "none"
+            val pymodFiles = nativeLibDir.listFiles()?.filter {
+                it.isFile && it.name.startsWith("libpymod_") && it.name.endsWith(".so")
+            }.orEmpty()
 
-            if (pythonZip.exists()) {
-                val needExtraction = !pythonEnvDir.exists() ||
+            val currentSignature = buildString {
+                append("direct_symlink_v3_")
+                if (pythonZip.exists()) append("${pythonZip.length()}_${pythonZip.lastModified()}_")
+                append("mods:${pymodFiles.size}")
+            }
+
+            if (pythonZip.exists() || pymodFiles.isNotEmpty()) {
+                val needSetup = !pythonEnvDir.exists() ||
                         !versionMarker.exists() ||
                         versionMarker.readText().trim() != currentSignature
 
-                if (needExtraction) {
-                    AuraDebugManager.logInfo(TAG, "Preparando módulos C nativos de Python (stdlib se lee directo desde nativeLibraryDir/libpython.zip.so sin extraer a disco)...")
+                if (needSetup) {
+                    AuraDebugManager.logInfo(TAG, "Vinculando módulos C nativos de Python desde nativeLibraryDir mediante symlinks de 0 bytes (cero triplicación en disco)...")
                     if (pythonEnvDir.exists()) {
                         pythonEnvDir.deleteRecursively()
                     }
                     pythonEnvDir.mkdirs()
 
-                    // Solo extraer los módulos C nativos (modules/*.so) que dlopen requiere en disco;
-                    // NUNCA extraer stdlib.zip ni archivos .pyc para ahorrar ~15MB en el teléfono.
-                    extractOnlyNativeModules(pythonZip, pythonEnvDir)
+                    // Enlazar módulos C nativos (libpymod_*.so) desde nativeLibraryDir hacia modules/*.so sin duplicar bytes
+                    linkNativeModulesFromLibDir(nativeLibDir, pythonZip, pythonEnvDir)
                     versionMarker.writeText(currentSignature)
-                    AuraDebugManager.logInfo(TAG, "Módulos C de Python inicializados con lectura directa desde libpython.zip.so.")
+                    AuraDebugManager.logInfo(TAG, "Módulos C de Python vinculados desde nativeLibraryDir y stdlib leído directo vía zipimport.")
                 } else {
                     // Limpiar cualquier stdlib.zip o carpeta stdlib residual de versiones anteriores
                     File(pythonEnvDir, "stdlib.zip").takeIf { it.exists() }?.delete()
@@ -620,19 +627,49 @@ object YtDlpNativeEngine {
     }
 
     /**
-     * Extrae únicamente los módulos C nativos (modules/.so) necesarios para dlopen(),
-     * omitiendo por completo stdlib.zip y los archivos .pyc ya que CPython los importa
-     * directamente desde nativeLibraryDir/libpython.zip.so vía zipimport.
+     * Vincula los módulos C nativos de Python desde [nativeLibraryDir] (`libpymod_<nombre>.so`)
+     * hacia `files/env/python/modules/<nombre>.so` utilizando enlaces simbólicos (`Os.symlink`) de 0 bytes.
+     * Evita que los módulos C estén triplicados en el teléfono (APK + nativeLibraryDir + filesDir).
+     * Incluye respaldo para extraer de `libpython.zip.so` si algún entorno legado aún los empaquetara dentro del zip.
      */
-    private fun extractOnlyNativeModules(zipFile: File, destDir: File) {
+    private fun linkNativeModulesFromLibDir(nativeLibDir: File, zipFile: File, destDir: File) {
         val canonicalDestDir = destDir.canonicalFile
+        val modulesDir = File(destDir, "modules").apply { mkdirs() }
+        val canonicalModulesDir = modulesDir.canonicalFile
+
+        val pymodFiles = nativeLibDir.listFiles()?.filter {
+            it.isFile && it.name.startsWith("libpymod_") && it.name.endsWith(".so")
+        }.orEmpty()
+
+        if (pymodFiles.isNotEmpty()) {
+            for (srcSo in pymodFiles) {
+                val originalModuleName = srcSo.name.removePrefix("libpymod_")
+                if (originalModuleName.isBlank() || originalModuleName.contains("/") || originalModuleName.contains("..")) continue
+                val targetLink = File(modulesDir, originalModuleName)
+                val canonicalTarget = targetLink.canonicalFile
+                if (!canonicalTarget.toPath().startsWith(canonicalModulesDir.toPath())) {
+                    throw SecurityException("Violación de seguridad Path Traversal al vincular módulo Python: '$originalModuleName'")
+                }
+                if (targetLink.exists()) targetLink.delete()
+                try {
+                    android.system.Os.symlink(srcSo.absolutePath, targetLink.absolutePath)
+                } catch (_: Throwable) {
+                    // Respaldo seguro si el sistema de archivos bloqueara symlinks
+                    srcSo.copyTo(targetLink, overwrite = true)
+                    targetLink.setExecutable(true, false)
+                }
+            }
+            return
+        }
+
+        // Respaldo de compatibilidad si algún zip legado aún trajera modules/*.so adentro
+        if (!zipFile.exists()) return
         ZipFile(zipFile).use { zip ->
             val entries = zip.entries()
             while (entries.hasMoreElements()) {
                 val entry = entries.nextElement()
                 if (entry.isDirectory) continue
                 val name = entry.name.trimStart('/')
-                // Solo extraer módulos C nativos (.so) o configuración de certificados si existiera
                 val isNativeModule = name.startsWith("modules/") && name.endsWith(".so")
                 if (!isNativeModule) continue
 

@@ -158,11 +158,22 @@ android {
       buildConfigField("boolean", "ENABLE_DEBUG_MONITOR", "true")
     }
   }
-  compileOptions {
-    sourceCompatibility = JavaVersion.VERSION_11
-    targetCompatibility = JavaVersion.VERSION_11
-  }
-  buildFeatures {
+    compileOptions {
+      sourceCompatibility = JavaVersion.VERSION_11
+      targetCompatibility = JavaVersion.VERSION_11
+    }
+    androidResources {
+      // Filtrar recursos de librerías de Android conservando Español e Inglés con todas sus variantes regionales
+      // (incluyendo Español de Latinoamérica b+es+419, España, EE.UU., México, Argentina, Colombia, Chile, Perú, etc., e Inglés en variantes regionales incluyendo en-rES y b+en+ES)
+      localeFilters += listOf(
+        "es", "es-rES", "es-rUS", "es-rMX", "es-rAR", "es-rCO", "es-rCL",
+        "es-rPE", "es-rVE", "es-rEC", "es-rGT", "es-rCU", "es-rBO", "es-rDO", "es-rHN",
+        "es-rPY", "es-rSV", "es-rNI", "es-rCR", "es-rPA", "es-rUY", "es-rPR", "es-rGQ", "es-rPH",
+        "en", "en-rUS", "en-rGB", "en-rES", "en-rCA", "en-rAU", "en-rIN", "en-rIE", "en-rNZ", "en-rZA",
+        "b+es+419", "b+en+ES", "b+en+001", "b+en+150"
+      )
+    }
+    buildFeatures {
     compose = true
     buildConfig = true
   }
@@ -529,13 +540,24 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
     val stdlibPycZip = resolvedPythonFiles.firstOrNull { it.name.contains("stdlib") }
     val pythonLauncherC = File(cppDir, "native_python_launcher.c")
 
-    // Paquetes y directorios de escritorio/test en stdlib que yt-dlp jamás utiliza en Android
+    // Paquetes y directorios de escritorio/test/servidores legados en stdlib que yt-dlp jamás utiliza en Android
     val prunedStdlibPrefixes = listOf(
       "test/", "tests/", "unittest/", "tkinter/", "idlelib/", "turtledemo/",
-      "pydoc_data/", "distutils/tests/", "distutils/command/wininst",
-      "lib2to3/tests/", "ensurepip/", "venv/", "curses/", "dbm/", "msilib/"
+      "pydoc_data/", "distutils/", "lib2to3/", "ensurepip/", "venv/", "curses/", "dbm/", "msilib/",
+      "multiprocessing/popen_", "multiprocessing/resource_", "multiprocessing/forkserver", "multiprocessing/shared_memory",
+      "wsgiref/", "xmlrpc/"
     )
-    val prunedStdlibExact = setOf("turtle.pyc", "turtle.py", "doctest.pyc", "doctest.py", "pdb.pyc")
+    val prunedStdlibExact = setOf(
+      "turtle.pyc", "turtle.py", "doctest.pyc", "doctest.py", "pdb.pyc",
+      "_pydecimal.pyc", "_pydecimal.py", "pydoc.pyc", "pydoc.py",
+      "mailbox.pyc", "mailbox.py", "pickletools.pyc", "pickletools.py",
+      "difflib.pyc", "difflib.py", "smtpd.pyc", "smtplib.pyc", "imaplib.pyc",
+      "poplib.pyc", "nntplib.pyc", "ftplib.pyc", "telnetlib.pyc",
+      "antigravity.pyc", "this.pyc", " tabnanny.pyc", "tabnanny.pyc",
+      "cProfile.pyc", "profile.pyc", "pstats.pyc", "timeit.pyc", "trace.pyc",
+      "modulefinder.pyc", " symtable.pyc", "symtable.pyc", " wave.pyc", "sunau.pyc", "aifc.pyc", "chunk.pyc",
+      "sndhdr.pyc", "ossaudiodev.pyc", "crypt.pyc", "pty.pyc", "tty.pyc", "pipes.pyc", "mailcap.pyc", "xdrlib.pyc"
+    )
 
     fun shouldPruneStdlibEntry(entryName: String): Boolean {
       val clean = entryName.trimStart('/')
@@ -545,7 +567,7 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
       return false
     }
 
-    // Módulos C nativos (.so) y librerías compartidas que yt-dlp nunca usa (bases de datos, tests, GUI, audioop, codecs CJK pesados)
+    // Módulos C nativos (.so) y librerías compartidas que yt-dlp nunca usa (bases de datos, tests, GUI, audioop, codecs CJK pesados, profilers)
     val prunedNativeSharedLibs = setOf(
       "libsqlite3_chaquopy.so", "libsqlite3.so"
     )
@@ -553,18 +575,20 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
       "_sqlite3", "_tkinter", "_test", "_ctypes_test", "_xxtestfuzz", "xxlimited",
       "_curses", "_dbm", "_gdbm", "nis", "ossaudiodev", "spwd", "syslog",
       "audioop", "_codecs_cn", "_codecs_hk", "_codecs_iso2022", "_codecs_jp", "_codecs_kr", "_codecs_tw",
-      "_decimal"
+      "_decimal", "_lsprof", "_xxsubinterpreters", "_statistics", "_zoneinfo", "termios", "resource",
+      "cmath", "mmap", "_multiprocessing", "_posixshmem", "grp", "crypt"
     )
 
     fun shouldPrunePythonCModule(fileName: String): Boolean {
       val lower = fileName.lowercase()
-      return prunedPythonCModules.any { lower == "$it.so" || lower.startsWith("${it}.") }
+      return prunedPythonCModules.any { lower == "$it.so" || lower.startsWith("${it}.") || lower.startsWith("${it}_") }
     }
 
     for (abi in abis) {
       val abiDir = File(jniLibsDir, abi).apply { mkdirs() }
-      // Limpiar posibles librerías compartidas podadas de ejecuciones previas
+      // Limpiar posibles librerías compartidas y módulos C podados de ejecuciones previas
       prunedNativeSharedLibs.forEach { File(abiDir, it).delete() }
+      abiDir.listFiles()?.filter { it.isFile && it.name.startsWith("libpymod_") }?.forEach { it.delete() }
 
       val abiTargetZip = resolvedPythonFiles.firstOrNull {
         it.name.endsWith("-$abi.zip") || (it.name.contains(abi) && !it.name.contains("stdlib"))
@@ -619,19 +643,22 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
           }
         }
 
-        // Optimizar símbolos de depuración en los módulos C nativos de Python antes de empaquetar
+        // Optimizar símbolos de depuración en los módulos C nativos de Python y colocarlos directamente en jniLibs/<abi>/libpymod_<nombre>.so
+        // De esta forma Android los instala directamente en nativeLibraryDir y YtDlpNativeEngine crea symlinks de 0 bytes,
+        // eliminando la triplicación de módulos C (ya no van dentro de libpython.zip.so ni se copian a filesDir).
         val llvmStripForPy = toolchainBin?.let { File(it, "llvm-strip") }?.takeIf { it.canExecute() }
-        if (llvmStripForPy != null) {
-          extractedModulesDir.listFiles()?.filter { it.isFile && it.name.endsWith(".so") }?.forEach { modSo ->
+        extractedModulesDir.listFiles()?.filter { it.isFile && it.name.endsWith(".so") }?.forEach { modSo ->
+          if (llvmStripForPy != null) {
             ProcessBuilder(llvmStripForPy.absolutePath, "--strip-unneeded", modSo.absolutePath).start().waitFor()
           }
+          val directPyModSo = File(abiDir, "libpymod_${modSo.name}")
+          modSo.copyTo(directPyModSo, overwrite = true)
+          directPyModSo.setExecutable(true, false)
         }
 
-        // Construir libpython.zip.so con compresión Deflate Nivel 9:
-        // - Los archivos .pyc de stdlib van directamente en la raíz de libpython.zip.so (con tests podados)
-        //   para que CPython los importe directamente vía zipimport desde nativeLibraryDir/libpython.zip.so
-        //   SIN extraer stdlib.zip al almacenamiento del teléfono.
-        // - Los módulos C nativos podados van en 'modules/*.so' (únicos que se extraen para dlopen).
+        // Construir libpython.zip.so con compresión Deflate Nivel 9 conteniendo EXCLUSIVAMENTE los .pyc de stdlib:
+        // - CPython los importa directamente vía zipimport desde nativeLibraryDir/libpython.zip.so SIN extraer stdlib.zip a disco.
+        // - Los módulos C nativos viven directamente en nativeLibraryDir/libpymod_*.so (cero duplicación en zip ni en filesDir).
         ZipOutputStream(FileOutputStream(pythonZipSo)).use { zos ->
           zos.setLevel(Deflater.BEST_COMPRESSION)
           val addedEntries = mutableSetOf<String>()
@@ -664,15 +691,6 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
             zos.write(sitePyContent)
             zos.closeEntry()
           }
-
-          extractedModulesDir.listFiles()?.sortedBy { it.name }?.forEach { modFile ->
-            val modEntryName = "modules/${modFile.name}"
-            if (addedEntries.add(modEntryName)) {
-              zos.putNextEntry(ZipEntry(modEntryName))
-              modFile.inputStream().use { it.copyTo(zos) }
-              zos.closeEntry()
-            }
-          }
         }
       }
 
@@ -694,16 +712,23 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
     }
 
     // -------------------------------------------------------------------------
-    // 4. Aprovisionamiento de FFmpeg Nativo Puro Multi-ABI + Lanzador PIE (Sin Duplicación .zip.so)
+    // 4. Aprovisionamiento de FFmpeg Nativo Puro Multi-ABI + Lanzador PIE (Sin Duplicación .zip.so ni librerías no usadas)
     // -------------------------------------------------------------------------
     val resolvedFfmpegFiles = try { ffmpegRuntimeFiles.files } catch (_: Throwable) { emptySet<File>() }
     val ffmpegAarFile = resolvedFfmpegFiles.firstOrNull { it.name.endsWith(".aar") || it.name.endsWith(".zip") }
     val ffmpegLauncherC = File(cppDir, "native_ffmpeg_launcher.c")
+    val prunedFfmpegLibs = setOf(
+      "libc++_shared.so",
+      "libavdevice.so",
+      "libavdevice_neon.so",
+      "libffmpegkit_abidetect.so"
+    )
 
     for (abi in abis) {
       val abiDir = File(jniLibsDir, abi).apply { mkdirs() }
-      // Eliminar cualquier libffmpeg.zip.so duplicado anterior para ahorrar ~45MB en el APK y ~90MB instalado
+      // Eliminar cualquier libffmpeg.zip.so duplicado anterior y librerías FFmpeg innecesarias (libavdevice, abidetect)
       File(abiDir, "libffmpeg.zip.so").delete()
+      prunedFfmpegLibs.forEach { File(abiDir, it).delete() }
       val ffmpegSo = File(abiDir, "libffmpeg.so")
 
       if (ffmpegAarFile != null && ffmpegAarFile.exists()) {
@@ -713,7 +738,7 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
             val entry = entries.nextElement()
             if (!entry.isDirectory && entry.name.startsWith("jni/$abi/") && entry.name.endsWith(".so")) {
               val soName = File(entry.name).name
-              if (soName != "libc++_shared.so") {
+              if (soName !in prunedFfmpegLibs) {
                 val soBytes = aarZip.getInputStream(entry).use { it.readBytes() }
                 val directSo = File(abiDir, soName)
                 directSo.writeBytes(soBytes)
@@ -768,7 +793,7 @@ val ensureDebugKeystore = tasks.register<EnsureDebugKeystoreTask>("ensureDebugKe
 
 val provisionNativeDeps = tasks.register<ProvisionNativeDepsTask>("provisionNativeDeps") {
   dependsOn(ensureDebugKeystore)
-  provisionVersion.set("v2.1-deflate9-direct-zipimport")
+  provisionVersion.set("v2.2-symlink-pymod-pruned")
   val betaMode = gradle.startParameter.taskNames.any { it.contains("Beta", ignoreCase = true) } ||
     System.getenv("AURA_BETA_MOBILE_ONLY") == "true"
   mobileOnlyAbis.set(betaMode)
@@ -822,7 +847,8 @@ dependencies {
   implementation(libs.media3.session)
   implementation(libs.media3.ui)
   implementation(libs.media3.common)
-  implementation(libs.converter.moshi)
+  // Dependencias reservadas para uso futuro (comentadas para no incluirse en el APK actual y reducir peso DEX/.odex)
+  // implementation(libs.converter.moshi)
   // implementation(libs.firebase.ai)
   // implementation(libs.firebase.firestore)
   // implementation(libs.firebase.auth)
@@ -833,11 +859,11 @@ dependencies {
   // implementation(libs.firebase.appcheck.debug)
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.kotlinx.coroutines.core)
-  implementation(libs.logging.interceptor)
-  implementation(libs.moshi.kotlin)
+  // implementation(libs.logging.interceptor)
+  // implementation(libs.moshi.kotlin)
   implementation(libs.okhttp)
   // implementation(libs.play.services.location)
-  implementation(libs.retrofit)
+  // implementation(libs.retrofit)
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)
   testImplementation(libs.androidx.junit)
@@ -853,5 +879,5 @@ dependencies {
   debugImplementation(libs.androidx.compose.ui.tooling)
   debugImplementation(libs.leakcanary.android)
   "ksp"(libs.androidx.room.compiler)
-  "ksp"(libs.moshi.kotlin.codegen)
+  // "ksp"(libs.moshi.kotlin.codegen)
 }
