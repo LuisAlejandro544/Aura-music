@@ -194,15 +194,18 @@ object OnlineVideoAudioImporter {
                 }
             }
 
-            // 3. Fallback inteligente de autoreparación: si el stream de WebView devolvió 403 o falló
+            // 3. Fallback inteligente de autoreparación: si el stream devolvió 403 (ej. pistas VEVO protegidas) o falló
             if (!audioReady && WebStreamExtractor.isWebVideoUrl(resolvedInfo.originalUrl)) {
                 val ytId = WebStreamExtractor.extractVideoId(resolvedInfo.originalUrl)
                 if (ytId != null) {
                     AuraDebugManager.logInfo(
                         "OnlineImporter",
-                        "El stream de WebView requirió autoreparación. Resolviendo stream directo fresco con InnerTube/Invidious..."
+                        "El stream inicial requirió autoreparación (posible bloqueo VEVO/403). Resolviendo stream firmado con yt-dlp / InnerTube / Invidious..."
                     )
-                    val freshInfo = InnerTubeClient.resolve(ytId, resolvedInfo.originalUrl)
+                    val freshInfo = (if (YtDlpNativeEngine.isAvailable(context)) {
+                        YtDlpNativeEngine.resolveStream(context, resolvedInfo.originalUrl).getOrNull()
+                    } else null)
+                        ?: InnerTubeClient.resolve(ytId, resolvedInfo.originalUrl)
                         ?: InvidiousStreamResolver.resolve(ytId, resolvedInfo.originalUrl)
 
                     if (freshInfo != null) {

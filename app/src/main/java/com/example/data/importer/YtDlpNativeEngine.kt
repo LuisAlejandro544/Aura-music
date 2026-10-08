@@ -55,7 +55,7 @@ object YtDlpNativeEngine {
             }.orEmpty()
 
             val currentSignature = buildString {
-                append("direct_symlink_v3_")
+                append("direct_symlink_v4_")
                 if (pythonZip.exists()) append("${pythonZip.length()}_${pythonZip.lastModified()}_")
                 append("mods:${pymodFiles.size}")
             }

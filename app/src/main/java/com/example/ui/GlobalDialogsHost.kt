@@ -290,8 +290,12 @@ fun GlobalDialogsHost(
     }
 
     // 5. Diálogo de enlace web entrante ("DownloadFromLinkDialog")
+    var wasDownloadingIncomingWebLink by remember { mutableStateOf(false) }
     LaunchedEffect(downloadProgress.isDownloading) {
-        if (!downloadProgress.isDownloading && pendingIncomingWebLink != null && viewModel.isImporting.value) {
+        if (downloadProgress.isDownloading && pendingIncomingWebLink != null) {
+            wasDownloadingIncomingWebLink = true
+        } else if (!downloadProgress.isDownloading && wasDownloadingIncomingWebLink) {
+            wasDownloadingIncomingWebLink = false
             viewModel.clearPendingIncomingWebLink()
         }
     }
@@ -300,9 +304,12 @@ fun GlobalDialogsHost(
         DownloadFromLinkDialog(
             initialUrl = pendingIncomingWebLink,
             downloadProgress = downloadProgress,
-            onDismiss = { viewModel.clearPendingIncomingWebLink() },
-            onConfirmDownload = { resolvedInfo, title, artist, attachAsCanvas, trimSilence ->
+            onDismiss = {
+                wasDownloadingIncomingWebLink = false
                 viewModel.clearPendingIncomingWebLink()
+            },
+            onConfirmDownload = { resolvedInfo, title, artist, attachAsCanvas, trimSilence ->
+                wasDownloadingIncomingWebLink = true
                 viewModel.importFromWebVideoLink(
                     resolvedInfo = resolvedInfo,
                     customTitle = title,
@@ -315,7 +322,7 @@ fun GlobalDialogsHost(
                 }
             },
             onConfirmDownloadWithLoopStyle = { resolvedInfo, title, artist, attachAsCanvas, trimSilence, loopStyle ->
-                viewModel.clearPendingIncomingWebLink()
+                wasDownloadingIncomingWebLink = true
                 viewModel.importFromWebVideoLink(
                     resolvedInfo = resolvedInfo,
                     customTitle = title,

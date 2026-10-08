@@ -560,30 +560,13 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
       "antigravity.pyc", "this.pyc", " tabnanny.pyc", "tabnanny.pyc",
       "cProfile.pyc", "profile.pyc", "pstats.pyc", "timeit.pyc", "trace.pyc",
       "modulefinder.pyc", " symtable.pyc", "symtable.pyc", " wave.pyc", "sunau.pyc", "aifc.pyc", "chunk.pyc",
-      "sndhdr.pyc", "ossaudiodev.pyc", "crypt.pyc", "pty.pyc", "tty.pyc", "pipes.pyc", "mailcap.pyc", "xdrlib.pyc",
-      "bdb.pyc", "cmd.pyc", "code.pyc", "codeop.pyc", "compileall.pyc", "py_compile.pyc",
-      "tarfile.pyc", "zipapp.pyc", "shelve.pyc", "tracemalloc.pyc", "webbrowser.pyc",
-      "imghdr.pyc", "sndhdr.pyc", "uu.pyc", "quopri.pyc", "binhex.pyc", "nis.pyc"
-    )
-    // Codificaciones legacy de mainframes IBM (EBCDIC), Macintosh Classic OS9 y PalmOS en encodings/ que yt-dlp nunca usa
-    val prunedLegacyEncodingsPrefixes = listOf(
-      "encodings/cp037", "encodings/cp273", "encodings/cp424", "encodings/cp500",
-      "encodings/cp720", "encodings/cp737", "encodings/cp775", "encodings/cp856",
-      "encodings/cp857", "encodings/cp858", "encodings/cp860", "encodings/cp861",
-      "encodings/cp862", "encodings/cp863", "encodings/cp864", "encodings/cp865",
-      "encodings/cp869", "encodings/cp874", "encodings/cp875", "encodings/cp1006",
-      "encodings/cp1026", "encodings/cp1125", "encodings/cp1140",
-      "encodings/mac_", "encodings/palmos", "encodings/ptcp154", "encodings/tis_620",
-      "encodings/hp_roman8", "encodings/kz1048", "encodings/koi8_",
-      "encodings/iso2022_", "encodings/hz", "encodings/gb", "encodings/big5",
-      "encodings/euc_", "encodings/shift_jis", "encodings/johab"
+      "sndhdr.pyc", "ossaudiodev.pyc", "crypt.pyc", "pty.pyc", "tty.pyc", "pipes.pyc", "mailcap.pyc", "xdrlib.pyc"
     )
 
     fun shouldPruneStdlibEntry(entryName: String): Boolean {
       val clean = entryName.trimStart('/')
       if (clean in prunedStdlibExact) return true
       if (prunedStdlibPrefixes.any { clean.startsWith(it) }) return true
-      if (prunedLegacyEncodingsPrefixes.any { clean.startsWith(it) }) return true
       if (clean.contains("/test/") || clean.contains("/tests/")) return true
       return false
     }
@@ -814,7 +797,7 @@ val ensureDebugKeystore = tasks.register<EnsureDebugKeystoreTask>("ensureDebugKe
 
 val provisionNativeDeps = tasks.register<ProvisionNativeDepsTask>("provisionNativeDeps") {
   dependsOn(ensureDebugKeystore)
-  provisionVersion.set("v2.3-r8full-stdlib-pruned")
+  provisionVersion.set("v2.4-ytdlp-vevo-restored")
   val betaMode = gradle.startParameter.taskNames.any { it.contains("Beta", ignoreCase = true) } ||
     System.getenv("AURA_BETA_MOBILE_ONLY") == "true"
   mobileOnlyAbis.set(betaMode)

@@ -569,7 +569,7 @@ fun ImportMusicScreen(
         )
     }
 
-    // Cierre garantizado del diálogo al finalizar la descarga o cuando se importa la pista
+    // Cierre garantizado del diálogo únicamente cuando finaliza la descarga (o si el usuario lo cierra manualmente con la X)
     var wasDownloadingInModal by remember { mutableStateOf(false) }
     LaunchedEffect(downloadProgress.isDownloading, allTracks.size) {
         if (downloadProgress.isDownloading && showDownloadFromLinkDialog) {
@@ -589,13 +589,11 @@ fun ImportMusicScreen(
                 wasDownloadingInModal = false
             },
             onConfirmDownload = { info, title, artist, attachCanvas, trimSilence ->
-                showDownloadFromLinkDialog = false
-                wasDownloadingInModal = false
+                wasDownloadingInModal = true
                 onDownloadFromLink(info, title, artist, attachCanvas, trimSilence)
             },
             onConfirmDownloadWithLoopStyle = { info, title, artist, attachCanvas, trimSilence, loopStyle ->
-                showDownloadFromLinkDialog = false
-                wasDownloadingInModal = false
+                wasDownloadingInModal = true
                 onDownloadFromLinkWithLoopStyle(info, title, artist, attachCanvas, trimSilence, loopStyle)
             }
         )
