@@ -1,0 +1,122 @@
+LICENCIA PROPIETARIA DE CÓDIGO VISIBLE (SOURCE-AVAILABLE — SOLO LECTURA)
+PROPRIETARY SOURCE-AVAILABLE LICENSE (VIEWING ONLY — ALL RIGHTS RESERVED)
+
+Copyright (c) 2026 Luis Alejandro Sosa Camacho (Aura Music / Aura Beta).
+Todos los derechos reservados. / All rights reserved.
+
+================================================================================
+VERSIÓN EN ESPAÑOL (TEXTO OFICIAL VINCULANTE)
+================================================================================
+
+1. TITULARIDAD Y DERECHOS DE AUTOR
+Todo el código fuente, archivos de configuración, algoritmos de procesamiento de
+señal digital (DSP en C++20), diseños de interfaz, recursos gráficos, textos,
+documentación y paquetes ejecutables (APKs) contenidos en este repositorio
+(conjuntamente, el "Software") son propiedad intelectual exclusiva de su autor,
+Luis Alejandro Sosa Camacho (el "Titular"), y están protegidos por las leyes
+nacionales de propiedad intelectual y los tratados internacionales de derechos
+de autor (incluyendo el Convenio de Berna y los tratados de la OMPI/WIPO).
+
+El hecho de que este repositorio sea públicamente accesible no convierte al
+Software en "Software Libre", "Open Source" (Código Abierto) ni de "Dominio
+Público".
+
+2. CONCESIÓN LIMITADA DE VISUALIZACIÓN (SOLO LECTURA)
+El Titular concede únicamente un permiso personal, revocable, no exclusivo,
+intransferible y sin costo para:
+  a) Visualizar y leer el código fuente y la documentación directamente a través
+     de la interfaz web de este repositorio con fines exclusivamente informativos,
+     educativos o de auditoría de seguridad/transparencia.
+  b) Descargar y ejecutar en dispositivos personales los paquetes de instalación
+     oficiales (.apk) publicados directamente por el Titular en la sección
+     oficial de lanzamientos ("Releases") de este proyecto, para uso estrictamente
+     personal y privado.
+
+3. RESTRICCIONES Y PROHIBICIONES ESTRICTAS
+Salvo autorización previa, expresa y por escrito firmada por el Titular, queda
+TERMINANTEMENTE PROHIBIDO:
+  a) Modificar, adaptar, traducir, refactorizar, parchear o crear obras derivadas
+     basadas total o parcialmente en el Software o en cualquiera de sus archivos.
+  b) Copiar, clonar para redistribución, publicar o alojar el código fuente (total
+     o parcialmente) en otros repositorios públicos o privados, sitios web o
+     plataformas de terceros.
+  c) Compilar, empaquetar, firmar o distribuir versiones propias o modificadas del
+     Software o de sus archivos ejecutables (.apk, .aab, .so, .dex).
+  d) Reutilizar módulos, clases, funciones, algoritmos C++/Kotlin o componentes
+     visuales del Software dentro de otros proyectos, aplicaciones o servicios,
+     sean gratuitos o comerciales.
+  e) Vender, alquilar, sublicenciar, monetizar o explotar comercialmente el
+     Software, su código fuente o sus binarios oficiales por cualquier medio.
+  f) Eliminar, ocultar o alterar los avisos de derechos de autor, marcas,
+     nombres de autoría o esta licencia en cualquier archivo del proyecto.
+
+4. TERMINACIÓN AUTOMÁTICA
+El incumplimiento de cualquiera de los términos establecidos en esta Licencia
+anulará de forma automática e inmediata el permiso de visualización y uso
+concedido en la Cláusula 2, facultando al Titular para ejercer las acciones
+legales civiles, penales y administrativas correspondientes, incluyendo
+reclamaciones por infracción de derechos de autor (DMCA / avisos de retirada).
+
+5. EXCLUSIÓN DE GARANTÍAS Y LIMITACIÓN DE RESPONSABILIDAD
+EL SOFTWARE SE PROPORCIONA "TAL CUAL" ("AS IS"), SIN GARANTÍA DE NINGÚN TIPO,
+EXPRESA O IMPLÍCITA, INCLUYENDO PERO NO LIMITADO A GARANTÍAS DE COMERCIABILIDAD,
+IDONEIDAD PARA UN PROPÓSITO PARTICULAR Y NO INFRACCIÓN. EN NINGÚN CASO EL
+TITULAR SERÁ RESPONSABLE POR NINGÚN RECLAMO, DAÑO O CUALQUIER OTRA
+RESPONSABILIDAD DERIVADA DEL USO O LA IMPOSIBILIDAD DE USO DEL SOFTWARE.
+
+================================================================================
+ENGLISH VERSION (FOR INTERNATIONAL REFERENCE)
+================================================================================
+
+1. OWNERSHIP AND COPYRIGHT
+All source code, configuration files, digital signal processing algorithms
+(C++20 DSP), user interface designs, graphic assets, documentation, and binary
+packages (APKs) contained in this repository (collectively, the "Software") are
+the exclusive intellectual property of Luis Alejandro Sosa Camacho (the "Owner"),
+and are protected by applicable copyright laws and international treaties
+(including the Berne Convention and WIPO treaties).
+
+Making this repository publicly visible does NOT make the Software "Free
+Software", "Open Source", or "Public Domain".
+
+2. LIMITED VIEWING GRANT (READ-ONLY)
+The Owner grants you solely a personal, revocable, non-exclusive,
+non-transferable, royalty-free permission to:
+  a) View and read the source code and documentation directly through the web
+     interface of this repository strictly for informational, educational, or
+     security/transparency auditing purposes.
+  b) Download and install on your personal devices the official binary packages
+     (.apk) published directly by the Owner in the official "Releases" section of
+     this repository, strictly for personal, non-commercial use.
+
+3. STRICT PROHIBITIONS AND RESTRICTIONS
+Without prior, explicit written permission signed by the Owner, you are STRICTLY
+PROHIBITED from:
+  a) Modifying, adapting, translating, refactoring, patching, or creating
+     derivative works based in whole or in part on the Software or any of its
+     files.
+  b) Copying, redistributing, mirroring, publishing, or hosting the source code
+     (in whole or in part) in any other public or private repository, website, or
+     third-party platform.
+  c) Compiling, packaging, signing, or distributing your own or modified builds
+     of the Software or its binaries (.apk, .aab, .so, .dex).
+  d) Extracting or reusing any modules, classes, functions, C++/Kotlin
+     algorithms, or UI components from the Software in any other project,
+     application, or service, whether free or commercial.
+  e) Selling, leasing, sublicensing, monetizing, or commercially exploiting the
+     Software, its source code, or its official binaries by any means.
+  f) Removing, obscuring, or altering any copyright notices, branding,
+     attribution, or this license file.
+
+4. AUTOMATIC TERMINATION
+Any breach of the terms of this License shall automatically and immediately
+terminate the permissions granted under Section 2, entitling the Owner to pursue
+all available legal remedies, including DMCA takedown notices and copyright
+infringement actions.
+
+5. DISCLAIMER OF WARRANTY AND LIMITATION OF LIABILITY
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE OWNER BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
