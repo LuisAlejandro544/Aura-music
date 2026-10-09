@@ -48,7 +48,8 @@ fun BackgroundVideoPlayer(
     videoUriString: String,
     isVideoLoop: Boolean,
     isPlaying: Boolean,
-    currentPositionMs: Long,
+    currentPositionMs: Long = 0L,
+    currentPositionFlow: kotlinx.coroutines.flow.StateFlow<Long>? = null,
     playbackSpeed: Float = 1.0f,
     placeholderTrack: Track? = null,
     modifier: Modifier = Modifier,
@@ -107,8 +108,9 @@ fun BackgroundVideoPlayer(
             setPlaybackSpeed(playbackSpeed)
 
             // Sincronizar posición inicial exacta antes de prepare() para evitar el re-buffering en negro
-            if (!isVideoLoop && currentPositionMs > 0L) {
-                seekTo(currentPositionMs)
+            val initialPos = currentPositionFlow?.value ?: currentPositionMs
+            if (!isVideoLoop && initialPos > 0L) {
+                seekTo(initialPos)
             }
 
             addListener(videoListener)
@@ -134,13 +136,25 @@ fun BackgroundVideoPlayer(
         }
     }
 
-    // Gestionar sincronización temporal para videos largos (> 10s)
-    LaunchedEffect(currentPositionMs, isVideoLoop, videoPlayer) {
-        if (!isVideoLoop) {
-            val playerPos = videoPlayer.currentPosition
-            // Si hay un desfase superior a 850ms (ej. seek manual o rebobinado), resincronizar
-            if (abs(playerPos - currentPositionMs) > 850L) {
-                videoPlayer.seekTo(currentPositionMs)
+    // Gestionar sincronización temporal para videos largos (> 10s) sin recomponer el AndroidView cada 200ms
+    if (currentPositionFlow != null) {
+        LaunchedEffect(currentPositionFlow, isVideoLoop, videoPlayer) {
+            if (!isVideoLoop) {
+                currentPositionFlow.collect { posMs ->
+                    val playerPos = videoPlayer.currentPosition
+                    if (abs(playerPos - posMs) > 850L) {
+                        videoPlayer.seekTo(posMs)
+                    }
+                }
+            }
+        }
+    } else {
+        LaunchedEffect(currentPositionMs, isVideoLoop, videoPlayer) {
+            if (!isVideoLoop) {
+                val playerPos = videoPlayer.currentPosition
+                if (abs(playerPos - currentPositionMs) > 850L) {
+                    videoPlayer.seekTo(currentPositionMs)
+                }
             }
         }
     }

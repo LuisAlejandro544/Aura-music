@@ -35,6 +35,8 @@ import com.example.ui.theme.CardBorder
 import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 /**
@@ -52,7 +54,8 @@ import kotlinx.coroutines.launch
 fun NowPlayingLyricsCard(
     currentTrack: Track,
     lyricsState: LyricsState,
-    currentPositionMs: Long,
+    currentPositionMs: Long = 0L,
+    currentPositionFlow: StateFlow<Long>? = null,
     animatedPrimary: Color,
     onSeekTo: (Long) -> Unit,
     onFetchOnlineLyrics: () -> Unit,
@@ -64,7 +67,6 @@ fun NowPlayingLyricsCard(
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
-    val coroutineScope = rememberCoroutineScope()
     var showPasteDialog by remember { mutableStateOf(false) }
 
     // Launcher del sistema para seleccionar archivos .lrc o .txt locales
@@ -76,12 +78,13 @@ fun NowPlayingLyricsCard(
         }
     }
 
-    // Determinar la línea activa en función de la posición actual de reproducción
-    val activeIndex = remember(currentPositionMs, lyricsState.lines) {
-        if (lyricsState.lines.isEmpty()) -1
-        else {
-            val idx = lyricsState.lines.indexOfLast { it.timeMs <= currentPositionMs }
-            if (idx >= 0) idx else 0
+    val collectedPosition = currentPositionFlow?.collectAsStateWithLifecycle()
+
+    // Búsqueda binaria O(log N) + derivedStateOf: la LazyColumn solo se recompone cuando cambia la frase activa (cada 3-6s)
+    val activeIndex by remember(lyricsState.lines, collectedPosition, currentPositionMs) {
+        derivedStateOf {
+            val posMs = collectedPosition?.value ?: currentPositionMs
+            findActiveLyricIndexBinary(lyricsState.lines, posMs)
         }
     }
 
@@ -494,3 +497,24 @@ fun NowPlayingLyricsCard(
         )
     }
 }
+
+/**
+ * Búsqueda binaria O(log N) sobre líneas sincronizadas ordenadas cronológicamente.
+ */
+internal fun findActiveLyricIndexBinary(lines: List<com.example.model.LyricLine>, positionMs: Long): Int {
+    if (lines.isEmpty()) return -1
+    var low = 0
+    var high = lines.size - 1
+    var result = -1
+    while (low <= high) {
+        val mid = (low + high) ushr 1
+        if (lines[mid].timeMs <= positionMs) {
+            result = mid
+            low = mid + 1
+        } else {
+            high = mid - 1
+        }
+    }
+    return if (result >= 0) result else 0
+}
+

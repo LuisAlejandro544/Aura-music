@@ -24,10 +24,12 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.model.Track
 import com.example.ui.theme.SurfaceElevatedDark
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Mini reproductor flotante Aura Sound con arquitectura Dark Luxury Neo-Glass y fondo dinámico tintado.
@@ -36,7 +38,7 @@ import com.example.ui.theme.TextSecondary
  * - Soporte para carátula estática o Video Canvas miniatura configurable por el usuario.
  * - Fondo completamente tintado y degradado con los colores extraídos de la pista/video actual.
  * - Desplazamiento horizontal automático (Marquee) para títulos y artistas largos en reproducción.
- * - Barra de progreso, botón de reproducción y acentos sincronizados con la paleta activa.
+ * - Barra de progreso aislada (MiniPlayerLinearProgress) que evita recomponer el resto del MiniPlayer cada 200ms.
  * - Controles ergonómicos estándar: Anterior (⏮️), Play/Pausa (⏯️) y Siguiente (⏭️).
  * - Permanece visible sobre la barra de navegación inferior con acceso instantáneo a Now Playing.
  */
@@ -45,7 +47,8 @@ import com.example.ui.theme.TextSecondary
 fun MiniPlayer(
     currentTrack: Track?,
     isPlaying: Boolean,
-    currentPositionMs: Long,
+    currentPositionMs: Long = 0L,
+    currentPositionFlow: StateFlow<Long>? = null,
     durationMs: Long,
     onTogglePlayPause: () -> Unit,
     onSkipNext: () -> Unit,
@@ -58,10 +61,6 @@ fun MiniPlayer(
     modifier: Modifier = Modifier
 ) {
     if (currentTrack == null) return
-
-    val progress = if (durationMs > 0) {
-        (currentPositionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
-    } else 0f
 
     val gradientBorder = Brush.horizontalGradient(
         listOf(
@@ -119,6 +118,7 @@ fun MiniPlayer(
                                 isVideoLoop = currentTrack.isVideoLoop,
                                 isPlaying = isPlaying,
                                 currentPositionMs = currentPositionMs,
+                                currentPositionFlow = currentPositionFlow,
                                 playbackSpeed = playbackSpeed,
                                 placeholderTrack = currentTrack,
                                 modifier = Modifier.fillMaxSize(),
@@ -233,15 +233,37 @@ fun MiniPlayer(
                 }
             }
 
-            // Barra delgada de progreso en la parte inferior tintada
-            LinearProgressIndicator(
-                progress = { progress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(3.dp),
-                color = dynamicPrimary,
-                trackColor = dynamicPrimary.copy(alpha = 0.20f)
+            // Barra delgada de progreso en la parte inferior tintada (aislada en su propio ámbito de composición)
+            MiniPlayerLinearProgress(
+                fallbackPositionMs = currentPositionMs,
+                currentPositionFlow = currentPositionFlow,
+                durationMs = durationMs,
+                dynamicPrimary = dynamicPrimary
             )
         }
     }
 }
+
+@Composable
+private fun MiniPlayerLinearProgress(
+    fallbackPositionMs: Long,
+    currentPositionFlow: StateFlow<Long>?,
+    durationMs: Long,
+    dynamicPrimary: Color
+) {
+    val collectedPosition = currentPositionFlow?.collectAsStateWithLifecycle()
+    val livePositionMs = collectedPosition?.value ?: fallbackPositionMs
+    val progress = if (durationMs > 0L) {
+        (livePositionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
+    } else 0f
+
+    LinearProgressIndicator(
+        progress = { progress },
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(3.dp),
+        color = dynamicPrimary,
+        trackColor = dynamicPrimary.copy(alpha = 0.20f)
+    )
+}
+

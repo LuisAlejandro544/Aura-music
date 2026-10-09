@@ -261,7 +261,7 @@ fun HomeScreen(
                         horizontalArrangement = Arrangement.spacedBy(14.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        items(recentlyAddedTracks.take(8)) { track ->
+                        items(recentlyAddedTracks.take(8), key = { it.id }) { track ->
                             HomeAlbumCard(
                                 track = track,
                                 isPlaying = isPlaying && currentTrack?.id == track.id,
@@ -298,7 +298,7 @@ fun HomeScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                 }
 
-                items(popularTracks.take(8)) { track ->
+                items(popularTracks.take(8), key = { it.id }) { track ->
                     TrackListItem(
                         track = track,
                         isCurrentTrack = currentTrack?.id == track.id,

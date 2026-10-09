@@ -24,6 +24,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.flow.StateFlow
 import com.example.model.ABLoopState
 import com.example.model.EqualizerBand
 import com.example.model.EqualizerPreset
@@ -67,7 +69,8 @@ import com.example.ui.theme.TextSecondary
 fun NowPlayingScreen(
     currentTrack: Track?,
     isPlaying: Boolean,
-    currentPositionMs: Long,
+    currentPositionMs: Long = 0L,
+    currentPositionFlow: StateFlow<Long>? = null,
     durationMs: Long,
     shuffleEnabled: Boolean,
     repeatMode: RepeatMode,
@@ -155,7 +158,9 @@ fun NowPlayingScreen(
     onSetStereoBalance: (Float) -> Unit = {},
     // Visualizador espectral C++20, intensidad acústica y Letras Sincronizadas
     visualizerBands: FloatArray? = null,
+    visualizerBandsFlow: StateFlow<FloatArray>? = null,
     audioIntensity: Float = 0.15f,
+    audioIntensityFlow: StateFlow<Float>? = null,
     lyricsState: com.example.model.LyricsState = com.example.model.LyricsState(),
     isSearchLyricsDialogOpen: Boolean = false,
     isSearchingLyrics: Boolean = false,
@@ -199,7 +204,7 @@ fun NowPlayingScreen(
 
     val isVideoVisual = (videoDisplayMode != VideoDisplayMode.OFF) && !currentTrack.videoUri.isNullOrEmpty()
 
-    // Extracción dinámica de color: si Video Canvas está activo, extrae del video para armonizar la UI
+    // Extracción armónica de color una sola vez por pista/video (sin invocar MediaMetadataRetriever cada segundo)
     LaunchedEffect(
         currentTrack.id,
         currentTrack.albumArtPath,
@@ -216,22 +221,6 @@ fun NowPlayingScreen(
             fallbackSecondary = fallbackSecondary,
             positionMs = currentPositionMs
         )
-    }
-
-    // Muestreo dinámico continuo de fotogramas del Video Canvas en tiempo real exacto según la posición de reproducción
-    if (isVideoVisual && isPlaying && isDynamicArtworkColorEnabled) {
-        val intervalStep = (currentPositionMs / 1000L).coerceAtLeast(0L)
-        LaunchedEffect(currentTrack.id, intervalStep) {
-            activeColors = ArtworkColorExtractor.extractPlaybackColors(
-                context = context,
-                track = currentTrack,
-                isVideoActive = true,
-                isDynamicEnabled = true,
-                fallbackPrimary = fallbackPrimary,
-                fallbackSecondary = fallbackSecondary,
-                positionMs = currentPositionMs
-            )
-        }
     }
 
     val animatedPrimary by animateColorAsState(
@@ -297,6 +286,7 @@ fun NowPlayingScreen(
                     isVideoLoop = currentTrack.isVideoLoop,
                     isPlaying = isPlaying,
                     currentPositionMs = currentPositionMs,
+                    currentPositionFlow = currentPositionFlow,
                     playbackSpeed = playbackSpeed,
                     placeholderTrack = currentTrack,
                     modifier = Modifier.fillMaxSize(),
@@ -321,23 +311,13 @@ fun NowPlayingScreen(
             )
         }
 
-        // Halo de luz ambiental decorativo sobre fondo sincronizado con video o carátula,
-        // respirando en tiempo real con la intensidad acústica procesada en C++20
-        val dynamicAuraGlow = animatedTopGlow.copy(
-            alpha = (0.24f + (audioIntensity.coerceIn(0f, 1f) * 0.32f)).coerceIn(0.18f, 0.75f)
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            dynamicAuraGlow,
-                            Color.Transparent,
-                            if (isFullscreenVideo) Color.Transparent else BackgroundDark
-                        )
-                    )
-                )
+        // Halo de luz ambiental decorativo aislado en su propio componente pequeño
+        // para que audioIntensity NO recomponga toda NowPlayingScreen
+        NowPlayingAmbientTopGlow(
+            animatedTopGlow = animatedTopGlow,
+            isFullscreenVideo = isFullscreenVideo,
+            fallbackIntensity = audioIntensity,
+            audioIntensityFlow = audioIntensityFlow
         )
 
         if (isCinematicActive && !showLyrics) {
@@ -345,6 +325,7 @@ fun NowPlayingScreen(
                 currentTrack = currentTrack,
                 isPlaying = isPlaying,
                 currentPositionMs = currentPositionMs,
+                currentPositionFlow = currentPositionFlow,
                 durationMs = durationMs,
                 shuffleEnabled = shuffleEnabled,
                 repeatMode = repeatMode,
@@ -352,6 +333,7 @@ fun NowPlayingScreen(
                 animatedPrimary = animatedPrimary,
                 animatedSecondary = animatedSecondary,
                 audioIntensity = audioIntensity,
+                audioIntensityFlow = audioIntensityFlow,
                 onTogglePlayPause = onTogglePlayPause,
                 onSeekTo = onSeekTo,
                 onPlayNext = onPlayNext,
@@ -409,6 +391,7 @@ fun NowPlayingScreen(
                     currentTrack = currentTrack,
                     lyricsState = lyricsState,
                     currentPositionMs = currentPositionMs,
+                    currentPositionFlow = currentPositionFlow,
                     animatedPrimary = animatedPrimary,
                     onSeekTo = onSeekTo,
                     onFetchOnlineLyrics = onFetchOnlineLyrics,
@@ -423,6 +406,7 @@ fun NowPlayingScreen(
                     currentTrack = currentTrack,
                     isPlaying = isPlaying,
                     currentPositionMs = currentPositionMs,
+                    currentPositionFlow = currentPositionFlow,
                     videoDisplayMode = videoDisplayMode,
                     animatedPrimary = animatedPrimary,
                     animatedSecondary = animatedSecondary,
@@ -435,10 +419,11 @@ fun NowPlayingScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Visualizador dinámico de audio en tiempo real ligado directamente a C++20 DSP
+            // Visualizador dinámico de audio en tiempo real aislado (recolecta bandsFlow localmente)
             AudioVisualizer(
                 isPlaying = isPlaying,
                 realBands = visualizerBands,
+                bandsFlow = visualizerBandsFlow,
                 modifier = Modifier.fillMaxWidth(0.9f),
                 barCount = 28,
                 barHeight = 40.dp,
@@ -453,6 +438,7 @@ fun NowPlayingScreen(
                 currentTrack = currentTrack,
                 isPlaying = isPlaying,
                 currentPositionMs = currentPositionMs,
+                currentPositionFlow = currentPositionFlow,
                 durationMs = durationMs,
                 shuffleEnabled = shuffleEnabled,
                 repeatMode = repeatMode,
@@ -758,10 +744,12 @@ fun NowPlayingScreen(
                 lyricsState = lyricsState,
                 isPlaying = isPlaying,
                 currentPositionMs = currentPositionMs,
+                currentPositionFlow = currentPositionFlow,
                 durationMs = durationMs,
                 animatedPrimary = animatedPrimary,
                 animatedSecondary = animatedSecondary,
                 audioIntensity = audioIntensity,
+                audioIntensityFlow = audioIntensityFlow,
                 onSeekTo = onSeekTo,
                 onTogglePlayPause = onTogglePlayPause,
                 onPlayNext = onPlayNext,
@@ -784,4 +772,31 @@ fun NowPlayingScreen(
             )
         }
     }
+}
+
+@Composable
+private fun NowPlayingAmbientTopGlow(
+    animatedTopGlow: Color,
+    isFullscreenVideo: Boolean,
+    fallbackIntensity: Float,
+    audioIntensityFlow: StateFlow<Float>?
+) {
+    val collectedIntensity = audioIntensityFlow?.collectAsStateWithLifecycle()
+    val liveIntensity = collectedIntensity?.value ?: fallbackIntensity
+    val dynamicAuraGlow = animatedTopGlow.copy(
+        alpha = (0.24f + (liveIntensity.coerceIn(0f, 1f) * 0.32f)).coerceIn(0.18f, 0.75f)
+    )
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        dynamicAuraGlow,
+                        Color.Transparent,
+                        if (isFullscreenVideo) Color.Transparent else BackgroundDark
+                    )
+                )
+            )
+    )
 }

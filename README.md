@@ -3,7 +3,7 @@
 # 🌌 Aura Music (`Aura Beta` • Codename: *Nebula*)
 
 ### **Tu estudio audiófilo, centro de descargas y experiencia Video Canvas en tu bolsillo.**
-**100% libre de anuncios, sin suscripciones y sin necesidad de una PC.**
+**100% libre de anuncios y sin suscripciones.**
 
 [![Versión Beta](https://img.shields.io/badge/Versi%C3%B3n-v0.1.0--beta.1a%20(Nebula)-8B5CF6?style=for-the-badge&logo=android&logoColor=white)](../../releases)
 [![Lenguaje Principal](https://img.shields.io/badge/Lenguaje-Kotlin%20%2B%20Jetpack%20Compose-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white)](./READMEAI.md)
@@ -20,9 +20,6 @@
 
 </div>
 
-
-
-TEST
 ---
 
 ## 🌟 ¿Por qué elegir Aura Music?
@@ -32,7 +29,7 @@ TEST
 - 🚫 **Cero Anuncios y Privacidad Estricta**: Sin publicidad, sin telemetría invasiva y sin escaneos ocultos de tus carpetas. Tú eliges exactamente qué música o videos importar.
 - 🎛️ **Motor Acústico Nativo en C++20 y Bit-Perfect**: Procesamiento en coma flotante de 64 bits con **Ecualizador de 10 bandas**, **Audio 8D / 16D Multi-Órbita**, **Clarificador de Voces HD**, **Reverb sin bloqueos**, **Normalizador EBU R128** y **Modo Bit-Perfect con Google AAudio**.
 - 🎬 **Video Canvas & Modo Cinemático**: Reproduce videos sincronizados o bucles continuos de fondo (con colores reactivos en tiempo real y 0ms de retraso al adelantar la canción).
-- 📥 **Autonomía Total sin PC**: Descarga canciones y videos de fondo directamente desde enlaces web (**YouTube, TikTok y más**) a máxima velocidad, convierte cualquier video de tu galería en música en 1 segundo y une canciones con el **Creador de Mixtapes**.
+- 📥 **Descargas y Conversión Todo en Uno**: Descarga canciones y videos de fondo directamente desde enlaces web (**YouTube, TikTok y más**) a máxima velocidad, convierte cualquier video de tu galería en música en 1 segundo y une canciones con el **Creador de Mixtapes**.
 - 🔄 **Siempre al Día (Actualizaciones OTA Integradas)**: Incluye actualizador automático tanto para nuevas versiones del APK como para el motor interno de extracción (`yt-dlp`), todo verificado con seguridad criptográfica `SHA-256`.
 
 ---

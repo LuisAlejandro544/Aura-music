@@ -217,15 +217,31 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val pendingIncomingWebLink: StateFlow<String?> = incomingMediaCoordinator.pendingIncomingWebLink
 
     init {
-        // Hilo de renderizado de espectro FFT C++20
+        // Hilo de renderizado de espectro FFT C++20 optimizado:
+        // Pausa el muestreo de las 28 bandas cuando la app está en Modo Cinemático (donde no hay barras de visualizador)
+        // o cuando NowPlayingScreen está minimizada, evitando recomposiciones innecesarias al grabar pantalla.
         viewModelScope.launch(Dispatchers.Default) {
             val buffer = FloatArray(28)
             while (true) {
-                if (audioPlayer.isPlaying.value) {
-                    NativeAudioEngine.getVisualizerBands(buffer)
-                    _visualizerBands.value = buffer.copyOf()
+                val playing = audioPlayer.isPlaying.value
+                val expanded = isNowPlayingExpanded.value
+                if (playing && expanded) {
+                    val currentTrk = audioPlayer.currentTrack.value
+                    val hasVideo = !currentTrk?.videoUri.isNullOrEmpty()
+                    val isFullscreenVid = hasVideo && videoDisplayMode.value.isFullscreen
+                    val isCinematicMode = when (nowPlayingDesignMode.value) {
+                        NowPlayingDesignMode.CINEMATIC_CANVAS -> true
+                        NowPlayingDesignMode.CLASSIC -> false
+                        NowPlayingDesignMode.AUTO -> isFullscreenVid
+                    }
+
+                    // Solo muestrear las 28 bandas cuando estamos en Modo Clásico (donde existe AudioVisualizer)
+                    if (!isCinematicMode) {
+                        NativeAudioEngine.getVisualizerBands(buffer)
+                        _visualizerBands.value = buffer.copyOf()
+                    }
                     _audioIntensity.value = NativeAudioEngine.getAudioIntensity()
-                    delay(25L)
+                    delay(if (isCinematicMode) 65L else 33L)
                 } else {
                     var needsDecay = false
                     for (i in buffer.indices) {
@@ -240,9 +256,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     if (needsDecay) {
                         _visualizerBands.value = buffer.copyOf()
-                        delay(35L)
+                        delay(45L)
                     } else {
-                        delay(120L)
+                        delay(160L)
                     }
                 }
             }

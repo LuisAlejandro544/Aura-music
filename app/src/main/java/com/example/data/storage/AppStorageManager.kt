@@ -69,11 +69,13 @@ class AppStorageManager(private val context: Context) {
 
     /**
      * Guarda una carátula comprimiéndola a formato WebP sin pérdida de calidad (Lossless)
-     * en un hilo secundario (Dispatchers.IO).
+     * en un hilo secundario (Dispatchers.IO), recortando una única vez posibles franjas negras
+     * horizontales (letterbox 4:3) para que la UI jamás tenga que escanear píxeles al hacer scroll.
      */
     suspend fun saveCoverAsWebp(key: String, bitmap: Bitmap): File = withContext(Dispatchers.IO) {
         val safeKey = key.replace(Regex("[^a-zA-Z0-9_-]"), "_").take(80).ifBlank { "${System.currentTimeMillis()}" }
         val file = resolveSafeChildFile(imagesDir, "cover_$safeKey.webp")
+        val cleanBitmap = com.example.data.importer.MediaAssetProcessor.removeHorizontalLetterboxBars(bitmap)
         FileOutputStream(file).use { outStream ->
             val format = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 Bitmap.CompressFormat.WEBP_LOSSLESS
@@ -81,7 +83,10 @@ class AppStorageManager(private val context: Context) {
                 @Suppress("DEPRECATION")
                 Bitmap.CompressFormat.WEBP
             }
-            bitmap.compress(format, 100, outStream)
+            cleanBitmap.compress(format, 100, outStream)
+        }
+        if (cleanBitmap !== bitmap && !cleanBitmap.isRecycled) {
+            cleanBitmap.recycle()
         }
         file
     }

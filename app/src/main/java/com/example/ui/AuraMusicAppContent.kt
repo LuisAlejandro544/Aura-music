@@ -45,10 +45,9 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
     val hasVisitedSettings by viewModel.hasVisitedSettings.collectAsStateWithLifecycle()
     val isNowPlayingExpanded by viewModel.isNowPlayingExpanded.collectAsStateWithLifecycle()
 
-    // Estados de reproducción Media3
+    // Estados de reproducción Media3 (currentPosition se pasa como StateFlow para evitar recomponer toda la app 5 veces/s)
     val currentTrack by viewModel.currentTrack.collectAsStateWithLifecycle()
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
-    val currentPosition by viewModel.currentPosition.collectAsStateWithLifecycle()
     val duration by viewModel.duration.collectAsStateWithLifecycle()
     val shuffleEnabled by viewModel.shuffleEnabled.collectAsStateWithLifecycle()
     val repeatMode by viewModel.repeatMode.collectAsStateWithLifecycle()
@@ -95,8 +94,6 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
     val isDynamicArtworkColorEnabled by viewModel.isDynamicArtworkColorEnabled.collectAsStateWithLifecycle()
     val isMiniPlayerVideoEnabled by viewModel.isMiniPlayerVideoEnabled.collectAsStateWithLifecycle()
     val headphoneConfig by viewModel.headphoneConfig.collectAsStateWithLifecycle()
-    val visualizerBands by viewModel.visualizerBands.collectAsStateWithLifecycle()
-    val audioIntensity by viewModel.audioIntensity.collectAsStateWithLifecycle()
     val lyricsState by viewModel.lyricsState.collectAsStateWithLifecycle()
     val isSearchLyricsDialogOpen by viewModel.isSearchLyricsDialogOpen.collectAsStateWithLifecycle()
     val isSearchingLyrics by viewModel.isSearchingLyrics.collectAsStateWithLifecycle()
@@ -151,7 +148,7 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
                 isDynamicEnabled = isDynamicArtworkColorEnabled,
                 fallbackPrimary = defaultMiniPrimary,
                 fallbackSecondary = defaultMiniSecondary,
-                positionMs = currentPosition
+                positionMs = viewModel.currentPosition.value
             )
         } else {
             miniPlayerColors = ExtractedArtworkColors(
@@ -209,7 +206,7 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
                             MiniPlayer(
                                 currentTrack = effectiveTrack,
                                 isPlaying = isPlaying,
-                                currentPositionMs = currentPosition,
+                                currentPositionFlow = viewModel.currentPosition,
                                 durationMs = duration,
                                 onTogglePlayPause = { viewModel.togglePlayPause() },
                                 onSkipNext = { viewModel.playNext() },
@@ -440,7 +437,7 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
             NowPlayingScreen(
                 currentTrack = effectiveTrack,
                 isPlaying = isPlaying,
-                currentPositionMs = currentPosition,
+                currentPositionFlow = viewModel.currentPosition,
                 durationMs = duration,
                 shuffleEnabled = shuffleEnabled,
                 repeatMode = repeatMode,
@@ -537,8 +534,8 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
                 onSetCrossfeedStrength = { viewModel.setCrossfeedStrength(it) },
                 onSetBalanceControlEnabled = { viewModel.setBalanceControlEnabled(it) },
                 onSetStereoBalance = { viewModel.setStereoBalance(it) },
-                visualizerBands = visualizerBands,
-                audioIntensity = audioIntensity,
+                visualizerBandsFlow = viewModel.visualizerBands,
+                audioIntensityFlow = viewModel.audioIntensity,
                 lyricsState = lyricsState,
                 isSearchLyricsDialogOpen = isSearchLyricsDialogOpen,
                 isSearchingLyrics = isSearchingLyrics,

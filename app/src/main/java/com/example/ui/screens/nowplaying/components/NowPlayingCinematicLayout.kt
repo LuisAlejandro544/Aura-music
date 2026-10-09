@@ -23,6 +23,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.flow.StateFlow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.ABLoopState
@@ -56,7 +58,8 @@ import java.util.Locale
 fun NowPlayingCinematicLayout(
     currentTrack: Track,
     isPlaying: Boolean,
-    currentPositionMs: Long,
+    currentPositionMs: Long = 0L,
+    currentPositionFlow: StateFlow<Long>? = null,
     durationMs: Long,
     shuffleEnabled: Boolean,
     repeatMode: RepeatMode,
@@ -64,6 +67,7 @@ fun NowPlayingCinematicLayout(
     animatedPrimary: Color,
     animatedSecondary: Color,
     audioIntensity: Float = 0.15f,
+    audioIntensityFlow: StateFlow<Float>? = null,
     onTogglePlayPause: () -> Unit,
     onSeekTo: (Long) -> Unit,
     onPlayNext: () -> Unit,
@@ -81,57 +85,18 @@ fun NowPlayingCinematicLayout(
     collectionContextTitle: String = "Tu Biblioteca",
     modifier: Modifier = Modifier
 ) {
-    // Buscar la línea lírica actual sincronizada para mostrarla flotando
-    val activeLyricLine = remember(lyricsState.lines, currentPositionMs) {
-        if (lyricsState.isSynced && lyricsState.lines.isNotEmpty()) {
-            lyricsState.lines.lastOrNull { it.timeMs <= currentPositionMs }?.text
-        } else {
-            null
-        }
-    }
-
-    var isDraggingSlider by remember { mutableStateOf(false) }
-    var sliderDragValue by remember { mutableFloatStateOf(0f) }
-
-    val safeDuration = if (durationMs > 0L) durationMs.toFloat() else 1f
-    val currentProgress = if (isDraggingSlider) {
-        sliderDragValue
-    } else {
-        (currentPositionMs.toFloat() / safeDuration).coerceIn(0f, 1f)
-    }
-
     Box(
         modifier = modifier
             .fillMaxSize()
             .testTag("now_playing_cinematic_layout")
     ) {
-        // Halo de resplandor ambiental y viñeta dinámica superior/inferior que reacciona
-        // en tiempo real exacto a la paleta cromática del Video Canvas y al ritmo acústico C++20
-        val dynamicBottomGlow = animatedPrimary.copy(
-            alpha = (0.28f + (audioIntensity.coerceIn(0f, 1f) * 0.24f)).coerceIn(0.18f, 0.60f)
-        )
-        val dynamicTopGlow = animatedSecondary.copy(
-            alpha = 0.35f
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            dynamicTopGlow,
-                            Color.Black.copy(alpha = 0.40f),
-                            Color.Transparent,
-                            Color.Transparent,
-                            dynamicBottomGlow,
-                            animatedSecondary.copy(alpha = 0.35f),
-                            BackgroundDark.copy(alpha = 0.92f),
-                            BackgroundDark
-                        ),
-                        startY = 0f,
-                        endY = Float.POSITIVE_INFINITY
-                    )
-                )
+        // Halo de resplandor ambiental y viñeta dinámica superior/inferior aislado en su propio
+        // componente pequeño para que audioIntensity NO recomponga todo el layout cinemático
+        CinematicReactiveVignette(
+            animatedPrimary = animatedPrimary,
+            animatedSecondary = animatedSecondary,
+            fallbackIntensity = audioIntensity,
+            audioIntensityFlow = audioIntensityFlow
         )
 
         Column(
@@ -225,43 +190,14 @@ fun NowPlayingCinematicLayout(
             // 2. Área Central Despejada para el Video Canvas
             Spacer(modifier = Modifier.weight(1f))
 
-            // Frase de letra flotante en vivo sobre el video (Estilo Spotify Canvas)
-            if (!activeLyricLine.isNullOrBlank()) {
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = Color.Black.copy(alpha = 0.55f),
-                    border = BorderStroke(1.2.dp, animatedPrimary.copy(alpha = 0.65f)),
-                    shadowElevation = 4.dp,
-                    modifier = Modifier
-                        .padding(bottom = 16.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .clickable { onOpenFullScreenLyrics() }
-                        .testTag("cinematic_floating_lyric_pill")
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Mic,
-                            contentDescription = null,
-                            tint = animatedPrimary,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = activeLyricLine,
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                color = Color.White,
-                                fontWeight = FontWeight.ExtraBold,
-                                fontSize = 16.sp
-                            ),
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-            }
+            // Frase de letra flotante en vivo sobre el video aislada en su propio ámbito de composición
+            CinematicFloatingLyricPill(
+                lyricsState = lyricsState,
+                fallbackPositionMs = currentPositionMs,
+                currentPositionFlow = currentPositionFlow,
+                animatedPrimary = animatedPrimary,
+                onOpenFullScreenLyrics = onOpenFullScreenLyrics
+            )
 
             // 3. Fila de Información de Pista (Miniatura + Título/Artista + Favorito)
             Row(
@@ -354,95 +290,14 @@ fun NowPlayingCinematicLayout(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // 4. Barra de Progreso (Seekbar continua con bolita clásica sin cortes ni huecos M3)
-            Slider(
-                value = currentProgress,
-                onValueChange = { newVal ->
-                    isDraggingSlider = true
-                    sliderDragValue = newVal
-                },
-                onValueChangeFinished = {
-                    val targetMs = (sliderDragValue * safeDuration).toLong()
-                    onSeekTo(targetMs)
-                    isDraggingSlider = false
-                },
-                colors = SliderDefaults.colors(
-                    thumbColor = Color.White,
-                    activeTrackColor = animatedPrimary,
-                    inactiveTrackColor = Color.White.copy(alpha = 0.24f)
-                ),
-                thumb = {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier.size(20.dp)
-                    ) {
-                        // Halo sutil reactivo al color del video
-                        Box(
-                            modifier = Modifier
-                                .size(20.dp)
-                                .background(animatedPrimary.copy(alpha = 0.35f), CircleShape)
-                        )
-                        // Bolita clásica circular blanca pura conectada a la barra
-                        Box(
-                            modifier = Modifier
-                                .size(13.dp)
-                                .shadow(elevation = 3.dp, shape = CircleShape)
-                                .background(Color.White, CircleShape)
-                        )
-                    }
-                },
-                track = {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(4.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(Color.White.copy(alpha = 0.24f))
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth(currentProgress.coerceIn(0f, 1f))
-                                .fillMaxHeight()
-                                .clip(RoundedCornerShape(2.dp))
-                                .background(animatedPrimary)
-                        )
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(24.dp)
-                    .testTag("cinematic_progress_slider")
+            // 4. Barra de Progreso y tiempos aislados en su propio ámbito de composición
+            CinematicSeekBarSection(
+                fallbackPositionMs = currentPositionMs,
+                currentPositionFlow = currentPositionFlow,
+                durationMs = durationMs,
+                animatedPrimary = animatedPrimary,
+                onSeekTo = onSeekTo
             )
-
-            // Tiempos numéricos (0:05 / 3:49)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                val displayPositionMs = if (isDraggingSlider) {
-                    (sliderDragValue * safeDuration).toLong()
-                } else {
-                    currentPositionMs
-                }
-                Text(
-                    text = formatTimeMs(displayPositionMs),
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        color = TextSecondary,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                )
-                Text(
-                    text = formatTimeMs(durationMs),
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        color = TextSecondary,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                )
-            }
 
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -484,18 +339,13 @@ fun NowPlayingCinematicLayout(
                     )
                 }
 
-                // Botón Play / Pausa Central Circular Blanco de 64dp con halo y borde reactivo al video
+                // Botón Play / Pausa Central Circular Blanco de 64dp con halo aislado reactivo al video
                 Box(contentAlignment = Alignment.Center) {
-                    // Halo reactivo pulsante con el audio y color del video
-                    Box(
-                        modifier = Modifier
-                            .size(74.dp)
-                            .background(
-                                animatedPrimary.copy(
-                                    alpha = if (isPlaying) (0.22f + audioIntensity.coerceIn(0f, 1f) * 0.25f).coerceIn(0.16f, 0.55f) else 0.12f
-                                ),
-                                CircleShape
-                            )
+                    CinematicPlayButtonHalo(
+                        isPlaying = isPlaying,
+                        animatedPrimary = animatedPrimary,
+                        fallbackIntensity = audioIntensity,
+                        audioIntensityFlow = audioIntensityFlow
                     )
                     Surface(
                         onClick = onTogglePlayPause,
@@ -678,9 +528,239 @@ fun NowPlayingCinematicLayout(
     }
 }
 
+@Composable
+private fun CinematicReactiveVignette(
+    animatedPrimary: Color,
+    animatedSecondary: Color,
+    fallbackIntensity: Float,
+    audioIntensityFlow: StateFlow<Float>?
+) {
+    val collectedIntensity = audioIntensityFlow?.collectAsStateWithLifecycle()
+    val liveIntensity = collectedIntensity?.value ?: fallbackIntensity
+    val dynamicBottomGlow = animatedPrimary.copy(
+        alpha = (0.28f + (liveIntensity.coerceIn(0f, 1f) * 0.24f)).coerceIn(0.18f, 0.60f)
+    )
+    val dynamicTopGlow = animatedSecondary.copy(alpha = 0.35f)
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        dynamicTopGlow,
+                        Color.Black.copy(alpha = 0.40f),
+                        Color.Transparent,
+                        Color.Transparent,
+                        dynamicBottomGlow,
+                        animatedSecondary.copy(alpha = 0.35f),
+                        BackgroundDark.copy(alpha = 0.92f),
+                        BackgroundDark
+                    ),
+                    startY = 0f,
+                    endY = Float.POSITIVE_INFINITY
+                )
+            )
+    )
+}
+
+@Composable
+private fun CinematicPlayButtonHalo(
+    isPlaying: Boolean,
+    animatedPrimary: Color,
+    fallbackIntensity: Float,
+    audioIntensityFlow: StateFlow<Float>?
+) {
+    val collectedIntensity = audioIntensityFlow?.collectAsStateWithLifecycle()
+    val liveIntensity = collectedIntensity?.value ?: fallbackIntensity
+    Box(
+        modifier = Modifier
+            .size(74.dp)
+            .background(
+                animatedPrimary.copy(
+                    alpha = if (isPlaying) (0.22f + liveIntensity.coerceIn(0f, 1f) * 0.25f).coerceIn(0.16f, 0.55f) else 0.12f
+                ),
+                CircleShape
+            )
+    )
+}
+
 private fun formatTimeMs(millis: Long): String {
     val totalSeconds = (millis / 1000L).coerceAtLeast(0L)
     val minutes = totalSeconds / 60
     val seconds = totalSeconds % 60
     return String.format(Locale.getDefault(), "%d:%02d", minutes, seconds)
 }
+
+@Composable
+private fun CinematicFloatingLyricPill(
+    lyricsState: LyricsState,
+    fallbackPositionMs: Long,
+    currentPositionFlow: StateFlow<Long>?,
+    animatedPrimary: Color,
+    onOpenFullScreenLyrics: () -> Unit
+) {
+    val collectedPosition = currentPositionFlow?.collectAsStateWithLifecycle()
+    val activeLyricLine by remember(lyricsState.lines, lyricsState.isSynced, collectedPosition, fallbackPositionMs) {
+        derivedStateOf {
+            if (lyricsState.isSynced && lyricsState.lines.isNotEmpty()) {
+                val posMs = collectedPosition?.value ?: fallbackPositionMs
+                val idx = findActiveLyricIndexBinary(lyricsState.lines, posMs)
+                if (idx >= 0 && lyricsState.lines[idx].timeMs <= posMs) {
+                    lyricsState.lines[idx].text
+                } else {
+                    null
+                }
+            } else {
+                null
+            }
+        }
+    }
+
+    if (!activeLyricLine.isNullOrBlank()) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = Color.Black.copy(alpha = 0.55f),
+            border = BorderStroke(1.2.dp, animatedPrimary.copy(alpha = 0.65f)),
+            shadowElevation = 4.dp,
+            modifier = Modifier
+                .padding(bottom = 16.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .clickable { onOpenFullScreenLyrics() }
+                .testTag("cinematic_floating_lyric_pill")
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Mic,
+                    contentDescription = null,
+                    tint = animatedPrimary,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = activeLyricLine ?: "",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        color = Color.White,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 16.sp
+                    ),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CinematicSeekBarSection(
+    fallbackPositionMs: Long,
+    currentPositionFlow: StateFlow<Long>?,
+    durationMs: Long,
+    animatedPrimary: Color,
+    onSeekTo: (Long) -> Unit
+) {
+    val collectedPosition = currentPositionFlow?.collectAsStateWithLifecycle()
+    val livePositionMs = collectedPosition?.value ?: fallbackPositionMs
+
+    var isDraggingSlider by remember { mutableStateOf(false) }
+    var sliderDragValue by remember { mutableFloatStateOf(0f) }
+
+    val safeDuration = if (durationMs > 0L) durationMs.toFloat() else 1f
+    val currentProgress = if (isDraggingSlider) {
+        sliderDragValue
+    } else {
+        (livePositionMs.toFloat() / safeDuration).coerceIn(0f, 1f)
+    }
+
+    Slider(
+        value = currentProgress,
+        onValueChange = { newVal ->
+            isDraggingSlider = true
+            sliderDragValue = newVal
+        },
+        onValueChangeFinished = {
+            val targetMs = (sliderDragValue * safeDuration).toLong()
+            onSeekTo(targetMs)
+            isDraggingSlider = false
+        },
+        colors = SliderDefaults.colors(
+            thumbColor = Color.White,
+            activeTrackColor = animatedPrimary,
+            inactiveTrackColor = Color.White.copy(alpha = 0.24f)
+        ),
+        thumb = {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.size(20.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(20.dp)
+                        .background(animatedPrimary.copy(alpha = 0.35f), CircleShape)
+                )
+                Box(
+                    modifier = Modifier
+                        .size(13.dp)
+                        .shadow(elevation = 3.dp, shape = CircleShape)
+                        .background(Color.White, CircleShape)
+                )
+            }
+        },
+        track = {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(Color.White.copy(alpha = 0.24f))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(currentProgress.coerceIn(0f, 1f))
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(animatedPrimary)
+                )
+            }
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(24.dp)
+            .testTag("cinematic_progress_slider")
+    )
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        val displayPositionMs = if (isDraggingSlider) {
+            (sliderDragValue * safeDuration).toLong()
+        } else {
+            livePositionMs
+        }
+        Text(
+            text = formatTimeMs(displayPositionMs),
+            style = MaterialTheme.typography.labelSmall.copy(
+                color = TextSecondary,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium
+            )
+        )
+        Text(
+            text = formatTimeMs(durationMs),
+            style = MaterialTheme.typography.labelSmall.copy(
+                color = TextSecondary,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium
+            )
+        )
+    }
+}
+

@@ -302,6 +302,14 @@ public:
         }
     }
 
+    // Tabla precalculada de pesos senoidales para las 28 bandas espectrales (evita 28 llamadas a std::sin por buffer PCM)
+    static constexpr std::array<float, 28> kVisualizerBandWeights = {
+        1.000000f, 1.039191f, 1.077886f, 1.115600f, 1.151860f, 1.186214f, 1.218231f,
+        1.247487f, 1.273605f, 1.296238f, 1.315075f, 1.329846f, 1.340325f, 1.346329f,
+        1.347724f, 1.344423f, 1.336389f, 1.323632f, 1.306210f, 1.284228f, 1.257836f,
+        1.227230f, 1.192647f, 1.154365f, 1.112699f, 1.068000f, 1.020648f, 0.971048f
+    };
+
     // Procesa un buffer de audio PCM de 16 bits estéreo entrelazado (L, R, L, R)
     void processPcm16(std::span<int16_t> samples) {
         const size_t totalSamples = samples.size();
@@ -313,78 +321,93 @@ public:
         const size_t samplesPerBand = std::max<size_t>(1, frames / NUM_BANDS);
         double sumSquares = 0.0;
 
-        for (size_t i = 0; i < totalSamples; i += mChannels) {
-            double sampleL = samples[i] / 32768.0;
-            double sampleR = (mChannels > 1 && (i + 1) < totalSamples) ? (samples[i + 1] / 32768.0) : sampleL;
+        const bool bitPerfect = mBitPerfectController.isBitPerfectEnabled();
+        const bool crossfeedActive = mCrossfeedProcessor.isEnabled() && mCrossfeedProcessor.isHeadphonesConnected() && (mChannels > 1);
+        const bool anyDspActive = !bitPerfect && (
+            mEnabled ||
+            mVocalClarityProcessor.isEnabled() ||
+            (mEightDProcessor.isEnabled() && mChannels > 1) ||
+            crossfeedActive ||
+            (mBalanceEnabled && mChannels > 1) ||
+            mReverbProcessor.isEnabled() ||
+            mVolumeNormalizer.isEnabled() ||
+            mDjAutomixFilter.isEnabled()
+        );
 
-            double monoSample = (sampleL + sampleR) * 0.5;
-            sumSquares += (monoSample * monoSample);
+        constexpr double kInv32768 = 1.0 / 32768.0;
 
-            size_t frameIdx = i / mChannels;
-            size_t bandIdx = std::min(NUM_BANDS - 1, frameIdx / samplesPerBand);
-            bandEnergy[bandIdx] += std::abs(monoSample);
+        if (!anyDspActive) {
+            // Fast-Path de cero alteración de muestras (ahorra ramificaciones y escrituras en memoria por muestra)
+            for (size_t i = 0, frameIdx = 0; i < totalSamples; i += mChannels, ++frameIdx) {
+                const double sampleL = samples[i] * kInv32768;
+                const double sampleR = (mChannels > 1 && (i + 1) < totalSamples) ? (samples[i + 1] * kInv32768) : sampleL;
+                const double monoSample = (sampleL + sampleR) * 0.5;
+                sumSquares += (monoSample * monoSample);
 
-            // Si el Modo Bit-Perfect Direct 1:1 está activo, omitimos toda alteración de bits en el flujo PCM
-            // pero mantenemos la telemetría espectral pasiva para el visualizador y luces ambientales.
-            if (mBitPerfectController.isBitPerfectEnabled()) {
-                continue;
+                const size_t bandIdx = std::min(NUM_BANDS - 1, frameIdx / samplesPerBand);
+                bandEnergy[bandIdx] += std::abs(monoSample);
             }
+        } else {
+            for (size_t i = 0, frameIdx = 0; i < totalSamples; i += mChannels, ++frameIdx) {
+                double sampleL = samples[i] * kInv32768;
+                double sampleR = (mChannels > 1 && (i + 1) < totalSamples) ? (samples[i + 1] * kInv32768) : sampleL;
 
-            // Modificaciones DSP si están activas
-            if (mEnabled) {
-                if (mBassBoostStrength > 0.001) {
-                    sampleL = mBassBoostFilterL.process(sampleL);
-                    sampleR = mBassBoostFilterR.process(sampleR);
-                }
-                for (int b = 0; b < 10; ++b) {
-                    if (std::abs(mBandGainsDb[b]) > 0.01) {
-                        sampleL = mFiltersL[b].process(sampleL);
-                        sampleR = mFiltersR[b].process(sampleR);
+                const double monoSample = (sampleL + sampleR) * 0.5;
+                sumSquares += (monoSample * monoSample);
+
+                const size_t bandIdx = std::min(NUM_BANDS - 1, frameIdx / samplesPerBand);
+                bandEnergy[bandIdx] += std::abs(monoSample);
+
+                // Modificaciones DSP si están activas
+                if (mEnabled) {
+                    if (mBassBoostStrength > 0.001) {
+                        sampleL = mBassBoostFilterL.process(sampleL);
+                        sampleR = mBassBoostFilterR.process(sampleR);
+                    }
+                    for (int b = 0; b < 10; ++b) {
+                        if (std::abs(mBandGainsDb[b]) > 0.01) {
+                            sampleL = mFiltersL[b].process(sampleL);
+                            sampleR = mFiltersR[b].process(sampleR);
+                        }
                     }
                 }
-            }
 
-            // Clarificador Vocal HD en C++20 (Aislamiento Mid-Side y realce de inteligibilidad)
-            if (mVocalClarityProcessor.isEnabled()) {
-                mVocalClarityProcessor.processSample(sampleL, sampleR);
-            }
+                // Clarificador Vocal HD en C++20 (Aislamiento Mid-Side y realce de inteligibilidad)
+                if (mVocalClarityProcessor.isEnabled()) {
+                    mVocalClarityProcessor.processSample(sampleL, sampleR);
+                }
 
-            // Procesamiento de Audio 8D / 16D Espacial
-            if (mEightDProcessor.isEnabled() && mChannels > 1) {
-                mEightDProcessor.processSample(sampleL, sampleR);
-            }
+                // Procesamiento de Audio 8D / 16D Espacial
+                if (mEightDProcessor.isEnabled() && mChannels > 1) {
+                    mEightDProcessor.processSample(sampleL, sampleR);
+                }
 
-            // Procesamiento de Filtro Crossfeed Acústico (exclusivo para auriculares conectados)
-            if (mCrossfeedProcessor.isEnabled() && mCrossfeedProcessor.isHeadphonesConnected() && mChannels > 1) {
-                mCrossfeedProcessor.processSample(sampleL, sampleR);
-            }
+                // Procesamiento de Filtro Crossfeed Acústico (exclusivo para auriculares conectados)
+                if (crossfeedActive) {
+                    mCrossfeedProcessor.processSample(sampleL, sampleR);
+                }
 
-            // Balance Estéreo Fino L/R
-            if (mBalanceEnabled && mChannels > 1) {
-                sampleL *= mGainL;
-                sampleR *= mGainR;
-            }
+                // Balance Estéreo Fino L/R
+                if (mBalanceEnabled && mChannels > 1) {
+                    sampleL *= mGainL;
+                    sampleR *= mGainR;
+                }
 
-            // Procesamiento de Reverb Acústico en C++20 (soporta mono y estéreo)
-            if (mReverbProcessor.isEnabled()) {
-                mReverbProcessor.processSample(sampleL, sampleR);
-            }
+                // Procesamiento de Reverb Acústico en C++20 (soporta mono y estéreo)
+                if (mReverbProcessor.isEnabled()) {
+                    mReverbProcessor.processSample(sampleL, sampleR);
+                }
 
-            // Normalización Inteligente de Volumen (Loudness Normalizer estilo Spotify / EBU R128)
-            if (mVolumeNormalizer.isEnabled()) {
-                mVolumeNormalizer.processSample(sampleL, sampleR);
-            }
+                // Normalización Inteligente de Volumen (Loudness Normalizer estilo Spotify / EBU R128)
+                if (mVolumeNormalizer.isEnabled()) {
+                    mVolumeNormalizer.processSample(sampleL, sampleR);
+                }
 
-            // Curva de Ecualización DJ Automix para transiciones suaves de pista
-            if (mDjAutomixFilter.isEnabled()) {
-                mDjAutomixFilter.processSample(sampleL, sampleR);
-            }
+                // Curva de Ecualización DJ Automix para transiciones suaves de pista
+                if (mDjAutomixFilter.isEnabled()) {
+                    mDjAutomixFilter.processSample(sampleL, sampleR);
+                }
 
-            // Si hubo procesamiento acústico activo, aplicar limitador suave y reescribir muestras
-            if (mEnabled || mVocalClarityProcessor.isEnabled() || mEightDProcessor.isEnabled() || 
-                (mCrossfeedProcessor.isEnabled() && mCrossfeedProcessor.isHeadphonesConnected()) || 
-                mBalanceEnabled || mReverbProcessor.isEnabled() ||
-                mVolumeNormalizer.isEnabled() || mDjAutomixFilter.isEnabled()) {
                 sampleL = softClip(sampleL);
                 samples[i] = static_cast<int16_t>(std::clamp(sampleL * 32767.0, -32768.0, 32767.0));
 
@@ -401,10 +424,10 @@ public:
             float targetIntensity = std::clamp(static_cast<float>(rms * 3.4), 0.06f, 1.0f);
             mCurrentIntensity = (mCurrentIntensity * 0.60f) + (targetIntensity * 0.40f);
 
+            const double invSamplesPerBand = 1.0 / static_cast<double>(samplesPerBand);
             for (size_t b = 0; b < NUM_BANDS; ++b) {
-                float avgBand = static_cast<float>(bandEnergy[b] / static_cast<double>(samplesPerBand));
-                float weight = 1.0f + 0.35f * std::sin((static_cast<float>(b) / NUM_BANDS) * std::numbers::pi_v<float>);
-                float targetH = std::clamp(avgBand * 3.8f * weight, 0.08f, 1.0f);
+                float avgBand = static_cast<float>(bandEnergy[b] * invSamplesPerBand);
+                float targetH = std::clamp(avgBand * 3.8f * kVisualizerBandWeights[b], 0.08f, 1.0f);
                 if (targetH > mVisualizerBands[b]) {
                     mVisualizerBands[b] = (mVisualizerBands[b] * 0.35f) + (targetH * 0.65f);
                 } else {

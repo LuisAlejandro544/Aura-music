@@ -1,0 +1,119 @@
+name: Limpiar Historial de GitHub Actions
+
+# Este flujo se ejecuta manualmente desde la pestaña Actions de GitHub
+# para eliminar todas las ejecuciones anteriores (workflow runs) y artefactos (APKs antiguos),
+# liberando cuota de almacenamiento y dejando limpia la lista en dispositivos móviles.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_clean:
+        description: 'Escribe "LIMPIAR" para confirmar el borrado del historial de Actions'
+        required: true
+        type: string
+        default: 'LIMPIAR'
+      keep_latest:
+        description: 'Cantidad de ejecuciones recientes a conservar (0 = borrar todo el historial anterior)'
+        required: true
+        type: choice
+        options:
+          - '0'
+          - '1'
+          - '3'
+          - '5'
+        default: '0'
+      only_failed:
+        description: '¿Borrar únicamente las ejecuciones fallidas o canceladas?'
+        required: true
+        type: boolean
+        default: false
+
+jobs:
+  purge-actions-runs:
+    name: Eliminar historial de ejecuciones y artefactos
+    # Bloqueo estricto: SOLO puede ejecutarse manualmente por el usuario (jamás por push, pull_request ni commit)
+    if: github.event_name == 'workflow_dispatch' && inputs.confirm_clean == 'LIMPIAR'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+
+    steps:
+      - name: 🔒 0. Verificar activación manual exclusiva
+        run: |
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            echo "❌ Error: Este workflow solo puede activarse manualmente."
+            exit 1
+          fi
+          if [ "${{ inputs.confirm_clean }}" != "LIMPIAR" ]; then
+            echo "❌ Operación cancelada: debes confirmar con 'LIMPIAR'."
+            exit 1
+          fi
+          echo "✅ Activación manual verificada correctamente."
+      - name: 🧹 1. Purgar artefactos huérfanos y antiguos
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          echo "=== Buscando artefactos almacenados en ${{ env.REPO }} ==="
+          ARTIFACT_IDS=$(gh api "repos/${REPO}/actions/artifacts?per_page=100" --paginate --jq '.artifacts[].id' || true)
+          
+          if [ -z "$ARTIFACT_IDS" ]; then
+            echo "✅ No hay artefactos pendientes por eliminar."
+          else
+            COUNT=0
+            for ID in $ARTIFACT_IDS; do
+              echo "🗑️ Eliminando artefacto ID: $ID"
+              gh api -X DELETE "repos/${REPO}/actions/artifacts/${ID}" || true
+              COUNT=$((COUNT + 1))
+            done
+            echo "✅ Se eliminaron $COUNT artefactos liberando espacio de almacenamiento."
+          fi
+
+      - name: 🗑️ 2. Purgar historial de ejecuciones (Workflow Runs)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          CURRENT_RUN_ID: ${{ github.run_id }}
+          KEEP_COUNT: ${{ inputs.keep_latest }}
+          ONLY_FAILED: ${{ inputs.only_failed }}
+        run: |
+          echo "=== Obteniendo historial de ejecuciones en ${{ env.REPO }} ==="
+          echo "Ejecución actual (protegida mientras corre): ${CURRENT_RUN_ID}"
+          echo "Conservar recientes: ${KEEP_COUNT} | Solo fallidos/cancelados: ${ONLY_FAILED}"
+
+          if [ "$ONLY_FAILED" = "true" ]; then
+            RUN_IDS=$(gh api "repos/${REPO}/actions/runs?per_page=100" --paginate \
+              --jq ".workflow_runs[] | select(.id != ${CURRENT_RUN_ID} and (.conclusion == \"failure\" or .conclusion == \"cancelled\" or .conclusion == \"timed_out\" or .conclusion == \"startup_failure\")) | .id" || true)
+          else
+            RUN_IDS=$(gh api "repos/${REPO}/actions/runs?per_page=100" --paginate \
+              --jq ".workflow_runs[] | select(.id != ${CURRENT_RUN_ID}) | .id" || true)
+          fi
+
+          if [ -z "$RUN_IDS" ]; then
+            echo "✅ No se encontraron ejecuciones para eliminar."
+            exit 0
+          fi
+
+          SKIPPED=0
+          DELETED=0
+
+          for ID in $RUN_IDS; do
+            if [ "$SKIPPED" -lt "$KEEP_COUNT" ]; then
+              echo "⏭️ Conservando ejecución reciente ID: $ID"
+              SKIPPED=$((SKIPPED + 1))
+              continue
+            fi
+
+            echo "🗑️ Eliminando ejecución ID: $ID"
+            if gh api -X DELETE "repos/${REPO}/actions/runs/${ID}" 2>/dev/null; then
+              DELETED=$((DELETED + 1))
+            else
+              echo "⚠️ No se pudo eliminar la ejecución $ID (puede estar en curso), intentando cancelar primero..."
+              gh api -X POST "repos/${REPO}/actions/runs/${ID}/cancel" 2>/dev/null || true
+              sleep 2
+              gh api -X DELETE "repos/${REPO}/actions/runs/${ID}" 2>/dev/null || true
+              DELETED=$((DELETED + 1))
+            fi
+          done
+
+          echo "🎉 ¡Limpieza completada! Se eliminaron ${DELETED} ejecuciones del historial de Actions."

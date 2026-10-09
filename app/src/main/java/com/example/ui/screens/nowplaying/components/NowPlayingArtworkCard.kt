@@ -26,7 +26,8 @@ import com.example.ui.components.BackgroundVideoPlayer
 fun NowPlayingArtworkCard(
     currentTrack: Track,
     isPlaying: Boolean,
-    currentPositionMs: Long,
+    currentPositionMs: Long = 0L,
+    currentPositionFlow: kotlinx.coroutines.flow.StateFlow<Long>? = null,
     videoDisplayMode: VideoDisplayMode,
     animatedPrimary: Color,
     animatedSecondary: Color,
@@ -58,6 +59,7 @@ fun NowPlayingArtworkCard(
                     isVideoLoop = currentTrack.isVideoLoop,
                     isPlaying = isPlaying,
                     currentPositionMs = currentPositionMs,
+                    currentPositionFlow = currentPositionFlow,
                     playbackSpeed = playbackSpeed,
                     placeholderTrack = currentTrack,
                     modifier = Modifier.fillMaxSize(),
@@ -73,3 +75,4 @@ fun NowPlayingArtworkCard(
         }
     }
 }
+

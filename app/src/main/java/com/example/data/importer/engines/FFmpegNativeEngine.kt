@@ -320,8 +320,10 @@ object FFmpegNativeEngine {
         val clipSec = durationSec.coerceAtMost(maxSourceDurationSec)
         val clipFormatted = String.format(java.util.Locale.US, "%.3f", clipSec)
 
-        // Filtro reverse + concat para bucle Ping-Pong 100% simétrico sin cortes
-        val filterComplex = "[0:v]trim=start=0:end=${clipFormatted},setpts=PTS-STARTPTS,split=2[v_fwd][v_rev_src];" +
+        // Filtro reverse + concat con escalado automático a 480p (lado menor <= 480px, múltiplo de 2)
+        // para garantizar fluidez total de GPU/MediaCodec incluso en videos de galería 1080p/4K y al grabar pantalla
+        val scale480Filter = "scale='if(gt(iw,ih),-2,min(480,iw))':'if(gt(iw,ih),min(480,ih),-2)'"
+        val filterComplex = "[0:v]trim=start=0:end=${clipFormatted},setpts=PTS-STARTPTS,${scale480Filter},split=2[v_fwd][v_rev_src];" +
                 "[v_rev_src]reverse,setpts=PTS-STARTPTS[v_rev];" +
                 "[v_fwd][v_rev]concat=n=2:v=1:a=0[v_out]"
 
@@ -352,7 +354,7 @@ object FFmpegNativeEngine {
         val expectedTotalMs = (clipSec * 2000.0f).toLong()
         val result = executeCommand(context, args, expectedTotalMs, null)
         if (result.success) {
-            AuraDebugManager.logInfo(TAG, "Loop Boomerang / Ping-Pong (reverse + concat) generado exitosamente (${outputFile.name}).")
+            AuraDebugManager.logInfo(TAG, "Loop Boomerang / Ping-Pong 480p (reverse + concat) generado exitosamente (${outputFile.name}).")
             result
         } else {
             AuraDebugManager.logWarning(TAG, "Filtro Boomerang reverse+concat falló, aplicando fallback Seamless Loop xfade...")
@@ -361,7 +363,7 @@ object FFmpegNativeEngine {
     }
 
     /**
-     * Crea un bucle infinito cinemático sin cortes (Seamless Loop con Crossfade) para Video Canvas cortos (<= 20s).
+     * Crea un bucle infinito cinemático sin cortes (Seamless Loop con Crossfade) para Video Canvas cortos (<= 20s) a 480p.
      * Mezcla suavemente los últimos segundos con los primeros mediante el filtro 'xfade',
      * garantizando que al repetirse continuamente en ExoPlayer no exista ningún salto brusco ni interrupción visual.
      */
@@ -396,9 +398,11 @@ object FFmpegNativeEngine {
         val crossfadeSec = crossfadeDurationSec.coerceIn(0.4f, (durationSec * 0.25f).coerceAtLeast(0.4f))
         val splitPoint = String.format(java.util.Locale.US, "%.3f", durationSec - crossfadeSec)
         val durFormatted = String.format(java.util.Locale.US, "%.3f", crossfadeSec)
+        val scale480Filter = "scale='if(gt(iw,ih),-2,min(480,iw))':'if(gt(iw,ih),min(480,ih),-2)'"
 
-        val filterComplex = "[0:v]trim=start=${splitPoint}:end=${String.format(java.util.Locale.US, "%.3f", durationSec)},setpts=PTS-STARTPTS[v_tail];" +
-                "[0:v]trim=start=0:end=${splitPoint},setpts=PTS-STARTPTS[v_main];" +
+        val filterComplex = "[0:v]${scale480Filter},split=2[v_src1][v_src2];" +
+                "[v_src1]trim=start=${splitPoint}:end=${String.format(java.util.Locale.US, "%.3f", durationSec)},setpts=PTS-STARTPTS[v_tail];" +
+                "[v_src2]trim=start=0:end=${splitPoint},setpts=PTS-STARTPTS[v_main];" +
                 "[v_tail][v_main]xfade=transition=fade:duration=${durFormatted}:offset=0[v_out]"
 
         if (outputFile.exists()) outputFile.delete()
@@ -427,17 +431,18 @@ object FFmpegNativeEngine {
 
         val result = executeCommand(context, args, durationMs, null)
         if (result.success) {
-            AuraDebugManager.logInfo(TAG, "Seamless Loop con crossfade generado exitosamente (${outputFile.name}).")
+            AuraDebugManager.logInfo(TAG, "Seamless Loop 480p con crossfade generado exitosamente (${outputFile.name}).")
             result
         } else {
-            AuraDebugManager.logWarning(TAG, "Filtro xfade falló, aplicando fallback de optimización GOP directa...")
+            AuraDebugManager.logWarning(TAG, "Filtro xfade falló, aplicando fallback de optimización GOP 480p directa...")
             optimizeVideoForInstantSync(context, inputFile, outputFile, gopSize = targetFps, targetFps = targetFps)
         }
     }
 
     /**
-     * Optimiza videos largos sincronizados (>20s) insertando fotogramas clave (Keyframes / GOP) cada 1 segundo.
-     * Permite que los saltos temporales (SeekTo) en Now Playing y Mini Reproductor sean instantáneos (0ms de congelamiento).
+     * Optimiza videos largos sincronizados (>20s) escalándolos a 480p e insertando fotogramas clave (Keyframes / GOP) cada 1 segundo.
+     * Permite que incluso los videos 1080p/4K importados desde la galería funcionen a 480p con cero lag al grabar pantalla
+     * y saltos temporales (SeekTo) instantáneos (0ms de congelamiento).
      */
     suspend fun optimizeVideoForInstantSync(
         context: Context,
@@ -456,11 +461,13 @@ object FFmpegNativeEngine {
 
         val safeInput = sanitizeFilePath(inputFile)
         val safeOutput = sanitizeFilePath(outputFile)
+        val scale480Filter = "scale='if(gt(iw,ih),-2,min(480,iw))':'if(gt(iw,ih),min(480,ih),-2)'"
 
         val args = arrayOf(
             ffmpegBin.absolutePath,
             "-y",
             "-i", safeInput,
+            "-vf", scale480Filter,
             "-c:v", "libx264",
             "-preset", "veryfast",
             "-crf", "23",
@@ -476,10 +483,10 @@ object FFmpegNativeEngine {
 
         val result = executeCommand(context, args, 0L, null)
         if (result.success) {
-            AuraDebugManager.logInfo(TAG, "Video sincronizado optimizado con GOP corto ($gopSize) y faststart.")
+            AuraDebugManager.logInfo(TAG, "Video sincronizado optimizado a 480p con GOP corto ($gopSize) y faststart.")
             result
         } else {
-            AuraDebugManager.logWarning(TAG, "Recodificación de video falló, aplicando faststart sin recodificar...")
+            AuraDebugManager.logWarning(TAG, "Recodificación de video a 480p falló, aplicando faststart sin recodificar...")
             val safeFallbackInput = sanitizeFilePath(inputFile)
             val safeFallbackOutput = sanitizeFilePath(outputFile)
             val fallbackArgs = arrayOf(

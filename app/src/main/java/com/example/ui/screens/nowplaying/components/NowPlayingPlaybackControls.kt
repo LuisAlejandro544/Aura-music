@@ -24,6 +24,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.flow.StateFlow
 import com.example.model.ABLoopState
 import com.example.model.RepeatMode
 import com.example.model.Track
@@ -43,7 +45,8 @@ import com.example.ui.theme.TextSecondary
 fun NowPlayingPlaybackControls(
     currentTrack: Track,
     isPlaying: Boolean,
-    currentPositionMs: Long,
+    currentPositionMs: Long = 0L,
+    currentPositionFlow: StateFlow<Long>? = null,
     durationMs: Long,
     shuffleEnabled: Boolean,
     repeatMode: RepeatMode,
@@ -61,25 +64,9 @@ fun NowPlayingPlaybackControls(
     onClearABLoop: () -> Unit = {},
     activeMixtapeChapter: com.example.model.MixtapeChapter? = null,
     mixtapeChapterIndex: Int = -1,
-    mixtapeTotalChapters: Int = 0,
+    mixtapeTotalChapters: Int = -1,
     modifier: Modifier = Modifier
 ) {
-    var isDraggingSlider by remember { mutableStateOf(false) }
-    var sliderDragPosition by remember { mutableStateOf(0f) }
-
-    val safeDuration = durationMs.coerceAtLeast(1L)
-    val sliderValue = if (isDraggingSlider) {
-        sliderDragPosition
-    } else {
-        (currentPositionMs.toFloat() / safeDuration.toFloat()).coerceIn(0f, 1f)
-    }
-
-    val displayPositionMs = if (isDraggingSlider) {
-        (sliderDragPosition * safeDuration).toLong()
-    } else {
-        currentPositionMs
-    }
-
     Column(modifier = modifier.fillMaxWidth()) {
         // Título con Marquesina fluida, Artista, Etiqueta de formato y botón de Favorito
         Row(
@@ -185,126 +172,18 @@ fun NowPlayingPlaybackControls(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Slider de Progreso, Indicador de Rango A-B y Tiempo
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Box(
-                modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.Center
-            ) {
-                // Franja luminosa que demarca el rango [A - B] sobre la barra de progreso
-                if (abLoopState.pointAMs != null) {
-                    BoxWithConstraints(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 10.dp)
-                            .height(6.dp)
-                    ) {
-                        val startFraction = (abLoopState.pointAMs.toFloat() / safeDuration.toFloat()).coerceIn(0f, 1f)
-                        val endFraction = ((abLoopState.pointBMs ?: currentPositionMs).toFloat() / safeDuration.toFloat())
-                            .coerceIn(startFraction, 1f)
-                        val startOffset = maxWidth * startFraction
-                        val segmentWidth = (maxWidth * (endFraction - startFraction)).coerceAtLeast(4.dp)
-
-                        Box(
-                            modifier = Modifier
-                                .offset(x = startOffset)
-                                .width(segmentWidth)
-                                .fillMaxHeight()
-                                .clip(RoundedCornerShape(3.dp))
-                                .background(
-                                    if (abLoopState.isLoopingActive) {
-                                        Color(0xFF10B981).copy(alpha = 0.78f)
-                                    } else {
-                                        animatedPrimary.copy(alpha = 0.55f)
-                                    }
-                                )
-                        )
-                    }
-                }
-
-                Slider(
-                    value = sliderValue,
-                    onValueChange = {
-                        isDraggingSlider = true
-                        sliderDragPosition = it
-                    },
-                    onValueChangeFinished = {
-                        onSeekTo((sliderDragPosition * safeDuration).toLong())
-                        isDraggingSlider = false
-                    },
-                    colors = SliderDefaults.colors(
-                        thumbColor = Color.White,
-                        activeTrackColor = animatedPrimary,
-                        inactiveTrackColor = animatedPrimary.copy(alpha = 0.25f)
-                    ),
-                    thumb = {
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier.size(20.dp)
-                        ) {
-                            // Halo exterior reactivo con el color dinámico de la pista
-                            Box(
-                                modifier = Modifier
-                                    .size(20.dp)
-                                    .background(animatedPrimary.copy(alpha = 0.35f), CircleShape)
-                            )
-                            // Bolita clásica circular sólida blanca conectada a la barra
-                            Box(
-                                modifier = Modifier
-                                    .size(13.dp)
-                                    .shadow(elevation = 3.dp, shape = CircleShape)
-                                    .background(Color.White, CircleShape)
-                            )
-                        }
-                    },
-                    track = {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(4.dp)
-                                .clip(RoundedCornerShape(2.dp))
-                                .background(Color.White.copy(alpha = 0.22f))
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth(sliderValue.coerceIn(0f, 1f))
-                                    .fillMaxHeight()
-                                    .clip(RoundedCornerShape(2.dp))
-                                    .background(animatedPrimary)
-                            )
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("now_playing_slider")
-                )
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = formatPlaybackTime(displayPositionMs),
-                    style = MaterialTheme.typography.bodySmall.copy(color = TextMuted)
-                )
-
-                // Barra Compacta del Repetidor de Segmento A-B integrada junto al tiempo
-                CompactABLoopBar(
-                    abLoopState = abLoopState,
-                    animatedPrimary = animatedPrimary,
-                    onMarkA = onMarkABPointA,
-                    onMarkB = onMarkABPointB,
-                    onClear = onClearABLoop
-                )
-
-                Text(
-                    text = formatPlaybackTime(durationMs),
-                    style = MaterialTheme.typography.bodySmall.copy(color = TextMuted)
-                )
-            }
-        }
+        // Slider de Progreso, Indicador de Rango A-B y Tiempo aislados en su propio ámbito de composición
+        NowPlayingSeekBarSection(
+            fallbackPositionMs = currentPositionMs,
+            currentPositionFlow = currentPositionFlow,
+            durationMs = durationMs,
+            animatedPrimary = animatedPrimary,
+            onSeekTo = onSeekTo,
+            abLoopState = abLoopState,
+            onMarkABPointA = onMarkABPointA,
+            onMarkABPointB = onMarkABPointB,
+            onClearABLoop = onClearABLoop
+        )
 
         Spacer(modifier = Modifier.height(10.dp))
 
@@ -395,6 +274,155 @@ fun NowPlayingPlaybackControls(
                     tint = if (repeatMode != RepeatMode.OFF) MaterialTheme.colorScheme.primary else TextMuted
                 )
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun NowPlayingSeekBarSection(
+    fallbackPositionMs: Long,
+    currentPositionFlow: StateFlow<Long>?,
+    durationMs: Long,
+    animatedPrimary: Color,
+    onSeekTo: (Long) -> Unit,
+    abLoopState: ABLoopState,
+    onMarkABPointA: () -> Unit,
+    onMarkABPointB: () -> Unit,
+    onClearABLoop: () -> Unit
+) {
+    val collectedPosition = currentPositionFlow?.collectAsStateWithLifecycle()
+    val livePositionMs = collectedPosition?.value ?: fallbackPositionMs
+
+    var isDraggingSlider by remember { mutableStateOf(false) }
+    var sliderDragPosition by remember { mutableFloatStateOf(0f) }
+
+    val safeDuration = durationMs.coerceAtLeast(1L)
+    val sliderValue = if (isDraggingSlider) {
+        sliderDragPosition
+    } else {
+        (livePositionMs.toFloat() / safeDuration.toFloat()).coerceIn(0f, 1f)
+    }
+
+    val displayPositionMs = if (isDraggingSlider) {
+        (sliderDragPosition * safeDuration).toLong()
+    } else {
+        livePositionMs
+    }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Box(
+            modifier = Modifier.fillMaxWidth(),
+            contentAlignment = Alignment.Center
+        ) {
+            if (abLoopState.pointAMs != null) {
+                BoxWithConstraints(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 10.dp)
+                        .height(6.dp)
+                ) {
+                    val startFraction = (abLoopState.pointAMs.toFloat() / safeDuration.toFloat()).coerceIn(0f, 1f)
+                    val endFraction = ((abLoopState.pointBMs ?: livePositionMs).toFloat() / safeDuration.toFloat())
+                        .coerceIn(startFraction, 1f)
+                    val startOffset = maxWidth * startFraction
+                    val segmentWidth = (maxWidth * (endFraction - startFraction)).coerceAtLeast(4.dp)
+
+                    Box(
+                        modifier = Modifier
+                            .offset(x = startOffset)
+                            .width(segmentWidth)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(
+                                if (abLoopState.isLoopingActive) {
+                                    Color(0xFF10B981).copy(alpha = 0.78f)
+                                } else {
+                                    animatedPrimary.copy(alpha = 0.55f)
+                                }
+                            )
+                    )
+                }
+            }
+
+            Slider(
+                value = sliderValue,
+                onValueChange = {
+                    isDraggingSlider = true
+                    sliderDragPosition = it
+                },
+                onValueChangeFinished = {
+                    onSeekTo((sliderDragPosition * safeDuration).toLong())
+                    isDraggingSlider = false
+                },
+                colors = SliderDefaults.colors(
+                    thumbColor = Color.White,
+                    activeTrackColor = animatedPrimary,
+                    inactiveTrackColor = animatedPrimary.copy(alpha = 0.25f)
+                ),
+                thumb = {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.size(20.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(20.dp)
+                                .background(animatedPrimary.copy(alpha = 0.35f), CircleShape)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(13.dp)
+                                .shadow(elevation = 3.dp, shape = CircleShape)
+                                .background(Color.White, CircleShape)
+                        )
+                    }
+                },
+                track = {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(Color.White.copy(alpha = 0.22f))
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(sliderValue.coerceIn(0f, 1f))
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(animatedPrimary)
+                        )
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("now_playing_slider")
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = formatPlaybackTime(displayPositionMs),
+                style = MaterialTheme.typography.bodySmall.copy(color = TextMuted)
+            )
+
+            CompactABLoopBar(
+                abLoopState = abLoopState,
+                animatedPrimary = animatedPrimary,
+                onMarkA = onMarkABPointA,
+                onMarkB = onMarkABPointB,
+                onClear = onClearABLoop
+            )
+
+            Text(
+                text = formatPlaybackTime(durationMs),
+                style = MaterialTheme.typography.bodySmall.copy(color = TextMuted)
+            )
         }
     }
 }

@@ -45,6 +45,8 @@ import com.example.ui.components.ArtworkImage
 import com.example.ui.theme.BackgroundDark
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 /**
@@ -63,11 +65,13 @@ fun FullScreenLyricsScreen(
     currentTrack: Track?,
     lyricsState: LyricsState,
     isPlaying: Boolean,
-    currentPositionMs: Long,
+    currentPositionMs: Long = 0L,
+    currentPositionFlow: StateFlow<Long>? = null,
     durationMs: Long,
     animatedPrimary: Color,
     animatedSecondary: Color,
     audioIntensity: Float = 0.15f,
+    audioIntensityFlow: StateFlow<Float>? = null,
     onSeekTo: (Long) -> Unit,
     onTogglePlayPause: () -> Unit,
     onPlayNext: () -> Unit,
@@ -93,12 +97,14 @@ fun FullScreenLyricsScreen(
         if (uri != null) onImportLyricsUri(uri)
     }
 
-    // Índice de la frase activa
-    val activeIndex = remember(currentPositionMs, lyricsState.lines) {
-        if (lyricsState.lines.isEmpty()) -1
-        else {
-            val idx = lyricsState.lines.indexOfLast { it.timeMs <= currentPositionMs }
-            if (idx >= 0) idx else 0
+    val collectedPosition = currentPositionFlow?.collectAsStateWithLifecycle()
+
+    // Índice de la frase activa mediante búsqueda binaria O(log N) + derivedStateOf
+    // para que la lista de letras solo se recomponga cuando cambie la línea activa
+    val activeIndex by remember(lyricsState.lines, collectedPosition, currentPositionMs) {
+        derivedStateOf {
+            val posMs = collectedPosition?.value ?: currentPositionMs
+            findActiveLyricIndexBinary(lyricsState.lines, posMs)
         }
     }
 
@@ -124,23 +130,12 @@ fun FullScreenLyricsScreen(
             .pointerInput(Unit) { detectTapGestures {} }
             .testTag("full_screen_lyrics_screen")
     ) {
-        // Fondo degradado dinámico inmersivo
-        val ambientGlow = animatedPrimary.copy(
-            alpha = (0.30f + (audioIntensity.coerceIn(0f, 1f) * 0.35f)).coerceIn(0.20f, 0.70f)
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            ambientGlow,
-                            animatedSecondary.copy(alpha = 0.22f),
-                            BackgroundDark.copy(alpha = 0.95f),
-                            BackgroundDark
-                        )
-                    )
-                )
+        // Fondo degradado dinámico inmersivo aislado en componente pequeño
+        FullScreenLyricsReactiveBackground(
+            animatedPrimary = animatedPrimary,
+            animatedSecondary = animatedSecondary,
+            fallbackIntensity = audioIntensity,
+            audioIntensityFlow = audioIntensityFlow
         )
 
         Column(
@@ -496,75 +491,14 @@ fun FullScreenLyricsScreen(
 
                     Spacer(modifier = Modifier.height(6.dp))
 
-                    // Seekbar / Slider de progreso compacto con bolita clásica
-                    val progressRatio = if (durationMs > 0) {
-                        (currentPositionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
-                    } else 0f
-
-                    Slider(
-                        value = progressRatio,
-                        onValueChange = { ratio ->
-                            val target = (ratio * durationMs).toLong()
-                            onSeekTo(target)
-                        },
-                        colors = SliderDefaults.colors(
-                            thumbColor = Color.White,
-                            activeTrackColor = animatedPrimary,
-                            inactiveTrackColor = Color.White.copy(alpha = 0.22f)
-                        ),
-                        thumb = {
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier.size(20.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(18.dp)
-                                        .background(animatedPrimary.copy(alpha = 0.35f), CircleShape)
-                                )
-                                Box(
-                                    modifier = Modifier
-                                        .size(12.dp)
-                                        .shadow(elevation = 3.dp, shape = CircleShape)
-                                        .background(Color.White, CircleShape)
-                                )
-                            }
-                        },
-                        track = {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(4.dp)
-                                    .clip(RoundedCornerShape(2.dp))
-                                    .background(Color.White.copy(alpha = 0.22f))
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth(progressRatio.coerceIn(0f, 1f))
-                                        .fillMaxHeight()
-                                        .clip(RoundedCornerShape(2.dp))
-                                        .background(animatedPrimary)
-                                )
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(28.dp)
+                    // Seekbar / Slider de progreso compacto aislado en su propio ámbito de composición
+                    FullScreenLyricsSeekBarSection(
+                        fallbackPositionMs = currentPositionMs,
+                        currentPositionFlow = currentPositionFlow,
+                        durationMs = durationMs,
+                        animatedPrimary = animatedPrimary,
+                        onSeekTo = onSeekTo
                     )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = formatPlaybackTime(currentPositionMs),
-                            style = MaterialTheme.typography.labelSmall.copy(color = TextSecondary, fontSize = 11.sp)
-                        )
-                        Text(
-                            text = formatPlaybackTime(durationMs),
-                            style = MaterialTheme.typography.labelSmall.copy(color = TextSecondary, fontSize = 11.sp)
-                        )
-                    }
 
                     // Controles de transporte
                     Row(
@@ -657,12 +591,122 @@ fun FullScreenLyricsScreen(
                         Text("Guardar")
                     }
                 },
-                dismissButton = {
-                    TextButton(onClick = { showPasteDialog = false }) {
-                        Text("Cancelar")
+                    dismissButton = {
+                        TextButton(onClick = { showPasteDialog = false }) {
+                            Text("Cancelar")
+                        }
                     }
-                }
-            )
+                )
+            }
         }
     }
+
+@Composable
+private fun FullScreenLyricsReactiveBackground(
+    animatedPrimary: Color,
+    animatedSecondary: Color,
+    fallbackIntensity: Float,
+    audioIntensityFlow: StateFlow<Float>?
+) {
+    val collectedIntensity = audioIntensityFlow?.collectAsStateWithLifecycle()
+    val liveIntensity = collectedIntensity?.value ?: fallbackIntensity
+    val ambientGlow = animatedPrimary.copy(
+        alpha = (0.30f + (liveIntensity.coerceIn(0f, 1f) * 0.35f)).coerceIn(0.20f, 0.70f)
+    )
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        ambientGlow,
+                        animatedSecondary.copy(alpha = 0.22f),
+                        BackgroundDark.copy(alpha = 0.95f),
+                        BackgroundDark
+                    )
+                )
+            )
+    )
 }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FullScreenLyricsSeekBarSection(
+    fallbackPositionMs: Long,
+    currentPositionFlow: StateFlow<Long>?,
+    durationMs: Long,
+    animatedPrimary: Color,
+    onSeekTo: (Long) -> Unit
+) {
+    val collectedPosition = currentPositionFlow?.collectAsStateWithLifecycle()
+    val livePositionMs = collectedPosition?.value ?: fallbackPositionMs
+    val progressRatio = if (durationMs > 0L) {
+        (livePositionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
+    } else 0f
+
+    Slider(
+        value = progressRatio,
+        onValueChange = { ratio ->
+            val target = (ratio * durationMs).toLong()
+            onSeekTo(target)
+        },
+        colors = SliderDefaults.colors(
+            thumbColor = Color.White,
+            activeTrackColor = animatedPrimary,
+            inactiveTrackColor = Color.White.copy(alpha = 0.22f)
+        ),
+        thumb = {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.size(20.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(18.dp)
+                        .background(animatedPrimary.copy(alpha = 0.35f), CircleShape)
+                )
+                Box(
+                    modifier = Modifier
+                        .size(12.dp)
+                        .shadow(elevation = 3.dp, shape = CircleShape)
+                        .background(Color.White, CircleShape)
+                )
+            }
+        },
+        track = {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(Color.White.copy(alpha = 0.22f))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(progressRatio.coerceIn(0f, 1f))
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(animatedPrimary)
+                )
+            }
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(28.dp)
+    )
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = formatPlaybackTime(livePositionMs),
+            style = MaterialTheme.typography.labelSmall.copy(color = TextSecondary, fontSize = 11.sp)
+        )
+        Text(
+            text = formatPlaybackTime(durationMs),
+            style = MaterialTheme.typography.labelSmall.copy(color = TextSecondary, fontSize = 11.sp)
+        )
+    }
+}
+
