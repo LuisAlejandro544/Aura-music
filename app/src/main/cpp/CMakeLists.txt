@@ -11,14 +11,19 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Opciones de optimización de tamaño, inlining y eliminación de secciones muertas para procesamiento de señal de audio C++20
+# Opciones de optimización de tamaño, inlining, eliminación de secciones muertas y desactivación
+# de Excepciones C++, RTTI y Tablas de Unwind para reducir drásticamente el peso de libauramusic_dsp.so
 add_compile_options(
-    -Os
+    -Oz
     -flto
     -ffast-math
     -fvisibility=hidden
     -ffunction-sections
     -fdata-sections
+    -fno-unwind-tables
+    -fno-asynchronous-unwind-tables
+    $<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions>
+    $<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>
     -Wall
     -Wextra
 )
@@ -26,7 +31,9 @@ add_compile_options(
 add_link_options(
     -flto
     -Wl,--gc-sections
+    -Wl,--icf=all
     -Wl,--exclude-libs,ALL
+    -Wl,-s
 )
 
 # Definir la librería compartida nativa de audio

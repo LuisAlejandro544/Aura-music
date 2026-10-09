@@ -43,6 +43,9 @@ enum class SettingsSubScreen {
     VISUAL_BEHAVIOR,
     THEME_PALETTES,
     HEADPHONES,
+    HEADPHONES_DSP,
+    HEADPHONES_SECURITY,
+    HEADPHONES_GESTURES,
     STORED_MEDIA,
     ENGINES_AND_DIAGNOSTICS
 }
@@ -52,9 +55,9 @@ enum class SettingsSubScreen {
  * Arquitectura Modular (MVVM):
  * - El apartado principal ahora se denomina "Ajustes" y organiza las opciones en tarjetas interactivas
  *   con el mismo diseño limpio que "Diseño del Reproductor" (icono, título, resumen activo y flecha `>`).
- * - Cambio crucial: Al pulsar cada apartado en "Ajustes", en lugar de abrir un diálogo modal emergente,
- *   se abre una pantalla/menú independiente a pantalla completa ([SettingsSubMenuScreen]) con botón de retroceso
- *   y soporte nativo de navegación hacia atrás.
+ * - Cambio crucial: Al pulsar cada apartado en "Ajustes" (y sus sub-apartados en Auriculares), en lugar de abrir
+ *   modales emergentes o barras de pestañas obsoletas, se abre una pantalla/menú independiente a pantalla completa
+ *   ([SettingsSubMenuScreen]) con botón de retroceso y soporte nativo de navegación hacia atrás.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -91,7 +94,6 @@ fun SettingsScreen(
     modifier: Modifier = Modifier
 ) {
     var activeSubScreen by remember { mutableStateOf(SettingsSubScreen.MAIN_MENU) }
-    var headphoneSectionTab by remember { mutableIntStateOf(0) }
     var editingClickType by remember { mutableStateOf<Int?>(null) }
 
     val mediaCount = remember(allTracks) {
@@ -101,7 +103,16 @@ fun SettingsScreen(
     AnimatedContent(
         targetState = activeSubScreen,
         transitionSpec = {
-            if (targetState != SettingsSubScreen.MAIN_MENU) {
+            val isGoingDeeper = when {
+                initialState == SettingsSubScreen.MAIN_MENU && targetState != SettingsSubScreen.MAIN_MENU -> true
+                initialState == SettingsSubScreen.HEADPHONES && (
+                    targetState == SettingsSubScreen.HEADPHONES_DSP ||
+                        targetState == SettingsSubScreen.HEADPHONES_SECURITY ||
+                        targetState == SettingsSubScreen.HEADPHONES_GESTURES
+                    ) -> true
+                else -> false
+            }
+            if (isGoingDeeper) {
                 (fadeIn(animationSpec = tween(220)) + slideInHorizontally(
                     animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
                 ) { it / 4 }).togetherWith(
@@ -221,7 +232,7 @@ fun SettingsScreen(
                 }
             }
 
-            // PANTALLA INDEPENDIENTE 4: AURICULARES & ACÚSTICA DSP
+            // PANTALLA INDEPENDIENTE 4: AURICULARES & ACÚSTICA DSP (MENÚ DE TARJETAS SIN BARRA DE PESTAÑAS)
             SettingsSubScreen.HEADPHONES -> {
                 SettingsSubMenuScreen(
                     title = "Auriculares & Acústica DSP",
@@ -231,10 +242,27 @@ fun SettingsScreen(
                     onBack = { activeSubScreen = SettingsSubScreen.MAIN_MENU },
                     testTag = "subscreen_headphones"
                 ) {
-                    headphonesFullSection(
+                    headphonesMenuSection(
                         headphoneConfig = headphoneConfig,
-                        headphoneSectionTab = headphoneSectionTab,
-                        onSelectSubTab = { headphoneSectionTab = it },
+                        onOpenAcousticsDsp = { activeSubScreen = SettingsSubScreen.HEADPHONES_DSP },
+                        onOpenSecurity = { activeSubScreen = SettingsSubScreen.HEADPHONES_SECURITY },
+                        onOpenGestures = { activeSubScreen = SettingsSubScreen.HEADPHONES_GESTURES }
+                    )
+                }
+            }
+
+            // SUB-PANTALLA 4.1: ACÚSTICA & DSP
+            SettingsSubScreen.HEADPHONES_DSP -> {
+                SettingsSubMenuScreen(
+                    title = "Acústica & DSP",
+                    subtitle = "Modo Bit-Perfect 1:1, Crossfeed C++20 y Balance Estéreo L/R",
+                    icon = Icons.Default.GraphicEq,
+                    iconTint = MaterialTheme.colorScheme.primary,
+                    onBack = { activeSubScreen = SettingsSubScreen.HEADPHONES },
+                    testTag = "subscreen_headphones_dsp"
+                ) {
+                    headphonesAcousticsSection(
+                        headphoneConfig = headphoneConfig,
                         onSetCrossfeedEnabled = onSetCrossfeedEnabled,
                         onSetCrossfeedStrength = onSetCrossfeedStrength,
                         onSetBalanceControlEnabled = onSetBalanceControlEnabled,
@@ -242,10 +270,42 @@ fun SettingsScreen(
                         onSetBitPerfectEnabled = onSetBitPerfectEnabled,
                         onSetLowLatencyEnabled = onSetLowLatencyEnabled,
                         onSetUsbDacExclusiveEnabled = onSetUsbDacExclusiveEnabled,
-                        onSetHiResTargetMode = onSetHiResTargetMode,
+                        onSetHiResTargetMode = onSetHiResTargetMode
+                    )
+                }
+            }
+
+            // SUB-PANTALLA 4.2: SEGURIDAD & CONEXIÓN
+            SettingsSubScreen.HEADPHONES_SECURITY -> {
+                SettingsSubMenuScreen(
+                    title = "Seguridad & Conexión",
+                    subtitle = "Protección contra desconexiones, Fade-In y Memoria de Volumen",
+                    icon = Icons.Default.Security,
+                    iconTint = MaterialTheme.colorScheme.secondary,
+                    onBack = { activeSubScreen = SettingsSubScreen.HEADPHONES },
+                    testTag = "subscreen_headphones_security"
+                ) {
+                    headphonesSecuritySection(
+                        headphoneConfig = headphoneConfig,
                         onSetBecomingNoisyGuardEnabled = onSetBecomingNoisyGuardEnabled,
                         onSetFadeInOnResumeEnabled = onSetFadeInOnResumeEnabled,
-                        onSetDedicatedVolumeMemoryEnabled = onSetDedicatedVolumeMemoryEnabled,
+                        onSetDedicatedVolumeMemoryEnabled = onSetDedicatedVolumeMemoryEnabled
+                    )
+                }
+            }
+
+            // SUB-PANTALLA 4.3: BOTONES Y GESTOS
+            SettingsSubScreen.HEADPHONES_GESTURES -> {
+                SettingsSubMenuScreen(
+                    title = "Botones y Gestos",
+                    subtitle = "Personaliza las pulsaciones simples, dobles, triples y prolongadas",
+                    icon = Icons.Default.TouchApp,
+                    iconTint = MaterialTheme.colorScheme.primary,
+                    onBack = { activeSubScreen = SettingsSubScreen.HEADPHONES },
+                    testTag = "subscreen_headphones_gestures"
+                ) {
+                    headphonesGesturesSection(
+                        headphoneConfig = headphoneConfig,
                         onSetHeadsetControlsEnabled = onSetHeadsetControlsEnabled,
                         onOpenEditClickType = { editingClickType = it }
                     )
@@ -297,23 +357,11 @@ fun SettingsScreen(
     }
 }
 
-private fun androidx.compose.foundation.lazy.LazyListScope.headphonesFullSection(
+private fun androidx.compose.foundation.lazy.LazyListScope.headphonesMenuSection(
     headphoneConfig: HeadphoneConfig,
-    headphoneSectionTab: Int,
-    onSelectSubTab: (Int) -> Unit,
-    onSetCrossfeedEnabled: (Boolean) -> Unit,
-    onSetCrossfeedStrength: (Int) -> Unit,
-    onSetBalanceControlEnabled: (Boolean) -> Unit,
-    onSetStereoBalance: (Float) -> Unit,
-    onSetBitPerfectEnabled: (Boolean) -> Unit,
-    onSetLowLatencyEnabled: (Boolean) -> Unit,
-    onSetUsbDacExclusiveEnabled: (Boolean) -> Unit,
-    onSetHiResTargetMode: (Int) -> Unit,
-    onSetBecomingNoisyGuardEnabled: (Boolean) -> Unit,
-    onSetFadeInOnResumeEnabled: (Boolean) -> Unit,
-    onSetDedicatedVolumeMemoryEnabled: (Boolean) -> Unit,
-    onSetHeadsetControlsEnabled: (Boolean) -> Unit,
-    onOpenEditClickType: (Int) -> Unit
+    onOpenAcousticsDsp: () -> Unit,
+    onOpenSecurity: () -> Unit,
+    onOpenGestures: () -> Unit
 ) {
     item {
         HeadphoneStatusCard(headphoneConfig = headphoneConfig)
@@ -321,62 +369,59 @@ private fun androidx.compose.foundation.lazy.LazyListScope.headphonesFullSection
     }
 
     item {
-        ScrollableTabRow(
-            selectedTabIndex = headphoneSectionTab,
-            containerColor = SurfaceCard,
-            contentColor = MaterialTheme.colorScheme.primary,
-            edgePadding = 0.dp,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-        ) {
-            Tab(
-                selected = headphoneSectionTab == 0,
-                onClick = { onSelectSubTab(0) },
-                text = { Text("1. Acústica & DSP", style = MaterialTheme.typography.labelMedium) },
-                icon = { Icon(Icons.Default.GraphicEq, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                modifier = Modifier.testTag("headphone_subtab_dsp")
-            )
-            Tab(
-                selected = headphoneSectionTab == 1,
-                onClick = { onSelectSubTab(1) },
-                text = { Text("2. Seguridad & Conexión", style = MaterialTheme.typography.labelMedium) },
-                icon = { Icon(Icons.Default.Security, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                modifier = Modifier.testTag("headphone_subtab_safety")
-            )
-            Tab(
-                selected = headphoneSectionTab == 2,
-                onClick = { onSelectSubTab(2) },
-                text = { Text("3. Botones y Gestos", style = MaterialTheme.typography.labelMedium) },
-                icon = { Icon(Icons.Default.TouchApp, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                modifier = Modifier.testTag("headphone_subtab_gestures")
-            )
-        }
-        Spacer(modifier = Modifier.height(16.dp))
+        val dspStatus = buildList {
+            if (headphoneConfig.isBitPerfectEnabled) add("Bit-Perfect 1:1")
+            if (headphoneConfig.isCrossfeedEnabled) add("Crossfeed activo")
+            if (headphoneConfig.isBalanceControlEnabled) add("Balance ${headphoneConfig.formattedBalance}")
+        }.joinToString(" • ").ifEmpty { "Modo Bit-Perfect, Crossfeed Bauer/Chu Moy C++20 y Balance Estéreo L/R" }
+
+        SettingsNavigationCard(
+            icon = Icons.Default.GraphicEq,
+            title = "Acústica & DSP",
+            subtitle = dspStatus,
+            iconTint = MaterialTheme.colorScheme.primary,
+            badgeText = if (headphoneConfig.isBitPerfectEnabled || headphoneConfig.isCrossfeedEnabled) "ACTIVO" else null,
+            badgeColor = MaterialTheme.colorScheme.primary,
+            onClick = onOpenAcousticsDsp,
+            testTag = "headphone_subtab_dsp"
+        )
+        Spacer(modifier = Modifier.height(12.dp))
     }
 
-    when (headphoneSectionTab) {
-        0 -> headphonesAcousticsSection(
-            headphoneConfig = headphoneConfig,
-            onSetCrossfeedEnabled = onSetCrossfeedEnabled,
-            onSetCrossfeedStrength = onSetCrossfeedStrength,
-            onSetBalanceControlEnabled = onSetBalanceControlEnabled,
-            onSetStereoBalance = onSetStereoBalance,
-            onSetBitPerfectEnabled = onSetBitPerfectEnabled,
-            onSetLowLatencyEnabled = onSetLowLatencyEnabled,
-            onSetUsbDacExclusiveEnabled = onSetUsbDacExclusiveEnabled,
-            onSetHiResTargetMode = onSetHiResTargetMode
+    item {
+        val activeGuards = listOf(
+            headphoneConfig.isBecomingNoisyGuardEnabled,
+            headphoneConfig.isFadeInOnResumeEnabled,
+            headphoneConfig.isDedicatedVolumeMemoryEnabled
+        ).count { it }
+
+        SettingsNavigationCard(
+            icon = Icons.Default.Security,
+            title = "Seguridad & Conexión",
+            subtitle = "Protección contra desconexiones, Fade-In suave al reanudar y Memoria de Volumen",
+            iconTint = MaterialTheme.colorScheme.secondary,
+            badgeText = if (activeGuards > 0) "$activeGuards/3" else null,
+            badgeColor = MaterialTheme.colorScheme.secondary,
+            onClick = onOpenSecurity,
+            testTag = "headphone_subtab_safety"
         )
-        1 -> headphonesSecuritySection(
-            headphoneConfig = headphoneConfig,
-            onSetBecomingNoisyGuardEnabled = onSetBecomingNoisyGuardEnabled,
-            onSetFadeInOnResumeEnabled = onSetFadeInOnResumeEnabled,
-            onSetDedicatedVolumeMemoryEnabled = onSetDedicatedVolumeMemoryEnabled
-        )
-        2 -> headphonesGesturesSection(
-            headphoneConfig = headphoneConfig,
-            onSetHeadsetControlsEnabled = onSetHeadsetControlsEnabled,
-            onOpenEditClickType = onOpenEditClickType
+        Spacer(modifier = Modifier.height(12.dp))
+    }
+
+    item {
+        SettingsNavigationCard(
+            icon = Icons.Default.TouchApp,
+            title = "Botones y Gestos",
+            subtitle = if (headphoneConfig.isHeadsetControlsEnabled) {
+                "Controles físicos activos • 1x: ${headphoneConfig.singleClickAction.label}, 2x: ${headphoneConfig.doubleClickAction.label}"
+            } else {
+                "Personaliza las pulsaciones simples, dobles, triples y prolongadas de tus audífonos"
+            },
+            iconTint = MaterialTheme.colorScheme.primary,
+            badgeText = if (headphoneConfig.isHeadsetControlsEnabled) "ON" else null,
+            badgeColor = MaterialTheme.colorScheme.primary,
+            onClick = onOpenGestures,
+            testTag = "headphone_subtab_gestures"
         )
     }
 }

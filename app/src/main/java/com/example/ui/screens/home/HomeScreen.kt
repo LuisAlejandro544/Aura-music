@@ -82,38 +82,21 @@ fun HomeScreen(
             .padding(horizontal = 16.dp),
         contentPadding = PaddingValues(bottom = 120.dp)
     ) {
-        // Encabezado con Saludo y Atajo a Ajustes
+        // Encabezado con Saludo Principal
         item {
             Spacer(modifier = Modifier.height(16.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = greeting,
-                        style = MaterialTheme.typography.headlineMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = TextPrimary
-                        )
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = greeting,
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
                     )
-                    Text(
-                        text = "Tu música local, sin conexión",
-                        style = MaterialTheme.typography.bodyMedium.copy(color = TextSecondary)
-                    )
-                }
-
-                IconButton(
-                    onClick = { onNavigate(NavScreen.Settings) },
-                    modifier = Modifier.testTag("home_settings_btn")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = "Ajustes",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
+                )
+                Text(
+                    text = "Tu música local, sin conexión",
+                    style = MaterialTheme.typography.bodyMedium.copy(color = TextSecondary)
+                )
             }
             Spacer(modifier = Modifier.height(20.dp))
         }

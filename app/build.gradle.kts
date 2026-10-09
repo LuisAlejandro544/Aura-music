@@ -64,7 +64,25 @@ android {
 
     externalNativeBuild {
       cmake {
-        cppFlags += "-std=c++20"
+        cppFlags += listOf(
+          "-std=c++20",
+          "-Oz",
+          "-fno-exceptions",
+          "-fno-rtti",
+          "-fno-unwind-tables",
+          "-fno-asynchronous-unwind-tables",
+          "-fvisibility=hidden",
+          "-ffunction-sections",
+          "-fdata-sections"
+        )
+        cFlags += listOf(
+          "-Oz",
+          "-fno-unwind-tables",
+          "-fno-asynchronous-unwind-tables",
+          "-fvisibility=hidden",
+          "-ffunction-sections",
+          "-fdata-sections"
+        )
         arguments += "-DANDROID_STL=c++_shared"
       }
     }
@@ -131,6 +149,7 @@ android {
 
   buildTypes {
     release {
+      multiDexEnabled = false
       isCrunchPngs = true
       isMinifyEnabled = true
       isShrinkResources = true
@@ -143,6 +162,7 @@ android {
       applicationIdSuffix = ""
       // Para la versión Beta el identificador es com.auramusic.beta -> Android/data/com.auramusic.beta
       isDebuggable = false
+      multiDexEnabled = false
       isCrunchPngs = true
       isMinifyEnabled = true
       isShrinkResources = true
@@ -496,8 +516,9 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
     val qjsCFiles = listOf("quickjs.c", "quickjs-libc.c", "cutils.c", "libbf.c", "libregexp.c", "libunicode.c", "qjs.c")
     val fallbackQjsC = File(cppDir, "native_quickjs_cli.c")
     val sizeOptFlags = listOf(
-      "-Os", "-flto", "-fvisibility=hidden", "-ffunction-sections", "-fdata-sections",
-      "-Wl,--gc-sections", "-Wl,--exclude-libs,ALL"
+      "-Oz", "-flto", "-fvisibility=hidden", "-ffunction-sections", "-fdata-sections",
+      "-fno-unwind-tables", "-fno-asynchronous-unwind-tables",
+      "-Wl,--gc-sections", "-Wl,--icf=all", "-Wl,--exclude-libs,ALL", "-Wl,-s"
     )
 
     for (abi in abis) {
