@@ -3,6 +3,9 @@
 **Tu música, tu estilo, sin límites ni anuncios.**  
 **Aura Music** es un reproductor de música de alta fidelidad para Android diseñado con estética **Dark Luxury OLED**, efectos de estudio en tiempo real, fondos de video inmersivos (*Video Canvas*) y herramientas integradas para importar y disfrutar toda tu colección musical sin conexión.
 
+
+
+TEST
 ---
 
 ## ✨ ¿Por qué usar Aura Music?
