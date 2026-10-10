@@ -1,6 +1,0 @@
-{
-  "summary":  "Plan de implementación para el sistema de verificación y actualización transparente de paquetes en segundo plano (con notificación nativa, indicador no intrusivo en app, bloqueo temporal de descargas yt-dlp y reinicio de aplicación) junto con los nuevos motores C++20 de Clarificador de Voces HD y Audio 16D Multi-Órbita ubicados estratégicamente sin animaciones innecesarias.",
-  "updatedAt":  "2026-10-06T06:58:37.661018995Z",
-  "requestFeedback":  true,
-  "userFacing":  true
-}

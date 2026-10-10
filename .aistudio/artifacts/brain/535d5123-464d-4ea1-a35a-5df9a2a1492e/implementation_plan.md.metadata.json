@@ -1,6 +1,0 @@
-{
-  "summary":  "Plan de implementación para: (1) Modal de descarga YouTube/TikTok completamente deslizable verticalmente, (2) Corrección definitiva del corte de sonido en Reverb usando el motor DSP C++20 sin bloqueo de hardware de Android, y (3) Ampliación de Velocidad de música y Tono/Voz hasta 2.0x con botones de acceso rápido en ambos controles.",
-  "updatedAt":  "2026-10-04T13:49:00.093492036Z",
-  "requestFeedback":  true,
-  "userFacing":  true
-}

@@ -279,3 +279,13 @@ app/
    - Sanitización de rutas canónicas de entrada y salida mediante `sanitizeFilePath()`.
    - Rechazo de rutas que comiencen con `-` o contengan saltos de línea/espacios sospechosos.
    - Inserción del delimitador POSIX `--` antes de argumentos posicionales en invocaciones nativas para neutralizar la interpretación accidental de rutas como banderas de línea de comandos.
+
+7. **Sandbox Estricto en WebView, Guardián Anti-SSRF/DNS Rebinding y Autenticación IPC (`HeadlessWebViewExtractor.kt`, `ChunkedStreamDownloader.kt`, `AuraMediaPlaybackService.kt`, `MainActivity.kt`, `native_ffmpeg_launcher.c`)**:
+   - Desactivación explícita de `allowFileAccess`, `allowContentAccess`, `allowFileAccessFromFileURLs` y `allowUniversalAccessFromFileURLs` en `HeadlessWebViewExtractor`, más validación de `videoId` y `shouldOverrideUrlLoading`.
+   - Interceptor anti-SSRF / anti-DNS Rebinding en `ChunkedStreamDownloader` y comprobación estricta del host real parseado antes de adjuntar cookies de sesión.
+   - Autorización de paquete/UID en `AuraMediaPlaybackService.onGetSession()` y token criptográfico interno (`INTERNAL_IPC_AUTH_TOKEN`) para comandos del Widget y notificaciones en `MainActivity`.
+   - Verificación con `stat()` en C (`native_ffmpeg_launcher.c` y `native_python_launcher.c`) rechazando bibliotecas escribibles por terceros (`S_IWOTH`) antes de `dlopen()`.
+
+8. **Escáner Automatizado Manual en GitHub Actions (`.github/workflows/security-vulnerability-audit.yml`)**:
+   - Flujo `workflow_dispatch` ("Escáner de Seguridad y Vulnerabilidades (Aura Shield)") con análisis multicapa (Gitleaks, Google OSV-Scanner, Semgrep Kotlin/C++20, Invariantes de Seguridad de Aura Music y Android Lint opcional) y reporte ejecutivo en español en `$GITHUB_STEP_SUMMARY` optimizado para lectura desde teléfono móvil.
+

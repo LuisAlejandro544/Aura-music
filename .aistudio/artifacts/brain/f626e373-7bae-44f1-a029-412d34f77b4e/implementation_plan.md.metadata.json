@@ -1,6 +1,0 @@
-{
-  "summary":  "Plan de implementación para el Temporizador de Apagado personalizable con fade-out de 10s, Crossfade suave y reproducción Gapless, Control de Velocidad y Tono (Pitch & Speed), y motor de Audio 8D Binaural nativo en C++20 con hoja modal en Now Playing.",
-  "updatedAt":  "2026-10-02T20:01:04.897477085Z",
-  "requestFeedback":  true,
-  "userFacing":  true
-}
