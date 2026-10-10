@@ -101,63 +101,75 @@ fun HomeScreen(
             Spacer(modifier = Modifier.height(20.dp))
         }
 
-        // Si la biblioteca está vacía, mostrar tarjeta de bienvenida para importar
+        // Si la biblioteca está vacía, mostrar tarjeta de bienvenida centrada y optimizada para pantallas anchas
         if (allTracks.isEmpty()) {
             item {
-                Card(
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 12.dp),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = SurfaceCard),
-                    border = CardBorder.let { androidx.compose.foundation.BorderStroke(1.dp, it) }
+                        .padding(vertical = 24.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .widthIn(max = 520.dp), // Limitamos el ancho para que no se deforme en pantallas anchas
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(containerColor = SurfaceCard),
+                        border = CardBorder.let { androidx.compose.foundation.BorderStroke(1.dp, it) }
                     ) {
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                            modifier = Modifier.size(64.dp)
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(28.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.LibraryMusic,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(32.dp)
-                                )
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                modifier = Modifier.size(72.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.LibraryMusic,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(36.dp)
+                                    )
+                                }
                             }
-                        }
-                        Spacer(modifier = Modifier.height(14.dp))
-                        Text(
-                            text = "Tu biblioteca está vacía",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = TextPrimary
+                            Spacer(modifier = Modifier.height(18.dp))
+                            Text(
+                                text = "Tu biblioteca está vacía",
+                                style = MaterialTheme.typography.titleLarge.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextPrimary
+                                )
                             )
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = if (com.example.BuildConfig.ENABLE_DEMO_TRACKS) {
-                                "Aura Music respeta tu privacidad: no escanea tu teléfono automáticamente. Importa tus archivos o prueba con canciones demo."
-                            } else {
-                                "Aura Music respeta tu privacidad: no escanea tu teléfono automáticamente. Importa tus archivos o descarga tu música favorita para empezar."
-                            },
-                            style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Button(
-                            onClick = { onNavigate(NavScreen.Import) },
-                            shape = RoundedCornerShape(24.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                            modifier = Modifier.testTag("home_import_cta")
-                        ) {
-                            Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Importar mi Música", fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = if (com.example.BuildConfig.ENABLE_DEMO_TRACKS) {
+                                    "Aura Music respeta tu privacidad: no escanea tu teléfono automáticamente. Importa tus archivos o prueba con canciones demo."
+                                } else {
+                                    "Aura Music respeta tu privacidad: no escanea tu teléfono automáticamente. Importa tus archivos o descarga tu música favorita para empezar."
+                                },
+                                style = MaterialTheme.typography.bodyMedium.copy(color = TextSecondary),
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                modifier = Modifier.padding(horizontal = 8.dp)
+                            )
+                            Spacer(modifier = Modifier.height(22.dp))
+                            Button(
+                                onClick = { onNavigate(NavScreen.Import) },
+                                shape = RoundedCornerShape(24.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                modifier = Modifier
+                                    .height(48.dp)
+                                    .testTag("home_import_cta")
+                            ) {
+                                Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(20.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Importar mi Música", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                            }
                         }
                     }
                 }
