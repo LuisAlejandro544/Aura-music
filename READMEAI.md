@@ -103,7 +103,7 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
     - *Modo Sutil (-18 LUFS)*: Preserva el rango dinámico completo para música clásica y acústica.
     - *Modo Estándar Spotify (-14 LUFS)*: Nivel oficial de streaming Spotify, garantizando volumen consistente sin pérdida de pegada.
     - *Modo Alto (-11 LUFS)*: Sonoridad potente y constante para entornos ruidosos o altavoces portátiles.
-- **Smart AutoMix Estilo Apple Music (`@jomar_oliver`) & Crossfade DJ con Curva Armónica en X (`DjAutomixFilter` en C++20 • Música Local)**:
+- **Smart AutoMix Estilo Apple Music & Crossfade DJ con Curva Armónica en X (`DjAutomixFilter` en C++20 • Música Local)**:
   - Mezcla continua y armónica entre canciones locales a punto de acabar inspirada en Apple Music AutoMix (operativa por ahora en música local, con arquitectura lista para extenderse a streaming).
   - **Detección Acústica de Outro (*Smart Outro Cue Point*)**: Evalúa en tiempo real la caída de energía de la canción local saliente en los últimos segundos para activar el cruce superpuesto Dual-Deck en el compás más limpio omitiendo silencios muertos.
   - **Curva Armónica en X (Bajos `<120 Hz` + Bolsillo Vocal `2.6 kHz` en C++20)**: Atenúa progresivamente los subgraves (`< 120 Hz`), abre un bolsillo en la banda vocal central (`2.6 kHz` con envolvente sinusoidal en vivo durante el cruce) y suaviza agudos extremos (`> 9.5 kHz`) de la canción saliente para evitar choques de bajos y de voces con la canción entrante.

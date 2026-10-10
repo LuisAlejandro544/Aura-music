@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de implementación para añadir: 1) Smart AutoMix estilo Apple Music para música local al finalizar cada pista (con detección inteligente de outro vocal/energía en C++20, emparejamiento armónico de frecuencias graves/vocales y ajuste progresivo en vivo durante el cruce Dual-Deck), y 2) Generador de Auto-Remix / Mashup Inteligente con 2 canciones locales (elegidas por el usuario o seleccionadas automáticamente por el algoritmo Auto-Match), soportando tanto Mashup (Voz A + Base B) como Remix Alternado DJ con sincronización de ritmo en FFmpeg, accesible desde Biblioteca/Playlists y dentro del Creador de Mixtapes/Remixes, además de actualizar todos los archivos .md y chanelog-beta.md.",
-  "updatedAt":  "2026-10-10T20:22:21.756227704Z",
+  "summary":  "Plan de implementación actualizado sin nombres de usuario externos.",
+  "updatedAt":  "2026-10-10T20:50:10.074213184Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

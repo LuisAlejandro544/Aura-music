@@ -4,7 +4,7 @@ Este plan implementa las dos funciones solicitadas por la comunidad (por ahora e
 
 ---
 
-## 1. Smart AutoMix Inteligente Estilo Apple Music al Terminar Canciones (`@jomar_oliver`)
+## 1. Smart AutoMix Inteligente Estilo Apple Music al Terminar Canciones
 
 ### Qué mejoraremos
 - **Motor DSP C++20 (`dsp_filters.h` & `auramusic_dsp.h`)**:
@@ -52,4 +52,4 @@ Este plan implementa las dos funciones solicitadas por la comunidad (por ahora e
   - `AI_CONTEXT.md`
   - `AGENTS.md`
   - `chanelog-beta.md`
-- En todos ellos quedará documentado en español tanto el **Smart AutoMix Estilo Apple Music (Música Local)** inspirado en la sugerencia de `@jomar_oliver` como el **Generador de Auto-Remix / Mashup de 2 Canciones Locales (Manual o Auto-Match)**, especificando que en esta fase operan sobre música local y preparando el camino para su futura expansión a streaming.
+- En todos ellos quedará documentado en español tanto el **Smart AutoMix Estilo Apple Music (Música Local)** como el **Generador de Auto-Remix / Mashup de 2 Canciones Locales (Manual o Auto-Match)**, especificando que en esta fase operan sobre música local y preparando el camino para su futura expansión a streaming.
