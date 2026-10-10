@@ -500,6 +500,10 @@ class AuraDownloadService : Service() {
                 action = Intent.ACTION_VIEW
                 flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 putExtra(EXTRA_PLAY_DOWNLOADED_TRACK_ID, track.id)
+                putExtra(
+                    com.example.widget.AuraMusicWidgetProvider.EXTRA_INTERNAL_AUTH_TOKEN,
+                    com.example.widget.AuraMusicWidgetProvider.INTERNAL_IPC_AUTH_TOKEN
+                )
             }
             val pendingIntent = PendingIntent.getActivity(
                 applicationContext,

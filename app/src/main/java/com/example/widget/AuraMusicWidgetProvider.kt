@@ -77,6 +77,7 @@ class AuraMusicWidgetProvider : AppWidgetProvider() {
             val launchIntent = Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
                 putExtra(EXTRA_WIDGET_COMMAND, actionCommand)
+                putExtra(EXTRA_INTERNAL_AUTH_TOKEN, INTERNAL_IPC_AUTH_TOKEN)
             }
             context.startActivity(launchIntent)
         } catch (_: Throwable) {}
@@ -87,6 +88,9 @@ class AuraMusicWidgetProvider : AppWidgetProvider() {
         const val ACTION_WIDGET_NEXT = "com.example.widget.ACTION_NEXT"
         const val ACTION_WIDGET_PREV = "com.example.widget.ACTION_PREV"
         const val EXTRA_WIDGET_COMMAND = "extra_widget_command"
+        const val EXTRA_INTERNAL_AUTH_TOKEN = "extra_aura_internal_auth_token"
+
+        val INTERNAL_IPC_AUTH_TOKEN: String = java.util.UUID.randomUUID().toString()
 
         @Volatile
         private var lastKnownTrack: Track? = null

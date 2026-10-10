@@ -70,6 +70,9 @@ object OnlineVideoAudioImporter {
                 cleanUrl.endsWith(".mp3", ignoreCase = true) ||
                 cleanUrl.endsWith(".webm", ignoreCase = true)
             ) {
+                if (!ChunkedStreamDownloader.isSafePublicUrl(cleanUrl)) {
+                    return@withContext Result.failure(IllegalArgumentException("La URL apunta a una dirección local o no permitida."))
+                }
                 val fileName = cleanUrl.substringAfterLast("/").substringBefore("?")
                 return@withContext Result.success(
                     ResolvedMediaInfo(
@@ -85,7 +88,7 @@ object OnlineVideoAudioImporter {
             }
 
             // Caso 4: Intentar con WebStreamExtractor si hay contexto disponible
-            if (context != null && (cleanUrl.startsWith("http://") || cleanUrl.startsWith("https://"))) {
+            if (context != null && ChunkedStreamDownloader.isSafePublicUrl(cleanUrl)) {
                 val streamRes = WebStreamExtractor.resolveStream(context, cleanUrl, engine)
                 if (streamRes.isSuccess) {
                     return@withContext streamRes

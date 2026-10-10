@@ -10,5 +10,6 @@
     <include domain="file" path="."/>
     <exclude domain="file" path="bin"/>
     <exclude domain="file" path="env"/>
+    <exclude domain="file" path="updates"/>
     <exclude domain="file" path="aura_debug_logs.json"/>
 </full-backup-content>

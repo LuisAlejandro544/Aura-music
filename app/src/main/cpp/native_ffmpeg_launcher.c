@@ -4,6 +4,7 @@
 #include <dlfcn.h>
 #include <unistd.h>
 #include <limits.h>
+#include <sys/stat.h>
 
 /**
  * Aura Music - Lanzador Nativo PIE de FFmpeg Puro (100% Nativo, Cero Wrappers)
@@ -18,6 +19,21 @@
  */
 
 typedef int (*ffmpeg_entry_t)(int argc, char **argv);
+
+static int is_safe_shared_object_path(const char *path) {
+    if (!path || path[0] != '/') return 0;
+    if (strstr(path, "..") != NULL) return 0;
+
+    struct stat st;
+    if (stat(path, &st) != 0) return 0;
+    if (!S_ISREG(st.st_mode)) return 0;
+    /* Bloquear cualquier archivo escribible por otros usuarios (world-writable) */
+    if ((st.st_mode & S_IWOTH) != 0) return 0;
+    /* El archivo debe pertenecer al sistema (root/system) o al propio UID del sandbox */
+    uid_t my_uid = getuid();
+    if (st.st_uid != 0 && st.st_uid != 1000 && st.st_uid != my_uid) return 0;
+    return 1;
+}
 
 static void extract_dir(const char *argv0, char *out_dir, size_t max_len) {
     if (!argv0 || !*argv0) {
@@ -41,16 +57,23 @@ static void extract_dir(const char *argv0, char *out_dir, size_t max_len) {
 
 static void *try_dlopen_in_dir(const char *dir, const char *lib_name, int flags) {
     char full_path[PATH_MAX];
+    if (!lib_name || strchr(lib_name, '/') != NULL || strstr(lib_name, "..") != NULL) {
+        return NULL;
+    }
     if (dir && *dir) {
         snprintf(full_path, sizeof(full_path), "%s/%s", dir, lib_name);
-        void *h = dlopen(full_path, flags);
-        if (h) return h;
+        if (is_safe_shared_object_path(full_path)) {
+            void *h = dlopen(full_path, flags);
+            if (h) return h;
+        }
     }
     const char *env_dir = getenv("FFMPEG_LIB_DIR");
-    if (env_dir && *env_dir) {
+    if (env_dir && *env_dir && env_dir[0] == '/' && strstr(env_dir, "..") == NULL) {
         snprintf(full_path, sizeof(full_path), "%s/%s", env_dir, lib_name);
-        void *h = dlopen(full_path, flags);
-        if (h) return h;
+        if (is_safe_shared_object_path(full_path)) {
+            void *h = dlopen(full_path, flags);
+            if (h) return h;
+        }
     }
     return dlopen(lib_name, flags);
 }

@@ -214,7 +214,7 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
                                 onClick = { viewModel.setNowPlayingExpanded(true) },
                                 dynamicPrimary = animatedMiniPrimary,
                                 dynamicSecondary = animatedMiniSecondary,
-                                isMiniPlayerVideoEnabled = isMiniPlayerVideoEnabled,
+                                isMiniPlayerVideoEnabled = isMiniPlayerVideoEnabled && !isNowPlayingExpanded,
                                 playbackSpeed = playbackSpeed
                             )
                         }

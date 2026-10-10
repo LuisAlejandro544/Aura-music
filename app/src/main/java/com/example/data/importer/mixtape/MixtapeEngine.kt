@@ -210,6 +210,29 @@ object MixtapeEngine {
     }
 
     /**
+     * Verifica que un archivo de audio local sea seguro de leer (pertenezca a `songs/` de Aura Music o almacenamiento compartido externo,
+     * bloqueando cualquier symlink hacia `databases/`, `shared_prefs/` o `files/bin/`).
+     */
+    private fun isSafeAudioFileForMixtape(context: Context, file: File): Boolean {
+        return try {
+            val canonical = file.canonicalFile.toPath()
+            val storageManager = AppStorageManager(context)
+            val songsDirPath = storageManager.songsDir.canonicalFile.toPath()
+            if (canonical.startsWith(songsDirPath)) {
+                return file.exists() && file.isFile && file.canRead()
+            }
+            val dataDir = context.applicationInfo.dataDir?.let { File(it).canonicalFile.toPath() }
+            val filesDir = context.filesDir.canonicalFile.toPath()
+            if ((dataDir != null && canonical.startsWith(dataDir)) || canonical.startsWith(filesDir)) {
+                return false
+            }
+            file.exists() && file.isFile && file.canRead()
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /**
      * Prepara un archivo de audio local seguro para FFmpeg a partir de una pista.
      */
     private fun prepareAudioInputFile(
@@ -221,15 +244,20 @@ object MixtapeEngine {
         val uriStr = track.uriString
         if (uriStr.startsWith("/")) {
             val f = File(uriStr)
-            if (f.exists() && f.canRead()) return f
+            if (isSafeAudioFileForMixtape(context, f)) return f.canonicalFile
+            return null
         } else if (uriStr.startsWith("file://")) {
             val f = File(Uri.parse(uriStr).path ?: "")
-            if (f.exists() && f.canRead()) return f
+            if (isSafeAudioFileForMixtape(context, f)) return f.canonicalFile
+            return null
         }
 
-        // Si es content:// o no se pudo leer directamente, copiar a temporal en cache
+        // Si es content:// o no se pudo leer directamente, copiar a temporal en cache previa validación
         return try {
             val uri = Uri.parse(uriStr)
+            if (!com.example.data.importer.IncomingMediaHandler.isSafeExternalUri(context, uri)) {
+                return null
+            }
             val tempFile = File(context.cacheDir, "mixtape_in_${index}_${System.currentTimeMillis()}.tmp")
             tempFiles.add(tempFile)
             context.contentResolver.openInputStream(uri)?.use { input ->

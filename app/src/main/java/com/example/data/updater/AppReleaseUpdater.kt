@@ -200,22 +200,34 @@ object AppReleaseUpdater {
         _updateState.value = AppUpdateState.Idle
     }
 
+    private val SAFE_REPO_SEGMENT_REGEX = Regex("^[a-zA-Z0-9._-]{1,100}$")
+
     /**
-     * Normaliza tanto una URL completa (`https://github.com/usuario/repo`) como un slug (`usuario/repo`).
+     * Normaliza tanto una URL completa (`https://github.com/usuario/repo`) como un slug (`usuario/repo`)
+     * y verifica que no contenga secuencias de Path Traversal (`..`) ni parámetros inyectados (`?`, `#`, `%`).
      */
     fun normalizeRepoSlug(input: String): String {
         val trimmed = input.trim()
+            .substringBefore("?")
+            .substringBefore("#")
             .removePrefix("https://github.com/")
             .removePrefix("http://github.com/")
             .removePrefix("github.com/")
             .removeSuffix(".git")
             .trim('/')
         val parts = trimmed.split("/").filter { it.isNotBlank() }
-        return if (parts.size >= 2) {
-            "${parts[0]}/${parts[1]}"
-        } else {
-            trimmed
+        if (parts.size >= 2) {
+            val owner = parts[0].trim()
+            val repo = parts[1].trim()
+            if (owner != "." && owner != ".." &&
+                repo != "." && repo != ".." &&
+                SAFE_REPO_SEGMENT_REGEX.matches(owner) &&
+                SAFE_REPO_SEGMENT_REGEX.matches(repo)
+            ) {
+                return "$owner/$repo"
+            }
         }
+        return ""
     }
 
     /**

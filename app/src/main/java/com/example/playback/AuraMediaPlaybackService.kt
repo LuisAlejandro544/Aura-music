@@ -56,11 +56,48 @@ class AuraMediaPlaybackService : MediaSessionService() {
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
+        if (!isAuthorizedController(controllerInfo)) {
+            AuraDebugManager.logWarning(
+                "AuraMediaPlaybackService",
+                "Bloqueado intento de conexión no autorizado a MediaSession desde paquete: ${controllerInfo.packageName}"
+            )
+            return null
+        }
         val session = AuraAudioPlayer.activeMediaSession
         if (session != null && !isSessionAdded(session)) {
             addSession(session)
         }
         return session
+    }
+
+    private fun isAuthorizedController(controllerInfo: MediaSession.ControllerInfo): Boolean {
+        if (controllerInfo.isTrusted) return true
+        val callerPkg = controllerInfo.packageName
+        if (callerPkg == packageName) return true
+        val uid = controllerInfo.uid
+        if (uid == android.os.Process.SYSTEM_UID ||
+            uid == android.os.Process.BLUETOOTH_UID ||
+            uid == android.os.Process.PHONE_UID ||
+            uid == android.os.Process.myUid()
+        ) {
+            return true
+        }
+        val allowedSystemControllers = setOf(
+            "android",
+            "com.android.systemui",
+            "com.android.bluetooth",
+            "com.google.android.projection.gearhead", // Android Auto
+            "com.google.android.googlequicksearchbox",
+            "com.android.settings"
+        )
+        if (callerPkg in allowedSystemControllers) return true
+        // Permitir si el paquete tiene firma del sistema (FLAG_SYSTEM / FLAG_UPDATED_SYSTEM_APP)
+        return try {
+            val appInfo = packageManager.getApplicationInfo(callerPkg, 0)
+            (appInfo.flags and (android.content.pm.ApplicationInfo.FLAG_SYSTEM or android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)) != 0
+        } catch (_: Throwable) {
+            false
+        }
     }
 
     private fun attachActiveSessionIfAvailable() {

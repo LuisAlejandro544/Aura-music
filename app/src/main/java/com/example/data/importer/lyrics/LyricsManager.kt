@@ -459,6 +459,31 @@ object LyricsManager {
         )
     }
 
+    private const val MAX_LYRICS_FILE_BYTES = 512 * 1024L // 512 KB máximo para evitar denegación de servicio en memoria (OOM)
+
+    /**
+     * Verifica que un archivo local en `file://` no apunte al sandbox interno sensible (databases, shared_prefs, bin).
+     */
+    private fun isSafeLocalSiblingFile(context: Context, file: File): Boolean {
+        return try {
+            val canonical = file.canonicalFile.toPath()
+            val dataDir = context.applicationInfo.dataDir?.let { File(it).canonicalFile.toPath() }
+            val filesDir = context.filesDir.canonicalFile.toPath()
+            val cacheDir = context.cacheDir.canonicalFile.toPath()
+
+            if ((dataDir != null && canonical.startsWith(dataDir)) ||
+                canonical.startsWith(filesDir) ||
+                canonical.startsWith(cacheDir)
+            ) {
+                false
+            } else {
+                file.exists() && file.isFile && file.length() in 1..MAX_LYRICS_FILE_BYTES
+            }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     /**
      * Importa un archivo de letras (.lrc o .txt) seleccionado por el usuario desde el almacenamiento del dispositivo.
      */
@@ -469,8 +494,25 @@ object LyricsManager {
         storageManager: AppStorageManager
     ): LyricsState? = withContext(Dispatchers.IO) {
         try {
+            if (!IncomingMediaHandler.isSafeExternalUri(context, uri)) {
+                AuraDebugManager.logWarning("LyricsManager", "Rechazada URI insegura al importar letra: $uri")
+                return@withContext null
+            }
+
             val content = context.contentResolver.openInputStream(uri)?.use { stream ->
-                BufferedReader(InputStreamReader(stream, Charsets.UTF_8)).readText()
+                val buffer = ByteArray(8192)
+                val out = java.io.ByteArrayOutputStream()
+                var totalRead = 0L
+                var n: Int
+                while (stream.read(buffer).also { n = it } != -1) {
+                    totalRead += n
+                    if (totalRead > MAX_LYRICS_FILE_BYTES) {
+                        AuraDebugManager.logWarning("LyricsManager", "Archivo de letras excede el tamaño máximo permitido (512 KB)")
+                        return@withContext null
+                    }
+                    out.write(buffer, 0, n)
+                }
+                out.toString(Charsets.UTF_8.name())
             } ?: return@withContext null
 
             if (content.isNotBlank()) {
@@ -512,8 +554,8 @@ object LyricsManager {
                         val siblingTxt = File(parentDir, "$baseName.txt")
 
                         val fileToRead = when {
-                            siblingLrc.exists() && siblingLrc.length() > 0L -> siblingLrc
-                            siblingTxt.exists() && siblingTxt.length() > 0L -> siblingTxt
+                            isSafeLocalSiblingFile(context, siblingLrc) -> siblingLrc
+                            isSafeLocalSiblingFile(context, siblingTxt) -> siblingTxt
                             else -> null
                         }
 

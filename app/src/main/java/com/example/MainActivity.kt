@@ -41,15 +41,23 @@ class MainActivity : ComponentActivity() {
     private fun handleSafeIncomingIntent(incomingIntent: android.content.Intent?, vm: MusicViewModel) {
         if (incomingIntent == null) return
         try {
+            val incomingAuthToken = incomingIntent.getStringExtra(
+                com.example.widget.AuraMusicWidgetProvider.EXTRA_INTERNAL_AUTH_TOKEN
+            )
+            val isInternalAuthenticated = incomingAuthToken == com.example.widget.AuraMusicWidgetProvider.INTERNAL_IPC_AUTH_TOKEN
+
             val widgetCommand = incomingIntent.getStringExtra(
                 com.example.widget.AuraMusicWidgetProvider.EXTRA_WIDGET_COMMAND
             )
             if (!widgetCommand.isNullOrBlank()) {
                 incomingIntent.removeExtra(com.example.widget.AuraMusicWidgetProvider.EXTRA_WIDGET_COMMAND)
-                when (widgetCommand) {
-                    com.example.widget.AuraMusicWidgetProvider.ACTION_WIDGET_PLAY_PAUSE -> vm.togglePlayPause()
-                    com.example.widget.AuraMusicWidgetProvider.ACTION_WIDGET_NEXT -> vm.playNext()
-                    com.example.widget.AuraMusicWidgetProvider.ACTION_WIDGET_PREV -> vm.playPrevious()
+                incomingIntent.removeExtra(com.example.widget.AuraMusicWidgetProvider.EXTRA_INTERNAL_AUTH_TOKEN)
+                if (isInternalAuthenticated) {
+                    when (widgetCommand) {
+                        com.example.widget.AuraMusicWidgetProvider.ACTION_WIDGET_PLAY_PAUSE -> vm.togglePlayPause()
+                        com.example.widget.AuraMusicWidgetProvider.ACTION_WIDGET_NEXT -> vm.playNext()
+                        com.example.widget.AuraMusicWidgetProvider.ACTION_WIDGET_PREV -> vm.playPrevious()
+                    }
                 }
                 return
             }
@@ -60,7 +68,10 @@ class MainActivity : ComponentActivity() {
             )
             if (downloadedTrackId > 0L) {
                 incomingIntent.removeExtra(com.example.playback.AuraDownloadService.EXTRA_PLAY_DOWNLOADED_TRACK_ID)
-                vm.playDownloadedTrackFromNotification(downloadedTrackId)
+                incomingIntent.removeExtra(com.example.widget.AuraMusicWidgetProvider.EXTRA_INTERNAL_AUTH_TOKEN)
+                if (isInternalAuthenticated) {
+                    vm.playDownloadedTrackFromNotification(downloadedTrackId)
+                }
                 return
             }
 

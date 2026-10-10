@@ -28,11 +28,33 @@ import kotlin.coroutines.resume
  */
 object HeadlessWebViewExtractor {
 
+    private val SAFE_YOUTUBE_ID_REGEX = Regex("^[a-zA-Z0-9_-]{11}$")
+
+    private fun isAllowedYoutubeNavigationHost(host: String?): Boolean {
+        val h = host?.lowercase() ?: return false
+        return h == "youtube.com" ||
+                h.endsWith(".youtube.com") ||
+                h == "googlevideo.com" ||
+                h.endsWith(".googlevideo.com") ||
+                h == "google.com" ||
+                h.endsWith(".google.com") ||
+                h == "ytimg.com" ||
+                h.endsWith(".ytimg.com") ||
+                h == "ggpht.com" ||
+                h.endsWith(".ggpht.com")
+    }
+
     suspend fun resolve(
         context: Context,
         videoId: String,
         originalUrl: String
     ): OnlineVideoAudioImporter.ResolvedMediaInfo? = withContext(Dispatchers.Main) {
+        val cleanVideoId = videoId.trim()
+        if (!SAFE_YOUTUBE_ID_REGEX.matches(cleanVideoId)) {
+            AuraDebugManager.logWarning("HeadlessWebView", "ID de video inválido o potencialmente malicioso rechazado: $videoId")
+            return@withContext null
+        }
+
         // Timeout de 22 segundos para conexiones móviles y carga de DOM
         withTimeoutOrNull(22000L) {
             suspendCancellableCoroutine { continuation ->
@@ -58,7 +80,13 @@ object HeadlessWebViewExtractor {
                     view.settings.apply {
                         javaScriptEnabled = true
                         domStorageEnabled = true
-                        databaseEnabled = true
+                        databaseEnabled = false
+                        allowFileAccess = false
+                        allowContentAccess = false
+                        @Suppress("DEPRECATION")
+                        allowFileAccessFromFileURLs = false
+                        @Suppress("DEPRECATION")
+                        allowUniversalAccessFromFileURLs = false
                         mediaPlaybackRequiresUserGesture = false
                         loadsImagesAutomatically = true
                         blockNetworkImage = false
@@ -71,6 +99,17 @@ object HeadlessWebViewExtractor {
                     var capturedVideoUrl: String? = null
 
                     view.webViewClient = object : WebViewClient() {
+                        override fun shouldOverrideUrlLoading(
+                            view: WebView?,
+                            request: WebResourceRequest?
+                        ): Boolean {
+                            val navUri = request?.url ?: return true
+                            val scheme = navUri.scheme?.lowercase() ?: return true
+                            if (scheme != "https") {
+                                return true
+                            }
+                            return !isAllowedYoutubeNavigationHost(navUri.host)
+                        }
                         override fun shouldInterceptRequest(
                             view: WebView?,
                             request: WebResourceRequest?
@@ -262,7 +301,7 @@ object HeadlessWebViewExtractor {
                     }
 
                     // Carga la versión móvil oficial en lugar de la versión embed
-                    view.loadUrl("https://m.youtube.com/watch?v=$videoId")
+                    view.loadUrl("https://m.youtube.com/watch?v=$cleanVideoId")
 
                 } catch (t: Throwable) {
                     cleanup()

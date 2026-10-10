@@ -1,6 +1,7 @@
 package com.example.ui.components
 
 import android.net.Uri
+import android.view.LayoutInflater
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.compose.animation.core.animateFloatAsState
@@ -19,28 +20,35 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.SeekParameters
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import com.example.R
 import com.example.model.Track
 import com.example.ui.theme.CardBorder
 import java.io.File
 import kotlin.math.abs
 
 /**
- * Componente de reproducción de Video de Fondo (Canvas / Video Sincronizado).
- * 
- * Modos de reproducción:
- * 1. Loop Corto (Canvas <= 10s): Se reproduce en bucle continuo infinito silenciado,
- *    pausándose únicamente si la música se detiene.
- * 2. Video Largo Sincronizado (> 10s): El video se sincroniza milimétricamente con el
- *    tiempo de reproducción de la canción (currentPositionMs) y saltos de búsqueda (seekTo).
+ * Componente de reproducción de Video de Fondo (Canvas / Video Sincronizado) con aceleración GPU sin colisiones.
  *
- * Mantiene la estética Dark Luxury OLED con atenuación y sombras sutiles,
- * eliminando fondos negros o parpadeos mediante precarga de posición y placeholder.
+ * Arquitectura Anti-Lag para Grabación de Pantalla y Multitarea:
+ * 1. Usa TextureView (`app:surface_type="texture_view"`) en lugar de SurfaceView para integrarse directamente
+ *    en el árbol HWUI/Skia de Jetpack Compose, evitando que SurfaceFlinger y el VirtualDisplay del grabador
+ *    de pantalla sufran bloqueos de BufferQueue al aplicar recortes (clip) o transiciones de opacidad (alpha).
+ * 2. Desactiva por completo el renderizador de audio (`C.TRACK_TYPE_AUDIO`) en el reproductor de video de fondo
+ *    para que jamás instancie un segundo decodificador de audio ni compita con el motor DSP C++20 principal.
+ * 3. Habilita `enableDecoderFallback = true` y operación asíncrona de MediaCodec junto con `SeekParameters.CLOSEST_SYNC`
+ *    y ventana de tolerancia de 1850ms con cooldown de 1500ms, erradicando el bucle de micro-seeks que congelaba
+ *    la imagen cuando el grabador de pantalla estaba activo.
  */
 @OptIn(UnstableApi::class)
 @Composable
@@ -93,33 +101,61 @@ fun BackgroundVideoPlayer(
 
     var playerViewRef by remember(videoUriString) { mutableStateOf<PlayerView?>(null) }
 
-    // Instancia de ExoPlayer dedicada a renderizado visual silenciado por videoUriString (usando applicationContext para no filtrar la Activity)
+    // Instancia de ExoPlayer optimizada exclusivamente para renderizado visual por GPU sin colisiones con Screen Recorder
     val videoPlayer = remember(videoUriString) {
-        ExoPlayer.Builder(context.applicationContext).build().apply {
-            volume = 0f // Silenciado: el audio proviene exclusivamente del motor DSP principal
-            repeatMode = if (isVideoLoop) Player.REPEAT_MODE_ALL else Player.REPEAT_MODE_OFF
+        val appCtx = context.applicationContext
 
-            val mediaItem = if (videoUriString.startsWith("content://") || videoUriString.startsWith("file://")) {
-                MediaItem.fromUri(Uri.parse(videoUriString))
-            } else {
-                MediaItem.fromUri(Uri.fromFile(File(videoUriString)))
+        val renderersFactory = DefaultRenderersFactory(appCtx)
+            .setEnableDecoderFallback(true)
+            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF)
+            .experimentalSetMediaCodecAsyncCryptoFlagEnabled(true)
+
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                /* minBufferMs = */ 1500,
+                /* maxBufferMs = */ 5000,
+                /* bufferForPlaybackMs = */ 250,
+                /* bufferForPlaybackAfterRebufferMs = */ 500
+            )
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .build()
+
+        ExoPlayer.Builder(appCtx, renderersFactory)
+            .setLoadControl(loadControl)
+            .build()
+            .apply {
+                // Desactivar por completo las pistas de audio y texto en el reproductor de video
+                // para no abrir ningún decodificador de audio redundante.
+                trackSelectionParameters = TrackSelectionParameters.Builder(appCtx)
+                    .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, true)
+                    .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+                    .build()
+
+                volume = 0f
+                setSeekParameters(SeekParameters.CLOSEST_SYNC)
+                repeatMode = if (isVideoLoop) Player.REPEAT_MODE_ALL else Player.REPEAT_MODE_OFF
+
+                val mediaItem = if (videoUriString.startsWith("content://") || videoUriString.startsWith("file://")) {
+                    MediaItem.fromUri(Uri.parse(videoUriString))
+                } else {
+                    MediaItem.fromUri(Uri.fromFile(File(videoUriString)))
+                }
+                setMediaItem(mediaItem)
+                setPlaybackSpeed(playbackSpeed)
+
+                // Sincronizar posición inicial exacta antes de prepare() para evitar el re-buffering en negro
+                val initialPos = currentPositionFlow?.value ?: currentPositionMs
+                if (!isVideoLoop && initialPos > 0L) {
+                    seekTo(initialPos)
+                }
+
+                addListener(videoListener)
+
+                prepare()
+                if (isPlaying) {
+                    play()
+                }
             }
-            setMediaItem(mediaItem)
-            setPlaybackSpeed(playbackSpeed)
-
-            // Sincronizar posición inicial exacta antes de prepare() para evitar el re-buffering en negro
-            val initialPos = currentPositionFlow?.value ?: currentPositionMs
-            if (!isVideoLoop && initialPos > 0L) {
-                seekTo(initialPos)
-            }
-
-            addListener(videoListener)
-
-            prepare()
-            if (isPlaying) {
-                play()
-            }
-        }
     }
 
     // Sincronizar velocidad de reproducción en tiempo real con la velocidad de la música
@@ -136,13 +172,19 @@ fun BackgroundVideoPlayer(
         }
     }
 
-    // Gestionar sincronización temporal para videos largos (> 10s) sin recomponer el AndroidView cada 200ms
+    // Gestionar sincronización temporal para videos largos (> 10s) con histéresis y cooldown anti-stutter
+    // para que las fluctuaciones del grabador de pantalla nunca disparen un bucle de seekTo() cada segundo
+    var lastSyncSeekWallClockMs by remember(videoUriString) { mutableLongStateOf(0L) }
+
     if (currentPositionFlow != null) {
         LaunchedEffect(currentPositionFlow, isVideoLoop, videoPlayer) {
             if (!isVideoLoop) {
                 currentPositionFlow.collect { posMs ->
+                    val now = android.os.SystemClock.elapsedRealtime()
                     val playerPos = videoPlayer.currentPosition
-                    if (abs(playerPos - posMs) > 850L) {
+                    val driftMs = abs(playerPos - posMs)
+                    if (driftMs > 1850L && (now - lastSyncSeekWallClockMs) > 1500L && videoPlayer.playbackState == Player.STATE_READY) {
+                        lastSyncSeekWallClockMs = now
                         videoPlayer.seekTo(posMs)
                     }
                 }
@@ -151,15 +193,18 @@ fun BackgroundVideoPlayer(
     } else {
         LaunchedEffect(currentPositionMs, isVideoLoop, videoPlayer) {
             if (!isVideoLoop) {
+                val now = android.os.SystemClock.elapsedRealtime()
                 val playerPos = videoPlayer.currentPosition
-                if (abs(playerPos - currentPositionMs) > 850L) {
+                val driftMs = abs(playerPos - currentPositionMs)
+                if (driftMs > 1850L && (now - lastSyncSeekWallClockMs) > 1500L && videoPlayer.playbackState == Player.STATE_READY) {
+                    lastSyncSeekWallClockMs = now
                     videoPlayer.seekTo(currentPositionMs)
                 }
             }
         }
     }
 
-    // Liberación estricta de recursos de códec, Surface y referencias de vista al cambiar de video o desmontar
+    // Liberación estricta de recursos de códec, SurfaceTexture y referencias de vista al cambiar de video o desmontar
     DisposableEffect(videoPlayer) {
         onDispose {
             try {
@@ -176,7 +221,7 @@ fun BackgroundVideoPlayer(
 
     val videoAlpha by animateFloatAsState(
         targetValue = if (isFirstFrameRendered) 1f else 0f,
-        animationSpec = tween(280),
+        animationSpec = tween(240),
         label = "VideoFadeInAlpha"
     )
 
@@ -204,10 +249,10 @@ fun BackgroundVideoPlayer(
             )
         }
 
-        // Capa 2: Reproductor de video con obturador transparente, actualización reactiva y fade-in suave
+        // Capa 2: Reproductor de video sobre TextureView acelerado por GPU, sin perforar SurfaceFlinger
         AndroidView(
             factory = { ctx ->
-                PlayerView(ctx).apply {
+                (LayoutInflater.from(ctx).inflate(R.layout.aura_background_video_player, null, false) as PlayerView).apply {
                     playerViewRef = this
                     player = videoPlayer
                     useController = false

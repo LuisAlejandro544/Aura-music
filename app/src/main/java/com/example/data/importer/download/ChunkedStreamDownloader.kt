@@ -1,11 +1,15 @@
 package com.example.data.importer.download
 
+import android.net.Uri
 import com.example.debug.AuraDebugManager
 import com.example.model.DownloadProgress
+import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
+import java.net.InetAddress
 import java.util.concurrent.TimeUnit
 
 /**
@@ -16,14 +20,94 @@ import java.util.concurrent.TimeUnit
  *   eliminando por completo la limitación artificial de ~63 KB/s de YouTube.
  * - Descarga lineal continua de respaldo con reintentos limpios en HTTP 403.
  * - Sonda de tamaño total y emisión fluida de métricas de progreso (bytes/s, porcentaje, fase).
+ * - Protección anti-SSRF / anti-DNS Rebinding y validación estricta de dominios para cookies.
  */
 object ChunkedStreamDownloader {
+
+    /**
+     * Verifica que un host o URL no apunte a direcciones privadas, loopback o link-local (RFC1918 / RFC3927).
+     */
+    fun isSafePublicUrl(rawUrl: String): Boolean {
+        return try {
+            val uri = Uri.parse(rawUrl.trim())
+            val scheme = uri.scheme?.lowercase() ?: return false
+            if (scheme != "https" && scheme != "http") return false
+            val host = uri.host?.lowercase() ?: return false
+            if (isDisallowedLocalHostName(host)) return false
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun isDisallowedLocalHostName(host: String): Boolean {
+        val h = host.trim().lowercase()
+        if (h.isEmpty()) return true
+        if (h == "localhost" ||
+            h.endsWith(".local") ||
+            h.endsWith(".internal") ||
+            h.endsWith(".lan") ||
+            h == "0.0.0.0" ||
+            h.startsWith("127.") ||
+            h.startsWith("10.") ||
+            h.startsWith("192.168.") ||
+            h.startsWith("169.254.") ||
+            h.startsWith("[::1]") ||
+            h == "::1" ||
+            Regex("^172\\.(1[6-9]|2[0-9]|3[0-1])\\..*").matches(h)
+        ) {
+            return true
+        }
+        return false
+    }
+
+    /**
+     * Verifica estrictamente si el host real parseado pertenece a YouTube o GoogleVideo
+     * (evita ataques de substring como `https://attacker.com/?q=googlevideo.com`).
+     */
+    private fun isTrustedYoutubeOrGoogleVideoHost(rawUrl: String): Boolean {
+        return try {
+            val host = Uri.parse(rawUrl.trim()).host?.lowercase() ?: return false
+            host == "youtube.com" ||
+                host.endsWith(".youtube.com") ||
+                host == "googlevideo.com" ||
+                host.endsWith(".googlevideo.com")
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private val ssrfGuardInterceptor = Interceptor { chain ->
+        val request = chain.request()
+        val urlHost = request.url.host.lowercase()
+        if (isDisallowedLocalHostName(urlHost)) {
+            throw IOException("Bloqueado acceso de red hacia host local o privado no autorizado: $urlHost")
+        }
+        val resolvedAddresses = try {
+            InetAddress.getAllByName(urlHost)
+        } catch (_: Exception) {
+            emptyArray()
+        }
+        for (addr in resolvedAddresses) {
+            if (addr.isLoopbackAddress ||
+                addr.isSiteLocalAddress ||
+                addr.isLinkLocalAddress ||
+                addr.isAnyLocalAddress ||
+                addr.isMulticastAddress
+            ) {
+                throw IOException("Bloqueado intento de conexión SSRF / DNS Rebinding hacia IP interna: ${addr.hostAddress}")
+            }
+        }
+        chain.proceed(request)
+    }
 
     val defaultHttpClient: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
         .followRedirects(true)
         .followSslRedirects(true)
+        .addInterceptor(ssrfGuardInterceptor)
+        .addNetworkInterceptor(ssrfGuardInterceptor)
         .build()
 
     fun downloadUrlToFile(
@@ -34,7 +118,12 @@ object ChunkedStreamDownloader {
         httpClient: OkHttpClient = defaultHttpClient,
         onProgress: (DownloadProgress) -> Unit
     ): Boolean {
-        val isYoutubeStream = url.contains("googlevideo.com") || url.contains("youtube.com")
+        if (!isSafePublicUrl(url)) {
+            AuraDebugManager.logWarning("Downloader", "Rechazada URL insegura o local: $url")
+            return false
+        }
+
+        val isYoutubeStream = isTrustedYoutubeOrGoogleVideoHost(url)
 
         // 1. Si la URL contiene rangos parciales (&range=0-...), probar primero sin rango para descargar el archivo completo
         val cleanUrl = if (isYoutubeStream && url.contains("&range=")) {
@@ -69,13 +158,20 @@ object ChunkedStreamDownloader {
         httpClient: OkHttpClient,
         onProgress: (DownloadProgress) -> Unit
     ): Boolean {
-        val cleanUrl = if (url.contains("googlevideo.com")) {
+        val isGoogleVideoHost = try {
+            val h = Uri.parse(url).host?.lowercase() ?: ""
+            h == "googlevideo.com" || h.endsWith(".googlevideo.com")
+        } catch (_: Exception) {
+            false
+        }
+
+        val cleanUrl = if (isGoogleVideoHost) {
             url.replace(Regex("""&range=\d+-\d+"""), "")
                 .replace(Regex("""\?range=\d+-\d+&"""), "?")
         } else url
 
         // 1. Acelerador de descarga por bloques HTTP Range (evita el estrangulamiento de 63 KB/s de YouTube)
-        if (cleanUrl.contains("googlevideo.com")) {
+        if (isGoogleVideoHost) {
             val chunkedSuccess = executeChunkedDownload(cleanUrl, targetFile, phase, customHeaders, httpClient, onProgress)
             if (chunkedSuccess && targetFile.exists() && targetFile.length() > 0L) {
                 return true
@@ -99,7 +195,7 @@ object ChunkedStreamDownloader {
                 }
             }
 
-            if (isYoutubeStream || cleanUrl.contains("googlevideo.com")) {
+            if (isYoutubeStream && isTrustedYoutubeOrGoogleVideoHost(cleanUrl)) {
                 if (customHeaders.isEmpty()) {
                     reqBuilder.header("Referer", "https://m.youtube.com/")
                 }

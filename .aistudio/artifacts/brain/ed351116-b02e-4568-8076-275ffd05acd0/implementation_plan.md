@@ -1,116 +1,100 @@
-# Plan de Optimización de Alto Impacto en Rendimiento (Aura Music)
+# Auditoría de Seguridad y Plan de Remediación de Vulnerabilidades — Aura Music 🛡️
 
-Este plan ataca y elimina los cuellos de botella de mayor consumo de CPU, GPU e hilo principal detectados en el código de **Aura Music**, logrando que la reproducción con Video Canvas, la navegación entre pantallas, el desplazamiento por listas largas y el motor de audio C++20 funcionen a máxima fluidez (60/120 FPS estables) sin alterar el diseño ni la estética visual de la aplicación.
+Siguiendo la **Fase 04 (El Crítico - Code Review & Seguridad)** del protocolo de ingeniería de **Aura Music**, he auditado de principio a fin las capas de red, IPC (comunicación entre procesos de Android), motores de extracción, sistema de archivos y lanzadores nativos C/C++20.
 
----
-
-## User Review & Critical Decisions
-
-> [!IMPORTANT]
-> **Decisiones confirmadas por el usuario en la Fase 1:**
-> - **Prioridad de impacto máximo ("El que esté quitando mucho rendimiento")**: Se abordarán de forma integral los cuellos de botella críticos que más lastran el hilo principal y el hilo de audio: el aislamiento de `currentPositionMs` (que actualmente recompone toda la aplicación 5 veces por segundo), la eliminación de bloqueos de disco y escaneo píxel por píxel durante el scroll de carátulas, y el camino rápido (*Fast-Path*) en el motor C++20 DSP.
-> - **Recorte único de franjas negras al guardar en WebP**: El recorte de bandas negras (*Deletterbox*) se ejecutará **una única vez** en segundo plano (`Dispatchers.IO`) en el momento de guardar la carátula `.webp` en `AppStorageManager.saveCoverAsWebp` (además de `MediaAssetProcessor`), eliminando por completo la transformación por píxeles en tiempo real de Coil y las llamadas síncronas a `File.exists()` en el hilo principal al hacer scroll.
+Tal como solicitaste, **se mantiene intacto el comportamiento actual de `SHA256SUMS.txt` en `AppReleaseUpdater`** (opcional cuando el Release aún no lo adjunta), y se corrigen todas las demás vulnerabilidades **Críticas, Altas y Medias** sin restar rendimiento ni alterar ninguna función ni el diseño de la aplicación.
 
 ---
 
-## 1. Overview & Core Concept
+## 🔍 Diagnóstico de las 7 Vulnerabilidades Detectadas y Cómo Arreglarlas
 
-- **Qué hace esta optimización**:
-  1. **Aislamiento de `currentPositionMs` (Fin de las recomposiciones globales a 5 Hz)**: Actualmente, `AuraMusicAppContent` recolecta `currentPosition` en la raíz de la aplicación. Como cambia cada 200 ms mientras suena una canción, fuerza a Jetpack Compose a re-evaluar `AuraMusicAppContent`, `MiniPlayer` y `NowPlayingScreen` 5 veces por segundo. Al pasar `currentPositionFlow: StateFlow<Long>` directamente a las barras de progreso y visores de letras sincronizadas, el resto de la interfaz deja de recomponerse en cada tic del reloj.
-  2. **Scroll Instantáneo de Carátulas (`ArtworkImage` + WebP Pre-Recortado)**: Se elimina `DeletterboxTransformation` en tiempo real y el chequeo bloqueante `File(artPath).exists()` en el hilo principal dentro de `ArtworkImage`. El recorte de franjas negras se realiza una sola vez al persistir el archivo WebP en `AppStorageManager`, permitiendo que Coil sirva las portadas directamente desde su caché de memoria/disco a 120 FPS.
-  3. **Búsqueda Binaria $O(\log n)$ y `derivedStateOf` en Letras Karaoke**: En `NowPlayingLyricsCard` y `FullScreenLyricsScreen`, el cálculo de la frase activa (`activeIndex`) pasará de recalcularse en cada actualización de milisegundos a usar búsqueda binaria y `derivedStateOf`, disparando recomposiciones **únicamente cuando cambia el verso activo** (cada 3–6 segundos en lugar de 5 veces por segundo).
-  4. **Fast-Path en el Bucle de Audio Nativo C++20 (`processPcm16`)**: Cuando ningún efecto modificador de señal está activo o cuando el usuario escucha con la pantalla apagada/minimizada, el motor C++20 aplicará un camino rápido evitando conversiones innecesarias de muestras y cálculos trigonométricos por bloque PCM.
-  5. **Claves Estables (`key`) en Listas de Inicio**: Se añaden claves únicas (`key = { it.id }`) en los carruseles y listas de `HomeScreen` para que Compose recicle las tarjetas sin reconstruirlas al actualizar favoritos o contadores de reproducción.
-
-- **Valor Clave para el Usuario**:
-  - **Cero tirones (Jank-Free)** al usar el reproductor, hacer scroll rápido por la biblioteca o grabar la pantalla con Video Canvas activo.
-  - **Menor calentamiento y ahorro de batería** al reducir drásticamente el trabajo innecesario de CPU/GPU en cada segundo de reproducción.
-
----
-
-## 2. User Experience & Visual Design
-
-- **Identidad Visual Intacta**:
-  - Se conserva al **100%** la estética **Dark Luxury Neo-Glass OLED**, los modos de diseño (Clásico, Cinemático y Automático), las animaciones de color y todos los controles actuales. Ningún icono, color ni disposición de pantalla cambia.
-- **Mejora Perceptible en la Experiencia**:
-  - **Desplazamiento de Biblioteca y Cola ("Up Next")**: Las listas de canciones, álbumes y cola cargan sus miniaturas WebP de inmediato sin micro-pausas de lectura de disco.
-  - **Reproductor Now Playing & MiniPlayer**: La barra de progreso ("bolita") y las letras Karaoke avanzan con total suavidad mientras el video de fondo, la carátula y los botones permanecen estáticos en la GPU sin recomponerse innecesariamente.
+### 1. [ALTA] Exposición de Archivos Locales en `HeadlessWebViewExtractor` (`file://` / `content://` Access)
+* **Dónde ocurre**: `app/src/main/java/com/example/data/importer/extractors/HeadlessWebViewExtractor.kt` (líneas 58–67 y 265).
+* **Por qué es vulnerable**:
+  - Aunque la versión de Android establece valores por defecto según el SDK, `WebSettings` tiene `javaScriptEnabled = true` y `domStorageEnabled = true`, pero **no deshabilita explícitamente** `allowFileAccess`, `allowContentAccess`, `allowFileAccessFromFileURLs` ni `allowUniversalAccessFromFileURLs`.
+  - Además, `videoId` se interpola directamente en `https://m.youtube.com/watch?v=$videoId` sin verificar con expresión regular estricta (`^[a-zA-Z0-9_-]{11}$`) dentro de `HeadlessWebViewExtractor.resolve()`, y el `WebViewClient` no bloquea navegaciones/redirecciones hacia esquemas `file://`, `content://` o `javascript:`.
+* **Cómo se arregla**:
+  - Desactivar explícitamente `allowFileAccess = false` y `allowContentAccess = false` en `WebSettings`.
+  - Validar `videoId` con `Regex("^[a-zA-Z0-9_-]{11}$")` antes de construir la URL.
+  - Implementar `shouldOverrideUrlLoading` en el `WebViewClient` para permitir exclusivamente esquemas `https://` hacia dominios legítimos de YouTube/Google.
 
 ---
 
-## 3. Key Product Decisions & Trade-Offs
-
-- **Decisión 1: Pasar `StateFlow<Long>` para la posición de reproducción en lugar de un `Long` primitivo en los contenedores padres**
-  - *Enfoque elegido*: Recolectar `currentPositionFlow` exclusivamente dentro de los componentes hoja que realmente dependen del tiempo: el indicador de progreso de `MiniPlayer`, el slider de tiempo de `NowPlayingScreen` / `NowPlayingCinematicLayout`, y los visores de letras `NowPlayingLyricsCard` / `FullScreenLyricsScreen`.
-  - *Por qué*: En Jetpack Compose, leer un `State<Long>` que cambia cada 200 ms en el Composable raíz invalida todo el ámbito de composición superior. Aislar la lectura en los nodos hoja reduce el costo de composición en más de un **85%** durante la reproducción.
-
-- **Decisión 2: Recorte de bandas negras (*Deletterbox*) en el guardado WebP (`AppStorageManager`) en vez de `Coil Transformation` en cada renderizado**
-  - *Enfoque elegido*: Aplicar `MediaAssetProcessor.removeHorizontalLetterboxBars(bitmap)` dentro de `AppStorageManager.saveCoverAsWebp` (en `Dispatchers.IO`) y eliminar `DeletterboxTransformation` y `File(artPath).exists()` de `ArtworkImage`.
-  - *Por qué*: Recortar una sola vez al importar o descargar la carátula cuesta 0 ms durante el uso diario de la app y permite que Coil utilice su caché de bitmaps sin ejecutar `Bitmap.getPixel` ni bloqueos de sistema de archivos (`stat`) en el hilo principal.
-
-- **Decisión 3: Optimización del Bucle PCM en C++20 (`NativeDspEngine::processPcm16`)**
-  - *Enfoque elegido*: Evaluar antes del bucle `for` si existe algún procesador acústico activo (`anyDspActive`) y precalcular los pesos trigonométricos de las 28 bandas espectrales en una tabla constante (`constexpr` / precalculada) en lugar de llamar a `std::sin` 28 veces en cada buffer de audio.
-  - *Por qué*: El hilo de audio de Media3/AAudio es de tiempo real estricto; ahorrar operaciones en coma flotante y ramificaciones dentro del bucle de muestras evita *underruns* y reduce el uso de CPU en segundo plano.
+### 2. [ALTA] Fuga de Cookies y SSRF por Redirección HTTP en `ChunkedStreamDownloader` y `OnlineVideoAudioImporter`
+* **Dónde ocurre**:
+  - `app/src/main/java/com/example/data/importer/download/ChunkedStreamDownloader.kt` (líneas 22–27 y 102–112).
+  - `app/src/main/java/com/example/data/importer/extractors/OnlineVideoAudioImporter.kt` (líneas 68–85).
+* **Por qué es vulnerable**:
+  1. **Bypass de validación de host por substring**: En `ChunkedStreamDownloader.kt`, la condición `url.contains("googlevideo.com") || url.contains("youtube.com")` puede ser engañada con una URL maliciosa tipo `https://attacker.com/?q=googlevideo.com`. Si un usuario comparte un enlace directo manipulado, el descargador **adjuntaría las cookies del `CookieManager` de `https://m.youtube.com` y las enviaría al servidor externo**.
+  2. **SSRF / Redirección hacia red local (LAN / Loopback)**: `OnlineVideoAudioImporter` acepta cualquier enlace terminado en `.mp4/.m4a/.mp3/.webm` sin pasar por un filtro anti-IP privada (`127.0.0.1`, `192.168.x.x`, `10.x.x.x`, `169.254.x.x`, `localhost`), y `OkHttpClient` sigue redirecciones automáticamente (`followRedirects(true)`) sin un interceptor que verifique que el destino redirigido no apunte a una IP privada/local (DNS Rebinding / Open Redirect a LAN).
+* **Cómo se arregla**:
+  - Verificar el **host real parseado (`Uri.parse(url).host`)** (que sea exactamente `youtube.com`, `.youtube.com` o `.googlevideo.com`) antes de adjuntar cabeceras `Cookie` o `Referer`.
+  - Añadir un validador de red segura (`NetworkSecurityValidator`) e interceptor en `ChunkedStreamDownloader.defaultHttpClient` que bloquee cualquier petición o redirección hacia direcciones loopback, link-local o rangos privados RFC1918 (`127.0.0.0/8`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `169.254.0.0/16`, `::1`), garantizando 0 ms de sobrecarga en descargas reales.
 
 ---
 
-## 4. Technical Architecture & Data Strategy *(Technical Reference)*
+### 3. [MEDIA-ALTA] Inyección de Ruta / Path Traversal en el Slug de Repositorio (`AppReleaseUpdater`)
+* **Dónde ocurre**: `app/src/main/java/com/example/data/updater/AppReleaseUpdater.kt` (líneas 206–219 y 262).
+* **Por qué es vulnerable**:
+  - `normalizeRepoSlug(input)` divide por `/` y toma `parts[0]/parts[1]`, pero no valida que `owner` y `repo` contengan únicamente caracteres válidos de GitHub (`[a-zA-Z0-9._-]`) ni bloquea secuencias `..` o parámetros de query/fragmento (`?`, `#`, `%`).
+  - Al construir `URL("https://api.github.com/repos/$repoSlug/releases?per_page=15")`, un slug manipulado con `..` o `?` permitiría consultar otros endpoints arbitrarios dentro de `api.github.com`.
+  - Nota: **Se preserva intacta la lógica actual de `SHA256SUMS.txt` opcional** tal como indicaste.
+* **Cómo se arregla**:
+  - Validar en `normalizeRepoSlug` que tanto `owner` como `repo` cumplan estrictamente el patrón `^[a-zA-Z0-9._-]+$` y no sean `.` ni `..`.
 
-### Diagrama de Arquitectura Reactiva Sin Recomposiciones Globales
+---
 
-```
-┌───────────────────────────────────────────────────────────────────────────┐
-│                         MusicViewModel (StateFlows)                       │
-│  • currentPosition: StateFlow<Long> (200ms)                               │
-│  • visualizerBands: StateFlow<FloatArray> (30fps solo en Modo Clásico)    │
-│  • audioIntensity:  StateFlow<Float>                                      │
-└───────────────────┬───────────────────────────────────┬───────────────────┘
-                    │ (Se pasan como Flow sin recolectar)│
-                    ▼                                   ▼
-┌───────────────────────────────────────┐ ┌─────────────────────────────────┐
-│         AuraMusicAppContent           │ │         NowPlayingScreen        │
-│  (0 recomposiciones por segundo)      │ │ (0 recomposiciones de layout/s) │
-└───────────────────┬───────────────────┘ └──────┬──────────────┬───────────┘
-                    │                            │              │
-                    ▼                            ▼              ▼
-       ┌─────────────────────────┐   ┌────────────────┐ ┌───────────────────┐
-       │ MiniPlayerProgressBar   │   │ SeekBar / Time │ │ Lyrics ActiveLine │
-       │ (Solo recompone 2dp bar)│   │ (Aislado)      │ │ (derivedStateOf)  │
-       └─────────────────────────┘   └────────────────┘ └───────────────────┘
-```
+### 4. [MEDIA] Control No Autorizado de Sesión Multimedia y Comandos Falsificados en `AuraMediaPlaybackService`, `MainActivity` y `AuraMusicWidgetProvider`
+* **Dónde ocurre**:
+  - `app/src/main/java/com/example/playback/AuraMediaPlaybackService.kt` (líneas 58–64).
+  - `app/src/main/java/com/example/MainActivity.kt` (líneas 44–65).
+* **Por qué es vulnerable**:
+  1. `AuraMediaPlaybackService` está exportado (`android:exported="true"`) para permitir Android Auto y System Media Controls, pero `onGetSession(controllerInfo: MediaSession.ControllerInfo)` devuelve la `MediaSession` activa a **cualquier paquete de terceros sin verificar** si el llamador es el propio paquete de la app, el sistema Android (`android`, `com.android.systemui`), el controlador de medios o Android Auto.
+  2. `MainActivity` (también exportada) procesa `EXTRA_PLAY_DOWNLOADED_TRACK_ID` y `EXTRA_WIDGET_COMMAND` desde cualquier `Intent` externo sin distinguir si la acción vino de una notificación/widget legítimo o de una app externa que fuerza la reproducción de cualquier ID.
+* **Cómo se arregla**:
+  - En `AuraMediaPlaybackService.onGetSession()`, permitir conexiones de la propia app, de clientes de confianza del sistema (`isTrusted` / UID de sistema / SystemUI / Bluetooth / Android Auto / Launcher) y rechazar apps de terceros desconocidas sin permisos.
+  - En `AuraMusicWidgetProvider` y `AuraDownloadService`, adjuntar un token de sesión en memoria de proceso (`internalAuthToken`) a los `PendingIntent` internos para que `MainActivity` verifique que los comandos `EXTRA_WIDGET_COMMAND` y `EXTRA_PLAY_DOWNLOADED_TRACK_ID` provienen exclusivamente de la propia instancia de Aura Music.
 
-### Flujo de Guardado y Renderizado de Carátulas WebP
+---
 
-```
-[Importación SAF / Video a Música / Descarga Web / Edición de Carátula]
-                                  │
-                                  ▼ (Dispatchers.IO)
-        ┌───────────────────────────────────────────────────┐
-        │         AppStorageManager.saveCoverAsWebp         │
-        │  1. removeHorizontalLetterboxBars(bitmap)         │
-        │  2. Compresión WebP Lossless -> disco (images/)   │
-        └─────────────────────────┬─────────────────────────┘
-                                  │
-                                  ▼ (UI Thread - 0 bloqueos I/O)
-        ┌───────────────────────────────────────────────────┐
-        │                   ArtworkImage                    │
-        │  • Sin File.exists() síncrono en Main Thread      │
-        │  • Sin DeletterboxTransformation por frame        │
-        │  • Caché directa de Coil en RAM y Disco           │
-        └───────────────────────────────────────────────────┘
-```
+### 5. [MEDIA] Lectura de Archivos Internos mediante `Track.uriString` / Archivos Hermanos en `MixtapeEngine` y `LyricsManager`
+* **Dónde ocurre**:
+  - `app/src/main/java/com/example/data/importer/mixtape/MixtapeEngine.kt` (líneas 215–229).
+  - `app/src/main/java/com/example/data/importer/lyrics/LyricsManager.kt` (líneas 504–529 y 465–485).
+* **Por qué es vulnerable**:
+  - En `LyricsManager.importLyricsFromUri`, se abre el `uri` directamente con `contentResolver.openInputStream(uri)` sin pasar primero por `IncomingMediaHandler.isSafeExternalUri(context, uri)` y sin límite de tamaño (un archivo gigante podría causar un `OutOfMemoryError` al hacer `.readText()`).
+  - En `LyricsManager.autoDetectAndAssociateLyrics` y `MixtapeEngine.prepareAudioInputFile`, cuando una pista tiene esquema `file://`, no se verifica que la ruta canónica del archivo (o de su `.lrc`/`.txt` hermano) pertenezca a las carpetas permitidas (`songs/`, almacenamiento externo compartido) y no apunte mediante un symlink a bases de datos privadas (`databases/`, `shared_prefs/`).
+* **Cómo se arregla**:
+  - Validar `IncomingMediaHandler.isSafeExternalUri(context, uri)` en `LyricsManager.importLyricsFromUri` y limitar la lectura de archivos `.lrc`/`.txt` a un máximo seguro de 512 KB.
+  - Verificar rutas canónicas (`canonicalFile`) en `LyricsManager` y `MixtapeEngine` para bloquear el acceso a `databases/`, `shared_prefs/` y `files/bin/`.
 
-### Mapeo de Componentes e Interacciones a Optimizar
+---
 
-1. **Aislamiento de `currentPositionFlow`**:
-   - `AuraMusicAppContent`: Deja de recolectar `currentPosition` en la raíz; pasa `currentPositionFlow = viewModel.currentPosition` a `MiniPlayer` y `NowPlayingScreen`.
-   - `MiniPlayer`: Extrae la barra de progreso lineal inferior a un micro-componente `MiniPlayerLinearProgress` que recolecta `currentPositionFlow` localmente sin recomponer la miniatura, el video ni el texto con marquesina.
-   - `NowPlayingScreen` y `NowPlayingCinematicLayout`: Aíslan la lectura de `currentPositionFlow` en la barra de progreso/tiempo y en los visores de letras (`NowPlayingLyricsCard`, `FullScreenLyricsScreen`, y la línea flotante de Karaoke cinemático).
-2. **Optimización de Letras Sincronizadas**:
-   - `NowPlayingLyricsCard` y `FullScreenLyricsScreen`: Utilizan búsqueda binaria sobre `lyricsState.lines` envuelta en `remember { derivedStateOf { ... } }` para que la lista `LazyColumn` solo se recomponga y haga auto-scroll cuando cambie el índice de la línea activa (`activeIndex`).
-3. **Carátulas WebP y Listas**:
-   - `AppStorageManager`: Aplica `MediaAssetProcessor.removeHorizontalLetterboxBars` antes de comprimir cualquier carátula a WebP.
-   - `ArtworkImage`: Elimina `DeletterboxTransformation` y `File.exists()` en el hilo principal, usando `remember(artPath)` en el `ImageRequest` con fallback automático a `ProceduralArtwork` si Coil reporta error de carga.
-   - `HomeScreen`: Añade `key = { it.id }` en `LazyRow` ("Recientes para ti") y en `LazyColumn` ("Populares en tu biblioteca").
-4. **Motor Nativo C++20 (`auramusic_dsp.h`)**:
-   - Precalcula la tabla de pesos senoidales de las 28 bandas espectrales y añade un *fast-path* limpio en `processPcm16` cuando todos los filtros modificadores están desactivados (`!anyDspActive`).
+### 6. [MEDIA] Validación de Bibliotecas en `FFMPEG_LIB_DIR` y `LD_LIBRARY_PATH` en Lanzadores Nativos C (`native_ffmpeg_launcher.c`)
+* **Dónde ocurre**: `app/src/main/cpp/native_ffmpeg_launcher.c` (líneas 42–56).
+* **Por qué es vulnerable**:
+  - `try_dlopen_in_dir` lee la variable de entorno `FFMPEG_LIB_DIR` y construye `snprintf(full_path, sizeof(full_path), "%s/%s", env_dir, lib_name)` sin validar que `env_dir` sea una ruta absoluta limpia libre de `..` (Path Traversal) ni verificar que el archivo no sea escribible por otros usuarios (`S_IWOTH`) antes de hacer `dlopen()`.
+* **Cómo se arregla**:
+  - Añadir validación en C (`stat()` y chequeo de ruta absoluta sin `..` ni permisos `S_IWOTH`) tanto en `native_ffmpeg_launcher.c` como en `native_python_launcher.c` antes de invocar `dlopen()`.
+
+---
+
+### 7. [BAJA-MEDIA] Respaldo de Resguardo en `allowBackup` para Archivos Ejecutables y Preferencias Internas
+* **Dónde ocurre**: `app/src/main/res/xml/backup_rules.xml` y `app/src/main/res/xml/data_extraction_rules.xml`.
+* **Por qué es vulnerable**:
+  - `android:allowBackup="true"` está habilitado en el `AndroidManifest.xml`. Si las reglas de extracción/backup incluyen la carpeta `files/bin/` o `files/env/`, un respaldo ADB o transferencia de dispositivo podría extraer o inyectar binarios OTA (`yt-dlp`) o entornos Python entre dispositivos con distintas firmas/arquitecturas.
+* **Cómo se arregla**:
+  - Excluir explícitamente `bin/` y `env/` en `backup_rules.xml` y `data_extraction_rules.xml`, conservando el respaldo de las preferencias del usuario y base de datos musical.
+
+---
+
+## 🛠️ Archivos que se Modificarán
+
+1. `app/src/main/java/com/example/data/importer/extractors/HeadlessWebViewExtractor.kt`: Blindaje de `WebSettings`, validación estricta de `videoId` y `shouldOverrideUrlLoading`.
+2. `app/src/main/java/com/example/data/importer/download/ChunkedStreamDownloader.kt`: Validación estricta del host parseado para envío de cookies, bloqueo de IPs privadas/loopback (anti-SSRF y anti-DNS Rebinding en redirecciones).
+3. `app/src/main/java/com/example/data/importer/extractors/OnlineVideoAudioImporter.kt`: Validación de URLs directas contra rangos internos/loopback.
+4. `app/src/main/java/com/example/data/updater/AppReleaseUpdater.kt`: Sanitización estricta de `normalizeRepoSlug` contra Path Traversal / Query Injection (manteniendo intacta la lógica actual de `SHA256SUMS.txt`).
+5. `app/src/main/java/com/example/playback/AuraMediaPlaybackService.kt`, `AuraMusicWidgetProvider.kt`, `AuraDownloadService.kt` y `MainActivity.kt`: Validación de llamadores IPC y token de autenticidad interno para intents de control/reproducción.
+6. `app/src/main/java/com/example/data/importer/lyrics/LyricsManager.kt` y `app/src/main/java/com/example/data/importer/mixtape/MixtapeEngine.kt`: Validación canónica de rutas y límite de tamaño en lectura de letras.
+7. `app/src/main/cpp/native_ffmpeg_launcher.c` y `app/src/main/cpp/native_python_launcher.c`: Verificación de rutas seguras y permisos con `stat()` antes de `dlopen()`.
+8. `app/src/main/res/xml/backup_rules.xml` y `app/src/main/res/xml/data_extraction_rules.xml`: Exclusión de `bin/` y `env/` en respaldos del sistema.
