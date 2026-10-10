@@ -25,3 +25,5 @@ app/src/main/jniLibs/**/*.zip.so
 app/src/main/assets/bin/*
 !app/src/main/assets/bin/.gitkeep
 !app/src/main/jniLibs/**/.gitkeep
+.idea/
+.idea/

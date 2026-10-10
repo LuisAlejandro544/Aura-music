@@ -4,11 +4,12 @@ import android.content.Context
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.OpenableColumns
+import com.example.data.storage.AppStorageManager
 import com.example.model.Track
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.File
-import java.io.FileOutputStream
+import java.util.Locale
+import kotlin.math.abs
 
 /**
  * Analizador de metadatos de audio local.
@@ -58,7 +59,6 @@ object AudioMetadataParser {
                     )
                 }
 
-                // Extraer nombre de archivo por si el título está vacío
                 val fileName = rawFileName
 
                 val title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
@@ -82,10 +82,11 @@ object AudioMetadataParser {
                     ?: "audio/mpeg"
 
                 // Extraer portada incrustada si existe y comprimir a WebP sin pérdida
-                val storageManager = com.example.data.storage.AppStorageManager(context)
+                val storageManager = AppStorageManager(context)
                 val embeddedArt = retriever.embeddedPicture
                 val albumArtPath = if (embeddedArt != null && embeddedArt.isNotEmpty()) {
-                    val webpFile = storageManager.saveCoverBytesAsWebp("${effectiveUri.toString().hashCode()}", embeddedArt)
+                    val coverKey = abs(effectiveUri.toString().hashCode()).toString()
+                    val webpFile = storageManager.saveCoverBytesAsWebp(coverKey, embeddedArt)
                     webpFile?.absolutePath
                 } else null
 
@@ -113,21 +114,21 @@ object AudioMetadataParser {
             } finally {
                 try {
                     retriever.release()
-                } catch (ignored: Exception) {}
+                } catch (_: Exception) {}
             }
         }
-
 
     fun getFileName(context: Context, uri: Uri): String? {
         if (uri.scheme == "content") {
             try {
-                context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                val projection = arrayOf(OpenableColumns.DISPLAY_NAME)
+                context.contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
                     val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
                     if (nameIndex != -1 && cursor.moveToFirst()) {
                         return cursor.getString(nameIndex)
                     }
                 }
-            } catch (ignored: Exception) {}
+            } catch (_: Exception) {}
         }
         return uri.lastPathSegment
     }
@@ -139,17 +140,20 @@ object AudioMetadataParser {
 
     private fun getFileSizeFormatted(context: Context, uri: Uri): String {
         try {
-            context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+            val projection = arrayOf(OpenableColumns.SIZE)
+            context.contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
                 val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
                 if (sizeIndex != -1 && cursor.moveToFirst()) {
                     val bytes = cursor.getLong(sizeIndex)
                     if (bytes > 0) {
-                        val mb = bytes / (1024f * 1024f)
-                        return String.format("%.1f MB", mb)
+                        return when {
+                            bytes < 1024 * 1024 -> String.format(Locale.US, "%.0f KB", bytes / 1024f)
+                            else -> String.format(Locale.US, "%.1f MB", bytes / (1024f * 1024f))
+                        }
                     }
                 }
             }
-        } catch (ignored: Exception) {}
+        } catch (_: Exception) {}
         return ""
     }
 }

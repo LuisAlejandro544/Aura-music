@@ -10,6 +10,7 @@ import com.example.data.importer.FFmpegNativeEngine
 import com.example.data.importer.IncomingMediaHandler
 import com.example.data.importer.LyricsManager
 import com.example.data.importer.SampleMusicGenerator
+import com.example.data.importer.SpecialAudioFormatDecoder
 import com.example.data.importer.VideoAudioExtractor
 import com.example.data.local.dao.TrackDao
 import com.example.data.local.entity.TrackEntity
@@ -18,6 +19,7 @@ import com.example.model.Track
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.Locale
 
 /**
  * Aura Music - Importador Modular de Archivos y Flujos SAF (Storage Access Framework)
@@ -264,7 +266,7 @@ class SafTrackImporter(private val trackDao: TrackDao) {
                         mime?.contains("webm") == true -> "webm"
                         else -> null
                     }
-                    val allowedExtensions = com.example.data.importer.SpecialAudioFormatDecoder.ALL_SUPPORTED_AUDIO_EXTENSIONS
+                    val allowedExtensions = SpecialAudioFormatDecoder.ALL_SUPPORTED_AUDIO_EXTENSIONS
                     val safeExt = when {
                         rawExt != null && rawExt in allowedExtensions -> rawExt
                         mimeMappedExt != null -> mimeMappedExt
@@ -286,7 +288,7 @@ class SafTrackImporter(private val trackDao: TrackDao) {
                     copiedLocalFile = copiedFile
                     finalUriString = Uri.fromFile(copiedFile).toString()
                     val mb = copiedFile.length() / (1024f * 1024f)
-                    fileSizeFormatted = String.format("%.1f MB", mb)
+                    fileSizeFormatted = String.format(Locale.US, "%.1f MB", mb)
                 }
             } catch (_: Exception) {}
 
@@ -302,7 +304,7 @@ class SafTrackImporter(private val trackDao: TrackDao) {
                         durationMs = trimRes.newDurationMs
                     }
                     val mb = localFile.length() / (1024f * 1024f)
-                    fileSizeFormatted = String.format("%.1f MB", mb)
+                    fileSizeFormatted = String.format(Locale.US, "%.1f MB", mb)
                 } else {
                     val trimRes = AudioSilenceTrimmer.processUriForSilenceTrim(
                         context = context,
