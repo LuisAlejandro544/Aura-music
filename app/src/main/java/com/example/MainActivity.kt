@@ -57,6 +57,28 @@ class MainActivity : ComponentActivity() {
                         com.example.widget.AuraMusicWidgetProvider.ACTION_WIDGET_PLAY_PAUSE -> vm.togglePlayPause()
                         com.example.widget.AuraMusicWidgetProvider.ACTION_WIDGET_NEXT -> vm.playNext()
                         com.example.widget.AuraMusicWidgetProvider.ACTION_WIDGET_PREV -> vm.playPrevious()
+                        com.example.widget.AuraMusicWidgetProvider.ACTION_WIDGET_FAVORITE -> {
+                            vm.currentTrack.value?.let { vm.toggleFavorite(it) }
+                        }
+                    }
+                }
+                return
+            }
+
+            val openPlaylistId = incomingIntent.getLongExtra(
+                com.example.widget.AuraLibraryWidgetProvider.EXTRA_OPEN_PLAYLIST_ID,
+                -100L
+            )
+            if (openPlaylistId != -100L) {
+                incomingIntent.removeExtra(com.example.widget.AuraLibraryWidgetProvider.EXTRA_OPEN_PLAYLIST_ID)
+                incomingIntent.removeExtra(com.example.widget.AuraMusicWidgetProvider.EXTRA_INTERNAL_AUTH_TOKEN)
+                if (isInternalAuthenticated) {
+                    val targetPlaylist = vm.playlists.value.find { it.id == openPlaylistId }
+                    if (targetPlaylist != null) {
+                        vm.openPlaylist(targetPlaylist)
+                    } else {
+                        vm.navigateTo(com.example.ui.navigation.NavScreen.Library)
+                        vm.setLibraryTab(com.example.ui.navigation.LibraryTab.PLAYLISTS)
                     }
                 }
                 return

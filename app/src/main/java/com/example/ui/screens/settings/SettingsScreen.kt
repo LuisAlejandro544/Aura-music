@@ -26,12 +26,17 @@ import com.example.model.AuraTheme
 import com.example.model.HeadphoneConfig
 import com.example.model.HeadsetButtonAction
 import com.example.model.NowPlayingDesignMode
+import com.example.model.Playlist
 import com.example.model.Track
+import com.example.model.WidgetConfig
+import com.example.model.WidgetGridContentMode
 import com.example.ui.screens.settings.components.*
 import com.example.ui.screens.settings.components.about.behindTheProjectSettingsContent
+import com.example.ui.screens.settings.components.widgets.widgetSettingsContent
 import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
+import androidx.compose.ui.graphics.Color
 
 /**
  * Menús independientes a pantalla completa dentro de Ajustes.
@@ -43,6 +48,7 @@ enum class SettingsSubScreen {
     PLAYER_DESIGN,
     VISUAL_BEHAVIOR,
     THEME_PALETTES,
+    WIDGETS,
     HEADPHONES,
     HEADPHONES_DSP,
     HEADPHONES_SECURITY,
@@ -72,6 +78,18 @@ fun SettingsScreen(
     onToggleMiniPlayerVideo: (Boolean) -> Unit = {},
     nowPlayingDesignMode: NowPlayingDesignMode = NowPlayingDesignMode.AUTO,
     onSetNowPlayingDesignMode: (NowPlayingDesignMode) -> Unit = {},
+    // Configuración de Widgets de Escritorio
+    widgetConfig: WidgetConfig = WidgetConfig(),
+    currentTrack: Track? = null,
+    topPlayedTracks: List<Track> = emptyList(),
+    playlists: List<Playlist> = emptyList(),
+    dynamicPrimaryColor: Color = Color(0xFF8B5CF6),
+    dynamicSecondaryColor: Color = Color(0xFF06B6D4),
+    onSetWidgetDynamicColorEnabled: (Boolean) -> Unit = {},
+    onSetWidgetGridContentMode: (WidgetGridContentMode) -> Unit = {},
+    onSetWidgetShowProgress: (Boolean) -> Unit = {},
+    onSetWidgetColorIntensityPercent: (Int) -> Unit = {},
+    onForceSyncWidgets: () -> Unit = {},
     // Configuración de Auriculares
     headphoneConfig: HeadphoneConfig = HeadphoneConfig(),
     onUpdateHeadphoneConfig: (HeadphoneConfig) -> Unit = {},
@@ -170,9 +188,11 @@ fun SettingsScreen(
                         isHeadphoneConnected = headphoneConfig.isHeadphoneConnected,
                         connectedDeviceName = headphoneConfig.connectedDeviceName,
                         mediaCount = mediaCount,
+                        widgetConfig = widgetConfig,
                         onOpenPlayerDesign = { activeSubScreen = SettingsSubScreen.PLAYER_DESIGN },
                         onOpenVisualBehavior = { activeSubScreen = SettingsSubScreen.VISUAL_BEHAVIOR },
                         onOpenThemePalettes = { activeSubScreen = SettingsSubScreen.THEME_PALETTES },
+                        onOpenWidgets = { activeSubScreen = SettingsSubScreen.WIDGETS },
                         onOpenHeadphones = { activeSubScreen = SettingsSubScreen.HEADPHONES },
                         onOpenStoredMedia = { activeSubScreen = SettingsSubScreen.STORED_MEDIA },
                         onOpenEnginesAndDiagnostics = { activeSubScreen = SettingsSubScreen.ENGINES_AND_DIAGNOSTICS },
@@ -231,6 +251,32 @@ fun SettingsScreen(
                     themePaletteSettingsContent(
                         currentTheme = currentTheme,
                         onSelectTheme = onSelectTheme
+                    )
+                }
+            }
+
+            // PANTALLA INDEPENDIENTE 4: WIDGET (COLOR DE IMAGEN, ESTIRAMIENTO Y TOP 4 / PLAYLISTS)
+            SettingsSubScreen.WIDGETS -> {
+                SettingsSubMenuScreen(
+                    title = "Widget",
+                    subtitle = "Color dinámico de carátula, adaptación al estirar y 4 Canciones / 4 Playlists",
+                    icon = Icons.Default.Widgets,
+                    iconTint = MaterialTheme.colorScheme.secondary,
+                    onBack = { activeSubScreen = SettingsSubScreen.MAIN_MENU },
+                    testTag = "subscreen_widgets"
+                ) {
+                    widgetSettingsContent(
+                        widgetConfig = widgetConfig,
+                        currentTrack = currentTrack,
+                        topTracks = topPlayedTracks.ifEmpty { allTracks },
+                        playlists = playlists,
+                        dynamicPrimaryColor = dynamicPrimaryColor,
+                        dynamicSecondaryColor = dynamicSecondaryColor,
+                        onSetDynamicColorEnabled = onSetWidgetDynamicColorEnabled,
+                        onSetGridContentMode = onSetWidgetGridContentMode,
+                        onSetShowProgressInWidget = onSetWidgetShowProgress,
+                        onSetColorIntensityPercent = onSetWidgetColorIntensityPercent,
+                        onForceSyncWidgets = onForceSyncWidgets
                     )
                 }
             }

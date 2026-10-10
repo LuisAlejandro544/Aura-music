@@ -7,6 +7,8 @@ import com.example.model.NowPlayingDesignMode
 import com.example.model.Playlist
 import com.example.model.Track
 import com.example.model.VideoDisplayMode
+import com.example.model.WidgetConfig
+import com.example.model.WidgetGridContentMode
 import com.example.ui.navigation.LibraryTab
 import com.example.ui.navigation.NavScreen
 import kotlinx.coroutines.CoroutineScope

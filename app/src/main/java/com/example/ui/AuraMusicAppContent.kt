@@ -454,35 +454,49 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
                                 mixtapeStatusMessage = mixtapeStatusMessage
                             )
 
-                            is NavScreen.Settings -> SettingsScreen(
-                                currentTheme = viewModel.currentTheme.collectAsStateWithLifecycle().value,
-                                onSelectTheme = { viewModel.setTheme(it) },
-                                onOpenOnboarding = { viewModel.reopenOnboarding() },
-                                isDynamicArtworkColorEnabled = isDynamicArtworkColorEnabled,
-                                onToggleDynamicArtworkColor = { viewModel.toggleDynamicArtworkColor(it) },
-                                isMiniPlayerVideoEnabled = isMiniPlayerVideoEnabled,
-                                onToggleMiniPlayerVideo = { viewModel.toggleMiniPlayerVideoEnabled() },
-                                nowPlayingDesignMode = nowPlayingDesignMode,
-                                onSetNowPlayingDesignMode = { viewModel.setNowPlayingDesignMode(it) },
-                                headphoneConfig = headphoneConfig,
-                                onUpdateHeadphoneConfig = { viewModel.updateHeadphoneConfig(it) },
-                                onSetCrossfeedEnabled = { viewModel.setCrossfeedEnabled(it) },
-                                onSetCrossfeedStrength = { viewModel.setCrossfeedStrength(it) },
-                                onSetBalanceControlEnabled = { viewModel.setBalanceControlEnabled(it) },
-                                onSetStereoBalance = { viewModel.setStereoBalance(it) },
-                                onSetBitPerfectEnabled = { viewModel.setBitPerfectEnabled(it) },
-                                onSetLowLatencyEnabled = { viewModel.setLowLatencyAAudioEnabled(it) },
-                                onSetUsbDacExclusiveEnabled = { viewModel.setUsbDacExclusiveEnabled(it) },
-                                onSetHiResTargetMode = { viewModel.setHiResTargetMode(it) },
-                                onSetBecomingNoisyGuardEnabled = { viewModel.setBecomingNoisyGuardEnabled(it) },
-                                onSetFadeInOnResumeEnabled = { viewModel.setFadeInOnResumeEnabled(it) },
-                                onSetDedicatedVolumeMemoryEnabled = { viewModel.setDedicatedVolumeMemoryEnabled(it) },
-                                onSetHeadsetControlsEnabled = { viewModel.setHeadsetControlsEnabled(it) },
-                                onSetHeadsetAction = { type, action -> viewModel.setHeadsetAction(type, action) },
-                                allTracks = allTracks,
-                                onDeleteTrackArtwork = { viewModel.deleteTrackArtwork(it) },
-                                onDeleteTrackVideo = { viewModel.deleteTrackVideo(it) }
-                            )
+                            is NavScreen.Settings -> {
+                                val widgetConfig by viewModel.widgetConfig.collectAsStateWithLifecycle()
+                                SettingsScreen(
+                                    currentTheme = viewModel.currentTheme.collectAsStateWithLifecycle().value,
+                                    onSelectTheme = { viewModel.setTheme(it) },
+                                    onOpenOnboarding = { viewModel.reopenOnboarding() },
+                                    isDynamicArtworkColorEnabled = isDynamicArtworkColorEnabled,
+                                    onToggleDynamicArtworkColor = { viewModel.toggleDynamicArtworkColor(it) },
+                                    isMiniPlayerVideoEnabled = isMiniPlayerVideoEnabled,
+                                    onToggleMiniPlayerVideo = { viewModel.toggleMiniPlayerVideoEnabled() },
+                                    nowPlayingDesignMode = nowPlayingDesignMode,
+                                    onSetNowPlayingDesignMode = { viewModel.setNowPlayingDesignMode(it) },
+                                    widgetConfig = widgetConfig,
+                                    currentTrack = effectiveTrack,
+                                    topPlayedTracks = topPlayedTracks,
+                                    playlists = playlists,
+                                    dynamicPrimaryColor = animatedMiniPrimary,
+                                    dynamicSecondaryColor = animatedMiniSecondary,
+                                    onSetWidgetDynamicColorEnabled = { viewModel.setWidgetDynamicColorEnabled(it) },
+                                    onSetWidgetGridContentMode = { viewModel.setWidgetGridContentMode(it) },
+                                    onSetWidgetShowProgress = { viewModel.setWidgetShowProgress(it) },
+                                    onSetWidgetColorIntensityPercent = { viewModel.setWidgetColorIntensityPercent(it) },
+                                    onForceSyncWidgets = { viewModel.forceSyncAllWidgets() },
+                                    headphoneConfig = headphoneConfig,
+                                    onUpdateHeadphoneConfig = { viewModel.updateHeadphoneConfig(it) },
+                                    onSetCrossfeedEnabled = { viewModel.setCrossfeedEnabled(it) },
+                                    onSetCrossfeedStrength = { viewModel.setCrossfeedStrength(it) },
+                                    onSetBalanceControlEnabled = { viewModel.setBalanceControlEnabled(it) },
+                                    onSetStereoBalance = { viewModel.setStereoBalance(it) },
+                                    onSetBitPerfectEnabled = { viewModel.setBitPerfectEnabled(it) },
+                                    onSetLowLatencyEnabled = { viewModel.setLowLatencyAAudioEnabled(it) },
+                                    onSetUsbDacExclusiveEnabled = { viewModel.setUsbDacExclusiveEnabled(it) },
+                                    onSetHiResTargetMode = { viewModel.setHiResTargetMode(it) },
+                                    onSetBecomingNoisyGuardEnabled = { viewModel.setBecomingNoisyGuardEnabled(it) },
+                                    onSetFadeInOnResumeEnabled = { viewModel.setFadeInOnResumeEnabled(it) },
+                                    onSetDedicatedVolumeMemoryEnabled = { viewModel.setDedicatedVolumeMemoryEnabled(it) },
+                                    onSetHeadsetControlsEnabled = { viewModel.setHeadsetControlsEnabled(it) },
+                                    onSetHeadsetAction = { type, action -> viewModel.setHeadsetAction(type, action) },
+                                    allTracks = allTracks,
+                                    onDeleteTrackArtwork = { viewModel.deleteTrackArtwork(it) },
+                                    onDeleteTrackVideo = { viewModel.deleteTrackVideo(it) }
+                                )
+                            }
                         }
                     }
                 }

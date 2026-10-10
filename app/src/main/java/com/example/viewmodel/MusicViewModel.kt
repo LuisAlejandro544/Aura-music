@@ -301,6 +301,96 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         }
+
+        // Vincular callbacks en memoria de los Widgets de Pantalla de Inicio hacia MusicViewModel
+        com.example.widget.AuraMusicWidgetProvider.onToggleFavoriteCallback = {
+            val current = audioPlayer.currentTrack.value
+            if (current != null) {
+                toggleFavorite(current)
+                true
+            } else {
+                false
+            }
+        }
+        com.example.widget.AuraMusicWidgetProvider.onPlaySpecificTrackCallback = { track, queueList ->
+            playTrack(track, queueList)
+            true
+        }
+
+        // Sincronización reactiva de las 4 canciones más escuchadas y las 4 playlists con el segundo Widget independiente
+        viewModelScope.launch(Dispatchers.IO) {
+            combine(topPlayedTracks, allTracks, playlists, favoriteTracks) { top, all, pls, favs ->
+                val effectiveTop = if (top.isNotEmpty()) top else all.sortedByDescending { it.playCount }.take(4)
+                Triple(effectiveTop, pls, favs)
+            }.collect { (top4, pls, favs) ->
+                com.example.widget.WidgetStateStore.saveQuickGridItems(
+                    context = application,
+                    topTracks = top4,
+                    playlists = pls,
+                    favoriteTracks = favs
+                )
+                com.example.widget.AuraLibraryWidgetProvider.refreshAllWidgets(application)
+            }
+        }
+    }
+
+    // --- Configuración de Widgets de Escritorio ---
+    private val _widgetConfig = MutableStateFlow(
+        com.example.widget.WidgetStateStore.getConfig(application)
+    )
+    val widgetConfig: StateFlow<WidgetConfig> = _widgetConfig.asStateFlow()
+
+    fun setWidgetDynamicColorEnabled(enabled: Boolean) {
+        val updated = _widgetConfig.value.copy(isDynamicColorEnabled = enabled)
+        _widgetConfig.value = updated
+        viewModelScope.launch(Dispatchers.IO) {
+            com.example.widget.WidgetStateStore.saveConfig(getApplication(), updated)
+            com.example.widget.AuraMusicWidgetProvider.refreshAllWidgets(getApplication())
+            com.example.widget.AuraLibraryWidgetProvider.refreshAllWidgets(getApplication())
+        }
+    }
+
+    fun setWidgetGridContentMode(mode: WidgetGridContentMode) {
+        val updated = _widgetConfig.value.copy(gridContentMode = mode)
+        _widgetConfig.value = updated
+        viewModelScope.launch(Dispatchers.IO) {
+            com.example.widget.WidgetStateStore.saveConfig(getApplication(), updated)
+            com.example.widget.AuraLibraryWidgetProvider.refreshAllWidgets(getApplication())
+        }
+    }
+
+    fun setWidgetShowProgress(enabled: Boolean) {
+        val updated = _widgetConfig.value.copy(showProgressInWidget = enabled)
+        _widgetConfig.value = updated
+        viewModelScope.launch(Dispatchers.IO) {
+            com.example.widget.WidgetStateStore.saveConfig(getApplication(), updated)
+            com.example.widget.AuraMusicWidgetProvider.refreshAllWidgets(getApplication())
+        }
+    }
+
+    fun setWidgetColorIntensityPercent(percent: Int) {
+        val updated = _widgetConfig.value.copy(colorIntensityPercent = percent.coerceIn(30, 100))
+        _widgetConfig.value = updated
+        viewModelScope.launch(Dispatchers.IO) {
+            com.example.widget.WidgetStateStore.saveConfig(getApplication(), updated)
+            com.example.widget.AuraMusicWidgetProvider.refreshAllWidgets(getApplication())
+            com.example.widget.AuraLibraryWidgetProvider.refreshAllWidgets(getApplication())
+        }
+    }
+
+    fun forceSyncAllWidgets() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val app = getApplication<Application>()
+            val top = topPlayedTracks.value.ifEmpty { allTracks.value.sortedByDescending { it.playCount }.take(4) }
+            com.example.widget.WidgetStateStore.saveQuickGridItems(
+                context = app,
+                topTracks = top,
+                playlists = playlists.value,
+                favoriteTracks = favoriteTracks.value
+            )
+            com.example.widget.AuraMusicWidgetProvider.refreshAllWidgets(app)
+            com.example.widget.AuraLibraryWidgetProvider.refreshAllWidgets(app)
+        }
     }
 
     // --- Navegación ---
@@ -357,8 +447,13 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleFavorite(track: Track) {
         viewModelScope.launch {
+            val newFavorite = !track.isFavorite
+            val app = getApplication<Application>()
             repository.toggleFavorite(track.id, track.isFavorite)
-            audioPlayer.updateTrackFavorite(track.id, !track.isFavorite)
+            audioPlayer.updateTrackFavorite(track.id, newFavorite)
+            com.example.widget.WidgetStateStore.updateFavoriteOnly(app, track.id, newFavorite)
+            com.example.widget.AuraMusicWidgetProvider.refreshAllWidgets(app)
+            com.example.widget.AuraLibraryWidgetProvider.refreshAllWidgets(app)
         }
     }
 

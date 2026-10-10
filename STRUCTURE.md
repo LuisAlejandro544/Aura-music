@@ -108,8 +108,12 @@ app/
 │   │       │       └── tiktok/                 # Resolución Directa de TikTok
 │   │       │           └── TikTokMediaResolver.kt # Extracción libre de audio/video TikTok
 │   │       │
-│   │       ├── widget/                         # Widgets Interactivos de Escritorio
-│   │       │   └── AuraMusicWidgetProvider.kt  # AppWidgetProvider con Material You, carátula y Bit-Perfect
+│   │       ├── widget/                         # Sistema de 2 Widgets Interactivos de Escritorio
+│   │       │   ├── AuraMusicWidgetProvider.kt  # Widget 1: Reproductor adaptativo (Compacto, Mediano, Expandido) con color de imagen
+│   │       │   ├── AuraLibraryWidgetProvider.kt # Widget 2: Cuadrícula 2x2 independiente de 4 Canciones Más Escuchadas o 4 Playlists
+│   │       │   ├── WidgetStateStore.kt         # Persistencia de estado, colores Palette de carátula y caché JSON Top 4 / Playlists
+│   │       │   ├── WidgetArtworkRenderer.kt    # Renderizador Canvas de fondos Neo-Glass, barras de progreso y collages 2x2
+│   │       │   └── WidgetPlaybackHeadlessController.kt # Reanudación y reproducción directa en segundo plano sin abrir la actividad
 │   │       │
 │   │       ├── playback/                       # Capa de Audio y Reproducción ExoPlayer
 │   │       │   ├── AuraAudioPlayer.kt          # Fachada del reproductor de audio
@@ -139,6 +143,7 @@ app/
 │   │       ├── model/                          # Modelos de Dominio y Datos
 │   │       │   ├── Track.kt
 │   │       │   ├── Playlist.kt
+│   │       │   ├── WidgetModels.kt                  # Modelos de configuración y estado persistido de Widgets
 │   │       │   ├── AppUpdateModels.kt               # Modelos de estado y metadatos de actualización APK
 │   │       │   ├── MixtapeModels.kt                 # Modelos de capítulos y metadatos de Mixtape
 │   │       │   ├── LyricsState.kt
@@ -176,17 +181,19 @@ app/
 │   │       │   │   │       ├── NowPlayingLyricsCard.kt
 │   │       │   │   │       ├── NowPlayingPlaybackControls.kt
 │   │       │   │   │       ├── NowPlayingQueueSheet.kt
-│   │       │   │   │       ├── NowPlayingTopBar.kt
-│   │       │   │   │       ├── NowPlayingBalanceBar.kt
-│   │       │   │   │       ├── AudioSpecsDialog.kt
-│   │       │   │   │       └── VideoDisplayModeDialog.kt
-│   │       │   │   ├── settings/
-│   │       │   │   │   ├── SettingsScreen.kt   # Orquestador de Ajustes y navegación a pantallas completas
-│   │       │   │   │   └── components/
-│   │       │   │   │       ├── SettingDetailRow.kt            # Fila reutilizable de información de ajuste
-│   │       │   │   │       ├── SettingsSubScreenComponents.kt # Tarjetas navegables y contenedor de pantalla completa
-│   │       │   │   │       ├── about/                         # Detrás del Proyecto (Creador & Contribuidores)
-│   │       │   │   │       │   └── BehindTheProjectSection.kt     # Perfiles de GitHub y caché único de avatares WebP
+│   │       │   │       ├── NowPlayingTopBar.kt
+│   │       │   │       ├── NowPlayingBalanceBar.kt
+│   │       │   │       ├── AudioSpecsDialog.kt
+│   │       │   │       └── VideoDisplayModeDialog.kt
+│   │       │   ├── settings/
+│   │       │   │   ├── SettingsScreen.kt   # Orquestador de Ajustes y navegación a pantallas completas
+│   │       │   │   └── components/
+│   │       │   │       ├── SettingDetailRow.kt            # Fila reutilizable de información de ajuste
+│   │       │   │       ├── SettingsSubScreenComponents.kt # Tarjetas navegables y contenedor de pantalla completa
+│   │       │   │       ├── widgets/                       # Personalización y Vista Previa de Widgets
+│   │       │   │       │   └── WidgetSettingsContent.kt       # Selector Canciones/Playlists, color de imagen y vista previa
+│   │       │   │       ├── about/                         # Detrás del Proyecto (Creador & Contribuidores)
+│   │       │   │       │   └── BehindTheProjectSection.kt     # Perfiles de GitHub y caché único de avatares WebP
 │   │       │   │   │       ├── appearance/                    # Ajustes de Apariencia, Temas y Diseño del Reproductor
 │   │       │   │   │       │   ├── AppearanceSettingsTab.kt       # Menú principal de Ajustes y secciones visuales
 │   │       │   │   │       │   ├── EnginesAndDiagnosticsSection.kt # Motores nativos, actualizador OTA y diagnóstico

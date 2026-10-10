@@ -31,10 +31,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.AuraTheme
 import com.example.model.NowPlayingDesignMode
+import com.example.model.WidgetConfig
 import com.example.ui.theme.CardBorder
 import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
+import androidx.compose.material.icons.filled.Widgets
 
 /**
  * Contenido modular de la pantalla de Ajustes de Aura Music (< 500 líneas).
@@ -54,9 +56,11 @@ fun LazyListScope.mainSettingsMenuContent(
     isHeadphoneConnected: Boolean,
     connectedDeviceName: String,
     mediaCount: Int,
+    widgetConfig: WidgetConfig = WidgetConfig(),
     onOpenPlayerDesign: () -> Unit,
     onOpenVisualBehavior: () -> Unit,
     onOpenThemePalettes: () -> Unit,
+    onOpenWidgets: () -> Unit = {},
     onOpenHeadphones: () -> Unit,
     onOpenStoredMedia: () -> Unit,
     onOpenEnginesAndDiagnostics: () -> Unit,
@@ -104,7 +108,23 @@ fun LazyListScope.mainSettingsMenuContent(
         Spacer(modifier = Modifier.height(12.dp))
     }
 
-    // 4. Auriculares, Acústica DSP & Gestos
+    // 4. Nuevo Apartado: Widget (Color dinámico de imagen, tamaño adaptativo y Top 4 Canciones / 4 Playlists)
+    item {
+        val colorSummary = if (widgetConfig.isDynamicColorEnabled) "Color de imagen activo" else "Color fijo"
+        SettingsNavigationCard(
+            icon = Icons.Default.Widgets,
+            title = "Widget",
+            subtitle = "${widgetConfig.gridContentMode.label} • $colorSummary • Reanudación y tamaño adaptativo",
+            iconTint = MaterialTheme.colorScheme.secondary,
+            badgeText = "2 WIDGETS",
+            badgeColor = MaterialTheme.colorScheme.primary,
+            onClick = onOpenWidgets,
+            testTag = "settings_nav_widgets"
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+    }
+
+    // 5. Auriculares, Acústica DSP & Gestos
     item {
         SettingsNavigationCard(
             icon = Icons.Default.Headphones,
@@ -123,7 +143,7 @@ fun LazyListScope.mainSettingsMenuContent(
         Spacer(modifier = Modifier.height(12.dp))
     }
 
-    // 5. Medios y Almacenamiento Guardado
+    // 6. Medios y Almacenamiento Guardado
     item {
         SettingsNavigationCard(
             icon = Icons.Default.PermMedia,
@@ -138,7 +158,7 @@ fun LazyListScope.mainSettingsMenuContent(
         Spacer(modifier = Modifier.height(12.dp))
     }
 
-    // 6. Motores Nativos, yt-dlp OTA & Diagnóstico (Aura Monitor solo en Debug)
+    // 7. Motores Nativos, yt-dlp OTA & Diagnóstico (Aura Monitor solo en Debug)
     item {
         val enginesTitle = if (com.example.BuildConfig.ENABLE_DEBUG_MONITOR) {
             "Motores Nativos, Actualizador APK & Diagnóstico"
@@ -161,7 +181,7 @@ fun LazyListScope.mainSettingsMenuContent(
         Spacer(modifier = Modifier.height(12.dp))
     }
 
-    // 7. Detrás del Proyecto (Creador & Contribuidores en GitHub)
+    // 8. Detrás del Proyecto (Creador & Contribuidores en GitHub)
     item {
         SettingsNavigationCard(
             icon = Icons.Default.Groups,
@@ -176,7 +196,7 @@ fun LazyListScope.mainSettingsMenuContent(
         Spacer(modifier = Modifier.height(12.dp))
     }
 
-    // 8. Bienvenida & Guía de la Aplicación
+    // 9. Bienvenida & Guía de la Aplicación
     item {
         SettingsNavigationCard(
             icon = Icons.Default.Info,

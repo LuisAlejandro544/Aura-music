@@ -139,7 +139,9 @@ class AuraAudioPlayer(
                 com.example.widget.AuraMusicWidgetProvider.pushPlaybackState(
                     context = context,
                     track = _currentTrack.value,
-                    isPlaying = isPlaying
+                    isPlaying = isPlaying,
+                    positionMs = player.currentPosition.coerceAtLeast(0L),
+                    durationMs = player.duration.coerceAtLeast(_duration.value)
                 )
                 if (isPlaying) {
                     startProgressTracking()
@@ -154,6 +156,13 @@ class AuraAudioPlayer(
                         _duration.value = player.duration.coerceAtLeast(0L)
                         _playbackError.value = null
                         effectManager.attachToSession(player.audioSessionId)
+                        com.example.widget.AuraMusicWidgetProvider.pushPlaybackState(
+                            context = context,
+                            track = _currentTrack.value,
+                            isPlaying = player.isPlaying,
+                            positionMs = player.currentPosition.coerceAtLeast(0L),
+                            durationMs = _duration.value
+                        )
                     }
                     Player.STATE_ENDED -> {
                         handleTrackEnded()
@@ -198,16 +207,28 @@ class AuraAudioPlayer(
 
         // Vincular callbacks directos para el Widget de Pantalla de Inicio
         com.example.widget.AuraMusicWidgetProvider.onTogglePlayPauseCallback = {
-            togglePlayPause()
-            true
+            if (_currentTrack.value == null && queue.value.isEmpty()) {
+                false
+            } else {
+                togglePlayPause()
+                true
+            }
         }
         com.example.widget.AuraMusicWidgetProvider.onPlayNextCallback = {
-            playNext()
-            true
+            if (queue.value.isEmpty()) {
+                false
+            } else {
+                playNext()
+                true
+            }
         }
         com.example.widget.AuraMusicWidgetProvider.onPlayPreviousCallback = {
-            playPrevious()
-            true
+            if (queue.value.isEmpty()) {
+                false
+            } else {
+                playPrevious()
+                true
+            }
         }
     }
 
@@ -233,7 +254,9 @@ class AuraAudioPlayer(
         com.example.widget.AuraMusicWidgetProvider.pushPlaybackState(
             context = context,
             track = track,
-            isPlaying = true
+            isPlaying = true,
+            positionMs = 0L,
+            durationMs = track.durationMs
         )
 
         val player = exoPlayer ?: return
@@ -483,6 +506,9 @@ class AuraAudioPlayer(
     fun updateTrackFavorite(trackId: Long, isFavorite: Boolean) {
         val (updatedCurrent, _) = queueController.updateTrackFavorite(trackId, isFavorite, _currentTrack.value)
         _currentTrack.value = updatedCurrent
+        com.example.widget.WidgetStateStore.updateFavoriteOnly(context, trackId, isFavorite)
+        com.example.widget.AuraMusicWidgetProvider.refreshAllWidgets(context)
+        com.example.widget.AuraLibraryWidgetProvider.refreshAllWidgets(context)
     }
 
     fun removeTrackFromQueue(trackId: Long) {
@@ -516,6 +542,15 @@ class AuraAudioPlayer(
             currentTrack = _currentTrack.value
         )
         _currentTrack.value = updatedCurrent
+        if (updatedCurrent != null && updatedCurrent.id == trackId) {
+            com.example.widget.AuraMusicWidgetProvider.pushPlaybackState(
+                context = context,
+                track = updatedCurrent,
+                isPlaying = _isPlaying.value,
+                positionMs = _currentPosition.value,
+                durationMs = _duration.value
+            )
+        }
     }
 
     private fun handleTrackEnded() {
@@ -531,8 +566,11 @@ class AuraAudioPlayer(
         }
     }
 
+    private var widgetProgressTickCounter = 0
+
     private fun startProgressTracking() {
         progressJob?.cancel()
+        widgetProgressTickCounter = 0
         progressJob = playerScope.launch {
             while (isActive) {
                 val loopState = abLoopState.value
@@ -541,6 +579,16 @@ class AuraAudioPlayer(
                     _currentPosition.value = pos
                     if (player.duration > 0) {
                         _duration.value = player.duration
+                    }
+
+                    widgetProgressTickCounter++
+                    if (widgetProgressTickCounter >= 12) {
+                        widgetProgressTickCounter = 0
+                        com.example.widget.AuraMusicWidgetProvider.pushPlaybackProgress(
+                            context = context,
+                            positionMs = pos,
+                            durationMs = _duration.value
+                        )
                     }
 
                     if (loopState.isLooping) {

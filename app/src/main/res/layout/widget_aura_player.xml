@@ -1,109 +1,146 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="@drawable/bg_widget_aura"
-    android:gravity="center_vertical"
-    android:orientation="horizontal"
-    android:padding="12dp">
+    android:layout_height="match_parent">
 
-    <!-- Carátula de la canción o arte procedural -->
+    <!-- Lienzo de fondo dinámico coloreado según la imagen de carátula -->
     <ImageView
-        android:id="@+id/widget_album_art"
-        android:layout_width="64dp"
-        android:layout_height="64dp"
-        android:contentDescription="@string/widget_album_art_desc"
-        android:scaleType="centerCrop"
-        android:src="@drawable/default_album_art_1790964821425" />
+        android:id="@+id/widget_dynamic_bg"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="@null"
+        android:scaleType="fitXY"
+        android:src="@drawable/bg_widget_aura" />
 
-    <!-- Información de la pista + Insignia de estado C++20 / Bit-Perfect -->
     <LinearLayout
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="12dp"
-        android:layout_marginEnd="8dp"
-        android:layout_weight="1"
-        android:orientation="vertical">
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="12dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="10dp"
+        android:paddingBottom="8dp">
 
-        <TextView
-            android:id="@+id/widget_badge"
+        <!-- Carátula de la canción o arte procedural -->
+        <ImageView
+            android:id="@+id/widget_album_art"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:contentDescription="@string/widget_album_art_desc"
+            android:scaleType="centerCrop"
+            android:src="@drawable/default_album_art_1790964821425" />
+
+        <!-- Información de la pista + Insignia de estado C++20 / Bit-Perfect -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:layout_marginEnd="6dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/widget_badge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_widget_badge"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:paddingStart="6dp"
+                android:paddingTop="1dp"
+                android:paddingEnd="6dp"
+                android:paddingBottom="1dp"
+                android:text="@string/widget_default_badge"
+                android:textColor="#E2E8F0"
+                android:textSize="9sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/widget_track_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="@string/widget_default_title"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/widget_track_artist"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="@string/widget_default_artist"
+                android:textColor="#CBD5E1"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <!-- Controles directos (Favorito, Anterior, Play/Pausa dinámico, Siguiente) -->
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:background="@drawable/bg_widget_badge"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:paddingStart="6dp"
-            android:paddingTop="2dp"
-            android:paddingEnd="6dp"
-            android:paddingBottom="2dp"
-            android:text="@string/widget_default_badge"
-            android:textColor="#C4B5FD"
-            android:textSize="9sp"
-            android:textStyle="bold" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
-        <TextView
-            android:id="@+id/widget_track_title"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="3dp"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:text="@string/widget_default_title"
-            android:textColor="#FFFFFF"
-            android:textSize="14sp"
-            android:textStyle="bold" />
+            <ImageButton
+                android:id="@+id/widget_btn_fav"
+                android:layout_width="38dp"
+                android:layout_height="48dp"
+                android:background="@android:color/transparent"
+                android:contentDescription="@string/widget_fav_desc"
+                android:padding="8dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_widget_fav_border" />
 
-        <TextView
-            android:id="@+id/widget_track_artist"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="1dp"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:text="@string/widget_default_artist"
-            android:textColor="#94A3B8"
-            android:textSize="12sp" />
+            <ImageButton
+                android:id="@+id/widget_btn_prev"
+                android:layout_width="40dp"
+                android:layout_height="48dp"
+                android:background="@android:color/transparent"
+                android:contentDescription="@string/widget_prev_desc"
+                android:padding="9dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_widget_previous" />
+
+            <FrameLayout
+                android:layout_width="46dp"
+                android:layout_height="46dp"
+                android:layout_marginStart="2dp"
+                android:layout_marginEnd="2dp">
+
+                <ImageView
+                    android:id="@+id/widget_play_btn_bg"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:contentDescription="@null"
+                    android:scaleType="fitXY"
+                    android:src="@drawable/bg_widget_play_btn" />
+
+                <ImageButton
+                    android:id="@+id/widget_btn_play_pause"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@android:color/transparent"
+                    android:contentDescription="@string/widget_play_pause_desc"
+                    android:padding="11dp"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_widget_play" />
+            </FrameLayout>
+
+            <ImageButton
+                android:id="@+id/widget_btn_next"
+                android:layout_width="40dp"
+                android:layout_height="48dp"
+                android:background="@android:color/transparent"
+                android:contentDescription="@string/widget_next_desc"
+                android:padding="9dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_widget_next" />
+        </LinearLayout>
     </LinearLayout>
-
-    <!-- Controles de reproducción directa (mínimo 48dp táctiles donde aplica) -->
-    <LinearLayout
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:orientation="horizontal">
-
-        <ImageButton
-            android:id="@+id/widget_btn_prev"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:background="@android:color/transparent"
-            android:contentDescription="@string/widget_prev_desc"
-            android:padding="8dp"
-            android:scaleType="fitCenter"
-            android:src="@drawable/ic_widget_previous" />
-
-        <ImageButton
-            android:id="@+id/widget_btn_play_pause"
-            android:layout_width="46dp"
-            android:layout_height="46dp"
-            android:layout_marginStart="4dp"
-            android:layout_marginEnd="4dp"
-            android:background="@drawable/bg_widget_play_btn"
-            android:contentDescription="@string/widget_play_pause_desc"
-            android:padding="11dp"
-            android:scaleType="fitCenter"
-            android:src="@drawable/ic_widget_play" />
-
-        <ImageButton
-            android:id="@+id/widget_btn_next"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:background="@android:color/transparent"
-            android:contentDescription="@string/widget_next_desc"
-            android:padding="8dp"
-            android:scaleType="fitCenter"
-            android:src="@drawable/ic_widget_next" />
-    </LinearLayout>
-
-</LinearLayout>
+</FrameLayout>

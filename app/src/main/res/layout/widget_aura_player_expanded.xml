@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- Lienzo de fondo dinámico coloreado según la imagen de carátula -->
+    <ImageView
+        android:id="@+id/widget_dynamic_bg"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="@null"
+        android:scaleType="fitXY"
+        android:src="@drawable/bg_widget_aura" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center_vertical"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- Cabecera grande con Carátula de Estudio + Metadatos + Corazón Favorito -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:id="@+id/widget_album_art"
+                android:layout_width="92dp"
+                android:layout_height="92dp"
+                android:contentDescription="@string/widget_album_art_desc"
+                android:scaleType="centerCrop"
+                android:src="@drawable/default_album_art_1790964821425" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="14dp"
+                android:layout_marginEnd="8dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/widget_badge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_widget_badge"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:paddingStart="8dp"
+                    android:paddingTop="3dp"
+                    android:paddingEnd="8dp"
+                    android:paddingBottom="3dp"
+                    android:text="@string/widget_default_badge"
+                    android:textColor="#F8FAFC"
+                    android:textSize="10sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/widget_track_title"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:ellipsize="end"
+                    android:maxLines="2"
+                    android:text="@string/widget_default_title"
+                    android:textColor="#FFFFFF"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/widget_track_artist"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="@string/widget_default_artist"
+                    android:textColor="#CBD5E1"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+            <ImageButton
+                android:id="@+id/widget_btn_fav"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="@drawable/bg_widget_grid_item"
+                android:contentDescription="@string/widget_fav_desc"
+                android:padding="11dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_widget_fav_border" />
+        </LinearLayout>
+
+        <!-- Barra de progreso de ancho completo con bolita clásica -->
+        <LinearLayout
+            android:id="@+id/widget_progress_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/widget_time_current"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0:00"
+                android:textColor="#F1F5F9"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <ImageView
+                android:id="@+id/widget_progress_bitmap"
+                android:layout_width="0dp"
+                android:layout_height="16dp"
+                android:layout_marginStart="10dp"
+                android:layout_marginEnd="10dp"
+                android:layout_weight="1"
+                android:contentDescription="@null"
+                android:scaleType="fitXY" />
+
+            <TextView
+                android:id="@+id/widget_time_total"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0:00"
+                android:textColor="#CBD5E1"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <!-- Controles inferiores centrados estilo Estudio Audiófilo -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <ImageButton
+                android:id="@+id/widget_btn_prev"
+                android:layout_width="52dp"
+                android:layout_height="48dp"
+                android:background="@drawable/bg_widget_grid_item"
+                android:contentDescription="@string/widget_prev_desc"
+                android:padding="11dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_widget_previous" />
+
+            <FrameLayout
+                android:layout_width="58dp"
+                android:layout_height="58dp"
+                android:layout_marginStart="20dp"
+                android:layout_marginEnd="20dp">
+
+                <ImageView
+                    android:id="@+id/widget_play_btn_bg"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:contentDescription="@null"
+                    android:scaleType="fitXY"
+                    android:src="@drawable/bg_widget_play_btn" />
+
+                <ImageButton
+                    android:id="@+id/widget_btn_play_pause"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@android:color/transparent"
+                    android:contentDescription="@string/widget_play_pause_desc"
+                    android:padding="14dp"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_widget_play" />
+            </FrameLayout>
+
+            <ImageButton
+                android:id="@+id/widget_btn_next"
+                android:layout_width="52dp"
+                android:layout_height="48dp"
+                android:background="@drawable/bg_widget_grid_item"
+                android:contentDescription="@string/widget_next_desc"
+                android:padding="11dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_widget_next" />
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

@@ -1,108 +1,114 @@
-# Evaluación de Potencial de Aura Music y Solución de Reactividad Cromática en Tiempo Real para Video Canvas
+# Sistema de Widgets Adaptativos, Color Dinámico y Cuadrícula de Favoritos en Aura Music
 
-Este plan entrega la evaluación estratégica completa sobre el estado actual y futuro de **Aura Music** (basada en el análisis de `README.md`, `READMEAI.md`, `ROADMAP.md`, `STRUCTURE.md`, `AI_CONTEXT.md` y `AGENTS.md`), junto con la arquitectura técnica para restaurar y optimizar la **reacción de colores en tiempo real mientras se reproduce el Video Canvas**, adaptando dinámicamente la velocidad de muestreo al estado de la batería del teléfono.
-
----
-
-## 📊 1. Evaluación Estratégica: ¿Tiene Potencial Aura Music y Deberíamos Seguir Trabajando en Ella?
-
-**Veredicto directo: SÍ, rotundamente.** Aura Music no es un reproductor convencional; tiene el potencial técnico y funcional para posicionarse como **uno de los reproductores audiófilos y multimedia más completos del ecosistema Android independiente (Uptodown / GitHub Releases)**.
-
-### ¿Por qué tiene un potencial tan alto?
-1. **Diferenciación Tecnológica Real (Foso Competitivo)**:
-   - Mientras el 95% de los reproductores locales en Android son simples capas visuales sobre el `MediaPlayer` básico de Android, Aura Music integra un **motor DSP propio en ISO C++20 a 64 bits** con puente directo a **Google AAudio (Bit-Perfect 1:1)**, filtros Biquad de 10 bandas, Audio 8D/16D Multi-Órbita, Clarificador de Voces Mid-Side HD, Crossfeed binaural Chu Moy y Normalizador EBU R128.
-2. **Ecosistema Todo-en-Uno para Usuarios Móviles sin PC**:
-   - Resuelve un dolor real: el usuario no necesita una computadora para armar su biblioteca de alta calidad. Puede descargar desde enlaces web (**YouTube, TikTok**) con el motor nativo (`yt-dlp` OTA + `InnerTube` + `FFmpeg` embebido), convertir videos de su galería a música en 1 segundo, crear **Mixtapes con crossfade y capítulos reactivos**, y obtener letras Karaoke sincronizadas automáticamente desde LRCLIB.
-3. **Experiencia Visual Inmersiva (Dark Luxury Neo-Glass + Video Canvas)**:
-   - Combina la estética OLED pura (0% anuncios, 0% telemetría invasiva) con funciones visuales que ni siquiera los reproductores locales de pago suelen tener juntas: **Video Canvas sincronizado o en bucle boomerang**, **Modo Cinemático estilo Spotify**, y **Karaoke a pantalla completa**.
-4. **Arquitectura Limpia, Segura y Autónoma**:
-   - Código modularizado en MVVM con coordinadores especializados, blindaje criptográfico SHA-256 en actualizaciones OTA (tanto de la app como del extractor), soporte para formatos audiófilos extremos (`DSD`, `APE`, `WavPack`, `FLAC`, `Chiptune`) y compatibilidad desde Android 8.0 (API 26) en arquitecturas de 32 y 64 bits (`armeabi-v7a` y `arm64-v8a`).
-
-### ¿Por qué vale la pena seguir puliéndola?
-- **La base pesada ya está construida**: Las 7 fases críticas de ingeniería (DSP C++20, FFmpeg/Python/QuickJS nativo, AAudio Bit-Perfect, Mixtapes, Karaoke y pipeline Beta) ya están operativas.
-- **Fase de Refinamiento de Experiencia (UX Polish)**: Estamos en la etapa donde pequeños ajustes de precisión —como hacer que la iluminación y los colores del reproductor respiren en tiempo real con cada cambio de escena del video sin gastar batería de más ni trabar el decodificador— elevan la sensación de calidad de "buena app" a **"producto insignia de nivel estudio"**.
+Esta actualización transforma el sistema de Widgets de escritorio de **Aura Music**, incorporando extracción cromática reactiva desde la carátula de la canción, adaptación automática al estirar el widget en la pantalla de inicio, reanudación de música en segundo plano sin abrir la ventana de la app, un **segundo Widget independiente de gran formato** para tus **4 Canciones más escuchadas o 4 Playlists**, y un nuevo menú a pantalla completa llamado **"Widget"** dentro de **Ajustes**.
 
 ---
 
-## 🛠️ 2. Decisiones Confirmadas con el Usuario
+## User Review & Critical Decisions
 
 > [!IMPORTANT]
-> **Configuración confirmada para la reactividad cromática en tiempo real del Video Canvas:**
-> - **Frecuencia Adaptativa Inteligente por Batería**:
->   - **Modo Normal (`180 ms`)**: Cuando el teléfono tiene **más de 15% de batería** y **no está activado el modo de ahorro de batería**, los colores se muestrean y actualizan cada **180 ms** con una transición suave y rápida para reaccionar al instante a cada cambio de escena o iluminación del video.
->   - **Modo Ahorro / Batería Baja (`800 ms`)**: Cuando el teléfono tiene **15% o menos de batería** (`<= 15%`) **o tiene activado el Modo Ahorro de Energía** (`PowerManager.isPowerSaveMode`), la frecuencia se reduce automáticamente a **800 ms** para proteger la autonomía del dispositivo sin perder el efecto dinámico.
-> - **Alcance Visual Completo**:
->   - La reacción de colores en tiempo real se aplicará **tanto en la pantalla del reproductor completo (`NowPlayingScreen`, incluyendo Modo Clásico, Modo Cinemático Canvas y Karaoke) como en el Mini Reproductor (`MiniPlayer`)**.
+> Se han integrado todas tus respuestas y preferencias confirmadas para asegurar una experiencia fluida, modular y fiel al diseño **Dark Luxury Neo-Glass OLED** de Aura Music:
+
+- **Segundo Widget Independiente en el Selector de Android**: Además del Widget de Reproductor principal, el usuario encontrará un segundo Widget dedicado (*"Aura Music • Top 4 & Playlists"*) en el selector de widgets de su teléfono, que muestra en formato grande las **4 canciones más escuchadas** o las **4 playlists principales** con sus portadas WebP o collages.
+- **Reanudación Directa en Segundo Plano + Controles Extra (Favorito ❤️ + Progreso)**: Al tocar *Play* (o elegir una canción/playlist del widget) incluso si la app fue cerrada horas antes, la música se reanudará directamente en segundo plano despertando al servicio multimedia y restaurando la última canción y posición guardada, además de incluir botón de **Favorito (Corazón ❤️)** y **barra de progreso** sincronizados en tiempo real.
+- **Nuevo Apartado "Widget" en Ajustes (Todo Configurable + Vista Previa)**: Dentro de **Ajustes** se añade la tarjeta navegable **"Widget"**, que abre una pantalla independiente a pantalla completa donde el usuario puede elegir si el Widget de accesos rápidos muestra las **4 Canciones más escuchadas** o las **4 Playlists**, activar o desactivar el **color dinámico de carátula en el Widget** y visualizar una **vista previa interactiva en vivo** de cómo lucirán ambos widgets antes de volver a su escritorio.
 
 ---
 
-## 🔍 3. Diagnóstico Técnico del Problema Actual (Fase: El Detective)
+## 1. Overview & Core Concept
 
-Al inspeccionar el código actual, identificamos las **3 causas raíz** por las cuales los colores dejaron de reaccionar en tiempo real cuando el video cambia de paleta:
-
-1. **Causa Raíz #1 (Cortocircuito por Carátula Estática en `ArtworkColorExtractor.kt`)**:
-   - En `extractPlaybackColors()` (líneas 201-208), existe un bloque `if (!track.albumArtPath.isNullOrBlank() && File(track.albumArtPath).exists())` que retorna inmediatamente el color estático de la portada WebP guardada en disco y **nunca llega a leer los fotogramas del video**.
-2. **Causa Raíz #2 (Caché Fija por Pista en lugar de Tiempo de Escena)**:
-   - `videoCacheKey` se calcula únicamente con `track.id` y `videoUri.hashCode()`, ignorando el progreso del video. Una vez calculado el primer color, devuelve siempre el mismo valor cacheado durante toda la canción.
-3. **Causa Raíz #3 (`LaunchedEffect` Estático y Contención de `MediaMetadataRetriever`)**:
-   - En `NowPlayingScreen.kt` y `AuraMusicAppContent.kt`, `LaunchedEffect` no observa el avance del video ni captura los cuadros ya decodificados en la GPU por el `TextureView` de `BackgroundVideoPlayer`. Usar `MediaMetadataRetriever` cada 180ms abriría un segundo decodificador de video en conflicto con ExoPlayer; en cambio, **muestrear un micro-bitmap (`24x24` px) directamente desde el `TextureView` activo que ya está renderizando el video** consume **0 decodificadores extra**, tarda menos de `1 ms` y refleja con exactitud milimétrica el fotograma exacto que el usuario está viendo en pantalla (incluso en loops o videos con boomerang).
-
----
-
-## 🎨 4. Experiencia de Usuario y Diseño Visual
-
-- **Reacción Instantánea a Cambios de Escena**:
-  - Cuando un video musical o Canvas pasa de una escena oscura/azul a una escena cálida/roja o neón, el halo ambiental superior (`NowPlayingAmbientTopGlow`), las ondas del visualizador espectral de 28 bandas (`AudioVisualizer`), el botón Play/Pausa, la barra de progreso con su bolita circular, la viñeta del Modo Cinemático y el fondo degradado del `MiniPlayer` transicionarán en vivo hacia la nueva paleta del fotograma actual.
-- **Sin Pantallas Negras ni tirones de FPS**:
-  - La captura se realiza directamente sobre el `TextureView` ya configurado en `BackgroundVideoPlayer` (`getBitmap(24, 24)`) y el cálculo de `Palette` ocurre en un hilo secundario (`Dispatchers.Default`), manteniendo los 60/120 FPS intactos y cero colisiones con `MediaCodec`.
-- **Adaptación Automática a la Batería**:
-  - Un monitor ligero consultará `BatteryManager` (`EXTRA_LEVEL` / `EXTRA_SCALE`) y `PowerManager.isPowerSaveMode`. Si la batería supera el 15% y el ahorro de energía está desactivado, el ciclo opera a **180 ms** (`tween(180)`). Si baja al 15% o menos, o se activa el ahorro de batería del sistema, el intervalo pasa automáticamente a **800 ms** (`tween(650)`).
+- **Qué hace**:
+  1. **Color Dinámico desde la Imagen (Carátula)**: El fondo, el halo superior, el botón principal de reproducción y la barra de progreso del Widget cambian automáticamente de color extrayendo la paleta vibrante de la imagen de portada WebP (o arte procedural) de la canción actual, manteniendo legibilidad perfecta y estética oscura OLED.
+  2. **Adaptación Automática al Estirarlo (Responsive Sizing)**: El Widget reproductor detecta en tiempo real sus dimensiones en `dp` (`onAppWidgetOptionsChanged`) cuando el usuario lo estira horizontal o verticalmente en su pantalla de inicio, conmutando entre **Modo Compacto (4x1)**, **Modo Mediano con Progreso y Favorito (4x2)** y **Modo Estudio Expandido (4x3 / Cuadrado Grande)** con carátula de gran formato y fila completa de transporte.
+  3. **Reanudación Persistente en Segundo Plano**: La última pista activa, la cola de reproducción y el segundo exacto donde quedó la música se guardan de forma persistente. Al tocar *Play*, *Siguiente*, *Favorito* o cualquiera de las 4 canciones/playlists desde el escritorio con la app cerrada, un motor de arranque en frío restaura la sesión desde la base de datos local y empieza a sonar al instante sin interrumpir al usuario abriendo la app.
+  4. **Segundo Widget Independiente "Top 4 Canciones / 4 Playlists"**: Un widget de buen tamaño (4x2 redimensionable a 4x3) que presenta una cuadrícula 2x2 de acceso directo a las **4 canciones que más escuchas** (ordenadas por `playCount`) o a tus **4 Playlists** (con su portada personalizada o collage automático de hasta 4 fotos). Tocar cualquiera de los 4 elementos inicia su reproducción inmediata en segundo plano.
+  5. **Nuevo Apartado "Widget" en Ajustes**: Menú a pantalla completa dentro de `Ajustes` con vista previa en vivo, selector de contenido del segundo widget (*4 Canciones más escuchadas* vs *4 Playlists*), interruptor de color dinámico en widgets y botón de sincronización instantánea.
+- **Valor Principal**: Control total de tu música y acceso inmediato a tus canciones y listas favoritas desde la pantalla de inicio del teléfono, sin esperas ni pantallas intermedias.
 
 ---
 
-## 🏗️ 5. Arquitectura Técnica y Flujo de Datos
+## 2. User Experience & Visual Design
+
+- **Flujos de Usuario Clave**:
+  1. **Reacción de Color y Estiramiento en Escritorio**: Al reproducir cualquier canción, el Widget extrae los colores dominantes y vibrantes de la imagen de carátula y pinta su fondo con un degradado diagonal Neo-Glass con borde luminoso sutil. Si el usuario mantiene presionado el widget en su launcher y lo estira hacia abajo, el widget pasa automáticamente de una barra horizontal compacta a una tarjeta amplia con barra de progreso en vivo, tiempos (`mm:ss`), botón de **Favorito (❤️)** e insignia técnica (`BIT-PERFECT AAUDIO` / `C++20 DSP`).
+  2. **Reanudación sin Abrir la App**: Si el teléfono reinició o Android cerró la app por falta de RAM, el Widget conserva en pantalla la última canción que estabas escuchando con su carátula y color. Al tocar **Play**, el servicio `AuraMediaPlaybackService` despierta en segundo plano, recarga la canción en el minuto donde la dejaste y comienza a sonar de inmediato.
+  3. **Uso del Segundo Widget (Top 4 Canciones / 4 Playlists)**: Al agregar el segundo widget a la pantalla de inicio, verás una cabecera con acceso rápido a reproducción y una cuadrícula 2x2 con las 4 canciones más escuchadas (o tus 4 playlists con su collage). Un toque sobre cualquier tarjeta reproduce esa canción o lista al instante.
+  4. **Personalización en `Ajustes > Widget`**: Al entrar a `Ajustes`, el usuario toca el nuevo apartado **"Widget"**. Allí ve una **Vista Previa en Vivo** de ambos widgets con los colores de su canción actual, puede alternar entre *"Mostrar 4 Canciones más escuchadas"* o *"Mostrar 4 Playlists"*, activar/desactivar el *"Color dinámico de la imagen en Widgets"* y elegir la opacidad/intensidad del tinte.
+- **Identidad Visual y Estética**:
+  - *Dirección Estética*: **Dark Luxury Neo-Glass OLED** armonizado con los colores reales de la carátula de cada canción.
+  - *Paleta y Contraste*: El color extraído de la imagen se combina con una base oscura profunda (`#0B0F19` a `#161F33`) para garantizar que el título blanco (`#FFFFFF`), el artista (`#CBD5E1`) y los controles mantengan un contraste impecable sin importar si la portada es muy clara o muy oscura.
+  - *Áreas Táctiles*: Todos los botones interactivos del widget (*Anterior*, *Play/Pausa*, *Siguiente*, *Favorito ❤️* y las *4 tarjetas de canciones/playlists*) cumplen con áreas táctiles cómodas y bien espaciadas.
+
+---
+
+## 3. Key Product Decisions & Trade-Offs
+
+- **Decisión 1: Renderizado de Fondo Degradado Dinámico por Bitmap en `RemoteViews`**
+  - *Enfoque Elegido*: Como los `RemoteViews` de Android tienen limitaciones para crear degradados complejos por código en todas las versiones desde Android 8.0 (API 26) hasta Android 16 (API 36), generaremos en un hilo secundario un lienzo vectorial redondeado (`Canvas` + `LinearGradient` + `RadialGradient` con los colores extraídos de la imagen por `Palette`) para el fondo del widget, el botón de Play y la barra de progreso.
+  - *Por qué*: Garantiza que el cambio de color según la imagen funcione al 100% en cualquier teléfono Android (desde Android 8.0 en adelante) con bordes curvos suaves, halo de neón y cero fallos visuales.
+- **Decisión 2: Reanudación en Frío Silenciosa vía `MediaSessionService` + Persistencia de Estado**
+  - *Enfoque Elegido*: Persistir cada cambio de canción, estado de favorito y posición periódica en el almacén local de estado del widget (`WidgetStateStore`). Cuando el usuario toca un botón del widget y el motor en memoria no está activo, el `BroadcastReceiver` arranca `AuraMediaPlaybackService` en segundo plano enviando la acción solicitada (`RESUME_LAST`, `PLAY_TRACK_ID`, `PLAY_PLAYLIST_ID`, `TOGGLE_FAVORITE`) sin lanzar `MainActivity`.
+  - *Por qué*: Evita que la app se abra de golpe en la cara del usuario cuando solo quería darle Play o cambiar de canción desde su pantalla de inicio.
+- **Decisión 3: Adaptación Multi-Tamaño por `OPTION_APPWIDGET_MIN_HEIGHT` y `MIN_WIDTH`**
+  - *Enfoque Elegido*: Soportar 3 niveles de diseño adaptativo dentro del Widget de Reproductor según la altura y anchura al estirarlo:
+    - **Compacto (`alto < 110dp`)**: Carátula, insignia, título/artista, botón Favorito ❤️ y controles principales.
+    - **Mediano (`110dp <= alto < 175dp`)**: Añade barra de progreso visual sincronizada, tiempo actual/total y fila ampliada de controles (Favorito ❤️, Anterior, Play/Pausa iluminado, Siguiente).
+    - **Expandido (`alto >= 175dp`)**: Diseño tipo estudio con portada destacada, metadatos completos, insignia audiófila y botonera de gran formato.
+
+---
+
+## 4. Technical Architecture & Data Strategy *(Technical Reference)*
+
+- **Diagrama de Arquitectura y Flujo de Componentes**:
 
 ```text
-┌─────────────────────────────────────────────────────────────────────────┐
-│                     Monitor de Estado de Batería                        │
-│  • BatteryManager (Nivel > 15% vs <= 15%) + PowerManager (PowerSave)    │
-│  • Define intervalo dinámico: 180 ms (Normal)  |  800 ms (Ahorro/Baja)  │
-└───────────────────────────────────┬─────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│             BackgroundVideoPlayer (TextureView Activo)                  │
-│  • Renderiza el Video Canvas en NowPlayingScreen o MiniPlayer           │
-│  • En cada ciclo (180ms / 800ms) mientras isPlaying == true:            │
-│    Extrae micro-frame 24x24 desde TextureView (0 sobrecarga MediaCodec) │
-└───────────────────────────────────┬─────────────────────────────────────┘
-                                    │ Bitmap 24x24
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│          ArtworkColorExtractor (Dispatchers.Default + Palette)          │
-│  • Analiza el micro-frame o fotograma actual en < 2ms                   │
-│  • Filtra cuadros completamente negros (fade-outs) para conservar       │
-│    una atmósfera cromática rica y evitar apagones grises                │
-│  • Emite ExtractedArtworkColors (primary, secondary, accent, topGlow)   │
-└─────────────────┬─────────────────────────────────────┬─────────────────┘
-                  │                                     │
-                  ▼                                     ▼
-┌───────────────────────────────────┐ ┌───────────────────────────────────┐
-│        NowPlayingScreen           │ │            MiniPlayer             │
-│  • Halo ambiental superior        │ │  • Degradado horizontal tintado   │
-│  • Visualizador C++20 28 bandas   │ │  • Borde luminoso Neo-Glass       │
-│  • Modo Cinemático & Controles    │ │  • Botón Play/Pausa y Seekbar     │
-└───────────────────────────────────┘ └───────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                     CAPA DE AJUSTES & VISTA PREVIA (UI)                      │
+│  [SettingsScreen] ──► [SettingsSubScreen.WIDGETS]                            │
+│                        ├── Selector: 4 Canciones Top vs 4 Playlists          │
+│                        ├── Switch: Color Dinámico desde Imagen de Carátula   │
+│                        └── Vista Previa Interactiva en Vivo de ambos Widgets │
+└──────────────────────────────────────┬───────────────────────────────────────┘
+                                       │ Guarda preferencias y refresca
+                                       ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                  ALMACÉN & SINCRONIZADOR DE WIDGETS (DATA)                   │
+│  [WidgetStateStore / WidgetDataSynchronizer]                                 │
+│   ├── Persiste última canción, posición (ms), favorito y colores de imagen   │
+│   ├── Caché de las 4 Canciones más escuchadas (Room: playCount DESC)         │
+│   └── Caché de las 4 Playlists principales + Collage WebP renderizado        │
+└───────────────┬──────────────────────────────────────────────┬───────────────┘
+                │                                              │
+                ▼                                              ▼
+┌─────────────────────────────────────────┐  ┌─────────────────────────────────┐
+│   WIDGET 1: REPRODUCTOR ADAPTATIVO      │  │  WIDGET 2: TOP 4 / PLAYLISTS    │
+│   [AuraMusicWidgetProvider]             │  │  [AuraLibraryWidgetProvider]    │
+│   ├── Reacciona al color de la imagen   │  │  ├── Cuadrícula 2x2 de buen     │
+│   ├── Se adapta al estirarlo:           │  │  │   tamaño (4 Canciones o      │
+│   │   • Compacto (4x1)                  │  │  │   4 Playlists configurables) │
+│   │   • Mediano con Progreso y ❤️ (4x2) │  │  ├── Reacciona al color activo  │
+│   │   • Expandido Estudio (4x3)         │  │  └── Toque directo reproduce    │
+└───┴──────────────────┬──────────────────┘  └───┴──────────────┬──────────────┘
+                       │                                        │
+                       └───────────────────┬────────────────────┘
+                                           │ Intents en 2do Plano (Sin abrir UI)
+                                           ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│               MOTOR DE REANUDACIÓN EN SEGUNDO PLANO (PLAYBACK)               │
+│  [AuraMediaPlaybackService] + [AuraAudioPlayer] + [Room Database]            │
+│   ├── Si la app está abierta: ejecuta acción al instante en memoria          │
+│   └── Si la app estaba cerrada: restaura pista/playlist desde Room,          │
+│       posiciona el segundo guardado y reanuda el audio en segundo plano      │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Componentes e Interacciones Clave a Actualizar
-1. **Extractor Cromático en Tiempo Real (`ArtworkColorExtractor`)**:
-   - Añadir soporte directo para extraer `ExtractedArtworkColors` a partir de un micro-bitmap en vivo del video (`extractColorsFromVideoFrame(bitmap, fallbackPrimary, fallbackSecondary)`), descartando cuadros completamente negros o vacíos (luminancia media casi cero en transiciones) para mantener colores vibrantes y armónicos.
-   - Corregir `extractPlaybackColors()` para que, cuando el video esté activo y aún no haya emitido su primer cuadro de `TextureView` (o cuando se consulte por tiempo en segundo plano), nunca sea bloqueado por la carátula estática WebP y extraiga del video real con `OPTION_CLOSEST`.
-2. **Muestreador Reactivo con Conciencia de Batería en `BackgroundVideoPlayer`**:
-   - Incorporar una utilidad ligera de verificación de batería y ahorro de energía (`isLowBatteryOrPowerSaveMode(context)`).
-   - Añadir un callback opcional `onVideoFrameColorsExtracted: ((ExtractedArtworkColors) -> Unit)? = null` en `BackgroundVideoPlayer` (o flujo compartido de colores de video en vivo) que, cuando el video está reproduciéndose y `isFirstFrameRendered == true`, capture un micro-bitmap de `24x24` píxeles del `TextureView` interno cada **180 ms** (o **800 ms** en batería `<= 15%` / ahorro de energía) y calcule la paleta en `Dispatchers.Default`.
-3. **Sincronización en `NowPlayingScreen` y `MiniPlayer` (`AuraMusicAppContent`)**:
-   - Conectar los colores emitidos en tiempo real tanto en `NowPlayingScreen` (en sus modos `FULLSCREEN_BACKGROUND`, `FULLSCREEN_ADAPTED` y `CARD_CANVAS`) como en `MiniPlayer` (`AuraMusicAppContent`), ajustando la duración de `animateColorAsState` (`tween(180)` en modo normal y `tween(650)` en modo ahorro) para que las transiciones sean continuas, suaves y 100% libres de parpadeos.
-4. **Sincronización de Documentación en Español**:
-   - Actualizar los documentos técnicos si aplica para reflejar el muestreo adaptativo por batería (`180ms` / `800ms`).
+- **Modelo de Datos y Estado Persistente**:
+  - `WidgetConfig`: Modelo inmutable persistido en preferencias con:
+    - `collectionMode`: Enum (`TOP_SONGS` para las 4 canciones más escuchadas, `PLAYLISTS` para las 4 playlists).
+    - `isDynamicColorEnabled`: Booleano (activo por defecto) para teñir el fondo y acentos de los widgets con los colores de la imagen de la canción actual.
+    - `showProgressInWidget`: Booleano para mostrar la barra de progreso y tiempos.
+  - `WidgetPersistedPlaybackState`: Guarda el `trackId`, `title`, `artist`, `albumArtPath`, `isFavorite`, `positionMs`, `durationMs`, `primaryColorInt` y `secondaryColorInt` de la última canción reproducida, permitiendo que el widget nunca pierda su diseño ni su capacidad de reanudar.
+- **Mapeo de Interacciones y Manejadores**:
+  - **Estiramiento (`onAppWidgetOptionsChanged`)**: Calcula `minWidth` y `minHeight` de las opciones del widget y selecciona la plantilla correspondiente (`Compact`, `Medium`, `Expanded`), regenerando el bitmap de fondo con las proporciones exactas para evitar deformaciones.
+  - **Botón Favorito (❤️) en el Widget**: Invoca `ACTION_WIDGET_FAVORITE`, alterna `isFavorite` en la base de datos Room y en `AuraAudioPlayer`, actualiza el icono del corazón en rojo intenso (`#EF4444`) al instante y sincroniza el estado con `NowPlayingScreen`.
+  - **Toque en cualquiera de las 4 Canciones o 4 Playlists del Segundo Widget**: Envía `ACTION_WIDGET_PLAY_ITEM` con el ID de la canción o de la playlist; inicia la cola correspondiente en `AuraAudioPlayer` en segundo plano y actualiza ambos widgets simultáneamente.

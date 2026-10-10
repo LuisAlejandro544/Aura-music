@@ -138,8 +138,12 @@ Todo el panel de efectos se despliega al instante en una hoja modal desde el **M
 - **Letras Estilo Karaoke con Descarga Automática (`LRCLIB`)**:
   - Descarga letras sincronizadas automáticamente sin registro, o usa el **Buscador Interactivo** que destaca la versión `⭐ OFICIAL / RECOMENDADA` en primer lugar y te permite comparar variantes comunitarias o importar tus propios archivos `.lrc` y `.txt`.
   - **Modo Karaoke a Pantalla Completa**: Vista inmersiva estilo *Apple Music Sing / Spotify* con letra grande iluminada en neón, auto-scroll y salto de tiempo al tocar cualquier verso.
-- **Temas OLED, Material You, Collages, Widgets y Android Auto**:
-  - 5 paletas de acento neón (*Material You dinámico, Nebula Violet, Cyber Mint, Sunset Ember, Ocean Abyss*), Playlists con portada personalizada o collage automático de 1 a 4 fotos, Widget redimensionable para la pantalla de inicio con insignia Bit-Perfect y soporte para **Android Auto**.
+- **Temas OLED, Material You, Collages, 2 Widgets Interactivos y Android Auto**:
+  - 5 paletas de acento neón (*Material You dinámico, Nebula Violet, Cyber Mint, Sunset Ember, Ocean Abyss*) y Playlists con portada personalizada o collage automático de 1 a 4 fotos.
+  - **2 Widgets Interactivos con Color Dinámico de la Imagen y Reanudación en Segundo Plano**:
+    - **Widget 1 (Reproductor Adaptativo)**: Reacciona automáticamente a los colores de la carátula de la canción actual, permite reanudar la música que estabas escuchando directamente en segundo plano (incluso tras cerrar la app), incluye botón de **Favorito ❤️** y **se adapta al estirarlo** en tu pantalla de inicio (*Compacto 4x1*, *Mediano 4x2 con barra de progreso y tiempos* y *Expandido 4x3 de estudio*).
+    - **Widget 2 Independiente (Top 4 Canciones & 4 Playlists)**: Un segundo widget de buen tamaño (cuadrícula 2x2) que muestra tus **4 canciones más escuchadas** o tus **4 Playlists principales** (con su portada o collage dinámico) para reproducirlas con un solo toque, todo 100% configurable con vista previa en vivo desde el nuevo apartado **Ajustes > Widget**.
+  - Soporte integrado para consolas de vehículos compatibles con **Android Auto**.
 - **Transparencia Total de Almacenamiento**:
   - En **Ajustes > Medios & Almacenamiento** puedes inspeccionar cada portada WebP y cada Video Canvas MP4 guardado, ver cuántos KB o MB ocupa y borrar individualmente los que no necesites para liberar espacio al instante.
 
