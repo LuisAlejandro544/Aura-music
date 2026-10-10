@@ -60,6 +60,28 @@ private fun findInternalTextureView(view: View?): TextureView? {
 }
 
 /**
+ * Estado reactivo compartido del reproductor de Video Canvas para indicar en Now Playing y MiniPlayer
+ * cuando el video de fondo está cargando buffer o esperando conexión a internet.
+ */
+object BackgroundVideoLoadingState {
+    private val _isVideoBufferingFlow = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val isVideoBufferingFlow: kotlinx.coroutines.flow.StateFlow<Boolean> = _isVideoBufferingFlow
+
+    private val _isVideoNetworkStalledFlow = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val isVideoNetworkStalledFlow: kotlinx.coroutines.flow.StateFlow<Boolean> = _isVideoNetworkStalledFlow
+
+    fun update(isBuffering: Boolean, isNetworkStalled: Boolean) {
+        _isVideoBufferingFlow.value = isBuffering
+        _isVideoNetworkStalledFlow.value = isNetworkStalled
+    }
+
+    fun reset() {
+        _isVideoBufferingFlow.value = false
+        _isVideoNetworkStalledFlow.value = false
+    }
+}
+
+/**
  * Componente de reproducción de Video de Fondo (Canvas / Video Sincronizado) con aceleración GPU sin colisiones
  * y muestreo cromático en tiempo real adaptativo por batería.
  *
@@ -92,7 +114,8 @@ fun BackgroundVideoPlayer(
     cornerRadius: androidx.compose.ui.unit.Dp = 24.dp,
     fitHorizontalInFullscreen: Boolean = false,
     enableLiveColorSampling: Boolean = true,
-    onLiveColorsExtracted: ((ExtractedArtworkColors, Long) -> Unit)? = null
+    onLiveColorsExtracted: ((ExtractedArtworkColors, Long) -> Unit)? = null,
+    onVideoLoadingStateChanged: ((isBuffering: Boolean, isNetworkStalled: Boolean) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val fallbackPrimary = MaterialTheme.colorScheme.primary
@@ -100,8 +123,20 @@ fun BackgroundVideoPlayer(
     val isAppInForeground by com.example.AuraApplication.isAppInForegroundFlow.collectAsState()
     val shouldPlayVideoNow = isPlaying && (isAppInForeground || !com.example.AuraApplication.isBackgroundGameModeEnabled)
 
+    val isRemoteStream = remember(videoUriString) {
+        videoUriString.startsWith("http://", ignoreCase = true) ||
+            videoUriString.startsWith("https://", ignoreCase = true)
+    }
+
     var isFirstFrameRendered by remember(videoUriString) { mutableStateOf(false) }
+    var isVideoBuffering by remember(videoUriString) { mutableStateOf(isRemoteStream) }
+    var isVideoNetworkStalled by remember(videoUriString) { mutableStateOf(false) }
     var videoDimensions by remember(videoUriString) { mutableStateOf<Pair<Int, Int>?>(null) }
+
+    LaunchedEffect(isVideoBuffering, isVideoNetworkStalled) {
+        BackgroundVideoLoadingState.update(isVideoBuffering, isVideoNetworkStalled)
+        onVideoLoadingStateChanged?.invoke(isVideoBuffering, isVideoNetworkStalled)
+    }
 
     // Detección reactiva de si el video es horizontal (16:9 / panorámico) o vertical (9:16)
     val isHorizontalVideo = remember(videoDimensions) {
@@ -124,6 +159,34 @@ fun BackgroundVideoPlayer(
         object : Player.Listener {
             override fun onRenderedFirstFrame() {
                 isFirstFrameRendered = true
+                isVideoBuffering = false
+                isVideoNetworkStalled = false
+            }
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                when (playbackState) {
+                    Player.STATE_BUFFERING -> {
+                        isVideoBuffering = true
+                    }
+                    Player.STATE_READY -> {
+                        isVideoBuffering = false
+                        isVideoNetworkStalled = false
+                    }
+                    Player.STATE_ENDED, Player.STATE_IDLE -> {
+                        if (isFirstFrameRendered) {
+                            isVideoBuffering = false
+                        }
+                    }
+                }
+            }
+
+            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                if (isRemoteStream) {
+                    isVideoBuffering = true
+                    isVideoNetworkStalled = true
+                } else {
+                    isVideoBuffering = false
+                }
             }
 
             override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
@@ -147,10 +210,10 @@ fun BackgroundVideoPlayer(
 
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
-                /* minBufferMs = */ 1500,
-                /* maxBufferMs = */ 5000,
-                /* bufferForPlaybackMs = */ 250,
-                /* bufferForPlaybackAfterRebufferMs = */ 500
+                /* minBufferMs = */ if (isRemoteStream) 2500 else 1500,
+                /* maxBufferMs = */ if (isRemoteStream) 8000 else 5000,
+                /* bufferForPlaybackMs = */ if (isRemoteStream) 600 else 250,
+                /* bufferForPlaybackAfterRebufferMs = */ if (isRemoteStream) 1200 else 500
             )
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
@@ -160,17 +223,29 @@ fun BackgroundVideoPlayer(
             .build()
             .apply {
                 // Desactivar por completo las pistas de audio y texto en el reproductor de video
-                // para no abrir ningún decodificador de audio redundante.
+                // y limitar en streaming la resolución/framerate (máx 480p @ 30fps) para enfriar GPU/CPU.
                 trackSelectionParameters = TrackSelectionParameters.Builder(appCtx)
                     .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, true)
                     .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+                    .apply {
+                        if (isRemoteStream) {
+                            setMaxVideoSize(854, 480)
+                            setMaxVideoFrameRate(30)
+                            setMaxVideoBitrate(1_200_000)
+                        }
+                    }
                     .build()
 
                 volume = 0f
                 setSeekParameters(SeekParameters.CLOSEST_SYNC)
                 repeatMode = if (isVideoLoop) Player.REPEAT_MODE_ALL else Player.REPEAT_MODE_OFF
 
-                val mediaItem = if (videoUriString.startsWith("content://") || videoUriString.startsWith("file://")) {
+                val mediaItem = if (
+                    videoUriString.startsWith("http://", ignoreCase = true) ||
+                    videoUriString.startsWith("https://", ignoreCase = true) ||
+                    videoUriString.startsWith("content://", ignoreCase = true) ||
+                    videoUriString.startsWith("file://", ignoreCase = true)
+                ) {
                     MediaItem.fromUri(Uri.parse(videoUriString))
                 } else {
                     MediaItem.fromUri(Uri.fromFile(File(videoUriString)))
@@ -191,6 +266,25 @@ fun BackgroundVideoPlayer(
                     play()
                 }
             }
+    }
+
+    // Auto-recuperación en segundo plano cuando el video online sufre micro-cortes de internet
+    LaunchedEffect(isVideoNetworkStalled, isRemoteStream, shouldPlayVideoNow, videoPlayer) {
+        if (isRemoteStream && isVideoNetworkStalled && shouldPlayVideoNow) {
+            while (isActive && isVideoNetworkStalled) {
+                delay(2500L)
+                if (videoPlayer.playbackState == Player.STATE_IDLE) {
+                    try {
+                        val pos = currentPositionFlow?.value ?: currentPositionMs
+                        if (!isVideoLoop && pos > 0L) {
+                            videoPlayer.seekTo(pos)
+                        }
+                        videoPlayer.prepare()
+                        videoPlayer.play()
+                    } catch (_: Throwable) {}
+                }
+            }
+        }
     }
 
     // Sincronizar velocidad de reproducción en tiempo real con la velocidad de la música

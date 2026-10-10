@@ -84,6 +84,9 @@ fun NowPlayingCinematicLayout(
     onOpenDetails: () -> Unit,
     collectionContextTitle: String = "Tu Biblioteca",
     onDownloadStreamingTrack: (() -> Unit)? = null,
+    isLoadingOrBuffering: Boolean = false,
+    isVideoLoading: Boolean = false,
+    isWaitingForNetwork: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -145,13 +148,21 @@ fun NowPlayingCinematicLayout(
                         .padding(horizontal = 8.dp)
                 ) {
                     Text(
-                        text = "REPRODUCIENDO DESDE",
+                        text = if (isWaitingForNetwork) {
+                            "SIN RED • ESPERANDO CONEXIÓN..."
+                        } else if (isLoadingOrBuffering || isVideoLoading) {
+                            "CARGANDO STREAM..."
+                        } else {
+                            "REPRODUCIENDO DESDE"
+                        },
                         style = MaterialTheme.typography.labelSmall.copy(
-                            color = TextSecondary,
+                            color = if (isWaitingForNetwork) Color(0xFFF59E0B) else if (isLoadingOrBuffering || isVideoLoading) animatedPrimary else TextSecondary,
                             fontWeight = FontWeight.Medium,
                             fontSize = 10.sp,
                             letterSpacing = 1.sp
-                        )
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = collectionContextTitle.ifBlank { currentTrack.album },
@@ -230,16 +241,35 @@ fun NowPlayingCinematicLayout(
                     .padding(vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Miniatura cuadrada de carátula oficial de 54dp
-                ArtworkImage(
-                    track = currentTrack,
+                // Miniatura cuadrada de carátula oficial de 54dp con indicador de carga de video/red
+                Box(
                     modifier = Modifier
                         .size(54.dp)
                         .clip(RoundedCornerShape(10.dp))
                         .shadow(4.dp, RoundedCornerShape(10.dp))
                         .testTag("cinematic_mini_artwork"),
-                    cornerRadius = 10.dp
-                )
+                    contentAlignment = Alignment.Center
+                ) {
+                    ArtworkImage(
+                        track = currentTrack,
+                        modifier = Modifier.fillMaxSize(),
+                        cornerRadius = 10.dp
+                    )
+                    if (isLoadingOrBuffering || isVideoLoading || isWaitingForNetwork) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.48f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(22.dp),
+                                color = if (isWaitingForNetwork) Color(0xFFF59E0B) else animatedPrimary,
+                                strokeWidth = 2.4.dp
+                            )
+                        }
+                    }
+                }
 
                 Spacer(modifier = Modifier.width(14.dp))
 
@@ -363,7 +393,7 @@ fun NowPlayingCinematicLayout(
                     )
                 }
 
-                // Botón Play / Pausa Central Circular Blanco de 64dp con halo aislado reactivo al video
+                // Botón Play / Pausa Central Circular Blanco de 64dp con halo aislado y anillo de carga en vivo
                 Box(contentAlignment = Alignment.Center) {
                     CinematicPlayButtonHalo(
                         isPlaying = isPlaying,
@@ -390,6 +420,15 @@ fun NowPlayingCinematicLayout(
                                 modifier = Modifier.size(34.dp)
                             )
                         }
+                    }
+                    if (isLoadingOrBuffering || isVideoLoading || isWaitingForNetwork) {
+                        CircularProgressIndicator(
+                            modifier = Modifier
+                                .size(72.dp)
+                                .testTag("cinematic_play_pause_loading_ring"),
+                            color = if (isWaitingForNetwork) Color(0xFFF59E0B) else animatedPrimary,
+                            strokeWidth = 3.dp
+                        )
                     }
                 }
 

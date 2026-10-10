@@ -35,6 +35,8 @@ fun NowPlayingArtworkCard(
     onCycleVideoDisplayMode: () -> Unit = {},
     audioIntensity: Float = 0.15f,
     onOpenVideoMode: (() -> Unit)? = null,
+    isLoadingOrBuffering: Boolean = false,
+    isWaitingForNetwork: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val hasVideo = !currentTrack.videoUri.isNullOrEmpty()
@@ -71,6 +73,34 @@ fun NowPlayingArtworkCard(
                     modifier = Modifier.fillMaxSize(),
                     cornerRadius = 26.dp
                 )
+            }
+        }
+
+        if (isLoadingOrBuffering || isWaitingForNetwork) {
+            androidx.compose.material3.Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = Color.Black.copy(alpha = 0.62f),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 14.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    androidx.compose.material3.CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        color = if (isWaitingForNetwork) Color(0xFFF59E0B) else animatedPrimary,
+                        strokeWidth = 2.dp
+                    )
+                    androidx.compose.material3.Text(
+                        text = if (isWaitingForNetwork) "Esperando red..." else "Cargando stream...",
+                        style = androidx.compose.material3.MaterialTheme.typography.labelSmall.copy(
+                            color = Color.White
+                        )
+                    )
+                }
             }
         }
     }

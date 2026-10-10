@@ -203,27 +203,32 @@ class StreamingModeCoordinator(
                     onLoadLyricsForTrack(playingTrack)
                 }
 
-                // 3. Pre-descargar de forma no lineal en la caché temporal los minutos de audio
-                cacheManager.prefetchAudioAheadAsync(
-                    videoId = item.videoId,
-                    streamUrl = playableAudioUrl
-                ) { cachedFile ->
-                    // Actualizar la referencia en la cola para que si el usuario repite o vuelve atrás use el archivo local a 0ms
-                    val updated = playingTrack.copy(uriString = cachedFile.absolutePath)
-                    audioPlayer.appendOrUpdateStreamingTrack(updated)
-                }
-
-                // 4. Si la política de Video Canvas en Streaming lo permite (Solo Wi-Fi vs Siempre), pre-cargar en caché
-                if (canUseVideoCanvas && resolved.videoUrl.isNotBlank()) {
-                    cacheManager.prefetchVideoCanvasAsync(
+                // 3. Pre-descargar de forma escalonada en la caché temporal para no competir con el buffer inicial
+                //    ni recrear el decodificador de video/audio en mitad de la canción activa.
+                scope.launch(Dispatchers.IO) {
+                    kotlinx.coroutines.delay(3500L)
+                    cacheManager.prefetchAudioAheadAsync(
                         videoId = item.videoId,
-                        videoStreamUrl = resolved.videoUrl
-                    ) { cachedVideoFile ->
-                        val cur = audioPlayer.currentTrack.value
-                        val updated = (if (cur?.id == playingTrack.id) cur else playingTrack).copy(
-                            videoUri = cachedVideoFile.absolutePath
-                        )
-                        audioPlayer.appendOrUpdateStreamingTrack(updated)
+                        streamUrl = playableAudioUrl
+                    ) { cachedFile ->
+                        val updated = playingTrack.copy(uriString = cachedFile.absolutePath)
+                        audioPlayer.appendOrUpdateStreamingTrack(updated, updateCurrentTrackIfSame = false)
+                    }
+
+                    // 4. Si la política de Video Canvas lo permite, pre-cargar en caché después del arranque inicial
+                    if (canUseVideoCanvas && resolved.videoUrl.isNotBlank() && initialVideoUri?.startsWith("http", ignoreCase = true) == true) {
+                        kotlinx.coroutines.delay(5000L)
+                        cacheManager.prefetchVideoCanvasAsync(
+                            videoId = item.videoId,
+                            videoStreamUrl = resolved.videoUrl
+                        ) { cachedVideoFile ->
+                            val cur = audioPlayer.currentTrack.value
+                            val updated = (if (cur?.id == playingTrack.id) cur else playingTrack).copy(
+                                videoUri = cachedVideoFile.absolutePath
+                            )
+                            // Actualizar solo en la cola para que no destruya ni reinicie el BackgroundVideoPlayer activo
+                            audioPlayer.appendOrUpdateStreamingTrack(updated, updateCurrentTrackIfSame = false)
+                        }
                     }
                 }
 
@@ -295,12 +300,16 @@ class StreamingModeCoordinator(
                         audioPlayer.playTrack(resolvedTrack, isAutoCrossfadeOverlap = isAutoCrossfade)
                         onLoadLyricsForTrack(resolvedTrack)
                     }
-                    cacheManager.prefetchAudioAheadAsync(videoId, playableAudioUrl) { file ->
-                        audioPlayer.appendOrUpdateStreamingTrack(resolvedTrack.copy(uriString = file.absolutePath))
-                    }
-                    if (allowVideo && resolved.videoUrl.isNotBlank()) {
-                        cacheManager.prefetchVideoCanvasAsync(videoId, resolved.videoUrl) { vFile ->
-                            audioPlayer.appendOrUpdateStreamingTrack(resolvedTrack.copy(videoUri = vFile.absolutePath))
+                    scope.launch(Dispatchers.IO) {
+                        kotlinx.coroutines.delay(3500L)
+                        cacheManager.prefetchAudioAheadAsync(videoId, playableAudioUrl) { file ->
+                            audioPlayer.appendOrUpdateStreamingTrack(resolvedTrack.copy(uriString = file.absolutePath), updateCurrentTrackIfSame = false)
+                        }
+                        if (allowVideo && resolved.videoUrl.isNotBlank()) {
+                            kotlinx.coroutines.delay(5000L)
+                            cacheManager.prefetchVideoCanvasAsync(videoId, resolved.videoUrl) { vFile ->
+                                audioPlayer.appendOrUpdateStreamingTrack(resolvedTrack.copy(videoUri = vFile.absolutePath), updateCurrentTrackIfSame = false)
+                            }
                         }
                     }
                     prefetchNextSimilarTrackForRadio(resolvedTrack)

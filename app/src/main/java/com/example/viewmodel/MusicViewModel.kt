@@ -133,6 +133,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val queue = audioPlayer.queue
     val currentIndex = audioPlayer.currentIndex
     val playbackError = audioPlayer.playbackError
+    val isAudioBuffering = audioPlayer.isBuffering
+    val isNetworkStalled = audioPlayer.isNetworkStalled
 
     // Estado de ecualizador y efectos
     val eqBands = effectsCoordinator.eqBands
@@ -242,6 +244,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         //   (por ejemplo, mientras el usuario está jugando) para ahorrar CPU y batería.
         // - Pausa el muestreo de las 28 bandas cuando la app está en Modo Cinemático (donde no hay barras de visualizador)
         //   o cuando NowPlayingScreen está minimizada.
+        // - En modo Streaming con Video Canvas, reduce la frecuencia de despertado del hilo para enfriar el procesador.
         viewModelScope.launch(Dispatchers.Default) {
             val buffer = FloatArray(28)
             while (true) {
@@ -263,13 +266,19 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                         NowPlayingDesignMode.AUTO -> isFullscreenVid
                     }
 
+                    if (currentTrk?.isStreamingTrack == true && isCinematicMode) {
+                        _audioIntensity.value = 0.22f
+                        delay(450L)
+                        continue
+                    }
+
                     // Solo muestrear las 28 bandas cuando estamos en Modo Clásico (donde existe AudioVisualizer)
                     if (!isCinematicMode) {
                         NativeAudioEngine.getVisualizerBands(buffer)
                         _visualizerBands.value = buffer.copyOf()
                     }
                     _audioIntensity.value = NativeAudioEngine.getAudioIntensity()
-                    delay(if (isCinematicMode) 65L else 33L)
+                    delay(if (isCinematicMode) 120L else 42L)
                 } else {
                     var needsDecay = false
                     for (i in buffer.indices) {
@@ -286,7 +295,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                         _visualizerBands.value = buffer.copyOf()
                         delay(45L)
                     } else {
-                        delay(250L)
+                        delay(350L)
                     }
                 }
             }

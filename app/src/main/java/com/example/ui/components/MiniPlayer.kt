@@ -58,6 +58,9 @@ fun MiniPlayer(
     dynamicSecondary: Color = MaterialTheme.colorScheme.secondary,
     isMiniPlayerVideoEnabled: Boolean = true,
     playbackSpeed: Float = 1.0f,
+    isLoadingOrBuffering: Boolean = false,
+    isVideoLoading: Boolean = false,
+    isWaitingForNetwork: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     if (currentTrack == null) return
@@ -132,6 +135,20 @@ fun MiniPlayer(
                             )
                         }
                     }
+                    if (isLoadingOrBuffering || isVideoLoading || isWaitingForNetwork) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.45f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                color = if (isWaitingForNetwork) Color(0xFFF59E0B) else dynamicPrimary,
+                                strokeWidth = 2.dp
+                            )
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.width(12.dp))
@@ -164,8 +181,16 @@ fun MiniPlayer(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = currentTrack.artist,
-                        style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
+                        text = if (isWaitingForNetwork) {
+                            "Esperando internet • ${currentTrack.artist}"
+                        } else if (isLoadingOrBuffering || isVideoLoading) {
+                            "Cargando stream • ${currentTrack.artist}"
+                        } else {
+                            currentTrack.artist
+                        },
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = if (isWaitingForNetwork) Color(0xFFF59E0B) else TextSecondary
+                        ),
                         maxLines = 1,
                         overflow = TextOverflow.Clip,
                         modifier = Modifier
@@ -195,24 +220,35 @@ fun MiniPlayer(
                     )
                 }
 
-                // Botón Play/Pause Tintado
+                // Botón Play/Pause Tintado con Anillo de Carga en Streaming
                 IconButton(
                     onClick = onTogglePlayPause,
                     modifier = Modifier
                         .size(48.dp)
                         .testTag("mini_player_play_pause")
                 ) {
-                    Surface(
-                        shape = RoundedCornerShape(24.dp),
-                        color = dynamicPrimary,
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                contentDescription = if (isPlaying) "Pausar" else "Reproducir",
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp)
+                    Box(contentAlignment = Alignment.Center) {
+                        Surface(
+                            shape = RoundedCornerShape(24.dp),
+                            color = dynamicPrimary,
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                    contentDescription = if (isPlaying) "Pausar" else "Reproducir",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                        if (isLoadingOrBuffering || isVideoLoading || isWaitingForNetwork) {
+                            CircularProgressIndicator(
+                                modifier = Modifier
+                                    .size(42.dp)
+                                    .testTag("mini_player_play_pause_loading_ring"),
+                                color = if (isWaitingForNetwork) Color(0xFFF59E0B) else Color.White,
+                                strokeWidth = 2.2.dp
                             )
                         }
                     }

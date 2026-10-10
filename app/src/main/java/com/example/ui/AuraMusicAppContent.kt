@@ -53,6 +53,11 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
     val repeatMode by viewModel.repeatMode.collectAsStateWithLifecycle()
     val queue by viewModel.queue.collectAsStateWithLifecycle()
     val currentIndex by viewModel.currentIndex.collectAsStateWithLifecycle()
+    val isAudioBuffering by viewModel.isAudioBuffering.collectAsStateWithLifecycle()
+    val isNetworkStalled by viewModel.isNetworkStalled.collectAsStateWithLifecycle()
+    val isResolvingStreamGlobal by viewModel.isResolvingStream.collectAsStateWithLifecycle()
+    val isVideoBufferingGlobal by com.example.ui.components.BackgroundVideoLoadingState.isVideoBufferingFlow.collectAsStateWithLifecycle()
+    val isVideoNetworkStalledGlobal by com.example.ui.components.BackgroundVideoLoadingState.isVideoNetworkStalledFlow.collectAsStateWithLifecycle()
 
     // Estados de Room
     val allTracks by viewModel.allTracks.collectAsStateWithLifecycle()
@@ -317,7 +322,10 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
                                 dynamicPrimary = animatedMiniPrimary,
                                 dynamicSecondary = animatedMiniSecondary,
                                 isMiniPlayerVideoEnabled = isMiniPlayerVideoEnabled && !isNowPlayingExpanded,
-                                playbackSpeed = playbackSpeed
+                                playbackSpeed = playbackSpeed,
+                                isLoadingOrBuffering = isAudioBuffering || isResolvingStreamGlobal,
+                                isVideoLoading = isMiniPlayerVideoEnabled && !effectiveTrack?.videoUri.isNullOrEmpty() && isVideoBufferingGlobal,
+                                isWaitingForNetwork = isNetworkStalled || (isMiniPlayerVideoEnabled && !effectiveTrack?.videoUri.isNullOrEmpty() && isVideoNetworkStalledGlobal)
                             )
                         }
 
@@ -635,6 +643,8 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
                 onSetNowPlayingDesignMode = { viewModel.setNowPlayingDesignMode(it) },
                 collectionContextTitle = selectedPlaylist?.name ?: currentTrack?.album ?: "Tu Biblioteca",
                 onDownloadStreamingTrack = { track -> viewModel.downloadCurrentStreamingTrackPermanently(track) },
+                isLoadingOrBuffering = isAudioBuffering || isResolvingStreamGlobal,
+                isWaitingForNetwork = isNetworkStalled,
                 isDynamicArtworkColorEnabled = isDynamicArtworkColorEnabled,
                 onToggleVideoCanvas = { viewModel.toggleVideoCanvas() },
                 onSetVideoDisplayMode = { viewModel.setVideoDisplayMode(it) },

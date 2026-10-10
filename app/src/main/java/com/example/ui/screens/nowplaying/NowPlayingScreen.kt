@@ -180,6 +180,8 @@ fun NowPlayingScreen(
     onSetNowPlayingDesignMode: (NowPlayingDesignMode) -> Unit = {},
     collectionContextTitle: String = "Tu Biblioteca",
     onDownloadStreamingTrack: ((Track) -> Unit)? = null,
+    isLoadingOrBuffering: Boolean = false,
+    isWaitingForNetwork: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     BackHandler {
@@ -205,6 +207,10 @@ fun NowPlayingScreen(
 
     val isVideoVisual = (videoDisplayMode != VideoDisplayMode.OFF) && !currentTrack.videoUri.isNullOrEmpty()
     val liveVideoSnapshot by ArtworkColorExtractor.liveVideoColorsFlow.collectAsStateWithLifecycle()
+    val isVideoBufferingLive by com.example.ui.components.BackgroundVideoLoadingState.isVideoBufferingFlow.collectAsStateWithLifecycle()
+    val isVideoNetworkStalledLive by com.example.ui.components.BackgroundVideoLoadingState.isVideoNetworkStalledFlow.collectAsStateWithLifecycle()
+    val effectiveVideoLoading = isVideoVisual && isVideoBufferingLive
+    val effectiveWaitingNetwork = isWaitingForNetwork || (isVideoVisual && isVideoNetworkStalledLive)
     var activeSampleIntervalMs by remember {
         mutableLongStateOf(ArtworkColorExtractor.getAdaptiveSampleIntervalMs(context))
     }
@@ -377,7 +383,10 @@ fun NowPlayingScreen(
                 collectionContextTitle = collectionContextTitle,
                 onDownloadStreamingTrack = if (currentTrack.isStreamingTrack && onDownloadStreamingTrack != null) {
                     { onDownloadStreamingTrack(currentTrack) }
-                } else null
+                } else null,
+                isLoadingOrBuffering = isLoadingOrBuffering,
+                isVideoLoading = effectiveVideoLoading,
+                isWaitingForNetwork = effectiveWaitingNetwork
             )
         } else {
             Column(
@@ -442,7 +451,9 @@ fun NowPlayingScreen(
                     playbackSpeed = playbackSpeed,
                     onCycleVideoDisplayMode = onCycleVideoDisplayMode,
                     audioIntensity = audioIntensity,
-                    onOpenVideoMode = { showVideoModeDialog = true }
+                    onOpenVideoMode = { showVideoModeDialog = true },
+                    isLoadingOrBuffering = isLoadingOrBuffering || effectiveVideoLoading,
+                    isWaitingForNetwork = effectiveWaitingNetwork
                 )
             }
 
@@ -485,7 +496,9 @@ fun NowPlayingScreen(
                 onClearABLoop = onClearABLoop,
                 activeMixtapeChapter = activeMixtapeChapter,
                 mixtapeChapterIndex = mixtapeChapterIndex,
-                mixtapeTotalChapters = mixtapeTotalChapters
+                mixtapeTotalChapters = mixtapeTotalChapters,
+                isLoadingOrBuffering = isLoadingOrBuffering || effectiveVideoLoading,
+                isWaitingForNetwork = effectiveWaitingNetwork
             )
 
             // Barra de Balance Estéreo Fino L/R en Tiempo Real

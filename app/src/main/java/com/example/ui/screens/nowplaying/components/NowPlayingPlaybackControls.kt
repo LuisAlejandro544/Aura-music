@@ -65,6 +65,8 @@ fun NowPlayingPlaybackControls(
     activeMixtapeChapter: com.example.model.MixtapeChapter? = null,
     mixtapeChapterIndex: Int = -1,
     mixtapeTotalChapters: Int = -1,
+    isLoadingOrBuffering: Boolean = false,
+    isWaitingForNetwork: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
@@ -220,26 +222,37 @@ fun NowPlayingPlaybackControls(
                 )
             }
 
-            // Play / Pause (Botón Grande con Sombra)
-            Surface(
-                shape = CircleShape,
-                color = animatedPrimary,
-                shadowElevation = 12.dp,
-                modifier = Modifier
-                    .size(68.dp)
-                    .clip(CircleShape)
-            ) {
-                IconButton(
-                    onClick = onTogglePlayPause,
+            // Play / Pause (Botón Grande con Sombra y Anillo de Carga en Streaming)
+            Box(contentAlignment = Alignment.Center) {
+                Surface(
+                    shape = CircleShape,
+                    color = animatedPrimary,
+                    shadowElevation = 12.dp,
                     modifier = Modifier
-                        .fillMaxSize()
-                        .testTag("now_playing_play_pause_btn")
+                        .size(68.dp)
+                        .clip(CircleShape)
                 ) {
-                    Icon(
-                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (isPlaying) "Pausar" else "Reproducir",
-                        tint = Color.White,
-                        modifier = Modifier.size(36.dp)
+                    IconButton(
+                        onClick = onTogglePlayPause,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .testTag("now_playing_play_pause_btn")
+                    ) {
+                        Icon(
+                            imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = if (isPlaying) "Pausar" else "Reproducir",
+                            tint = Color.White,
+                            modifier = Modifier.size(36.dp)
+                        )
+                    }
+                }
+                if (isLoadingOrBuffering || isWaitingForNetwork) {
+                    CircularProgressIndicator(
+                        modifier = Modifier
+                            .size(76.dp)
+                            .testTag("now_playing_play_pause_loading_ring"),
+                        color = if (isWaitingForNetwork) Color(0xFFF59E0B) else Color.White,
+                        strokeWidth = 3.dp
                     )
                 }
             }

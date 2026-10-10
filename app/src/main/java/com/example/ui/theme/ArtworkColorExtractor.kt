@@ -265,6 +265,13 @@ object ArtworkColorExtractor {
     }
 
     private fun getOrCreateRetriever(context: Context, videoUri: String): MediaMetadataRetriever? {
+        // Prohibir MediaMetadataRetriever sobre flujos HTTP/HTTPS remotos para evitar
+        // abrir una segunda conexión de red y decodificar video por software en CPU (recalentamiento).
+        if (videoUri.startsWith("http://", ignoreCase = true) ||
+            videoUri.startsWith("https://", ignoreCase = true)
+        ) {
+            return null
+        }
         synchronized(retrieverLock) {
             if (cachedVideoUri == videoUri && cachedRetriever != null) {
                 return cachedRetriever
@@ -295,7 +302,55 @@ object ArtworkColorExtractor {
     }
 
     /**
-     * Extrae los colores de la carátula estática o genera una paleta armónica si no existe.
+     * Descarga o recupera de la caché temporal (`cacheDir/streaming_media/artwork/`)
+     * un micro-bitmap de una portada online (`http://` o `https://`) de YouTube / YT Music
+     * para extraer su paleta cromática real al instante.
+     */
+    private suspend fun decodeRemoteArtworkBitmap(context: Context, urlString: String, trackId: Long): Bitmap? =
+        withContext(Dispatchers.IO) {
+            try {
+                val artworkDir = File(File(context.cacheDir, "streaming_media"), "artwork").apply {
+                    if (!exists()) mkdirs()
+                }
+                val cacheKey = urlString.hashCode().absoluteValue
+                val cachedFile = File(artworkDir, "art_${trackId.absoluteValue}_$cacheKey.jpg")
+
+                val options = BitmapFactory.Options().apply {
+                    inSampleSize = 2
+                    inPreferredConfig = Bitmap.Config.RGB_565
+                }
+
+                if (cachedFile.exists() && cachedFile.length() > 256L) {
+                    BitmapFactory.decodeFile(cachedFile.absolutePath, options)?.let { return@withContext it }
+                }
+
+                var conn: java.net.HttpURLConnection? = null
+                try {
+                    conn = (java.net.URL(urlString).openConnection() as java.net.HttpURLConnection).apply {
+                        connectTimeout = 5000
+                        readTimeout = 6000
+                        setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14)")
+                    }
+                    if (conn.responseCode in 200..299) {
+                        val bytes = conn.inputStream.use { it.readBytes() }
+                        if (bytes.size > 256) {
+                            try {
+                                cachedFile.writeBytes(bytes)
+                            } catch (_: Throwable) {}
+                            return@withContext BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+                        }
+                    }
+                } finally {
+                    conn?.disconnect()
+                }
+                null
+            } catch (_: Throwable) {
+                null
+            }
+        }
+
+    /**
+     * Extrae los colores de la carátula estática (local u online HTTP/HTTPS) o genera una paleta armónica si no existe.
      */
     suspend fun extractColors(
         context: Context,
@@ -314,20 +369,25 @@ object ArtworkColorExtractor {
         try {
             val artPath = track.albumArtPath
             if (!artPath.isNullOrBlank()) {
-                val file = File(artPath)
-                if (file.exists() && file.length() > 0) {
-                    val options = BitmapFactory.Options().apply {
-                        // Submuestreo rápido para decodificar a baja resolución (ej: ~96x96)
-                        inSampleSize = 4
-                        inPreferredConfig = Bitmap.Config.RGB_565
+                if (artPath.startsWith("http://", ignoreCase = true) ||
+                    artPath.startsWith("https://", ignoreCase = true)
+                ) {
+                    bitmap = decodeRemoteArtworkBitmap(context, artPath, track.id)
+                } else {
+                    val file = File(artPath)
+                    if (file.exists() && file.length() > 0) {
+                        val options = BitmapFactory.Options().apply {
+                            // Submuestreo rápido para decodificar a baja resolución (ej: ~96x96)
+                            inSampleSize = 4
+                            inPreferredConfig = Bitmap.Config.RGB_565
+                        }
+                        bitmap = BitmapFactory.decodeFile(file.absolutePath, options)
                     }
-                    bitmap = BitmapFactory.decodeFile(file.absolutePath, options)
                 }
             }
 
-            // Si no se obtuvo de archivo privado, intentar leer de SAF si es una URI de imagen
+            // Si no se obtuvo de archivo privado ni de URL online, generar color armónico a partir de metadatos
             if (bitmap == null && track.uriString.isNotBlank()) {
-                // Generar color a partir de metadatos si no hay portada física
                 val hash = (track.title + track.artist).hashCode().absoluteValue
                 return@withContext generateHarmonicPaletteFromHash(hash, fallbackPrimary, fallbackSecondary).also {
                     memoryCache.put(track.id, it)
@@ -345,19 +405,19 @@ object ArtworkColorExtractor {
                 val darkVibrant = palette.darkVibrantSwatch
                 val muted = palette.mutedSwatch
 
-                val primaryInt = vibrant?.rgb ?: dominant?.rgb ?: lightVibrant?.rgb ?: fallbackPrimary.hashCode()
+                val primaryInt = vibrant?.rgb ?: lightVibrant?.rgb ?: dominant?.rgb ?: fallbackPrimary.hashCode()
                 val secondaryInt = lightVibrant?.rgb ?: muted?.rgb ?: vibrant?.rgb ?: fallbackSecondary.hashCode()
                 val accentInt = darkVibrant?.rgb ?: dominant?.rgb ?: primaryInt
 
-                val primaryColor = Color(primaryInt)
-                val secondaryColor = Color(secondaryInt)
-                val accentColor = Color(accentInt)
+                val primaryColor = boostColorVibrancy(Color(primaryInt), minSaturation = 0.35f, minLightness = 0.42f)
+                val secondaryColor = boostColorVibrancy(Color(secondaryInt), minSaturation = 0.30f, minLightness = 0.48f)
+                val accentColor = boostColorVibrancy(Color(accentInt), minSaturation = 0.40f, minLightness = 0.45f)
 
                 val result = ExtractedArtworkColors(
                     primary = primaryColor,
                     secondary = secondaryColor,
                     accent = accentColor,
-                    ambientTopGlow = primaryColor.copy(alpha = 0.28f)
+                    ambientTopGlow = primaryColor.copy(alpha = 0.32f)
                 )
 
                 memoryCache.put(track.id, result)
@@ -381,9 +441,11 @@ object ArtworkColorExtractor {
      *
      * - Si el reproductor de video ya está emitiendo fotogramas en vivo por [liveVideoColorsFlow],
      *   retorna inmediatamente el color real de la escena actual.
-     * - Si el video acaba de iniciar o está en un modo donde aún no hay muestra de TextureView,
-     *   extrae del fotograma correspondiente a [positionMs] con [MediaMetadataRetriever.OPTION_CLOSEST]
-     *   sin ser bloqueado jamás por la carátula estática WebP.
+     * - Si el video es online (`http://` o `https://`) y aún está cargando su primer fotograma,
+     *   usa los colores extraídos de la miniatura oficial online sin abrir conexiones extra con MediaMetadataRetriever,
+     *   y en cuanto el TextureView arranca, cambia cada 1 segundo siguiendo el video.
+     * - Si el video es un archivo local y aún no hay muestra de TextureView, extrae del fotograma
+     *   correspondiente a [positionMs] con [MediaMetadataRetriever.OPTION_CLOSEST].
      */
     suspend fun extractPlaybackColors(
         context: Context,
@@ -400,84 +462,89 @@ object ArtworkColorExtractor {
 
         val videoUri = track.videoUri
         if (isVideoActive && !videoUri.isNullOrBlank()) {
-            // Si ya tenemos una muestra en tiempo real del TextureView para este mismo video, usarla al instante
+            // Si ya tenemos una muestra en tiempo real del TextureView para este mismo video (o para la misma pista en streaming), usarla al instante
             val liveSnapshot = _liveVideoColorsFlow.value
-            if (liveSnapshot != null && liveSnapshot.videoUri == videoUri) {
+            if (liveSnapshot != null && (liveSnapshot.videoUri == videoUri || lastVideoTrackId == track.id)) {
                 return@withContext liveSnapshot.colors
             }
 
-            val intervalMs = getAdaptiveSampleIntervalMs(context)
-            val timeBucket = (positionMs.coerceAtLeast(0L) / intervalMs)
-            val videoCacheKey = -(
-                track.id.absoluteValue * 1_000_000L +
-                    ((videoUri.hashCode().absoluteValue % 999L) * 1_000L) +
-                    (timeBucket % 1_000L)
-            )
-            memoryCache.get(videoCacheKey)?.let { cachedResult ->
-                lastVideoTrackId = track.id
-                lastVideoUri = videoUri
-                lastVideoColors = cachedResult
-                return@withContext cachedResult
-            }
+            val isRemoteStreamVideo = videoUri.startsWith("http://", ignoreCase = true) ||
+                videoUri.startsWith("https://", ignoreCase = true)
 
-            var frameBitmap: Bitmap? = null
-            try {
-                val retriever = getOrCreateRetriever(context, videoUri)
-                val durationMs = cachedVideoDurationMs
-                if (retriever != null) {
-                    val effectivePosMs = when {
-                        durationMs > 0L && track.isVideoLoop -> (positionMs % durationMs).coerceAtLeast(0L)
-                        durationMs > 0L -> positionMs.coerceIn(0L, durationMs)
-                        else -> positionMs.coerceAtLeast(0L)
-                    }
-                    val sampleTimeUs = effectivePosMs * 1000L
-                    frameBitmap = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
-                        try {
-                            retriever.getScaledFrameAtTime(sampleTimeUs, MediaMetadataRetriever.OPTION_CLOSEST, 28, 28)
-                        } catch (_: Throwable) {
-                            retriever.getScaledFrameAtTime(sampleTimeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, 28, 28)
-                        }
-                    } else {
-                        try {
-                            retriever.getFrameAtTime(sampleTimeUs, MediaMetadataRetriever.OPTION_CLOSEST)
-                        } catch (_: Throwable) {
-                            retriever.getFrameAtTime(sampleTimeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-                        }
-                    } ?: retriever.frameAtTime
+            if (!isRemoteStreamVideo) {
+                val intervalMs = getAdaptiveSampleIntervalMs(context)
+                val timeBucket = (positionMs.coerceAtLeast(0L) / intervalMs)
+                val videoCacheKey = -(
+                    track.id.absoluteValue * 1_000_000L +
+                        ((videoUri.hashCode().absoluteValue % 999L) * 1_000L) +
+                        (timeBucket % 1_000L)
+                )
+                memoryCache.get(videoCacheKey)?.let { cachedResult ->
+                    lastVideoTrackId = track.id
+                    lastVideoUri = videoUri
+                    lastVideoColors = cachedResult
+                    return@withContext cachedResult
+                }
 
-                    if (frameBitmap != null) {
-                        val scaled = if (frameBitmap.width > 28 || frameBitmap.height > 28) {
-                            Bitmap.createScaledBitmap(frameBitmap, 28, 28, false).also {
-                                if (it != frameBitmap) frameBitmap.recycle()
+                var frameBitmap: Bitmap? = null
+                try {
+                    val retriever = getOrCreateRetriever(context, videoUri)
+                    val durationMs = cachedVideoDurationMs
+                    if (retriever != null) {
+                        val effectivePosMs = when {
+                            durationMs > 0L && track.isVideoLoop -> (positionMs % durationMs).coerceAtLeast(0L)
+                            durationMs > 0L -> positionMs.coerceIn(0L, durationMs)
+                            else -> positionMs.coerceAtLeast(0L)
+                        }
+                        val sampleTimeUs = effectivePosMs * 1000L
+                        frameBitmap = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
+                            try {
+                                retriever.getScaledFrameAtTime(sampleTimeUs, MediaMetadataRetriever.OPTION_CLOSEST, 28, 28)
+                            } catch (_: Throwable) {
+                                retriever.getScaledFrameAtTime(sampleTimeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, 28, 28)
                             }
                         } else {
-                            frameBitmap
-                        }
+                            try {
+                                retriever.getFrameAtTime(sampleTimeUs, MediaMetadataRetriever.OPTION_CLOSEST)
+                            } catch (_: Throwable) {
+                                retriever.getFrameAtTime(sampleTimeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                            }
+                        } ?: retriever.frameAtTime
 
-                        val extracted = extractColorsFromVideoFrame(
-                            frameBitmap = scaled,
-                            trackId = track.id,
-                            videoUri = videoUri,
-                            fallbackPrimary = fallbackPrimary,
-                            fallbackSecondary = fallbackSecondary,
-                            sampleIntervalMs = intervalMs
-                        )
-                        if (extracted != null) {
-                            memoryCache.put(videoCacheKey, extracted)
-                            return@withContext extracted
+                        if (frameBitmap != null) {
+                            val scaled = if (frameBitmap.width > 28 || frameBitmap.height > 28) {
+                                Bitmap.createScaledBitmap(frameBitmap, 28, 28, false).also {
+                                    if (it != frameBitmap) frameBitmap.recycle()
+                                }
+                            } else {
+                                frameBitmap
+                            }
+
+                            val extracted = extractColorsFromVideoFrame(
+                                frameBitmap = scaled,
+                                trackId = track.id,
+                                videoUri = videoUri,
+                                fallbackPrimary = fallbackPrimary,
+                                fallbackSecondary = fallbackSecondary,
+                                sampleIntervalMs = intervalMs
+                            )
+                            if (extracted != null) {
+                                memoryCache.put(videoCacheKey, extracted)
+                                return@withContext extracted
+                            }
                         }
                     }
+                } catch (_: Throwable) {
+                    releaseRetriever()
                 }
-            } catch (_: Throwable) {
-                releaseRetriever()
             }
 
-            if (lastVideoUri == videoUri && lastVideoColors != null) {
+            if ((lastVideoUri == videoUri || lastVideoTrackId == track.id) && lastVideoColors != null) {
                 return@withContext lastVideoColors!!
             }
         }
 
-        // Si no hay video o no está activo el Canvas, extraer de la carátula estática
+        // Si no hay video o mientras el video online prepara su primer fotograma, extraer de la carátula oficial (local u online)
         return@withContext extractColors(context, track, fallbackPrimary, fallbackSecondary)
     }
 

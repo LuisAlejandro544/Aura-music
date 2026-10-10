@@ -70,6 +70,12 @@ class AuraAudioPlayer(
     private val _playbackError = MutableStateFlow<String?>(null)
     val playbackError: StateFlow<String?> = _playbackError.asStateFlow()
 
+    private val _isBuffering = MutableStateFlow(false)
+    val isBuffering: StateFlow<Boolean> = _isBuffering.asStateFlow()
+
+    private val _isNetworkStalled = MutableStateFlow(false)
+    val isNetworkStalled: StateFlow<Boolean> = _isNetworkStalled.asStateFlow()
+
     private val _playbackSpeed = MutableStateFlow(1.0f)
     val playbackSpeed: StateFlow<Float> = _playbackSpeed.asStateFlow()
 
@@ -186,6 +192,8 @@ class AuraAudioPlayer(
             override fun onPlaybackStateChanged(playbackState: Int) {
                 when (playbackState) {
                     Player.STATE_READY -> {
+                        _isBuffering.value = false
+                        _isNetworkStalled.value = false
                         _duration.value = player.duration.coerceAtLeast(0L)
                         _playbackError.value = null
                         effectManager.attachToSession(player.audioSessionId)
@@ -198,14 +206,44 @@ class AuraAudioPlayer(
                         )
                     }
                     Player.STATE_ENDED -> {
+                        _isBuffering.value = false
                         handleTrackEnded()
                     }
-                    Player.STATE_IDLE -> {}
-                    Player.STATE_BUFFERING -> {}
+                    Player.STATE_IDLE -> {
+                        _isBuffering.value = false
+                    }
+                    Player.STATE_BUFFERING -> {
+                        _isBuffering.value = true
+                    }
                 }
             }
 
             override fun onPlayerError(error: PlaybackException) {
+                val isNetworkError = error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ||
+                    error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT ||
+                    error.errorCode == PlaybackException.ERROR_CODE_IO_UNSPECIFIED
+
+                if (isNetworkError && _currentTrack.value?.isStreamingTrack == true) {
+                    _isBuffering.value = true
+                    _isNetworkStalled.value = true
+                    com.example.debug.AuraDebugManager.logWarning(
+                        "ExoPlayer",
+                        "Interrupción de red en streaming (${error.errorCodeName}), esperando reconexión..."
+                    )
+                    playerScope.launch {
+                        delay(2200L)
+                        val p = exoPlayer
+                        if (p != null && _currentTrack.value?.isStreamingTrack == true && p.playbackState == Player.STATE_IDLE) {
+                            try {
+                                p.prepare()
+                                p.play()
+                            } catch (_: Throwable) {}
+                        }
+                    }
+                    return
+                }
+
+                _isBuffering.value = false
                 _playbackError.value = "Error al reproducir pista: ${error.message}"
                 com.example.debug.AuraDebugManager.logError(
                     "ExoPlayer",
@@ -309,6 +347,8 @@ class AuraAudioPlayer(
         _currentTrack.value = track
         _currentPosition.value = 0L
         _duration.value = track.durationMs
+        _isBuffering.value = track.isStreamingTrack && (track.uriString.startsWith("http://", ignoreCase = true) || track.uriString.startsWith("https://", ignoreCase = true))
+        _isNetworkStalled.value = false
         crossfadeTriggeredForTrackId = -1L
         streamingPrefetchTriggeredForId = 0L
         abLoopController.reset()
@@ -606,11 +646,13 @@ class AuraAudioPlayer(
     }
 
     /**
-     * Encola una canción similar de streaming o actualiza su URI (ej. cuando ya está en la caché de 30 min).
+     * Encola una canción similar de streaming o actualiza su URI en la cola (ej. cuando ya está en la caché de 30 min).
+     * Si [updateCurrentTrackIfSame] es false, actualiza únicamente la cola para futuras repeticiones/vuelta atrás
+     * sin recrear el reproductor activo en mitad de la canción.
      */
-    fun appendOrUpdateStreamingTrack(track: Track) {
+    fun appendOrUpdateStreamingTrack(track: Track, updateCurrentTrackIfSame: Boolean = true) {
         queueController.appendOrUpdateTrack(track)
-        if (_currentTrack.value?.id == track.id) {
+        if (updateCurrentTrackIfSame && _currentTrack.value?.id == track.id) {
             _currentTrack.value = track
         }
     }

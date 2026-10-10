@@ -169,7 +169,10 @@ Todo el panel de efectos se despliega al instante en una hoja modal desde el **M
 - **Política de Red Exclusiva para Video Canvas en Streaming**:
   - Nueva opción en Ajustes para elegir cómo se comportan los videos de fondo en streaming: **Solo con Wi-Fi**, **Siempre (incluso con datos móviles)** o **Desactivado** (afecta únicamente al streaming sin alterar jamás tus videos locales).
 - **Radio Automática de Canciones Similares y Descarga Permanente en 1 Toque**:
-  - Antes de que finalice la pista en reproducción, la API busca automáticamente una canción similar y la prepara con `yt-dlp` para ofrecer reproducción continua infinita. Además, puedes pulsar el botón **Descargar** en cualquier resultado o dentro del reproductor para guardarla permanentemente en tu biblioteca offline (durante la reproducción en streaming, los efectos DSP C++20 permanecen en bypass directo).
+  - Antes de que finalice la pista en reproducción, la API busca automáticamente una canción similar y la prepara para ofrecer reproducción continua infinita. Además, puedes pulsar el botón **Descargar** en cualquier resultado o dentro del reproductor para guardarla permanentemente en tu biblioteca offline (durante la reproducción en streaming, los efectos DSP C++20 permanecen en bypass directo).
+- **Color Reactivo Cada 1 Segundo, Indicadores de Red y Enfriamiento Inteligente en Streaming**:
+  - El reproductor online adapta sus colores dinámicamente cada **1 segundo (1000 ms)** tanto desde las portadas de **YouTube / YT Music** como desde el video en reproducción.
+  - Muestra indicadores claros de carga o espera de internet directamente en el **botón Play/Pausa y en la miniatura** (tanto en el reproductor grande como en el Mini Reproductor), y optimiza el uso de CPU/GPU para mantener el teléfono fresco y ahorrar batería mientras escuchas música online con video.
 
 </details>
 
