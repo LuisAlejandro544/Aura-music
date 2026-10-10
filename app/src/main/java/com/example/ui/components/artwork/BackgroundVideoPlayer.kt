@@ -70,9 +70,13 @@ private fun findInternalTextureView(view: View?): TextureView? {
  *    y permitiendo extraer micro-bitmaps (24x24) en <1ms sin abrir un segundo MediaCodec.
  * 2. Desactiva por completo el renderizador de audio (`C.TRACK_TYPE_AUDIO`) en el reproductor de video de fondo
  *    para que jamás instancie un segundo decodificador de audio ni compita con el motor DSP C++20 principal.
- * 3. Muestreo Cromático Adaptativo en Tiempo Real:
- *    - **180 ms** cuando el teléfono tiene **> 15% de batería** y el modo ahorro de energía está desactivado.
- *    - **800 ms** cuando el teléfono tiene **<= 15% de batería** o el modo ahorro de energía está activado.
+ * 3. Muestreo Cromático Adaptativo en Tiempo Real (Cada 1 Segundo):
+ *    - **1000 ms (1s)** cuando el teléfono tiene **> 15% de batería** y el modo ahorro de energía está desactivado.
+ *    - **1500 ms (1.5s)** cuando el teléfono tiene **<= 15% de batería** o el modo ahorro de energía está activado.
+ * 4. Suspensión Inteligente en Segundo Plano (Modo Juego):
+ *    - Cuando la aplicación pasa a segundo plano mientras el usuario juega, pausa el decodificador de video
+ *      por hardware y detiene el muestreo del TextureView para dejar el 100% de la GPU libre al juego,
+ *      sincronizando y reanudando al instante cuando el usuario vuelve a abrir la app.
  */
 @OptIn(UnstableApi::class)
 @Composable
@@ -93,6 +97,9 @@ fun BackgroundVideoPlayer(
     val context = LocalContext.current
     val fallbackPrimary = MaterialTheme.colorScheme.primary
     val fallbackSecondary = MaterialTheme.colorScheme.secondary
+    val isAppInForeground by com.example.AuraApplication.isAppInForegroundFlow.collectAsState()
+    val shouldPlayVideoNow = isPlaying && (isAppInForeground || !com.example.AuraApplication.isBackgroundGameModeEnabled)
+
     var isFirstFrameRendered by remember(videoUriString) { mutableStateOf(false) }
     var videoDimensions by remember(videoUriString) { mutableStateOf<Pair<Int, Int>?>(null) }
 
@@ -180,7 +187,7 @@ fun BackgroundVideoPlayer(
                 addListener(videoListener)
 
                 prepare()
-                if (isPlaying) {
+                if (shouldPlayVideoNow) {
                     play()
                 }
             }
@@ -191,25 +198,35 @@ fun BackgroundVideoPlayer(
         videoPlayer.setPlaybackSpeed(playbackSpeed)
     }
 
-    // Gestionar play / pause según el estado del reproductor de música principal
-    LaunchedEffect(isPlaying, videoPlayer) {
-        if (isPlaying) {
+    // Gestionar play / pause según el estado del reproductor principal y si la app está en primer plano:
+    // Al ir a segundo plano mientras juegas, el video se pausa liberando GPU; al volver a primer plano,
+    // sincroniza el segundo actual con la canción y continúa reproduciendo sin cortes.
+    LaunchedEffect(shouldPlayVideoNow, isAppInForeground, videoPlayer) {
+        if (shouldPlayVideoNow) {
+            if (!isVideoLoop) {
+                val targetPos = currentPositionFlow?.value ?: currentPositionMs
+                if (targetPos > 0L && abs(videoPlayer.currentPosition - targetPos) > 1200L) {
+                    videoPlayer.seekTo(targetPos)
+                }
+            }
             videoPlayer.play()
         } else {
             videoPlayer.pause()
         }
     }
 
-    // Muestreo cromático en tiempo real desde el TextureView con frecuencia adaptativa por batería:
-    // - 180 ms cuando la batería es > 15% y no está activo el ahorro de batería
-    // - 800 ms cuando la batería es <= 15% o está activo el ahorro de batería
-    LaunchedEffect(videoUriString, isFirstFrameRendered, isPlaying, enableLiveColorSampling) {
-        if (!enableLiveColorSampling || !isFirstFrameRendered) return@LaunchedEffect
+    // Muestreo cromático en tiempo real desde el TextureView cada 1 segundo (1000 ms):
+    // - 1000 ms cuando la batería es > 15% y no está activo el ahorro de batería
+    // - 1500 ms cuando la batería es <= 15% o está activo el ahorro de batería
+    // - Se suspende por completo cuando la app está en segundo plano para no consumir GPU/CPU mientras juegas
+    LaunchedEffect(videoUriString, isFirstFrameRendered, shouldPlayVideoNow, isAppInForeground, enableLiveColorSampling) {
+        val canSampleInCurrentState = isAppInForeground || !com.example.AuraApplication.isBackgroundGameModeEnabled
+        if (!enableLiveColorSampling || !isFirstFrameRendered || !canSampleInCurrentState) return@LaunchedEffect
 
         var sampledOnceWhenPaused = false
         while (isActive) {
             val intervalMs = ArtworkColorExtractor.getAdaptiveSampleIntervalMs(context)
-            if (isPlaying || !sampledOnceWhenPaused) {
+            if (shouldPlayVideoNow || !sampledOnceWhenPaused) {
                 val textureView = (playerViewRef?.videoSurfaceView as? TextureView)
                     ?: findInternalTextureView(playerViewRef)
                 if (textureView != null && textureView.isAvailable && textureView.width > 0 && textureView.height > 0) {
@@ -238,13 +255,12 @@ fun BackgroundVideoPlayer(
         }
     }
 
-    // Gestionar sincronización temporal para videos largos (> 10s) con histéresis y cooldown anti-stutter
-    // para que las fluctuaciones del grabador de pantalla nunca disparen un bucle de seekTo() cada segundo
+    // Gestionar sincronización temporal para videos largos (> 10s) únicamente cuando el video está activo en primer plano
     var lastSyncSeekWallClockMs by remember(videoUriString) { mutableLongStateOf(0L) }
 
     if (currentPositionFlow != null) {
-        LaunchedEffect(currentPositionFlow, isVideoLoop, videoPlayer) {
-            if (!isVideoLoop) {
+        LaunchedEffect(currentPositionFlow, isVideoLoop, shouldPlayVideoNow, videoPlayer) {
+            if (!isVideoLoop && shouldPlayVideoNow) {
                 currentPositionFlow.collect { posMs ->
                     val now = android.os.SystemClock.elapsedRealtime()
                     val playerPos = videoPlayer.currentPosition
@@ -257,8 +273,8 @@ fun BackgroundVideoPlayer(
             }
         }
     } else {
-        LaunchedEffect(currentPositionMs, isVideoLoop, videoPlayer) {
-            if (!isVideoLoop) {
+        LaunchedEffect(currentPositionMs, isVideoLoop, shouldPlayVideoNow, videoPlayer) {
+            if (!isVideoLoop && shouldPlayVideoNow) {
                 val now = android.os.SystemClock.elapsedRealtime()
                 val playerPos = videoPlayer.currentPosition
                 val driftMs = abs(playerPos - currentPositionMs)

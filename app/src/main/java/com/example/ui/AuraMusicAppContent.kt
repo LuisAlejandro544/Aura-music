@@ -93,6 +93,9 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
     val nowPlayingDesignMode by viewModel.nowPlayingDesignMode.collectAsStateWithLifecycle()
     val isDynamicArtworkColorEnabled by viewModel.isDynamicArtworkColorEnabled.collectAsStateWithLifecycle()
     val isMiniPlayerVideoEnabled by viewModel.isMiniPlayerVideoEnabled.collectAsStateWithLifecycle()
+    val isBackgroundGameModeEnabled by viewModel.isBackgroundGameModeEnabled.collectAsStateWithLifecycle()
+    val appWallpaperConfig by viewModel.appWallpaperConfig.collectAsStateWithLifecycle()
+    val isAppInForeground by com.example.AuraApplication.isAppInForegroundFlow.collectAsStateWithLifecycle()
     val headphoneConfig by viewModel.headphoneConfig.collectAsStateWithLifecycle()
     val lyricsState by viewModel.lyricsState.collectAsStateWithLifecycle()
     val isSearchLyricsDialogOpen by viewModel.isSearchLyricsDialogOpen.collectAsStateWithLifecycle()
@@ -143,6 +146,8 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
         mutableLongStateOf(ArtworkColorExtractor.getAdaptiveSampleIntervalMs(context))
     }
 
+    val shouldRunLiveVisualSampling = isAppInForeground || !isBackgroundGameModeEnabled
+
     LaunchedEffect(
         effectiveTrack?.id,
         effectiveTrack?.albumArtPath,
@@ -158,7 +163,7 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
             miniPlayerColors = ArtworkColorExtractor.extractPlaybackColors(
                 context = context,
                 track = track,
-                isVideoActive = isVideo,
+                isVideoActive = isVideo && shouldRunLiveVisualSampling,
                 isDynamicEnabled = isDynamicArtworkColorEnabled,
                 fallbackPrimary = defaultMiniPrimary,
                 fallbackSecondary = defaultMiniSecondary,
@@ -174,17 +179,18 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
         }
     }
 
-    // Reacción en tiempo real en el MiniPlayer cuando el Video Canvas emite cambios de escena
+    // Reacción en tiempo real en el MiniPlayer cuando el Video Canvas emite cambios de escena (cada 1 segundo)
     LaunchedEffect(
         liveVideoSnapshot,
         effectiveTrack?.videoUri,
         videoDisplayMode,
         isMiniPlayerVideoEnabled,
-        isDynamicArtworkColorEnabled
+        isDynamicArtworkColorEnabled,
+        shouldRunLiveVisualSampling
     ) {
         val track = effectiveTrack
         val isVideo = track != null && ((videoDisplayMode != VideoDisplayMode.OFF) || isMiniPlayerVideoEnabled) && !track.videoUri.isNullOrEmpty()
-        if (isDynamicArtworkColorEnabled && isVideo) {
+        if (isDynamicArtworkColorEnabled && isVideo && shouldRunLiveVisualSampling) {
             val snapshot = liveVideoSnapshot
             if (snapshot != null && snapshot.videoUri == track?.videoUri) {
                 miniSampleIntervalMs = snapshot.sampleIntervalMs
@@ -193,7 +199,8 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
         }
     }
 
-    // Respaldo periódico para cuando el MiniPlayer tiene la miniatura de video oculta pero la canción tiene video activo
+    // Respaldo periódico cada 1s para cuando el MiniPlayer tiene la miniatura de video oculta pero la canción tiene video activo
+    // Se suspende automáticamente en 2do plano mientras el usuario juega para ahorrar CPU/GPU
     LaunchedEffect(
         effectiveTrack?.id,
         effectiveTrack?.videoUri,
@@ -201,13 +208,14 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
         isNowPlayingExpanded,
         isMiniPlayerVideoEnabled,
         videoDisplayMode,
-        isDynamicArtworkColorEnabled
+        isDynamicArtworkColorEnabled,
+        shouldRunLiveVisualSampling
     ) {
         val track = effectiveTrack
         val hasVideo = track != null && !track.videoUri.isNullOrEmpty()
         val isVideoColorActive = hasVideo && (videoDisplayMode != VideoDisplayMode.OFF)
         val hasActiveTextureSampler = isNowPlayingExpanded || isMiniPlayerVideoEnabled
-        if (track != null && isDynamicArtworkColorEnabled && isVideoColorActive && !hasActiveTextureSampler && isPlaying) {
+        if (track != null && isDynamicArtworkColorEnabled && isVideoColorActive && !hasActiveTextureSampler && isPlaying && shouldRunLiveVisualSampling) {
             while (true) {
                 val intervalMs = ArtworkColorExtractor.getAdaptiveSampleIntervalMs(context)
                 miniSampleIntervalMs = intervalMs
@@ -226,9 +234,9 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
     }
 
     val miniTransitionDurationMs = if (isDynamicArtworkColorEnabled && !effectiveTrack?.videoUri.isNullOrEmpty()) {
-        if (miniSampleIntervalMs <= ArtworkColorExtractor.INTERVAL_NORMAL_MS) 180 else 650
+        if (miniSampleIntervalMs <= ArtworkColorExtractor.INTERVAL_NORMAL_MS) 1000 else 1400
     } else {
-        500
+        600
     }
 
     val animatedMiniPrimary by animateColorAsState(
@@ -247,14 +255,37 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
         viewModel.handleBackPress()
     }
 
+    val isCustomWallpaperVisible = remember(appWallpaperConfig, currentScreen, isNowPlayingExpanded) {
+        if (!appWallpaperConfig.hasValidMedia || isNowPlayingExpanded || currentScreen is NavScreen.Onboarding) {
+            false
+        } else {
+            when (appWallpaperConfig.screenScope) {
+                com.example.model.WallpaperScreenScope.LIBRARY_ONLY ->
+                    currentScreen is NavScreen.Library || currentScreen is NavScreen.PlaylistDetail
+                com.example.model.WallpaperScreenScope.HOME_AND_LIBRARY ->
+                    currentScreen is NavScreen.Home || currentScreen is NavScreen.Library || currentScreen is NavScreen.PlaylistDetail
+                com.example.model.WallpaperScreenScope.ALL_SCREENS ->
+                    true
+            }
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(BackgroundDark)
     ) {
+        // Capa de fondo de pantalla personalizado de galería (Imagen WebP o Video corto MP4)
+        com.example.ui.components.AppWallpaperBackground(
+            config = appWallpaperConfig,
+            currentScreen = currentScreen,
+            isNowPlayingExpanded = isNowPlayingExpanded,
+            isBackgroundGameModeEnabled = isBackgroundGameModeEnabled
+        )
+
         Scaffold(
             modifier = Modifier.fillMaxSize(),
-            containerColor = BackgroundDark,
+            containerColor = if (isCustomWallpaperVisible) androidx.compose.ui.graphics.Color.Transparent else BackgroundDark,
             contentWindowInsets = WindowInsets.statusBars,
             bottomBar = {
                 if (currentScreen !is NavScreen.Onboarding) {
@@ -464,6 +495,16 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
                                     onToggleDynamicArtworkColor = { viewModel.toggleDynamicArtworkColor(it) },
                                     isMiniPlayerVideoEnabled = isMiniPlayerVideoEnabled,
                                     onToggleMiniPlayerVideo = { viewModel.toggleMiniPlayerVideoEnabled() },
+                                    isBackgroundGameModeEnabled = isBackgroundGameModeEnabled,
+                                    onToggleBackgroundGameMode = { viewModel.setBackgroundGameModeEnabled(it) },
+                                    appWallpaperConfig = appWallpaperConfig,
+                                    onToggleWallpaperEnabled = { viewModel.setAppWallpaperEnabled(it) },
+                                    onSelectWallpaperImage = { viewModel.setCustomWallpaperImage(it) },
+                                    onSelectWallpaperVideo = { viewModel.setCustomWallpaperVideo(it) },
+                                    onClearWallpaper = { viewModel.clearCustomWallpaper() },
+                                    onSelectWallpaperScope = { viewModel.setAppWallpaperScope(it) },
+                                    onChangeWallpaperDimAlpha = { viewModel.setAppWallpaperDimAlpha(it) },
+                                    onChangeWallpaperBlurDp = { viewModel.setAppWallpaperBlurDp(it) },
                                     nowPlayingDesignMode = nowPlayingDesignMode,
                                     onSetNowPlayingDesignMode = { viewModel.setNowPlayingDesignMode(it) },
                                     widgetConfig = widgetConfig,

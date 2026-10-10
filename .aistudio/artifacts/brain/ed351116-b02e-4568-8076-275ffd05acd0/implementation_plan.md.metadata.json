@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de arquitectura y diseño para los Widgets interactivos adaptativos de Aura Music: reacción de color dinámico extraído de la carátula, adaptación multi-tamaño al estirar (Compacto 4x1, Mediano 4x2, Expandido 4x3 con Favorito ❤️ y Barra de Progreso), reanudación en segundo plano tras cierre de app, nuevo Widget independiente 4x2/4x3 de 4 Canciones Más Escuchadas o 4 Playlists, y nuevo apartado a pantalla completa \"Widget\" en Ajustes con vista previa en vivo.",
-  "updatedAt":  "2026-10-10T04:45:44.247086813Z",
+  "summary":  "Plan de implementación para la Carpeta de Usuario Personalizada y Exportador de Vídeos con Audio Completo en Ajustes > Medios & Almacenamiento. Incluye selección de carpeta sin restricciones mediante SAF (OpenDocumentTree), estructura escalable (subcarpeta Videos/ lista para futuras subcarpetas Images/), unión ultrarrápida de vídeo y audio en FFmpeg (-c copy), visualización de la ruta exacta elegida por el usuario y botones de exportación individual y masiva en Ajustes > Medios.",
+  "updatedAt":  "2026-10-10T07:46:31.901960172Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

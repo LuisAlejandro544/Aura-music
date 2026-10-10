@@ -5,7 +5,7 @@
 ### **Tu estudio audiófilo, centro de descargas y experiencia Video Canvas en tu bolsillo.**
 **100% libre de anuncios y sin suscripciones.**
 
-[![Versión Beta](https://img.shields.io/badge/Versi%C3%B3n-v0.1.0--beta.1a%20(Nebula)-8B5CF6?style=for-the-badge&logo=android&logoColor=white)](../../releases)
+[![Versión Beta](https://img.shields.io/badge/Versi%C3%B3n-v0.1.1--beta--1a%20(Nebula)-8B5CF6?style=for-the-badge&logo=android&logoColor=white)](../../releases)
 [![Lenguaje Principal](https://img.shields.io/badge/Lenguaje-Kotlin%20%2B%20Jetpack%20Compose-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white)](./READMEAI.md)
 [![Motor de Audio](https://img.shields.io/badge/Audio%20DSP-ISO%20C%2B%2B20%20(64--bit)%20%2B%20AAudio-00D2FF?style=for-the-badge&logo=cplusplus&logoColor=white)](./READMEAI.md)
 [![Android API](https://img.shields.io/badge/Android-8.0%2B%20(API%2026--36)-3DDC84?style=for-the-badge&logo=android&logoColor=white)](../../releases)
@@ -74,8 +74,8 @@ Todo el panel de efectos se despliega al instante en una hoja modal desde el **M
   - Modula la velocidad de la música y el tono de la voz por separado (ideal para *Slowed + Reverb*, *Nightcore* o practicar instrumentos) con botones rápidos (`0.8x`, `1.0x`, `1.25x`, `1.5x`, `2.0x`) y barra compacta de **Bucle A-B** con ajuste fino de `±1s`.
 - **Normalizador de Volumen Inteligente (EBU R128 / Nivel Spotify)**:
   - Iguala automáticamente el volumen entre canciones suaves y fuertes con 3 niveles: *Sutil (-18 LUFS)*, *Estándar (-14 LUFS)* y *Alto (-11 LUFS)*.
-- **Automix Inteligente DJ con Curva en X**:
-  - Detecta el final real de la canción para saltar silencios muertos y atenúa progresivamente los subgraves (`<120 Hz`) de la pista saliente para evitar choques de bajos en el *crossfade*.
+- **Crossfade Profesional Dual-Deck & Automix Inteligente DJ con Curva en X**:
+  - Motor de **doble reproductor sincronizado (`Deck A + Deck B`)** con curva trigonométrica de igual potencia (*Equal-Power S-Curve: `sin/cos`*): cuando una canción baja de volumen, la siguiente empieza a sonar **exactamente al mismo tiempo** sin un solo milisegundo de pausa, atenuando subgraves (`<120 Hz`) de la pista saliente para evitar choques de bajos.
 - **Temporizador de Apagado con Fade-Out**:
   - Apaga la música automáticamente tras el tiempo elegido disminuyendo suavemente el volumen durante los últimos 10 segundos.
 
@@ -109,6 +109,12 @@ Todo el panel de efectos se despliega al instante en una hoja modal desde el **M
 - **Ingeniería FFmpeg en tus Videos de Fondo**:
   - **Bucles Infinitos sin Cortes**: En videos cortos (≤20s), elige entre fundido continuo (*Seamless Crossfade*) o **Efecto Boomerang / Ping-Pong** (ida y vuelta sin saltos).
   - **Saltos Instantáneos (0ms) y Ahorro de Espacio (hasta -85%)**: En videos largos sincronizados (>20s), reestructura los fotogramas clave a 1 segundo (GOP corto a 30fps) y elimina la pista de audio redundante (`-an`) del archivo de video para que adelantar o cambiar de canción sea instantáneo y sin pantallas negras.
+- **🖼️ Fondo de Pantalla Personalizado de Galería (Imagen WebP o Video Corto)**:
+  - Elige una **foto o un video corto de tu galería** para mostrarlo como fondo de pantalla mientras navegas por **Tu Biblioteca**, **Inicio** o **toda la aplicación**, con controles en vivo de **Oscurecimiento / Velo OLED (25%–92%)** y **Desenfoque / Blur (0–25 dp)** en *Ajustes > Aura Dinámica, Video & Modo Juego*.
+- **Armonización Cromática Suave a 1 Segundo (Cero Mareos Visuales)**:
+  - Tanto en el reproductor completo como en el **Mini Reproductor**, los colores del video se muestrean cada **1 segundo (1000 ms)** con un fundido orgánico de **1000 ms**, evitando parpadeos bruscos.
+- **🎮 Modo Juego / Ahorro Inteligente en Segundo Plano**:
+  - Al minimizar la app para jugar, **Aura Music libera automáticamente todo lo que no se está viendo** (apaga el decodificador de video en GPU, detiene la captura de texturas, suspende el hilo del visualizador espectral de 28 bandas y recorta cachés gráficas en RAM), mientras **mantiene 100% activos la música y únicamente los efectos de audio que tengas encendidos** (EQ, 8D/16D, Reverb, A-B Loop o Crossfade Dual-Deck). Configurable en *Ajustes > Aura Dinámica, Video & Modo Juego*.
 
 </details>
 
@@ -144,8 +150,9 @@ Todo el panel de efectos se despliega al instante en una hoja modal desde el **M
     - **Widget 1 (Reproductor Adaptativo)**: Reacciona automáticamente a los colores de la carátula de la canción actual, permite reanudar la música que estabas escuchando directamente en segundo plano (incluso tras cerrar la app), incluye botón de **Favorito ❤️** y **se adapta al estirarlo** en tu pantalla de inicio (*Compacto 4x1*, *Mediano 4x2 con barra de progreso y tiempos* y *Expandido 4x3 de estudio*).
     - **Widget 2 Independiente (Top 4 Canciones & 4 Playlists)**: Un segundo widget de buen tamaño (cuadrícula 2x2) que muestra tus **4 canciones más escuchadas** o tus **4 Playlists principales** (con su portada o collage dinámico) para reproducirlas con un solo toque, todo 100% configurable con vista previa en vivo desde el nuevo apartado **Ajustes > Widget**.
   - Soporte integrado para consolas de vehículos compatibles con **Android Auto**.
-- **Transparencia Total de Almacenamiento**:
+- **Transparencia Total de Almacenamiento y Carpeta Pública de Vídeos**:
   - En **Ajustes > Medios & Almacenamiento** puedes inspeccionar cada portada WebP y cada Video Canvas MP4 guardado, ver cuántos KB o MB ocupa y borrar individualmente los que no necesites para liberar espacio al instante.
+  - **Carpeta Pública de Usuario (Sin Restricciones)**: Crea o selecciona libremente cualquier carpeta de tu teléfono (`OpenDocumentTree`), visualiza la ruta exacta donde se guardan tus archivos (`.../Videos`) y exporta cualquier vídeo descargado en `.mp4` **con su pista de audio original completa incluida** mediante fusión instantánea en FFmpeg para verlo en tu Galería o compartirlo fuera de la app.
 
 </details>
 

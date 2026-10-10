@@ -11,10 +11,10 @@ on:
   workflow_dispatch:
     inputs:
       version_tag:
-        description: 'Versión Beta estratégica (ej: v0.1.0-beta.1a)'
+        description: 'Versión Beta estratégica (ej: v0.1.1-beta-1a)'
         required: false
         type: string
-        default: 'v0.1.0-beta.1a'
+        default: 'v0.1.1-beta-1a'
       codename:
         description: 'Codename de la serie Beta'
         required: false
@@ -48,7 +48,7 @@ jobs:
             RAW_TAG="${{ github.event.release.tag_name }}"
             CODENAME="Nebula"
           else
-            RAW_TAG="${{ inputs.version_tag || 'v0.1.0-beta.1a' }}"
+            RAW_TAG="${{ inputs.version_tag || 'v0.1.1-beta-1a' }}"
             CODENAME="${{ inputs.codename || 'Nebula' }}"
           fi
           echo "VERSION_TAG=$RAW_TAG" >> $GITHUB_ENV

@@ -20,7 +20,10 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
   - 🍃 **Cyber Mint**: Esmeralda brillante y menta líquida.
   - 🔥 **Sunset Ember**: Coral cálido, naranja fuego y destellos dorados.
   - 🌊 **Ocean Abyss**: Azul zafiro profundo y agua bioluminiscente.
-  - 💾 **Persistencia Permanente en el Dispositivo**: El tema elegido (incluyendo *Material You*), el interruptor de *Aura Dinámica de Carátula* y el modo de visualización de *Video Canvas* se guardan permanentemente en las preferencias del sistema (`SharedPreferences`), conservándose intactos al cerrar y volver a abrir la aplicación.
+  - 💾 **Persistencia Permanente en el Dispositivo**: El tema elegido (incluyendo *Material You*), el interruptor de *Aura Dinámica de Carátula*, el **Fondo de Pantalla Personalizado de Galería** y el modo de visualización de *Video Canvas* se guardan permanentemente en las preferencias del sistema (`SharedPreferences`), conservándose intactos al cerrar y volver a abrir la aplicación.
+- **🖼️ Fondo de Pantalla Personalizado de Galería (Imagen WebP o Video Corto)**:
+  - Permite elegir desde la galería del teléfono cualquier imagen (convertida automáticamente a WebP sin pérdida en `images/`) o un video corto (optimizado sin pista de audio en `videos/`) como fondo de pantalla de la aplicación (`AppWallpaperBackground`).
+  - Configurable desde **Ajustes > Aura Dinámica, Video & Modo Juego**, permitiendo decidir en qué pantallas mostrarlo (*Solo en Tu Biblioteca*, *En Biblioteca e Inicio* o *En toda la aplicación*), junto con deslizadores en vivo de **Oscurecimiento / Velo OLED (25%–92%)** y **Desenfoque / Blur (0–25 dp)**.
 - **Protección Tipográfica Fija y Marquesina Automática (Cero Desbordamientos)**:
   - Escala de densidad y fuente estabilizada (`fontScale = 1.0f`) para que las configuraciones globales de tamaño de letra en Android no rompan la maquetación ni corten textos.
   - **Títulos en Movimiento (Marquee Fluido)**: Los títulos y artistas largos se desplazan horizontalmente de forma continua (`basicMarquee`) en la pantalla completa *Now Playing*, en el *Mini Reproductor* y en la canción en reproducción dentro de las listas y la cola.
@@ -377,20 +380,20 @@ gradle :app:assembleBeta
 
 ### GitHub Actions (Compilación Debug y Canal Beta `Nebula`):
 - **Compilación de APK Beta — `Aura Beta` (`.github/workflows/build-beta-apk.yml`)**:
-  - **Identidad Beta**: Nombre en el launcher **`Aura Beta`**, identificador de paquete **`com.auramusic.beta`** (almacenamiento en `Android/data/com.auramusic.beta/files/`), versión **`v0.1.0-beta.1a`**, codename **`Nebula`** y código estratégico **`NEBULA-00101A`** (`versionCode = 100101`).
+  - **Identidad Beta**: Nombre en el launcher **`Aura Beta`**, identificador de paquete **`com.auramusic.beta`** (almacenamiento en `Android/data/com.auramusic.beta/files/`), versión **`v0.1.1-beta-1a`**, codename **`Nebula`** y código estratégico **`NEBULA-00111A`** (`versionCode = 100111`).
   - **Limpio de Herramientas Debug y Pistas de Prueba (Excepto Actualizador OTA `yt-dlp`)**: Elimina por completo `DebugMonitorActivity` ("Aura Monitor") del Manifiesto y Ajustes (`BuildConfig.ENABLE_DEBUG_MONITOR = false`), oculta la tarjeta de generación de canciones de prueba Synthwave (`BuildConfig.ENABLE_DEMO_TRACKS = false`) y excluye `LeakCanary`, manteniendo **100% activo el actualizador OTA en caliente de `yt-dlp`**.
   - **100% Sin Caché y Basado en el Flujo Probado de Debug**: Compila siempre desde cero (`--no-build-cache --rerun-tasks`) sin depender de `actions/cache`.
   - **Exclusivo para Móviles (3 APKs) y Sin Arquitecturas de PC**: Elimina `x86` y `x86_64` y genera 3 APKs:
-    1. `AuraBeta-v0.1.0-beta.1a-Nebula-arm64-v8a.apk` (64 bits).
-    2. `AuraBeta-v0.1.0-beta.1a-Nebula-armeabi-v7a.apk` (32 bits).
-    3. `AuraBeta-v0.1.0-beta.1a-Nebula-universal.apk` (Universal 32 + 64 bits).
+    1. `AuraBeta-v0.1.1-beta-1a-Nebula-arm64-v8a.apk` (64 bits).
+    2. `AuraBeta-v0.1.1-beta-1a-Nebula-armeabi-v7a.apk` (32 bits).
+    3. `AuraBeta-v0.1.1-beta-1a-Nebula-universal.apk` (Universal 32 + 64 bits).
   - **Firma desde GitHub Secrets**: Busca automáticamente en `secrets` las variables `BETA_KEYSTORE_BASE64` (o `KEYSTORE_BASE64`), `BETA_KEYSTORE_PASSWORD` (o `STORE_PASSWORD`), `BETA_KEY_ALIAS` (o `KEY_ALIAS`) y `BETA_KEY_PASSWORD` (o `KEY_PASSWORD`).
   - **Regla de Activación Dual (Manual vs Pre-Release con Tag `-beta`)**:
     - Si se activa **manualmente (`workflow_dispatch`)**, genera y sube los 3 APKs únicamente a los **Artifacts** de la ejecución (no los sube a ningún Release).
-    - Si se activa por un **Pre-Release con su respectivo Tag `-beta`** (ej. `v0.1.0-beta.1a`), adjunta los 3 APKs y `SHA256SUMS.txt` a los **Assets del Pre-Release** e inyecta automáticamente las notas y la tabla explicativa de APKs desde **`chanelog-beta.md`**.
+    - Si se activa por un **Pre-Release con su respectivo Tag `-beta`** (ej. `v0.1.1-beta-1a`), adjunta los 3 APKs y `SHA256SUMS.txt` a los **Assets del Pre-Release** e inyecta automáticamente las notas y la tabla explicativa de APKs desde **`chanelog-beta.md`**.
   - **Actualizador Automático de Versiones APK en la App (`AppReleaseUpdater` & `AppUpdateDialog`)**:
     - Conectado por defecto al repositorio oficial **`LuisAlejandro544/Aura-music`** (`https://github.com/LuisAlejandro544/Aura-music/releases` y API `https://api.github.com/repos/LuisAlejandro544/Aura-music/releases`).
-    - Filtra los Pre-Releases `-beta` y compara semánticamente cualquier formato de tag dinámico (`v0.1.0-beta.1a` vs `v0.1.0-beta.2d` vs `v0.2.0-beta.1m`) desglosando versión, número de revisión beta y letra estratégica (`a`, `d`, `m`, `s`, `u`).
+    - Filtra los Pre-Releases `-beta` y compara semánticamente cualquier formato de tag dinámico (`v0.1.0-beta.1a` vs `v0.1.1-beta-1a` vs `v0.2.0-beta.1m`) desglosando versión, número de revisión beta y letra estratégica (`a`, `d`, `m`, `s`, `u`).
     - Detecta automáticamente la arquitectura del teléfono (`Build.SUPPORTED_ABIS`) para descargar el APK exacto (`arm64-v8a`, `armeabi-v7a` o `universal`), valida su integridad SHA-256 contra `SHA256SUMS.txt`, presenta las notas de `chanelog-beta.md` y lanza el instalador de Android mediante `FileProvider` conservando todos los datos en `Android/data/com.auramusic.beta/`.
 - **Compilación de APK Debug (`.github/workflows/build-debug-apk.yml`)**:
   - Se activa manualmente desde la pestaña **Actions -> Run workflow** (`workflow_dispatch`).

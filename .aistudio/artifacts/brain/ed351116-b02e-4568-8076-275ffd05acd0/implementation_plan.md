@@ -1,114 +1,103 @@
-# Sistema de Widgets Adaptativos, Color Dinámico y Cuadrícula de Favoritos en Aura Music
+# Carpeta Personalizada de Usuario & Exportación de Vídeos con Audio en Aura Music
 
-Esta actualización transforma el sistema de Widgets de escritorio de **Aura Music**, incorporando extracción cromática reactiva desde la carátula de la canción, adaptación automática al estirar el widget en la pantalla de inicio, reanudación de música en segundo plano sin abrir la ventana de la app, un **segundo Widget independiente de gran formato** para tus **4 Canciones más escuchadas o 4 Playlists**, y un nuevo menú a pantalla completa llamado **"Widget"** dentro de **Ajustes**.
+Este plan detalla la incorporación de un sistema de **Carpeta Pública / Personalizada elegida por el usuario** dentro de **Ajustes > Medios & Almacenamiento**, permitiendo que cualquier usuario elija (o cree desde el selector de su teléfono) su propia carpeta libre de restricciones (`Android/data/`), visualice en todo momento la ruta exacta donde se guardan sus archivos y exporte sus vídeos descargados en formato `.mp4` **con su pista de audio completa incluida** mediante fusión instantánea en FFmpeg.
 
 ---
 
-## User Review & Critical Decisions
+## Revisión del Usuario y Decisiones Confirmadas
 
 > [!IMPORTANT]
-> Se han integrado todas tus respuestas y preferencias confirmadas para asegurar una experiencia fluida, modular y fiel al diseño **Dark Luxury Neo-Glass OLED** de Aura Music:
-
-- **Segundo Widget Independiente en el Selector de Android**: Además del Widget de Reproductor principal, el usuario encontrará un segundo Widget dedicado (*"Aura Music • Top 4 & Playlists"*) en el selector de widgets de su teléfono, que muestra en formato grande las **4 canciones más escuchadas** o las **4 playlists principales** con sus portadas WebP o collages.
-- **Reanudación Directa en Segundo Plano + Controles Extra (Favorito ❤️ + Progreso)**: Al tocar *Play* (o elegir una canción/playlist del widget) incluso si la app fue cerrada horas antes, la música se reanudará directamente en segundo plano despertando al servicio multimedia y restaurando la última canción y posición guardada, además de incluir botón de **Favorito (Corazón ❤️)** y **barra de progreso** sincronizados en tiempo real.
-- **Nuevo Apartado "Widget" en Ajustes (Todo Configurable + Vista Previa)**: Dentro de **Ajustes** se añade la tarjeta navegable **"Widget"**, que abre una pantalla independiente a pantalla completa donde el usuario puede elegir si el Widget de accesos rápidos muestra las **4 Canciones más escuchadas** o las **4 Playlists**, activar o desactivar el **color dinámico de carátula en el Widget** y visualizar una **vista previa interactiva en vivo** de cómo lucirán ambos widgets antes de volver a su escritorio.
+> **Decisiones confirmadas por el usuario en la fase de planificación:**
+> - **Ubicación de la Carpeta**: El propio usuario crea y selecciona la carpeta que desee en el almacenamiento de su teléfono (mediante el selector nativo de carpetas de Android `OpenDocumentTree` con permisos persistentes), sin estar encerrado en rutas restringidas del sistema.
+> - **Formato del Vídeo Entregado**: **Vídeo completo con su audio incluido** (uniendo la pista de vídeo y la pista de audio de la canción mediante `FFmpeg` de forma rápida con `-c copy`), para que pueda reproducirlo con sonido en su galería, reproductor externo o compartirlo en redes sociales.
+> - **Punto de Acceso e Interfaz**: Integrado directamente en **Ajustes > Medios & Almacenamiento**, con visualización clara de la ruta exacta configurada, selector/cambiador de carpeta y botón en cada tarjeta de canción con vídeo para guardarlo en dicha carpeta (además de preparación arquitectónica para habilitar imágenes WebP/PNG en el futuro).
 
 ---
 
-## 1. Overview & Core Concept
+## 1. Visión General y Concepto Principal
 
 - **Qué hace**:
-  1. **Color Dinámico desde la Imagen (Carátula)**: El fondo, el halo superior, el botón principal de reproducción y la barra de progreso del Widget cambian automáticamente de color extrayendo la paleta vibrante de la imagen de portada WebP (o arte procedural) de la canción actual, manteniendo legibilidad perfecta y estética oscura OLED.
-  2. **Adaptación Automática al Estirarlo (Responsive Sizing)**: El Widget reproductor detecta en tiempo real sus dimensiones en `dp` (`onAppWidgetOptionsChanged`) cuando el usuario lo estira horizontal o verticalmente en su pantalla de inicio, conmutando entre **Modo Compacto (4x1)**, **Modo Mediano con Progreso y Favorito (4x2)** y **Modo Estudio Expandido (4x3 / Cuadrado Grande)** con carátula de gran formato y fila completa de transporte.
-  3. **Reanudación Persistente en Segundo Plano**: La última pista activa, la cola de reproducción y el segundo exacto donde quedó la música se guardan de forma persistente. Al tocar *Play*, *Siguiente*, *Favorito* o cualquiera de las 4 canciones/playlists desde el escritorio con la app cerrada, un motor de arranque en frío restaura la sesión desde la base de datos local y empieza a sonar al instante sin interrumpir al usuario abriendo la app.
-  4. **Segundo Widget Independiente "Top 4 Canciones / 4 Playlists"**: Un widget de buen tamaño (4x2 redimensionable a 4x3) que presenta una cuadrícula 2x2 de acceso directo a las **4 canciones que más escuchas** (ordenadas por `playCount`) o a tus **4 Playlists** (con su portada personalizada o collage automático de hasta 4 fotos). Tocar cualquiera de los 4 elementos inicia su reproducción inmediata en segundo plano.
-  5. **Nuevo Apartado "Widget" en Ajustes**: Menú a pantalla completa dentro de `Ajustes` con vista previa en vivo, selector de contenido del segundo widget (*4 Canciones más escuchadas* vs *4 Playlists*), interruptor de color dinámico en widgets y botón de sincronización instantánea.
-- **Valor Principal**: Control total de tu música y acceso inmediato a tus canciones y listas favoritas desde la pantalla de inicio del teléfono, sin esperas ni pantallas intermedias.
+  1. Añade en **Ajustes > Medios & Almacenamiento** un panel interactivo de **"Carpeta de Descargas del Usuario (Acceso Libre)"** donde el usuario puede pulsar **"Elegir / Crear Carpeta"** usando el explorador nativo de su teléfono.
+  2. Dentro de la carpeta elegida por el usuario, Aura Music organiza automáticamente una subcarpeta **`Videos/`** (dejando lista la arquitectura para añadir `Imagenes/` próximamente sin romper nada).
+  3. Muestra de forma transparente la **ruta legible exacta** de la carpeta seleccionada (por ejemplo: `Almacenamiento interno > Mi Música Aura > Videos`) y el estado de los vídeos exportados.
+  4. En cada canción listada en **Ajustes > Medios & Almacenamiento** que tenga un vídeo descargado, incorpora un botón de **"Guardar vídeo en mi carpeta"** (además de opción de exportar todos los vídeos de un toque) que combina instantáneamente en segundo plano el flujo de vídeo con el audio de alta fidelidad de la canción usando `FFmpeg` y deposita el archivo `.mp4` con nombre limpio (`Artista - Título.mp4`) en la carpeta del usuario.
+- **Por qué no afecta al reproductor**:
+  - El archivo interno de Video Canvas (`Android/data/.../files/videos/`) permanece intacto y sin audio (`-an`) para que el reproductor principal, el modo Cinemático y el ecualizador C++20 sigan funcionando a 0ms sin interferencias de doble sonido. La copia que se entrega en la carpeta elegida por el usuario es un archivo `.mp4` completo e independiente con sonido.
 
 ---
 
-## 2. User Experience & Visual Design
+## 2. Experiencia de Usuario y Diseño Visual
 
-- **Flujos de Usuario Clave**:
-  1. **Reacción de Color y Estiramiento en Escritorio**: Al reproducir cualquier canción, el Widget extrae los colores dominantes y vibrantes de la imagen de carátula y pinta su fondo con un degradado diagonal Neo-Glass con borde luminoso sutil. Si el usuario mantiene presionado el widget en su launcher y lo estira hacia abajo, el widget pasa automáticamente de una barra horizontal compacta a una tarjeta amplia con barra de progreso en vivo, tiempos (`mm:ss`), botón de **Favorito (❤️)** e insignia técnica (`BIT-PERFECT AAUDIO` / `C++20 DSP`).
-  2. **Reanudación sin Abrir la App**: Si el teléfono reinició o Android cerró la app por falta de RAM, el Widget conserva en pantalla la última canción que estabas escuchando con su carátula y color. Al tocar **Play**, el servicio `AuraMediaPlaybackService` despierta en segundo plano, recarga la canción en el minuto donde la dejaste y comienza a sonar de inmediato.
-  3. **Uso del Segundo Widget (Top 4 Canciones / 4 Playlists)**: Al agregar el segundo widget a la pantalla de inicio, verás una cabecera con acceso rápido a reproducción y una cuadrícula 2x2 con las 4 canciones más escuchadas (o tus 4 playlists con su collage). Un toque sobre cualquier tarjeta reproduce esa canción o lista al instante.
-  4. **Personalización en `Ajustes > Widget`**: Al entrar a `Ajustes`, el usuario toca el nuevo apartado **"Widget"**. Allí ve una **Vista Previa en Vivo** de ambos widgets con los colores de su canción actual, puede alternar entre *"Mostrar 4 Canciones más escuchadas"* o *"Mostrar 4 Playlists"*, activar/desactivar el *"Color dinámico de la imagen en Widgets"* y elegir la opacidad/intensidad del tinte.
-- **Identidad Visual y Estética**:
-  - *Dirección Estética*: **Dark Luxury Neo-Glass OLED** armonizado con los colores reales de la carátula de cada canción.
-  - *Paleta y Contraste*: El color extraído de la imagen se combina con una base oscura profunda (`#0B0F19` a `#161F33`) para garantizar que el título blanco (`#FFFFFF`), el artista (`#CBD5E1`) y los controles mantengan un contraste impecable sin importar si la portada es muy clara o muy oscura.
-  - *Áreas Táctiles*: Todos los botones interactivos del widget (*Anterior*, *Play/Pausa*, *Siguiente*, *Favorito ❤️* y las *4 tarjetas de canciones/playlists*) cumplen con áreas táctiles cómodas y bien espaciadas.
+### Flujo Paso a Paso del Usuario
+1. **Configuración de la Carpeta Personalizada**:
+   - El usuario entra en **Ajustes > Medios & Almacenamiento**.
+   - En la parte superior (debajo del resumen de espacio ocupado), visualiza la nueva tarjeta **"Carpeta Pública de Usuario (Vídeos)"**.
+   - Si aún no ha seleccionado una carpeta, ve un indicador claro y el botón **"Crear o Seleccionar Carpeta"**. Al tocarlo, se abre el selector oficial de carpetas de Android donde el usuario puede crear una carpeta nueva en su teléfono o tocar cualquiera existente y darle a *"Usar esta carpeta"*.
+   - Una vez seleccionada, la tarjeta muestra la **ruta exacta en texto claro** (ej. `Memoria interna / Aura Videos / Videos`) y un botón para **"Cambiar carpeta"** cuando quiera.
+2. **Exportación de Vídeos con Audio Completo**:
+   - En la lista de canciones de **Ajustes > Medios & Almacenamiento** (o filtrando por el chip *"Videos"*), cada tarjeta de canción que posee un vídeo muestra ahora, junto al botón de borrar, la acción **"Guardar en carpeta"** (o **"Guardado ✓"** si ya fue exportado a la carpeta del usuario).
+   - Si el usuario pulsa **"Guardar en carpeta"** sin haber elegido aún una carpeta destino, la app abre automáticamente el selector de carpetas primero y luego guarda el vídeo inmediatamente.
+   - Durante el segundo que toma unir el vídeo y el audio en FFmpeg, el botón muestra un indicador de progreso en vivo y al terminar confirma la ruta exacta donde quedó disponible el `.mp4`.
 
----
-
-## 3. Key Product Decisions & Trade-Offs
-
-- **Decisión 1: Renderizado de Fondo Degradado Dinámico por Bitmap en `RemoteViews`**
-  - *Enfoque Elegido*: Como los `RemoteViews` de Android tienen limitaciones para crear degradados complejos por código en todas las versiones desde Android 8.0 (API 26) hasta Android 16 (API 36), generaremos en un hilo secundario un lienzo vectorial redondeado (`Canvas` + `LinearGradient` + `RadialGradient` con los colores extraídos de la imagen por `Palette`) para el fondo del widget, el botón de Play y la barra de progreso.
-  - *Por qué*: Garantiza que el cambio de color según la imagen funcione al 100% en cualquier teléfono Android (desde Android 8.0 en adelante) con bordes curvos suaves, halo de neón y cero fallos visuales.
-- **Decisión 2: Reanudación en Frío Silenciosa vía `MediaSessionService` + Persistencia de Estado**
-  - *Enfoque Elegido*: Persistir cada cambio de canción, estado de favorito y posición periódica en el almacén local de estado del widget (`WidgetStateStore`). Cuando el usuario toca un botón del widget y el motor en memoria no está activo, el `BroadcastReceiver` arranca `AuraMediaPlaybackService` en segundo plano enviando la acción solicitada (`RESUME_LAST`, `PLAY_TRACK_ID`, `PLAY_PLAYLIST_ID`, `TOGGLE_FAVORITE`) sin lanzar `MainActivity`.
-  - *Por qué*: Evita que la app se abra de golpe en la cara del usuario cuando solo quería darle Play o cambiar de canción desde su pantalla de inicio.
-- **Decisión 3: Adaptación Multi-Tamaño por `OPTION_APPWIDGET_MIN_HEIGHT` y `MIN_WIDTH`**
-  - *Enfoque Elegido*: Soportar 3 niveles de diseño adaptativo dentro del Widget de Reproductor según la altura y anchura al estirarlo:
-    - **Compacto (`alto < 110dp`)**: Carátula, insignia, título/artista, botón Favorito ❤️ y controles principales.
-    - **Mediano (`110dp <= alto < 175dp`)**: Añade barra de progreso visual sincronizada, tiempo actual/total y fila ampliada de controles (Favorito ❤️, Anterior, Play/Pausa iluminado, Siguiente).
-    - **Expandido (`alto >= 175dp`)**: Diseño tipo estudio con portada destacada, metadatos completos, insignia audiófila y botonera de gran formato.
+### Identidad Visual y Estética
+- **Estética**: Mantiene fielmente el estilo **Dark Luxury Neo-Glass OLED** de Aura Music (`SurfaceCard`, bordes `CardBorder` de `1.dp`, superficies 100% opacas y acentos reactivos del tema activo).
+- **Ergonomía Móvil**: Botones con altura y área táctil mínima garantizada de `48.dp`, textos con `fontScale = 1.0f` y diseño limpio sin saturar ni alterar ninguna otra pantalla de la aplicación.
 
 ---
 
-## 4. Technical Architecture & Data Strategy *(Technical Reference)*
+## 3. Decisiones Clave de Producto e Ingeniería
 
-- **Diagrama de Arquitectura y Flujo de Componentes**:
+- **Decisión 1: Uso de `Storage Access Framework (OpenDocumentTree)` con Permisos Persistentes**
+  - *Enfoque Elegido*: Usar `ActivityResultContracts.OpenDocumentTree()` y registrar el permiso persistente de lectura/escritura con `takePersistableUriPermission`.
+  - *Por qué*: Cumple al 100% con las políticas de almacenamiento de Android 8.0 a Android 15+ sin pedir permisos invasivos de acceso total al disco (`MANAGE_EXTERNAL_STORAGE`), permite que el usuario cree la carpeta donde él quiera en su teléfono y los archivos resultantes son visibles inmediatamente en cualquier gestor de archivos o galería.
+- **Decisión 2: Ensamblaje de Vídeo + Audio con FFmpeg (`mergeVideoCanvasWithTrackAudio`)**
+  - *Enfoque Elegido*: Como el Video Canvas interno se almacena sin audio (`-an`) y a veces como un bucle corto (`<= 20s`), cuando el vídeo tiene duración completa se hace un *Direct Stream Copy* (`-c:v copy -c:a copy -shortest`) ultrarrápido (~1 segundo); y si el Video Canvas es un loop corto mientras la canción dura 3 minutos, se ofrece unión directa o repetición cíclica (`-stream_loop -1 -i video.mp4 -i audio.m4a -shortest -c:v copy -c:a aac`) para que el `.mp4` tenga sonido de principio a fin sin cortes.
+  - *Por qué*: Garantiza que el usuario nunca reciba un vídeo mudo al abrirlo desde sus archivos.
+- **Decisión 3: Estructura Escalable (`Videos/` hoy, `Imagenes/` mañana)**
+  - *Enfoque Elegido*: El nuevo gestor modular `UserPublicMediaExporter` gestiona subdirectorios por categoría (`Videos` activo ahora, y preparado para `Images` en el futuro) usando `DocumentFile` en `Dispatchers.IO`.
+
+---
+
+## 4. Arquitectura Técnica y Estrategia de Datos
+
+### Diagrama de Arquitectura y Flujo de Datos
 
 ```text
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                     CAPA DE AJUSTES & VISTA PREVIA (UI)                      │
-│  [SettingsScreen] ──► [SettingsSubScreen.WIDGETS]                            │
-│                        ├── Selector: 4 Canciones Top vs 4 Playlists          │
-│                        ├── Switch: Color Dinámico desde Imagen de Carátula   │
-│                        └── Vista Previa Interactiva en Vivo de ambos Widgets │
-└──────────────────────────────────────┬───────────────────────────────────────┘
-                                       │ Guarda preferencias y refresca
-                                       ▼
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                  ALMACÉN & SINCRONIZADOR DE WIDGETS (DATA)                   │
-│  [WidgetStateStore / WidgetDataSynchronizer]                                 │
-│   ├── Persiste última canción, posición (ms), favorito y colores de imagen   │
-│   ├── Caché de las 4 Canciones más escuchadas (Room: playCount DESC)         │
-│   └── Caché de las 4 Playlists principales + Collage WebP renderizado        │
-└───────────────┬──────────────────────────────────────────────┬───────────────┘
-                │                                              │
-                ▼                                              ▼
-┌─────────────────────────────────────────┐  ┌─────────────────────────────────┐
-│   WIDGET 1: REPRODUCTOR ADAPTATIVO      │  │  WIDGET 2: TOP 4 / PLAYLISTS    │
-│   [AuraMusicWidgetProvider]             │  │  [AuraLibraryWidgetProvider]    │
-│   ├── Reacciona al color de la imagen   │  │  ├── Cuadrícula 2x2 de buen     │
-│   ├── Se adapta al estirarlo:           │  │  │   tamaño (4 Canciones o      │
-│   │   • Compacto (4x1)                  │  │  │   4 Playlists configurables) │
-│   │   • Mediano con Progreso y ❤️ (4x2) │  │  ├── Reacciona al color activo  │
-│   │   • Expandido Estudio (4x3)         │  │  └── Toque directo reproduce    │
-└───┴──────────────────┬──────────────────┘  └───┴──────────────┬──────────────┘
-                       │                                        │
-                       └───────────────────┬────────────────────┘
-                                           │ Intents en 2do Plano (Sin abrir UI)
-                                           ▼
-┌──────────────────────────────────────────────────────────────────────────────┐
-│               MOTOR DE REANUDACIÓN EN SEGUNDO PLANO (PLAYBACK)               │
-│  [AuraMediaPlaybackService] + [AuraAudioPlayer] + [Room Database]            │
-│   ├── Si la app está abierta: ejecuta acción al instante en memoria          │
-│   └── Si la app estaba cerrada: restaura pista/playlist desde Room,          │
-│       posiciona el segundo guardado y reanuda el audio en segundo plano      │
-└──────────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                UI: Ajustes > Medios & Almacenamiento                    │
+│  ┌───────────────────────────────────────────────────────────────────┐  │
+│  │ Tarjeta: Carpeta de Usuario (Muestra ruta exacta + Botón Elegir)  │  │
+│  └───────────────────────────────┬───────────────────────────────────┘  │
+│                                  │                                      │
+│  ┌───────────────────────────────▼───────────────────────────────────┐  │
+│  │ Lista de Canciones (StoredMediaTrackCard)                         │  │
+│  │  • Muestra peso de Carátula WebP y Video Canvas MP4               │  │
+│  │  • [Nuevo] Botón "Guardar vídeo con audio en mi carpeta"          │  │
+│  └───────────────────────────────┬───────────────────────────────────┘  │
+└──────────────────────────────────┼──────────────────────────────────────┘
+                                   │ Eventos Compose
+                                   ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│             ViewModel & Coordinador (TrackLibraryCoordinator)           │
+│  • Persiste URI de carpeta elegida en SharedPreferences                 │
+│  • Expone ruta legible humana y estado de exportación por canción       │
+└──────────────────────────────────┬──────────────────────────────────────┘
+                                   │ Coroutines (Dispatchers.IO)
+                                   ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│          Nuevo Módulo: UserPublicMediaExporter (Storage Layer)          │
+│  1. Verifica/crea subcarpeta "Videos" dentro del DocumentTree elegido   │
+│  2. Invoca FFmpegNativeEngine.mergeAudioAndVideo() en archivo temporal  │
+│     combinando el Video Canvas (.mp4) + el Audio de la pista (.m4a)     │
+│  3. Escribe el MP4 final ("Artista - Titulo.mp4") en la carpeta SAF     │
+│     del usuario e indexa en MediaStore para que aparezca en Galería     │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Modelo de Datos y Estado Persistente**:
-  - `WidgetConfig`: Modelo inmutable persistido en preferencias con:
-    - `collectionMode`: Enum (`TOP_SONGS` para las 4 canciones más escuchadas, `PLAYLISTS` para las 4 playlists).
-    - `isDynamicColorEnabled`: Booleano (activo por defecto) para teñir el fondo y acentos de los widgets con los colores de la imagen de la canción actual.
-    - `showProgressInWidget`: Booleano para mostrar la barra de progreso y tiempos.
-  - `WidgetPersistedPlaybackState`: Guarda el `trackId`, `title`, `artist`, `albumArtPath`, `isFavorite`, `positionMs`, `durationMs`, `primaryColorInt` y `secondaryColorInt` de la última canción reproducida, permitiendo que el widget nunca pierda su diseño ni su capacidad de reanudar.
-- **Mapeo de Interacciones y Manejadores**:
-  - **Estiramiento (`onAppWidgetOptionsChanged`)**: Calcula `minWidth` y `minHeight` de las opciones del widget y selecciona la plantilla correspondiente (`Compact`, `Medium`, `Expanded`), regenerando el bitmap de fondo con las proporciones exactas para evitar deformaciones.
-  - **Botón Favorito (❤️) en el Widget**: Invoca `ACTION_WIDGET_FAVORITE`, alterna `isFavorite` en la base de datos Room y en `AuraAudioPlayer`, actualiza el icono del corazón en rojo intenso (`#EF4444`) al instante y sincroniza el estado con `NowPlayingScreen`.
-  - **Toque en cualquiera de las 4 Canciones o 4 Playlists del Segundo Widget**: Envía `ACTION_WIDGET_PLAY_ITEM` con el ID de la canción o de la playlist; inicia la cola correspondiente en `AuraAudioPlayer` en segundo plano y actualiza ambos widgets simultáneamente.
+### Mapeo de Componentes Interactivos y Estado
+- **Selector de Carpeta (`OpenDocumentTree`)**:
+  - Al seleccionar la carpeta, se invoca `contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)`.
+  - Un convertidor de URI SAF traduce el identificador del documento (ej. `primary:MiCarpeta/Aura`) a una ruta amigable para el usuario (`Almacenamiento interno / MiCarpeta / Aura / Videos`).
+- **Exportación Individual y Masiva en Segundo Plano (`Dispatchers.IO`)**:
+  - Controla estados de carga (`Exporting`, `Success`, `Error`) por `track.id` para mostrar feedback visual inmediato en la tarjeta sin congelar la interfaz.
+  - Sanitiza los nombres de archivo (`Artista - Título.mp4`) eliminando caracteres reservados para que sean 100% compatibles con el sistema de archivos FAT32/exFAT/ext4 de cualquier teléfono Android.

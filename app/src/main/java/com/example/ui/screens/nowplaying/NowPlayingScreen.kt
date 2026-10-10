@@ -240,9 +240,9 @@ fun NowPlayingScreen(
     }
 
     val colorTransitionDurationMs = if (isVideoVisual && isDynamicArtworkColorEnabled) {
-        if (activeSampleIntervalMs <= ArtworkColorExtractor.INTERVAL_NORMAL_MS) 180 else 650
+        if (activeSampleIntervalMs <= ArtworkColorExtractor.INTERVAL_NORMAL_MS) 1000 else 1400
     } else {
-        400
+        600
     }
 
     val animatedPrimary by animateColorAsState(

@@ -239,6 +239,97 @@ object FFmpegNativeEngine {
     }
 
     /**
+     * Une el archivo de Video Canvas (.mp4 sin sonido) con el archivo de audio de la canción (.m4a/.mp3)
+     * para entregar al usuario en su carpeta personalizada un vídeo MP4 completo con sonido.
+     * - Si el vídeo es sincronizado de duración completa: hace muxing instantáneo (-c:v copy -c:a aac).
+     * - Si el vídeo es un loop corto (isVideoLoop = true): repite el bucle de vídeo (-stream_loop -1)
+     *   hasta cubrir la duración de la canción (-shortest) sin recodificar el vídeo (-c:v copy).
+     */
+    suspend fun mergeVideoCanvasWithTrackAudio(
+        context: Context,
+        videoFile: File,
+        audioFile: File,
+        outputFile: File,
+        isVideoLoop: Boolean = false,
+        totalDurationMs: Long = 0L
+    ): ExecutionResult = withContext(Dispatchers.IO) {
+        init(context)
+        val ffmpegBin = getBinaryFile(context)
+        if (ffmpegBin == null) {
+            return@withContext ExecutionResult(
+                success = false,
+                exitCode = -1,
+                outputLog = "FFmpeg no disponible para exportar vídeo con audio.",
+                outputFile = null
+            )
+        }
+
+        if (outputFile.exists()) {
+            outputFile.delete()
+        }
+
+        val safeVideo = sanitizeFilePath(videoFile)
+        val safeAudio = sanitizeFilePath(audioFile)
+        val safeOutput = sanitizeFilePath(outputFile)
+
+        // Intentar primero copia directa de vídeo + audio (ultrarrápido, ~0.5s)
+        val fastArgs = if (isVideoLoop) {
+            arrayOf(
+                ffmpegBin.absolutePath,
+                "-y",
+                "-stream_loop", "-1",
+                "-i", safeVideo,
+                "-i", safeAudio,
+                "-map", "0:v:0",
+                "-map", "1:a:0",
+                "-c:v", "copy",
+                "-c:a", "aac",
+                "-b:a", "192k",
+                "-shortest",
+                "-movflags", "+faststart",
+                safeOutput
+            )
+        } else {
+            arrayOf(
+                ffmpegBin.absolutePath,
+                "-y",
+                "-i", safeVideo,
+                "-i", safeAudio,
+                "-map", "0:v:0",
+                "-map", "1:a:0",
+                "-c:v", "copy",
+                "-c:a", "copy",
+                "-shortest",
+                "-movflags", "+faststart",
+                safeOutput
+            )
+        }
+
+        val fastResult = executeCommand(context, fastArgs, totalDurationMs, null)
+        if (fastResult.success && outputFile.exists() && outputFile.length() > 4096L) {
+            return@withContext fastResult
+        }
+
+        // Fallback compatible si el códec de audio original (ej. Opus/FLAC) requiere transcodificación AAC para contenedor MP4
+        if (outputFile.exists()) outputFile.delete()
+        val compatArgs = arrayOf(
+            ffmpegBin.absolutePath,
+            "-y",
+            "-i", safeVideo,
+            "-i", safeAudio,
+            "-map", "0:v:0",
+            "-map", "1:a:0",
+            "-c:v", "copy",
+            "-c:a", "aac",
+            "-b:a", "192k",
+            "-shortest",
+            "-movflags", "+faststart",
+            safeOutput
+        )
+        executeCommand(context, compatArgs, totalDurationMs, null)
+    }
+
+    /**
      * Recorta físicamente un archivo de audio sin pérdida de calidad.
      */
     suspend fun trimAudioLossless(

@@ -50,16 +50,17 @@ data class LiveVideoColorSnapshot(
  * Cuando el Video Canvas está activo:
  * - Extrae la paleta cromática en tiempo real a partir de un micro-bitmap (24x24) del
  *   [android.view.TextureView] activo (sin instanciar un segundo MediaCodec).
- * - Adapta automáticamente la frecuencia de muestreo según el estado de batería del teléfono:
- *   • **180 ms** cuando el dispositivo tiene **> 15% de batería** y **no está en modo ahorro de energía**.
- *   • **800 ms** cuando el dispositivo tiene **<= 15% de batería** o **tiene activado el ahorro de batería**.
+ * - Adapta automáticamente la frecuencia de muestreo cada **1 segundo (1000 ms)** para brindar
+ *   transiciones cromáticas orgánicas y descansadas sin marear al usuario:
+ *   • **1000 ms (1s)** cuando el dispositivo tiene **> 15% de batería** y **no está en modo ahorro de energía**.
+ *   • **1500 ms (1.5s)** cuando el dispositivo tiene **<= 15% de batería** o **tiene activado el ahorro de batería**.
  * - Si el TextureView aún no ha renderizado su primer cuadro, extrae directamente del fotograma real
  *   del video con [MediaMetadataRetriever.OPTION_CLOSEST] sin dejar que la carátula estática interfiera.
  */
 object ArtworkColorExtractor {
 
-    const val INTERVAL_NORMAL_MS = 180L
-    const val INTERVAL_BATTERY_SAVER_MS = 800L
+    const val INTERVAL_NORMAL_MS = 1000L
+    const val INTERVAL_BATTERY_SAVER_MS = 1500L
 
     // Caché en memoria para almacenar las paletas de carátulas y buckets temporales de video
     private val memoryCache = LruCache<Long, ExtractedArtworkColors>(80)
@@ -84,8 +85,8 @@ object ArtworkColorExtractor {
 
     /**
      * Determina el intervalo de muestreo cromático en tiempo real según el estado de batería y ahorro de energía:
-     * - 180 ms si la batería es > 15% y el Modo Ahorro de Batería está desactivado.
-     * - 800 ms si la batería es <= 15% o el Modo Ahorro de Batería está activado.
+     * - 1000 ms (1 segundo) si la batería es > 15% y el Modo Ahorro de Batería está desactivado.
+     * - 1500 ms (1.5 segundos) si la batería es <= 15% o el Modo Ahorro de Batería está activado.
      */
     fun getAdaptiveSampleIntervalMs(context: Context): Long {
         return try {
@@ -521,6 +522,16 @@ object ArtworkColorExtractor {
             cachedVideoUri = null
             cachedVideoDurationMs = 0L
         }
+    }
+
+    /**
+     * Libera recursos pesados de extracción de video y poda la caché de memoria cuando
+     * la aplicación pasa a segundo plano mientras el usuario juega, conservando el último
+     * color válido de la pista actual para que al regresar no haya parpadeos.
+     */
+    fun trimForBackgroundGaming() {
+        releaseRetriever()
+        memoryCache.trimToSize(10)
     }
 
     fun clearCache() {

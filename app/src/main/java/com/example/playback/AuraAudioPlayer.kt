@@ -51,6 +51,9 @@ class AuraAudioPlayer(
     private var progressJob: Job? = null
 
     private var exoPlayer: ExoPlayer? = null
+    private var outgoingExoPlayer: ExoPlayer? = null
+    private var outgoingNativeAudioProcessor: NativeAudioProcessor? = null
+    private var crossfadeTriggeredForTrackId: Long = -1L
 
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
@@ -132,6 +135,23 @@ class AuraAudioPlayer(
 
         val player = ExoPlayer.Builder(context, renderersFactory).build()
         exoPlayer = player
+
+        // Inicializar segundo reproductor auxiliar (Deck B Saliente) para Crossfade Dual-Deck superpuesto real
+        val auxProcessor = NativeAudioProcessor()
+        outgoingNativeAudioProcessor = auxProcessor
+        val auxAudioSink = androidx.media3.exoplayer.audio.DefaultAudioSink.Builder(context)
+            .setAudioProcessors(arrayOf(auxProcessor))
+            .build()
+        val auxRenderersFactory = object : androidx.media3.exoplayer.DefaultRenderersFactory(context) {
+            override fun buildAudioSink(
+                context: Context,
+                enableFloatOutput: Boolean,
+                enableAudioTrackPlaybackParams: Boolean
+            ): androidx.media3.exoplayer.audio.AudioSink {
+                return auxAudioSink
+            }
+        }
+        outgoingExoPlayer = ExoPlayer.Builder(context, auxRenderersFactory).build()
 
         player.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -241,11 +261,42 @@ class AuraAudioPlayer(
         playTrack(selected)
     }
 
-    fun playTrack(track: Track) {
-        val previousTrackId = _currentTrack.value?.id
+    fun playTrack(track: Track, isAutoCrossfadeOverlap: Boolean = false) {
+        val player = exoPlayer ?: return
+        val outDeck = outgoingExoPlayer
+        val previousTrack = _currentTrack.value
+        val previousTrackId = previousTrack?.id
+        val effectiveCrossfadeSecs = if (_isDjAutomixEnabled.value && _crossfadeSeconds.value == 0) 5 else _crossfadeSeconds.value
+
+        // Si el Crossfade o Automix DJ está activo y había una pista sonando en el reproductor primario,
+        // transferimos la cola final de la pista saliente al Deck B auxiliar para que ambas suenen superpuestas
+        var handoffToDualDeckSucceeded = false
+        if (effectiveCrossfadeSecs > 0 && outDeck != null && previousTrack != null && previousTrack.id != track.id && player.isPlaying) {
+            val outgoingItem = player.currentMediaItem
+            val outgoingPos = player.currentPosition.coerceAtLeast(0L)
+            val outgoingDur = player.duration
+            if (outgoingItem != null && (outgoingDur <= 0L || (outgoingDur - outgoingPos) > 350L)) {
+                try {
+                    outDeck.stop()
+                    outDeck.clearMediaItems()
+                    outDeck.setMediaItem(outgoingItem, outgoingPos)
+                    outDeck.playbackParameters = player.playbackParameters
+                    outDeck.volume = player.volume.coerceIn(0.25f * fadeController.getVolume(), fadeController.getVolume())
+                    outDeck.prepare()
+                    outDeck.play()
+                    handoffToDualDeckSucceeded = true
+                } catch (_: Throwable) {
+                    handoffToDualDeckSucceeded = false
+                }
+            }
+        } else {
+            fadeController.stopOutgoingDeckImmediately(outDeck)
+        }
+
         _currentTrack.value = track
         _currentPosition.value = 0L
         _duration.value = track.durationMs
+        crossfadeTriggeredForTrackId = -1L
         abLoopController.reset()
         if (previousTrackId != track.id) {
             effectManager.onTrackChanged(track.id)
@@ -259,7 +310,6 @@ class AuraAudioPlayer(
             durationMs = track.durationMs
         )
 
-        val player = exoPlayer ?: return
         try {
             val artworkUri = if (!track.albumArtPath.isNullOrBlank()) {
                 val artFile = File(track.albumArtPath)
@@ -298,14 +348,30 @@ class AuraAudioPlayer(
             ensurePlaybackServiceStarted()
             player.play()
 
-            val fadeDurationMs = if (_crossfadeSeconds.value > 0) {
-                (_crossfadeSeconds.value * 1000L).coerceIn(1200L, 5000L)
-            } else if (fadeController.isFadeInOnResume) {
-                1500L
+            if (handoffToDualDeckSucceeded && outDeck != null) {
+                val overlapDurationMs = if (isAutoCrossfadeOverlap) {
+                    (effectiveCrossfadeSecs * 1000L).coerceIn(1200L, 12000L)
+                } else {
+                    // En cambio manual de canción con Crossfade activo, mezcla sedosa y rápida (1.6s a 3.0s)
+                    (effectiveCrossfadeSecs * 650L).coerceIn(1500L, 3200L)
+                }
+                fadeController.startDualDeckCrossfade(
+                    durationMs = overlapDurationMs,
+                    outgoingPlayer = outDeck,
+                    incomingPlayer = player
+                ) {
+                    effectManager.setDjAutomixTransition(false, 0.0f)
+                }
             } else {
-                1000L
+                val fadeDurationMs = if (effectiveCrossfadeSecs > 0) {
+                    (effectiveCrossfadeSecs * 1000L).coerceIn(1200L, 5000L)
+                } else if (fadeController.isFadeInOnResume) {
+                    1500L
+                } else {
+                    1000L
+                }
+                fadeController.startSmoothFadeIn(fadeDurationMs, player)
             }
-            fadeController.startSmoothFadeIn(fadeDurationMs, player)
         } catch (e: Exception) {
             _playbackError.value = "No se pudo cargar la pista: ${e.message}"
         }
@@ -356,7 +422,7 @@ class AuraAudioPlayer(
         }
     }
 
-    fun setVolume(volume: Float) = fadeController.setVolume(volume, exoPlayer)
+    fun setVolume(volume: Float) = fadeController.setVolume(volume, exoPlayer, outgoingExoPlayer)
 
     fun getVolume(): Float = fadeController.getVolume()
 
@@ -367,6 +433,7 @@ class AuraAudioPlayer(
     fun startSmoothFadeIn(durationMs: Long = 1500L) = fadeController.startSmoothFadeIn(durationMs, exoPlayer)
 
     fun pause() {
+        fadeController.stopOutgoingDeckImmediately(outgoingExoPlayer)
         exoPlayer?.pause()
         effectManager.flushBuffers()
     }
@@ -444,6 +511,7 @@ class AuraAudioPlayer(
     fun togglePlayPause() {
         val player = exoPlayer ?: return
         if (player.isPlaying) {
+            fadeController.stopOutgoingDeckImmediately(outgoingExoPlayer)
             player.pause()
         } else {
             if (_currentTrack.value == null && queue.value.isNotEmpty()) {
@@ -462,23 +530,24 @@ class AuraAudioPlayer(
 
     fun seekTo(positionMs: Long) {
         val player = exoPlayer ?: return
+        fadeController.stopOutgoingDeckImmediately(outgoingExoPlayer)
         val clamped = positionMs.coerceIn(0L, _duration.value)
         effectManager.flushBuffers()
         player.seekTo(clamped)
         _currentPosition.value = clamped
     }
 
-    fun playNext() {
+    fun playNext(isAutoCrossfadeOverlap: Boolean = false) {
         val q = queue.value
         if (q.isEmpty()) return
 
         if (repeatMode.value == RepeatMode.ONE) {
-            _currentTrack.value?.let { playTrack(it) }
+            _currentTrack.value?.let { playTrack(it, isAutoCrossfadeOverlap = false) }
             return
         }
 
         val nextIndex = queueController.getNextIndex() ?: return
-        playTrack(q[nextIndex])
+        playTrack(q[nextIndex], isAutoCrossfadeOverlap = isAutoCrossfadeOverlap)
     }
 
     fun playPrevious() {
@@ -492,7 +561,7 @@ class AuraAudioPlayer(
         if (q.isEmpty()) return
 
         val prevIndex = queueController.getPreviousIndex() ?: return
-        playTrack(q[prevIndex])
+        playTrack(q[prevIndex], isAutoCrossfadeOverlap = false)
     }
 
     fun toggleShuffle() {
@@ -553,7 +622,7 @@ class AuraAudioPlayer(
         }
     }
 
-    private fun handleTrackEnded() {
+    private fun handleTrackEnded(isAutoCrossfadeOverlap: Boolean = false) {
         when (repeatMode.value) {
             RepeatMode.ONE -> {
                 seekTo(0L)
@@ -561,7 +630,7 @@ class AuraAudioPlayer(
                 startSmoothFadeIn(1200L)
             }
             RepeatMode.ALL, RepeatMode.OFF -> {
-                playNext()
+                playNext(isAutoCrossfadeOverlap = isAutoCrossfadeOverlap)
             }
         }
     }
@@ -574,16 +643,34 @@ class AuraAudioPlayer(
         progressJob = playerScope.launch {
             while (isActive) {
                 val loopState = abLoopState.value
+                val isBackgroundGaming = com.example.AuraApplication.shouldSuspendBackgroundVisuals()
+                var nextDelayMs = if (loopState.isLooping) 75L else 180L
+
                 exoPlayer?.let { player ->
                     val pos = player.currentPosition.coerceAtLeast(0L)
-                    _currentPosition.value = pos
+                    val dur = if (player.duration > 0) player.duration else _duration.value
                     if (player.duration > 0) {
                         _duration.value = player.duration
                     }
 
+                    val crossfadeSecs = _crossfadeSeconds.value
+                    val isDjMix = _isDjAutomixEnabled.value
+                    val effectiveCrossfadeSecs = if (isDjMix && crossfadeSecs == 0) 5 else crossfadeSecs
+                    val remainingMs = if (dur > 0L) (dur - pos) else Long.MAX_VALUE
+                    val crossfadeWindowMs = (effectiveCrossfadeSecs * 1000L).coerceAtLeast(4500L)
+                    val isNearTransitionOrEnd = dur > 0L && remainingMs <= (crossfadeWindowMs + 1500L)
+
+                    // Si estamos en segundo plano mientras el usuario juega, solo actualizamos los flujos
+                    // visuales de alta frecuencia si realmente hay una transición activa, un bucle A-B o Mixtape
+                    if (!isBackgroundGaming || loopState.isLooping || isNearTransitionOrEnd) {
+                        _currentPosition.value = pos
+                    }
+
                     widgetProgressTickCounter++
-                    if (widgetProgressTickCounter >= 12) {
+                    val widgetTickThreshold = if (isBackgroundGaming) 5 else 12
+                    if (widgetProgressTickCounter >= widgetTickThreshold) {
                         widgetProgressTickCounter = 0
+                        _currentPosition.value = pos
                         com.example.widget.AuraMusicWidgetProvider.pushPlaybackProgress(
                             context = context,
                             positionMs = pos,
@@ -599,51 +686,60 @@ class AuraAudioPlayer(
                             _currentPosition.value = aMs
                         }
                     } else {
-                        val crossfadeSecs = _crossfadeSeconds.value
-                        val isDjMix = _isDjAutomixEnabled.value
-                        val effectiveCrossfadeSecs = if (isDjMix && crossfadeSecs == 0) 5 else crossfadeSecs
+                        val curTrackId = _currentTrack.value?.id ?: -1L
+                        val crossfadeMs = (effectiveCrossfadeSecs * 1000L).coerceIn(0L, 12000L)
 
-                        if (effectiveCrossfadeSecs > 0 && player.duration > 0 && player.isPlaying) {
-                            val remainingMs = player.duration - pos
-                            val crossfadeMs = effectiveCrossfadeSecs * 1000L
-                            fadeController.applyFadeOut(remainingMs, crossfadeMs, player)
+                        // Si el Crossfade profesional o DJ Automix está activo y la pista entra en la ventana
+                        // de los últimos N segundos (y dura al menos el doble del crossfade), disparamos el
+                        // cruce Dual-Deck superpuesto: la canción saliente sigue sonando en el Deck B mientras
+                        // la siguiente canción arranca simultáneamente en el Deck A sin pausa alguna.
+                        val canOverlapNext = effectiveCrossfadeSecs > 0 &&
+                            dur > (crossfadeMs + 4000L) &&
+                            pos > 2500L &&
+                            repeatMode.value != RepeatMode.ONE &&
+                            queue.value.size > 1 &&
+                            !isTransitioningTrack &&
+                            crossfadeTriggeredForTrackId != curTrackId
 
-                            // Curva de ecualización DJ en X: atenúa subgraves de la canción saliente
-                            if (_isDjEqCurveEnabled.value && remainingMs in 0..crossfadeMs) {
-                                val progress = (1.0f - (remainingMs.toFloat() / crossfadeMs.toFloat())).coerceIn(0.0f, 1.0f)
-                                effectManager.setDjAutomixTransition(true, progress)
-                            } else {
-                                effectManager.setDjAutomixTransition(false, 0.0f)
+                        val shouldTriggerEarlyOutro = isDjMix &&
+                            remainingMs in 600L..(crossfadeMs + 3500L) &&
+                            NativeAudioEngine.getAudioIntensity() < 0.07f
+
+                        val shouldTriggerCrossfadeWindow = remainingMs in 300L..crossfadeMs
+
+                        if (canOverlapNext && player.isPlaying && (shouldTriggerCrossfadeWindow || shouldTriggerEarlyOutro)) {
+                            crossfadeTriggeredForTrackId = curTrackId
+                            isTransitioningTrack = true
+                            if (_isDjEqCurveEnabled.value) {
+                                effectManager.setDjAutomixTransition(true, 0.55f)
                             }
-
-                            // Detección inteligente de outro en DJ Automix: si la intensidad acústica cae (<0.07f)
-                            // en los últimos 4 segundos, avanzar a la siguiente pista para omitir silencio muerto
-                            if (isDjMix && remainingMs in 250L..4200L && NativeAudioEngine.getAudioIntensity() < 0.07f && !isTransitioningTrack) {
-                                isTransitioningTrack = true
-                                playerScope.launch(Dispatchers.Main) {
-                                    handleTrackEnded()
-                                    delay(600L)
-                                    isTransitioningTrack = false
-                                }
+                            playerScope.launch(Dispatchers.Main) {
+                                handleTrackEnded(isAutoCrossfadeOverlap = true)
+                                delay(650L)
+                                isTransitioningTrack = false
                             }
-                        } else {
-                            effectManager.setDjAutomixTransition(false, 0.0f)
-                        }
-
-                        if (player.duration > 0 && player.isPlaying && !isTransitioningTrack) {
-                            val remainingMs = player.duration - pos
+                        } else if (dur > 0 && player.isPlaying && !isTransitioningTrack) {
                             if (remainingMs in 1..250L) {
                                 isTransitioningTrack = true
                                 playerScope.launch(Dispatchers.Main) {
-                                    handleTrackEnded()
+                                    handleTrackEnded(isAutoCrossfadeOverlap = false)
                                     delay(600L)
                                     isTransitioningTrack = false
                                 }
                             }
                         }
                     }
+
+                    // Si la app está en segundo plano (Modo Juego) y el usuario NO está usando A-B Loop
+                    // ni está en los segundos finales de Crossfade/DJ Automix, espaciamos el sondeo a 1000 ms
+                    // para reducir más de un 80% los despertares de CPU en el hilo principal.
+                    nextDelayMs = when {
+                        loopState.isLooping -> 75L
+                        isBackgroundGaming && !isNearTransitionOrEnd -> 1000L
+                        else -> 180L
+                    }
                 }
-                delay(if (loopState.isLooping) 75L else 180L)
+                delay(nextDelayMs)
             }
         }
     }
@@ -657,12 +753,17 @@ class AuraAudioPlayer(
 
     fun release() {
         stopProgressTracking()
+        fadeController.stopOutgoingDeckImmediately(outgoingExoPlayer)
         fadeController.cancel()
         playerScope.cancel()
         mediaSessionBridge?.release()
         mediaSessionBridge = null
         effectManager.flushBuffers()
         effectManager.release()
+        try {
+            outgoingExoPlayer?.release()
+        } catch (_: Throwable) {}
+        outgoingExoPlayer = null
         exoPlayer?.release()
         exoPlayer = null
     }

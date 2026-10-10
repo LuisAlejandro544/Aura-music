@@ -22,12 +22,15 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.net.Uri
+import com.example.model.AppWallpaperConfig
 import com.example.model.AuraTheme
 import com.example.model.HeadphoneConfig
 import com.example.model.HeadsetButtonAction
 import com.example.model.NowPlayingDesignMode
 import com.example.model.Playlist
 import com.example.model.Track
+import com.example.model.WallpaperScreenScope
 import com.example.model.WidgetConfig
 import com.example.model.WidgetGridContentMode
 import com.example.ui.screens.settings.components.*
@@ -76,6 +79,16 @@ fun SettingsScreen(
     onToggleDynamicArtworkColor: (Boolean) -> Unit = {},
     isMiniPlayerVideoEnabled: Boolean = true,
     onToggleMiniPlayerVideo: (Boolean) -> Unit = {},
+    isBackgroundGameModeEnabled: Boolean = true,
+    onToggleBackgroundGameMode: (Boolean) -> Unit = {},
+    appWallpaperConfig: AppWallpaperConfig = AppWallpaperConfig(),
+    onToggleWallpaperEnabled: (Boolean) -> Unit = {},
+    onSelectWallpaperImage: (Uri) -> Unit = {},
+    onSelectWallpaperVideo: (Uri) -> Unit = {},
+    onClearWallpaper: () -> Unit = {},
+    onSelectWallpaperScope: (WallpaperScreenScope) -> Unit = {},
+    onChangeWallpaperDimAlpha: (Float) -> Unit = {},
+    onChangeWallpaperBlurDp: (Int) -> Unit = {},
     nowPlayingDesignMode: NowPlayingDesignMode = NowPlayingDesignMode.AUTO,
     onSetNowPlayingDesignMode: (NowPlayingDesignMode) -> Unit = {},
     // Configuración de Widgets de Escritorio
@@ -184,6 +197,8 @@ fun SettingsScreen(
                         currentTheme = currentTheme,
                         isDynamicArtworkColorEnabled = isDynamicArtworkColorEnabled,
                         isMiniPlayerVideoEnabled = isMiniPlayerVideoEnabled,
+                        isBackgroundGameModeEnabled = isBackgroundGameModeEnabled,
+                        appWallpaperConfig = appWallpaperConfig,
                         nowPlayingDesignMode = nowPlayingDesignMode,
                         isHeadphoneConnected = headphoneConfig.isHeadphoneConnected,
                         connectedDeviceName = headphoneConfig.connectedDeviceName,
@@ -219,11 +234,11 @@ fun SettingsScreen(
                 }
             }
 
-            // PANTALLA INDEPENDIENTE 2: AURA DINÁMICA & VIDEO EN MINI REPRODUCTOR
+            // PANTALLA INDEPENDIENTE 2: AURA DINÁMICA, FONDO DE GALERÍA & MODO JUEGO EN 2DO PLANO
             SettingsSubScreen.VISUAL_BEHAVIOR -> {
                 SettingsSubMenuScreen(
-                    title = "Aura Dinámica & Video",
-                    subtitle = "Armonización cromática en tiempo real y Video Canvas miniatura",
+                    title = "Aura Dinámica, Fondo & Modo Juego",
+                    subtitle = "Colores a 1s, Fondo de Galería (Foto/Video) y ahorro al jugar en 2do plano",
                     icon = Icons.Default.Videocam,
                     iconTint = MaterialTheme.colorScheme.secondary,
                     onBack = { activeSubScreen = SettingsSubScreen.MAIN_MENU },
@@ -233,7 +248,17 @@ fun SettingsScreen(
                         isDynamicArtworkColorEnabled = isDynamicArtworkColorEnabled,
                         onToggleDynamicArtworkColor = onToggleDynamicArtworkColor,
                         isMiniPlayerVideoEnabled = isMiniPlayerVideoEnabled,
-                        onToggleMiniPlayerVideo = onToggleMiniPlayerVideo
+                        onToggleMiniPlayerVideo = onToggleMiniPlayerVideo,
+                        isBackgroundGameModeEnabled = isBackgroundGameModeEnabled,
+                        onToggleBackgroundGameMode = onToggleBackgroundGameMode,
+                        appWallpaperConfig = appWallpaperConfig,
+                        onToggleWallpaperEnabled = onToggleWallpaperEnabled,
+                        onSelectWallpaperImage = onSelectWallpaperImage,
+                        onSelectWallpaperVideo = onSelectWallpaperVideo,
+                        onClearWallpaper = onClearWallpaper,
+                        onSelectWallpaperScope = onSelectWallpaperScope,
+                        onChangeWallpaperDimAlpha = onChangeWallpaperDimAlpha,
+                        onChangeWallpaperBlurDp = onChangeWallpaperBlurDp
                     )
                 }
             }

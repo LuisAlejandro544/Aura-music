@@ -11,7 +11,7 @@ El proyecto sigue una arquitectura reactiva y desacoplada organizada en capas:
 1. **Capa Nativa (C++20 / NDK)**: Motores de procesamiento de audio digital DSP en tiempo real (Ecualizador paramétrico de 10 bandas IIR, Audio 8D/16D Multi-Órbita, Clarificador de Voces Mid-Side HD, Reverb Schroeder/Moorer y Crossfeed Chu Moy) + binarios nativos optimizados de FFmpeg y QuickJS/CPython.
 2. **Capa de Datos & Almacenamiento (Data & Storage)**:
    - Base de datos SQLite reactiva con **Room**.
-   - Acceso al almacenamiento estructurado en `Android/data/com.aistudio.musicplayer.aurasound/files/` (Debug) y `Android/data/com.auramusic.beta/files/` (APK Beta `Aura Beta` • Codename `Nebula`) con subcarpetas (`songs/`, `images/`, `lyrics/`, `metadata/`, `videos/`).
+   - Acceso al almacenamiento estructurado en `Android/data/com.aistudio.musicplayer.aurasound/files/` (Debug) y `Android/data/com.auramusic.beta/files/` (APK Beta `Aura Beta` • Codename `Nebula`) con subcarpetas (`songs/`, `images/`, `lyrics/`, `metadata/`, `videos/`), además de **Carpeta Pública / Personalizada del Usuario (`UserPublicMediaExporter` & `UserPublicFolderCard`)** mediante SAF (`OpenDocumentTree`) con subcarpeta `Videos/` (y preparada para `Images/`) para exportar vídeos descargados con su audio completo.
    - Motores de importación, sincronización de letras LRCLIB, extracción FFmpeg, descarga resiliente (Chunked Range Download, InnerTube, Invidious y fallback `yt-dlp` blindado con actualización OTA activa en Debug y Beta) y actualizador automático de versiones APK (`AppReleaseUpdater` con comparador semántico de tags dinámicos `-beta`, selección por arquitectura móvil y verificación SHA-256).
 3. **Capa de Control & Reproducción (Playback Layer)**:
    - `AuraAudioPlayer` con ExoPlayer/Media3, modularizado con controladores especializados (`PlayerQueueController`, `AudioFadeController`, `ABLoopController`, `MediaSessionBridge`).
@@ -125,7 +125,7 @@ app/
 │   │       │   ├── NativeAudioProcessor.kt     # Pipe de ExoPlayer hacia DSP C++20
 │   │       │   └── controllers/
 │   │       │       ├── PlayerQueueController.kt # Gestión de cola y modos de repetición/aleatorio
-│   │       │       ├── AudioFadeController.kt  # Fundidos de entrada, salida y Sleep Timer
+│   │       │       ├── AudioFadeController.kt  # Crossfade Dual-Deck (Equal-Power sin/cos), Fade-In/Out y Sleep Timer
 │   │       │       ├── ABLoopController.kt     # Bucle de repetición de segmento A-B
 │   │       │       └── MediaSessionBridge.kt   # Notificación nativa System Media Controls
 │   │       │
@@ -155,6 +155,7 @@ app/
 │   │       │   ├── PackageUpdateState.kt
 │   │       │   ├── RepeatMode.kt
 │   │       │   ├── ThemePalette.kt
+│   │       │   ├── AppWallpaperConfig.kt            # Configuración de fondo de pantalla personalizado de galería (WebP/MP4)
 │   │       │   ├── VideoDisplayMode.kt
 │   │       │   └── NowPlayingDesignMode.kt          # Modos de diseño: Clásico, Cinemático Canvas y Auto
 │   │       │
@@ -194,8 +195,9 @@ app/
 │   │       │   │       │   └── WidgetSettingsContent.kt       # Selector Canciones/Playlists, color de imagen y vista previa
 │   │       │   │       ├── about/                         # Detrás del Proyecto (Creador & Contribuidores)
 │   │       │   │       │   └── BehindTheProjectSection.kt     # Perfiles de GitHub y caché único de avatares WebP
-│   │       │   │   │       ├── appearance/                    # Ajustes de Apariencia, Temas y Diseño del Reproductor
+│   │       │   │   │       ├── appearance/                    # Ajustes de Apariencia, Fondo de Galería, Temas y Diseño
 │   │       │   │   │       │   ├── AppearanceSettingsTab.kt       # Menú principal de Ajustes y secciones visuales
+│   │       │   │   │       │   ├── AppWallpaperSettingsSection.kt # Controles de fondo de galería (WebP/Video, Opacidad y Blur)
 │   │       │   │   │       │   ├── EnginesAndDiagnosticsSection.kt # Motores nativos, actualizador OTA y diagnóstico
 │   │       │   │   │       │   └── PlayerDesignSettingsContent.kt # Pantalla dedicada de Diseño del Reproductor
 │   │       │   │   │       ├── headphones/                    # Ajustes de Auriculares, Acústica DSP, Bit-Perfect y Gestos
@@ -227,8 +229,9 @@ app/
 │   │       │       ├── BottomNavBar.kt         # Barra de navegación inferior con insignia de descubrimiento
 │   │       │       ├── TrackListItem.kt        # Elemento modular de canción con marquesina
 │   │       │       ├── AudioEffectsBottomSheet.kt # Hoja modal unificada del estudio acústico C++20
-│   │       │       ├── artwork/                # Portadas, Collages, Arte Procedural, Visualizador y Video Canvas
+│   │       │       ├── artwork/                # Portadas, Collages, Fondo de Galería, Arte Procedural y Video Canvas
 │   │       │       │   ├── ArtworkImage.kt         # Renderizador WebP con recorte de franjas negras 4:3
+│   │       │       │   ├── AppWallpaperBackground.kt # Capa global de fondo de pantalla personalizado (Imagen WebP o Video)
 │   │       │       │   ├── PlaylistCoverCollage.kt # Collage dinámico de 1 a 4 fotos para Playlists
 │   │       │       │   ├── ProceduralArtwork.kt    # Lienzo matemático vectorial para pistas sin carátula
 │   │       │       │   ├── BackgroundVideoPlayer.kt # Reproductor Video Canvas en bucle o sincronizado

@@ -2,11 +2,14 @@ package com.example.viewmodel.delegates
 
 import android.content.SharedPreferences
 import com.example.data.repository.MusicRepository
+import com.example.model.AppWallpaperConfig
 import com.example.model.AuraTheme
 import com.example.model.NowPlayingDesignMode
 import com.example.model.Playlist
 import com.example.model.Track
 import com.example.model.VideoDisplayMode
+import com.example.model.WallpaperMediaType
+import com.example.model.WallpaperScreenScope
 import com.example.model.WidgetConfig
 import com.example.model.WidgetGridContentMode
 import com.example.ui.navigation.LibraryTab
@@ -21,7 +24,7 @@ import kotlinx.coroutines.launch
 /**
  * Coordinador modular de navegación, preferencias de interfaz y colecciones de usuario en Aura Music.
  * Desacopla la gestión de pantallas, pila de navegación hacia atrás, selección de listas/álbumes/artistas,
- * paletas temáticas y modos de visualización de video de Now Playing y Mini Reproductor.
+ * paletas temáticas, fondo personalizado de galería y modos de visualización de video.
  */
 class NavigationCoordinator(
     private val appPrefs: SharedPreferences,
@@ -85,6 +88,33 @@ class NavigationCoordinator(
     )
     val isMiniPlayerVideoEnabled: StateFlow<Boolean> = _isMiniPlayerVideoEnabled.asStateFlow()
 
+    private val _isBackgroundGameModeEnabled = MutableStateFlow(
+        appPrefs.getBoolean("pref_background_game_mode_enabled", true).also {
+            com.example.AuraApplication.isBackgroundGameModeEnabled = it
+        }
+    )
+    val isBackgroundGameModeEnabled: StateFlow<Boolean> = _isBackgroundGameModeEnabled.asStateFlow()
+
+    private val _appWallpaperConfig = MutableStateFlow(loadWallpaperConfigFromPrefs(appPrefs))
+    val appWallpaperConfig: StateFlow<AppWallpaperConfig> = _appWallpaperConfig.asStateFlow()
+
+    private fun loadWallpaperConfigFromPrefs(prefs: SharedPreferences): AppWallpaperConfig {
+        val enabled = prefs.getBoolean("pref_app_wallpaper_enabled", false)
+        val mediaType = WallpaperMediaType.fromId(prefs.getInt("pref_app_wallpaper_type", 0))
+        val mediaPath = prefs.getString("pref_app_wallpaper_path", "") ?: ""
+        val scope = WallpaperScreenScope.fromId(prefs.getInt("pref_app_wallpaper_scope", 1))
+        val dimAlpha = prefs.getFloat("pref_app_wallpaper_dim", 0.62f).coerceIn(0.25f, 0.92f)
+        val blurDp = prefs.getInt("pref_app_wallpaper_blur", 0).coerceIn(0, 25)
+        return AppWallpaperConfig(
+            isEnabled = enabled,
+            mediaType = mediaType,
+            mediaPath = mediaPath,
+            screenScope = scope,
+            dimOverlayAlpha = dimAlpha,
+            blurRadiusDp = blurDp
+        )
+    }
+
     private val _videoDisplayMode = MutableStateFlow(
         try {
             val savedMode = appPrefs.getString("pref_video_display_mode", VideoDisplayMode.FULLSCREEN_BACKGROUND.name)
@@ -124,6 +154,19 @@ class NavigationCoordinator(
             }
             "pref_mini_player_video_enabled" -> {
                 _isMiniPlayerVideoEnabled.value = prefs.getBoolean(key, false)
+            }
+            "pref_background_game_mode_enabled" -> {
+                val enabled = prefs.getBoolean(key, true)
+                _isBackgroundGameModeEnabled.value = enabled
+                com.example.AuraApplication.isBackgroundGameModeEnabled = enabled
+            }
+            "pref_app_wallpaper_enabled",
+            "pref_app_wallpaper_type",
+            "pref_app_wallpaper_path",
+            "pref_app_wallpaper_scope",
+            "pref_app_wallpaper_dim",
+            "pref_app_wallpaper_blur" -> {
+                _appWallpaperConfig.value = loadWallpaperConfigFromPrefs(prefs)
             }
             "pref_now_playing_design_mode" -> {
                 val design = prefs.getString(key, NowPlayingDesignMode.AUTO.name)
@@ -275,6 +318,50 @@ class NavigationCoordinator(
     fun setMiniPlayerVideoEnabled(enabled: Boolean) {
         _isMiniPlayerVideoEnabled.value = enabled
         appPrefs.edit().putBoolean("pref_mini_player_video_enabled", enabled).apply()
+    }
+
+    fun setBackgroundGameModeEnabled(enabled: Boolean) {
+        _isBackgroundGameModeEnabled.value = enabled
+        com.example.AuraApplication.isBackgroundGameModeEnabled = enabled
+        appPrefs.edit().putBoolean("pref_background_game_mode_enabled", enabled).apply()
+    }
+
+    fun updateAppWallpaperMedia(type: WallpaperMediaType, path: String, enabled: Boolean = true) {
+        val updated = _appWallpaperConfig.value.copy(
+            isEnabled = enabled && type != WallpaperMediaType.NONE && path.isNotBlank(),
+            mediaType = type,
+            mediaPath = path
+        )
+        _appWallpaperConfig.value = updated
+        appPrefs.edit()
+            .putBoolean("pref_app_wallpaper_enabled", updated.isEnabled)
+            .putInt("pref_app_wallpaper_type", updated.mediaType.id)
+            .putString("pref_app_wallpaper_path", updated.mediaPath)
+            .apply()
+    }
+
+    fun setAppWallpaperEnabled(enabled: Boolean) {
+        val current = _appWallpaperConfig.value
+        val validEnabled = enabled && current.mediaType != WallpaperMediaType.NONE && current.mediaPath.isNotBlank()
+        _appWallpaperConfig.value = current.copy(isEnabled = validEnabled)
+        appPrefs.edit().putBoolean("pref_app_wallpaper_enabled", validEnabled).apply()
+    }
+
+    fun setAppWallpaperScope(scope: WallpaperScreenScope) {
+        _appWallpaperConfig.value = _appWallpaperConfig.value.copy(screenScope = scope)
+        appPrefs.edit().putInt("pref_app_wallpaper_scope", scope.id).apply()
+    }
+
+    fun setAppWallpaperDimAlpha(alpha: Float) {
+        val clamped = alpha.coerceIn(0.25f, 0.92f)
+        _appWallpaperConfig.value = _appWallpaperConfig.value.copy(dimOverlayAlpha = clamped)
+        appPrefs.edit().putFloat("pref_app_wallpaper_dim", clamped).apply()
+    }
+
+    fun setAppWallpaperBlurDp(blurDp: Int) {
+        val clamped = blurDp.coerceIn(0, 25)
+        _appWallpaperConfig.value = _appWallpaperConfig.value.copy(blurRadiusDp = clamped)
+        appPrefs.edit().putInt("pref_app_wallpaper_blur", clamped).apply()
     }
 
     fun setVideoDisplayMode(mode: VideoDisplayMode) {

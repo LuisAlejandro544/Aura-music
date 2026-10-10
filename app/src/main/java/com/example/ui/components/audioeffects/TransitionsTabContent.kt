@@ -264,14 +264,14 @@ fun TransitionsTabContent(
                         Spacer(modifier = Modifier.width(8.dp))
                         Column {
                             Text(
-                                text = "Automix Inteligente DJ (Estilo Spotify)",
+                                text = "Automix DJ & Crossfade Dual-Deck (Estudio)",
                                 style = MaterialTheme.typography.titleSmall.copy(
                                     fontWeight = FontWeight.Bold,
                                     color = TextPrimary
                                 )
                             )
                             Text(
-                                text = "Mezcla continua de pistas adyacentes y detección automática de outro.",
+                                text = "Mezcla superpuesta real de doble reproductor (sin/cos de igual potencia): cuando una canción baja, la siguiente empieza al mismo tiempo sin pausas.",
                                 style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
                             )
                         }
@@ -323,17 +323,24 @@ fun TransitionsTabContent(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Duración del Crossfade
+                // Duración del Crossfade Dual-Deck
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("Duración del Fundido (Crossfade)", style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary))
                     Text(
-                        text = if (crossfadeSeconds == 0) "Automático / Directo" else "${crossfadeSeconds}s",
+                        text = "Superposición Dual-Deck (Crossfade)",
+                        style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                    )
+                    Text(
+                        text = when {
+                            crossfadeSeconds > 0 -> "${crossfadeSeconds}s (Superpuesto)"
+                            isDjAutomixEnabled -> "5s Auto (DJ Mix)"
+                            else -> "Desactivado (Directo)"
+                        },
                         style = MaterialTheme.typography.bodySmall.copy(
                             fontWeight = FontWeight.Bold,
-                            color = if (crossfadeSeconds > 0) MaterialTheme.colorScheme.primary else TextMuted
+                            color = if (crossfadeSeconds > 0 || isDjAutomixEnabled) Color(0xFF10B981) else TextMuted
                         )
                     )
                 }
@@ -346,6 +353,35 @@ fun TransitionsTabContent(
                         .fillMaxWidth()
                         .testTag("crossfade_slider")
                 )
+
+                // Botones rápidos de Crossfade Profesional
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    listOf(0 to "Off", 3 to "3s", 5 to "5s DJ", 8 to "8s", 12 to "12s").forEach { (secs, label) ->
+                        val isSelected = crossfadeSeconds == secs
+                        FilledTonalButton(
+                            onClick = { onCrossfadeChange(secs) },
+                            modifier = Modifier
+                                .weight(1f)
+                                .defaultMinSize(minHeight = 36.dp),
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.24f) else Color(0xFF161A26),
+                                contentColor = if (isSelected) MaterialTheme.colorScheme.primary else TextSecondary
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                )
+                            )
+                        }
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(12.dp))
                 HorizontalDivider(color = Color(0xFF232736))

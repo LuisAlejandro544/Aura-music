@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PermMedia
+import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -29,9 +30,13 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.net.Uri
+import com.example.model.AppWallpaperConfig
 import com.example.model.AuraTheme
 import com.example.model.NowPlayingDesignMode
+import com.example.model.WallpaperScreenScope
 import com.example.model.WidgetConfig
+import com.example.ui.screens.settings.components.appearance.appWallpaperSettingsSection
 import com.example.ui.theme.CardBorder
 import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.TextPrimary
@@ -43,7 +48,7 @@ import androidx.compose.material.icons.filled.Widgets
  * Proporciona:
  * 1. [mainSettingsMenuContent]: Menú principal de navegación de Ajustes con tarjetas estilo "Diseño del Reproductor"
  *    que abren pantallas independientes a pantalla completa (sin modales).
- * 2. [visualCustomizationSettingsContent]: Pantalla dedicada de Aura Dinámica y Video en Mini Reproductor.
+ * 2. [visualCustomizationSettingsContent]: Pantalla dedicada de Aura Dinámica (1s), Video en Mini Reproductor, Fondo de Galería y Modo Juego en 2do Plano.
  * 3. [themePaletteSettingsContent]: Pantalla dedicada de Paleta Base Predeterminada y Material You.
  * 4. [appearanceSettingsTab]: Compatibilidad de renderizado para pruebas y vistas integradas.
  */
@@ -52,6 +57,8 @@ fun LazyListScope.mainSettingsMenuContent(
     currentTheme: AuraTheme,
     isDynamicArtworkColorEnabled: Boolean,
     isMiniPlayerVideoEnabled: Boolean,
+    isBackgroundGameModeEnabled: Boolean = true,
+    appWallpaperConfig: AppWallpaperConfig = AppWallpaperConfig(),
     nowPlayingDesignMode: NowPlayingDesignMode,
     isHeadphoneConnected: Boolean,
     connectedDeviceName: String,
@@ -80,15 +87,18 @@ fun LazyListScope.mainSettingsMenuContent(
         Spacer(modifier = Modifier.height(12.dp))
     }
 
-    // 2. Aura Dinámica y Video en Mini Reproductor
+    // 2. Aura Dinámica (1s), Video, Fondo de Galería y Modo Juego
     item {
-        val auraStatus = if (isDynamicArtworkColorEnabled) "Aura Dinámica activa" else "Aura Dinámica desactivada"
-        val miniVideoStatus = if (isMiniPlayerVideoEnabled) "Video en Mini Reproductor activo" else "Solo carátula en Mini Reproductor"
+        val auraStatus = if (isDynamicArtworkColorEnabled) "Aura Dinámica (1s)" else "Aura Dinámica OFF"
+        val wallpaperStatus = if (appWallpaperConfig.hasValidMedia) "Fondo Galería activo" else "Fondo OLED"
+        val gameModeStatus = if (isBackgroundGameModeEnabled) "Modo Juego ON" else "Modo Juego OFF"
         SettingsNavigationCard(
             icon = Icons.Default.Videocam,
-            title = "Aura Dinámica & Video en Mini Reproductor",
-            subtitle = "$auraStatus • $miniVideoStatus",
+            title = "Aura Dinámica, Fondo de Galería & Modo Juego",
+            subtitle = "$auraStatus • $wallpaperStatus • $gameModeStatus",
             iconTint = MaterialTheme.colorScheme.secondary,
+            badgeText = if (appWallpaperConfig.hasValidMedia) "FONDO" else if (isBackgroundGameModeEnabled) "JUEGO" else null,
+            badgeColor = MaterialTheme.colorScheme.secondary,
             onClick = onOpenVisualBehavior,
             testTag = "settings_nav_visual_behavior"
         )
@@ -213,9 +223,19 @@ fun LazyListScope.visualCustomizationSettingsContent(
     isDynamicArtworkColorEnabled: Boolean,
     onToggleDynamicArtworkColor: (Boolean) -> Unit,
     isMiniPlayerVideoEnabled: Boolean,
-    onToggleMiniPlayerVideo: (Boolean) -> Unit
+    onToggleMiniPlayerVideo: (Boolean) -> Unit,
+    isBackgroundGameModeEnabled: Boolean = true,
+    onToggleBackgroundGameMode: (Boolean) -> Unit = {},
+    appWallpaperConfig: AppWallpaperConfig = AppWallpaperConfig(),
+    onToggleWallpaperEnabled: (Boolean) -> Unit = {},
+    onSelectWallpaperImage: (Uri) -> Unit = {},
+    onSelectWallpaperVideo: (Uri) -> Unit = {},
+    onClearWallpaper: () -> Unit = {},
+    onSelectWallpaperScope: (WallpaperScreenScope) -> Unit = {},
+    onChangeWallpaperDimAlpha: (Float) -> Unit = {},
+    onChangeWallpaperBlurDp: (Int) -> Unit = {}
 ) {
-    // Opción Avanzada: Aura Dinámica de Carátula
+    // Opción Avanzada: Aura Dinámica de Carátula y Video (1s)
     item {
         Card(
             shape = RoundedCornerShape(18.dp),
@@ -242,7 +262,7 @@ fun LazyListScope.visualCustomizationSettingsContent(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Aura Dinámica de Carátula",
+                            text = "Aura Dinámica de Carátula y Video (1s)",
                             style = MaterialTheme.typography.titleSmall.copy(
                                 fontWeight = FontWeight.Bold,
                                 color = TextPrimary
@@ -251,7 +271,7 @@ fun LazyListScope.visualCustomizationSettingsContent(
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Adapta el resplandor de neón, la barra de progreso y los acentos visuales a los tonos de cada portada o video.",
+                        text = "Adapta los colores del reproductor y mini reproductor a la portada o al Video Canvas con muestreo suave cada 1 segundo (1000 ms) sin mareos visuales.",
                         style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
                     )
                 }
@@ -327,7 +347,77 @@ fun LazyListScope.visualCustomizationSettingsContent(
                 )
             }
         }
+
+        Spacer(modifier = Modifier.height(14.dp))
     }
+
+    // Opción: Modo Juego / Ahorro Inteligente en 2do Plano
+    item {
+        Card(
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = SurfaceCard),
+            border = BorderStroke(1.dp, CardBorder),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("background_game_mode_card")
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(18.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.SportsEsports,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Modo Juego / Ahorro en 2do Plano",
+                            style = MaterialTheme.typography.titleSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Al salir de la app mientras juegas, apaga automáticamente lo que no se ve (decodificador de video, muestreo de colores, visualizador espectral y cachés gráficas) dejando toda tu GPU y RAM para el juego, mientras mantiene 100% activos la música y los efectos que estés usando.",
+                        style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Switch(
+                    checked = isBackgroundGameModeEnabled,
+                    onCheckedChange = onToggleBackgroundGameMode,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = MaterialTheme.colorScheme.primary
+                    ),
+                    modifier = Modifier.testTag("background_game_mode_switch")
+                )
+            }
+        }
+    }
+
+    // Nueva Opción: Fondo de Pantalla Personalizado de Galería (Imagen WebP o Video corto MP4)
+    appWallpaperSettingsSection(
+        wallpaperConfig = appWallpaperConfig,
+        onToggleWallpaperEnabled = onToggleWallpaperEnabled,
+        onSelectWallpaperImage = onSelectWallpaperImage,
+        onSelectWallpaperVideo = onSelectWallpaperVideo,
+        onClearWallpaper = onClearWallpaper,
+        onSelectWallpaperScope = onSelectWallpaperScope,
+        onChangeDimAlpha = onChangeWallpaperDimAlpha,
+        onChangeBlurDp = onChangeWallpaperBlurDp
+    )
 }
 
 fun LazyListScope.themePaletteSettingsContent(

@@ -170,6 +170,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val currentTheme = navigationCoordinator.currentTheme
     val isDynamicArtworkColorEnabled = navigationCoordinator.isDynamicArtworkColorEnabled
     val isMiniPlayerVideoEnabled = navigationCoordinator.isMiniPlayerVideoEnabled
+    val isBackgroundGameModeEnabled = navigationCoordinator.isBackgroundGameModeEnabled
+    val appWallpaperConfig = navigationCoordinator.appWallpaperConfig
     val videoDisplayMode = navigationCoordinator.videoDisplayMode
     val isVideoCanvasActive: StateFlow<Boolean> = videoDisplayMode.map { it != VideoDisplayMode.OFF }
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
@@ -218,11 +220,19 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         // Hilo de renderizado de espectro FFT C++20 optimizado:
-        // Pausa el muestreo de las 28 bandas cuando la app está en Modo Cinemático (donde no hay barras de visualizador)
-        // o cuando NowPlayingScreen está minimizada, evitando recomposiciones innecesarias al grabar pantalla.
+        // - Pausa por completo el muestreo JNI y entra en suspensión profunda cuando la app está en segundo plano
+        //   (por ejemplo, mientras el usuario está jugando) para ahorrar CPU y batería.
+        // - Pausa el muestreo de las 28 bandas cuando la app está en Modo Cinemático (donde no hay barras de visualizador)
+        //   o cuando NowPlayingScreen está minimizada.
         viewModelScope.launch(Dispatchers.Default) {
             val buffer = FloatArray(28)
             while (true) {
+                val isBackgroundSuspended = com.example.AuraApplication.shouldSuspendBackgroundVisuals()
+                if (isBackgroundSuspended) {
+                    delay(850L)
+                    continue
+                }
+
                 val playing = audioPlayer.isPlaying.value
                 val expanded = isNowPlayingExpanded.value
                 if (playing && expanded) {
@@ -258,7 +268,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                         _visualizerBands.value = buffer.copyOf()
                         delay(45L)
                     } else {
-                        delay(160L)
+                        delay(250L)
                     }
                 }
             }
@@ -410,6 +420,52 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     fun toggleDynamicArtworkColor(enabled: Boolean) = setDynamicArtworkColorEnabled(enabled)
     fun setMiniPlayerVideoEnabled(enabled: Boolean) = navigationCoordinator.setMiniPlayerVideoEnabled(enabled)
     fun toggleMiniPlayerVideoEnabled() = setMiniPlayerVideoEnabled(!isMiniPlayerVideoEnabled.value)
+    fun setBackgroundGameModeEnabled(enabled: Boolean) = navigationCoordinator.setBackgroundGameModeEnabled(enabled)
+    fun toggleBackgroundGameMode(enabled: Boolean) = setBackgroundGameModeEnabled(enabled)
+    fun setAppWallpaperEnabled(enabled: Boolean) = navigationCoordinator.setAppWallpaperEnabled(enabled)
+    fun setAppWallpaperScope(scope: com.example.model.WallpaperScreenScope) = navigationCoordinator.setAppWallpaperScope(scope)
+    fun setAppWallpaperDimAlpha(alpha: Float) = navigationCoordinator.setAppWallpaperDimAlpha(alpha)
+    fun setAppWallpaperBlurDp(blurDp: Int) = navigationCoordinator.setAppWallpaperBlurDp(blurDp)
+    fun setCustomWallpaperImage(uri: Uri) {
+        viewModelScope.launch {
+            val storageManager = com.example.data.storage.AppStorageManager(getApplication())
+            val oldPath = appWallpaperConfig.value.mediaPath
+            val savedPath = storageManager.saveAppWallpaperImageFromUri(uri, oldPath)
+            if (!savedPath.isNullOrBlank()) {
+                navigationCoordinator.updateAppWallpaperMedia(
+                    type = com.example.model.WallpaperMediaType.IMAGE,
+                    path = savedPath,
+                    enabled = true
+                )
+            }
+        }
+    }
+    fun setCustomWallpaperVideo(uri: Uri) {
+        viewModelScope.launch {
+            val storageManager = com.example.data.storage.AppStorageManager(getApplication())
+            val oldPath = appWallpaperConfig.value.mediaPath
+            val savedPath = storageManager.saveAppWallpaperVideoFromUri(uri, oldPath)
+            if (!savedPath.isNullOrBlank()) {
+                navigationCoordinator.updateAppWallpaperMedia(
+                    type = com.example.model.WallpaperMediaType.VIDEO,
+                    path = savedPath,
+                    enabled = true
+                )
+            }
+        }
+    }
+    fun clearCustomWallpaper() {
+        viewModelScope.launch {
+            val storageManager = com.example.data.storage.AppStorageManager(getApplication())
+            val oldPath = appWallpaperConfig.value.mediaPath
+            storageManager.deleteAppWallpaperFile(oldPath)
+            navigationCoordinator.updateAppWallpaperMedia(
+                type = com.example.model.WallpaperMediaType.NONE,
+                path = "",
+                enabled = false
+            )
+        }
+    }
     fun setVideoDisplayMode(mode: VideoDisplayMode) = navigationCoordinator.setVideoDisplayMode(mode)
     fun cycleVideoDisplayMode() = setVideoDisplayMode(videoDisplayMode.value.next())
     fun toggleVideoCanvas() = cycleVideoDisplayMode()

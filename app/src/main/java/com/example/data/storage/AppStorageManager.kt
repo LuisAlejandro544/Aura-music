@@ -386,6 +386,99 @@ class AppStorageManager(private val context: Context) {
         } catch (ignored: Exception) {}
     }
 
+    /**
+     * Guarda una imagen de la galería como Fondo de Pantalla Personalizado de la aplicación en images/
+     * comprimiéndola a WebP sin pérdida y eliminando el fondo anterior si existía.
+     */
+    suspend fun saveAppWallpaperImageFromUri(
+        sourceUri: Uri,
+        oldMediaPath: String?
+    ): String? = withContext(Dispatchers.IO) {
+        try {
+            val inputStream = context.contentResolver.openInputStream(sourceUri) ?: return@withContext null
+            val bitmap = BitmapFactory.decodeStream(inputStream)
+            inputStream.close()
+            if (bitmap == null) return@withContext null
+
+            deleteAppWallpaperFile(oldMediaPath)
+
+            val newFile = File(imagesDir, "app_wallpaper_${System.currentTimeMillis()}.webp")
+            FileOutputStream(newFile).use { outStream ->
+                val format = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    Bitmap.CompressFormat.WEBP_LOSSLESS
+                } else {
+                    @Suppress("DEPRECATION")
+                    Bitmap.CompressFormat.WEBP
+                }
+                bitmap.compress(format, 100, outStream)
+            }
+            bitmap.recycle()
+            newFile.absolutePath
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Guarda un video corto de la galería como Fondo de Pantalla Personalizado de la aplicación en videos/,
+     * optimizándolo con FFmpeg (-an sin pista de audio para no interferir con la música) y eliminando el previo.
+     */
+    suspend fun saveAppWallpaperVideoFromUri(
+        sourceUri: Uri,
+        oldMediaPath: String?
+    ): String? = withContext(Dispatchers.IO) {
+        try {
+            deleteAppWallpaperFile(oldMediaPath)
+
+            val rawTempFile = File(videosDir, "wallpaper_raw_${System.currentTimeMillis()}.tmp")
+            val newFile = File(videosDir, "app_wallpaper_${System.currentTimeMillis()}.mp4")
+            context.contentResolver.openInputStream(sourceUri)?.use { input ->
+                FileOutputStream(rawTempFile).use { output ->
+                    input.copyTo(output)
+                }
+            } ?: return@withContext null
+
+            try {
+                val processResult = com.example.data.importer.FFmpegNativeEngine.processVideoForCanvas(
+                    context = context,
+                    inputFile = rawTempFile,
+                    outputFile = newFile,
+                    isLoop = true,
+                    loopStyle = com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE
+                )
+                if (!processResult.success || !newFile.exists() || newFile.length() == 0L) {
+                    rawTempFile.renameTo(newFile)
+                } else {
+                    rawTempFile.delete()
+                }
+            } catch (_: Exception) {
+                rawTempFile.renameTo(newFile)
+            }
+
+            newFile.absolutePath
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Elimina el archivo de fondo de pantalla personalizado si reside en images/ o videos/.
+     */
+    suspend fun deleteAppWallpaperFile(mediaPath: String?): Boolean = withContext(Dispatchers.IO) {
+        if (mediaPath.isNullOrBlank()) return@withContext false
+        try {
+            val file = File(mediaPath)
+            if (file.exists() && (isInsideDirectoryCanonical(file, imagesDir) || isInsideDirectoryCanonical(file, videosDir))) {
+                file.delete()
+            } else {
+                false
+            }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+
     companion object {
         /**
          * Purga automáticamente al iniciar la aplicación cualquier residuo de archivos temporales,
