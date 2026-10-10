@@ -28,6 +28,7 @@ import com.example.model.HeadsetButtonAction
 import com.example.model.NowPlayingDesignMode
 import com.example.model.Track
 import com.example.ui.screens.settings.components.*
+import com.example.ui.screens.settings.components.about.behindTheProjectSettingsContent
 import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
@@ -47,7 +48,8 @@ enum class SettingsSubScreen {
     HEADPHONES_SECURITY,
     HEADPHONES_GESTURES,
     STORED_MEDIA,
-    ENGINES_AND_DIAGNOSTICS
+    ENGINES_AND_DIAGNOSTICS,
+    BEHIND_THE_PROJECT
 }
 
 /**
@@ -174,6 +176,7 @@ fun SettingsScreen(
                         onOpenHeadphones = { activeSubScreen = SettingsSubScreen.HEADPHONES },
                         onOpenStoredMedia = { activeSubScreen = SettingsSubScreen.STORED_MEDIA },
                         onOpenEnginesAndDiagnostics = { activeSubScreen = SettingsSubScreen.ENGINES_AND_DIAGNOSTICS },
+                        onOpenBehindTheProject = { activeSubScreen = SettingsSubScreen.BEHIND_THE_PROJECT },
                         onOpenOnboarding = onOpenOnboarding
                     )
                 }
@@ -341,6 +344,20 @@ fun SettingsScreen(
                     testTag = "subscreen_engines_diagnostics"
                 ) {
                     enginesAndDiagnosticsSettingsContent(onOpenOnboarding = onOpenOnboarding)
+                }
+            }
+
+            // PANTALLA INDEPENDIENTE 7: DETRÁS DEL PROYECTO (CREADOR & CONTRIBUIDORES)
+            SettingsSubScreen.BEHIND_THE_PROJECT -> {
+                SettingsSubMenuScreen(
+                    title = "Detrás del Proyecto",
+                    subtitle = "Creador oficial, contribuidores y perfiles de GitHub",
+                    icon = Icons.Default.Groups,
+                    iconTint = MaterialTheme.colorScheme.primary,
+                    onBack = { activeSubScreen = SettingsSubScreen.MAIN_MENU },
+                    testTag = "subscreen_behind_project"
+                ) {
+                    behindTheProjectSettingsContent()
                 }
             }
         }

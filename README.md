@@ -178,6 +178,13 @@ Aura Music está construida siguiendo principios de **Clean Architecture + MVVM*
 > - [**`ROADMAP.md`**](./ROADMAP.md) — Historial de fases de ingeniería completadas.
 > - [**`chanelog-beta.md`**](./chanelog-beta.md) — Notas de lanzamiento detalladas de `Aura Beta (Nebula)`.
 
+## 👨‍💻 Detrás del Proyecto (Creador & Contribuidores)
+
+- 🌟 **Creador, Fundador & Propietario del Proyecto**: [**Luis Alejandro Sosa Camacho (`@LuisAlejandro544`)**](https://github.com/LuisAlejandro544)
+- 🤝 **Contribuidor Oficial**: [**`@thelandy03-boop`**](https://github.com/thelandy03-boop)
+
+*(Puedes consultar sus perfiles directamente dentro de la app entrando a **Ajustes > Detrás del Proyecto**; las fotos de perfil de GitHub se descargan una única vez y se guardan permanentemente en formato WebP sin pérdida para funcionar incluso sin internet).*
+
 ---
 
 ## ⚖️ Licencia y Derechos de Autor
@@ -185,6 +192,6 @@ Aura Music está construida siguiendo principios de **Clean Architecture + MVVM*
 **Copyright © 2026 Luis Alejandro Sosa Camacho. Todos los derechos reservados.**
 
 Este proyecto se publica bajo una **Licencia Propietaria de Código Visible (*Source-Available — Viewing Only*)**.  
-El código fuente se encuentra disponible en este repositorio **únicamente para su visualización, lectura y consulta**. **Queda estrictamente prohibida** la copia, modificación, compilación por terceros, creación de obras derivadas, redistribución o uso comercial del código fuente o de sus binarios sin la autorización previa y por escrito del autor.
+**Luis Alejandro Sosa Camacho** es el único propietario y titular exclusivo de los derechos del proyecto, otorgando reconocimiento y crédito oficial a los colaboradores autorizados. El código fuente se encuentra disponible en este repositorio **únicamente para su visualización, lectura y consulta**. **Queda estrictamente prohibida** la copia, modificación por terceros no autorizados, compilación externa, creación de obras derivadas, redistribución o uso comercial del código fuente o de sus binarios sin la autorización previa y por escrito del autor.
 
 Consulta el archivo [**`LICENSE`**](./LICENSE) para leer los términos legales completos.

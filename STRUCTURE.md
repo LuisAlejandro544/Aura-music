@@ -185,8 +185,11 @@ app/
 │   │       │   │   │   └── components/
 │   │       │   │   │       ├── SettingDetailRow.kt            # Fila reutilizable de información de ajuste
 │   │       │   │   │       ├── SettingsSubScreenComponents.kt # Tarjetas navegables y contenedor de pantalla completa
+│   │       │   │   │       ├── about/                         # Detrás del Proyecto (Creador & Contribuidores)
+│   │       │   │   │       │   └── BehindTheProjectSection.kt     # Perfiles de GitHub y caché único de avatares WebP
 │   │       │   │   │       ├── appearance/                    # Ajustes de Apariencia, Temas y Diseño del Reproductor
-│   │       │   │   │       │   ├── AppearanceSettingsTab.kt       # Menú principal de Ajustes y secciones dedicadas
+│   │       │   │   │       │   ├── AppearanceSettingsTab.kt       # Menú principal de Ajustes y secciones visuales
+│   │       │   │   │       │   ├── EnginesAndDiagnosticsSection.kt # Motores nativos, actualizador OTA y diagnóstico
 │   │       │   │   │       │   └── PlayerDesignSettingsContent.kt # Pantalla dedicada de Diseño del Reproductor
 │   │       │   │   │       ├── headphones/                    # Ajustes de Auriculares, Acústica DSP, Bit-Perfect y Gestos
 │   │       │   │   │       │   ├── BitPerfectSettingsSection.kt   # Configuración Bit-Perfect 1:1 y Google AAudio

@@ -8,14 +8,15 @@ Todos los derechos reservados. / All rights reserved.
 VERSIÓN EN ESPAÑOL (TEXTO OFICIAL VINCULANTE)
 ================================================================================
 
-1. TITULARIDAD Y DERECHOS DE AUTOR
+1. TITULARIDAD EXCLUSIVA Y DERECHOS DE AUTOR
 Todo el código fuente, archivos de configuración, algoritmos de procesamiento de
 señal digital (DSP en C++20), diseños de interfaz, recursos gráficos, textos,
 documentación y paquetes ejecutables (APKs) contenidos en este repositorio
-(conjuntamente, el "Software") son propiedad intelectual exclusiva de su autor,
-Luis Alejandro Sosa Camacho (el "Titular"), y están protegidos por las leyes
-nacionales de propiedad intelectual y los tratados internacionales de derechos
-de autor (incluyendo el Convenio de Berna y los tratados de la OMPI/WIPO).
+(conjuntamente, el "Software") son propiedad intelectual única y exclusiva de su
+creador y fundador, Luis Alejandro Sosa Camacho (el "Titular"), y están
+protegidos por las leyes nacionales de propiedad intelectual y los tratados
+internacionales de derechos de autor (incluyendo el Convenio de Berna y los
+tratados de la OMPI/WIPO).
 
 El hecho de que este repositorio sea públicamente accesible no convierte al
 Software en "Software Libre", "Open Source" (Código Abierto) ni de "Dominio
@@ -50,31 +51,53 @@ TERMINANTEMENTE PROHIBIDO:
   f) Eliminar, ocultar o alterar los avisos de derechos de autor, marcas,
      nombres de autoría o esta licencia en cualquier archivo del proyecto.
 
-4. TERMINACIÓN AUTOMÁTICA
+4. CONTRIBUCIONES Y COLABORADORES OFICIALES CON CRÉDITOS
+Luis Alejandro Sosa Camacho mantiene en todo momento la titularidad única y
+exclusiva del proyecto y del Software:
+  a) Los colaboradores autorizados por el Titular (incluyendo a @thelandy03-boop
+     y futuros contribuidores aceptados mediante Pull Requests o commits en el
+     repositorio oficial) cuentan con permiso expreso para aportar mejoras,
+     correcciones de errores y código al proyecto, recibiendo reconocimiento y
+     crédito oficial como "Contribuidor Oficial" tanto en la documentación del
+     repositorio como en el apartado "Detrás del Proyecto" dentro de la aplicación.
+  b) Al enviar, publicar o integrar cualquier contribución (código, parches,
+     diseños o documentación) en este repositorio, el colaborador cede y otorga
+     de forma perpetua, irrevocable, mundial y libre de regalías al Titular
+     (Luis Alejandro Sosa Camacho) todos los derechos patrimoniales y de
+     explotación sobre dicha contribución, pasando a formar parte integral del
+     Software bajo la propiedad exclusiva del Titular.
+  c) La participación como colaborador otorga el derecho al reconocimiento de
+     créditos en el proyecto, pero en ningún caso transfiere co-propiedad sobre
+     el Software ni faculta al colaborador para redistribuir, relicenciar o
+     explotar el proyecto de forma independiente.
+
+5. TERMINACIÓN AUTOMÁTICA
 El incumplimiento de cualquiera de los términos establecidos en esta Licencia
 anulará de forma automática e inmediata el permiso de visualización y uso
 concedido en la Cláusula 2, facultando al Titular para ejercer las acciones
 legales civiles, penales y administrativas correspondientes, incluyendo
 reclamaciones por infracción de derechos de autor (DMCA / avisos de retirada).
 
-5. EXCLUSIÓN DE GARANTÍAS Y LIMITACIÓN DE RESPONSABILIDAD
+6. EXCLUSIÓN DE GARANTÍAS Y LIMITACIÓN DE RESPONSABILIDAD
 EL SOFTWARE SE PROPORCIONA "TAL CUAL" ("AS IS"), SIN GARANTÍA DE NINGÚN TIPO,
 EXPRESA O IMPLÍCITA, INCLUYENDO PERO NO LIMITADO A GARANTÍAS DE COMERCIABILIDAD,
 IDONEIDAD PARA UN PROPÓSITO PARTICULAR Y NO INFRACCIÓN. EN NINGÚN CASO EL
-TITULAR SERÁ RESPONSABLE POR NINGÚN RECLAMO, DAÑO O CUALQUIER OTRA
-RESPONSABILIDAD DERIVADA DEL USO O LA IMPOSIBILIDAD DE USO DEL SOFTWARE.
+TITULAR NI LOS COLABORADORES SERÁN RESPONSABLES POR NINGÚN RECLAMO, DAÑO O
+CUALQUIER OTRA RESPONSABILIDAD DERIVADA DEL USO O LA IMPOSIBILIDAD DE USO DEL
+SOFTWARE.
 
 ================================================================================
 ENGLISH VERSION (FOR INTERNATIONAL REFERENCE)
 ================================================================================
 
-1. OWNERSHIP AND COPYRIGHT
+1. SOLE OWNERSHIP AND COPYRIGHT
 All source code, configuration files, digital signal processing algorithms
 (C++20 DSP), user interface designs, graphic assets, documentation, and binary
 packages (APKs) contained in this repository (collectively, the "Software") are
-the exclusive intellectual property of Luis Alejandro Sosa Camacho (the "Owner"),
-and are protected by applicable copyright laws and international treaties
-(including the Berne Convention and WIPO treaties).
+the sole and exclusive intellectual property of its creator and founder,
+Luis Alejandro Sosa Camacho (the "Owner"), and are protected by applicable
+copyright laws and international treaties (including the Berne Convention and
+WIPO treaties).
 
 Making this repository publicly visible does NOT make the Software "Free
 Software", "Open Source", or "Public Domain".
@@ -108,15 +131,37 @@ PROHIBITED from:
   f) Removing, obscuring, or altering any copyright notices, branding,
      attribution, or this license file.
 
-4. AUTOMATIC TERMINATION
+4. CONTRIBUTIONS AND OFFICIAL CONTRIBUTORS WITH CREDITS
+Luis Alejandro Sosa Camacho retains sole and exclusive ownership of the project
+and the Software at all times:
+  a) Authorized contributors approved by the Owner (including @thelandy03-boop
+     and future contributors accepted via Pull Requests or commits in the
+     official repository) are expressly permitted to contribute improvements,
+     bug fixes, and code to the project, receiving official recognition and
+     credit as an "Official Contributor" both in the repository documentation
+     and in the "Behind the Project" ("Detrás del Proyecto") section inside the
+     application.
+  b) By submitting, publishing, or merging any contribution (code, patches,
+     designs, or documentation) into this repository, the contributor permanently,
+     irrevocably, worldwide, and royalty-free assigns and grants to the Owner
+     (Luis Alejandro Sosa Camacho) all proprietary and exploitation rights over
+     such contribution, which becomes an integral part of the Software under the
+     sole ownership of the Owner.
+  c) Participation as a contributor grants the right to official credit and
+     recognition within the project, but under no circumstances transfers
+     co-ownership of the Software or authorizes the contributor to redistribute,
+     relicense, or independently exploit the project.
+
+5. AUTOMATIC TERMINATION
 Any breach of the terms of this License shall automatically and immediately
 terminate the permissions granted under Section 2, entitling the Owner to pursue
 all available legal remedies, including DMCA takedown notices and copyright
 infringement actions.
 
-5. DISCLAIMER OF WARRANTY AND LIMITATION OF LIABILITY
+6. DISCLAIMER OF WARRANTY AND LIMITATION OF LIABILITY
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
-FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE OWNER BE
-LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM, OUT OF OR IN
-CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE OWNER OR
+CONTRIBUTORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
