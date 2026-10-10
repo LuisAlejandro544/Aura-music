@@ -610,13 +610,22 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // --- Mixtapes Continuos (FFmpeg) ---
+    // --- Mixtapes Continuos y Auto-Remix de 2 Canciones Locales (FFmpeg) ---
     fun createMixtape(
         tracks: List<Track>,
         title: String,
         crossfadeSeconds: Int = 5,
         onCreated: ((Track) -> Unit)? = null
     ) = mixtapeCoordinator.createMixtape(tracks, title, crossfadeSeconds, onCreated)
+
+    fun createAutoRemix(
+        trackA: Track,
+        trackB: Track,
+        title: String,
+        style: AutoRemixStyle,
+        crossfadeSeconds: Int = 6,
+        onCreated: ((Track) -> Unit)? = null
+    ) = mixtapeCoordinator.createAutoRemix(trackA, trackB, title, style, crossfadeSeconds, onCreated)
 
     fun dismissMixtapeStatus() = mixtapeCoordinator.dismissStatus()
     fun getActiveChapterIndex(): Int = mixtapeCoordinator.getActiveChapterIndex()

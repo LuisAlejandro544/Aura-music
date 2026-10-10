@@ -78,6 +78,49 @@ class MixtapeCoordinator(
     }
 
     /**
+     * Inicia la creación de un Auto-Remix / Mashup inteligente con 2 canciones locales mediante FFmpeg.
+     */
+    fun createAutoRemix(
+        trackA: Track,
+        trackB: Track,
+        title: String,
+        style: com.example.model.AutoRemixStyle,
+        crossfadeSeconds: Int = 6,
+        onCreated: ((Track) -> Unit)? = null
+    ) {
+        if (trackA.isStreamingTrack || trackB.isStreamingTrack) {
+            _mixtapeStatusMessage.value = "El Auto-Remix está disponible por ahora solo para música local."
+            return
+        }
+        scope.launch {
+            _isCreatingMixtape.value = true
+            _mixtapeProgress.value = 0f
+            _mixtapeStatusMessage.value = "Iniciando preparación del Auto-Remix..."
+
+            val resultTrack = com.example.data.importer.mixtape.SmartAutoRemixEngine.createAutoRemix(
+                context = context,
+                trackA = trackA,
+                trackB = trackB,
+                customTitle = title,
+                style = style,
+                crossfadeSeconds = crossfadeSeconds,
+                onProgress = { p, msg ->
+                    _mixtapeProgress.value = p
+                    _mixtapeStatusMessage.value = msg
+                }
+            )
+
+            _isCreatingMixtape.value = false
+            if (resultTrack != null) {
+                _mixtapeStatusMessage.value = "¡Auto-Remix '${resultTrack.title}' creado exitosamente!"
+                onCreated?.invoke(resultTrack)
+            } else {
+                _mixtapeStatusMessage.value = "No se pudo generar el Auto-Remix. Verifica las pistas locales."
+            }
+        }
+    }
+
+    /**
      * Actualiza el capítulo activo según la posición de reproducción del reproductor.
      */
     fun updateActiveChapter(currentTrack: Track?, currentPositionMs: Long) {

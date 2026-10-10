@@ -35,6 +35,7 @@ import com.example.model.WidgetConfig
 import com.example.model.WidgetGridContentMode
 import com.example.ui.screens.settings.components.*
 import com.example.ui.screens.settings.components.about.behindTheProjectSettingsContent
+import com.example.ui.screens.settings.components.appearance.appWallpaperSettingsSection
 import com.example.ui.screens.settings.components.widgets.widgetSettingsContent
 import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.TextPrimary
@@ -50,6 +51,10 @@ enum class SettingsSubScreen {
     MAIN_MENU,
     PLAYER_DESIGN,
     VISUAL_BEHAVIOR,
+    VISUAL_STREAMING_AND_CACHE,
+    VISUAL_AURA_AND_MINIPLAYER,
+    VISUAL_GAME_MODE,
+    VISUAL_GALLERY_WALLPAPER,
     THEME_PALETTES,
     WIDGETS,
     HEADPHONES,
@@ -143,6 +148,12 @@ fun SettingsScreen(
         transitionSpec = {
             val isGoingDeeper = when {
                 initialState == SettingsSubScreen.MAIN_MENU && targetState != SettingsSubScreen.MAIN_MENU -> true
+                initialState == SettingsSubScreen.VISUAL_BEHAVIOR && (
+                    targetState == SettingsSubScreen.VISUAL_STREAMING_AND_CACHE ||
+                        targetState == SettingsSubScreen.VISUAL_AURA_AND_MINIPLAYER ||
+                        targetState == SettingsSubScreen.VISUAL_GAME_MODE ||
+                        targetState == SettingsSubScreen.VISUAL_GALLERY_WALLPAPER
+                    ) -> true
                 initialState == SettingsSubScreen.HEADPHONES && (
                     targetState == SettingsSubScreen.HEADPHONES_DSP ||
                         targetState == SettingsSubScreen.HEADPHONES_SECURITY ||
@@ -239,35 +250,106 @@ fun SettingsScreen(
                 }
             }
 
-            // PANTALLA INDEPENDIENTE 2: AURA DINÁMICA, FONDO DE GALERÍA & MODO JUEGO EN 2DO PLANO
+            // PANTALLA INDEPENDIENTE 2: AURA DINÁMICA, STREAMING & MODO JUEGO (MENÚ DE 4 TARJETAS)
             SettingsSubScreen.VISUAL_BEHAVIOR -> {
                 SettingsSubMenuScreen(
                     title = "Aura Dinámica, Streaming & Modo Juego",
-                    subtitle = "Videos Canvas en Streaming (Wi-Fi/Datos), Caché 50-500MB, Colores a 1s y Modo Juego",
+                    subtitle = "Elige una categoría para configurar el streaming, colores dinámicos, modo juego o fondo",
                     icon = Icons.Default.Videocam,
                     iconTint = MaterialTheme.colorScheme.secondary,
                     onBack = { activeSubScreen = SettingsSubScreen.MAIN_MENU },
                     testTag = "subscreen_visual_behavior"
                 ) {
-                    visualCustomizationSettingsContent(
+                    visualBehaviorMenuSection(
+                        isDynamicArtworkColorEnabled = isDynamicArtworkColorEnabled,
+                        isMiniPlayerVideoEnabled = isMiniPlayerVideoEnabled,
+                        isBackgroundGameModeEnabled = isBackgroundGameModeEnabled,
+                        appWallpaperConfig = appWallpaperConfig,
+                        streamingCacheConfig = streamingCacheConfig,
+                        onOpenStreamingAndCache = { activeSubScreen = SettingsSubScreen.VISUAL_STREAMING_AND_CACHE },
+                        onOpenAuraAndMiniPlayer = { activeSubScreen = SettingsSubScreen.VISUAL_AURA_AND_MINIPLAYER },
+                        onOpenGameMode = { activeSubScreen = SettingsSubScreen.VISUAL_GAME_MODE },
+                        onOpenGalleryWallpaper = { activeSubScreen = SettingsSubScreen.VISUAL_GALLERY_WALLPAPER }
+                    )
+                }
+            }
+
+            // SUB-PANTALLA 2.1: STREAMING & CACHÉ INTELIGENTE
+            SettingsSubScreen.VISUAL_STREAMING_AND_CACHE -> {
+                SettingsSubMenuScreen(
+                    title = "Streaming & Caché Inteligente",
+                    subtitle = "Videos Canvas en Streaming (Wi-Fi/Datos) y caché temporal de 50 a 500 MB",
+                    icon = Icons.Default.CloudQueue,
+                    iconTint = MaterialTheme.colorScheme.primary,
+                    onBack = { activeSubScreen = SettingsSubScreen.VISUAL_BEHAVIOR },
+                    testTag = "subscreen_visual_streaming_cache"
+                ) {
+                    item {
+                        com.example.ui.screens.settings.components.appearance.StreamingCacheAndVideoSettingsCard(
+                            cacheConfig = streamingCacheConfig,
+                            onSelectVideoPolicy = onSelectStreamingVideoPolicy,
+                            onChangeMaxCacheMb = onChangeStreamingCacheMaxMb,
+                            onClearStreamingCache = onClearStreamingCache
+                        )
+                    }
+                }
+            }
+
+            // SUB-PANTALLA 2.2: AURA DINÁMICA (1S) & MINI REPRODUCTOR
+            SettingsSubScreen.VISUAL_AURA_AND_MINIPLAYER -> {
+                SettingsSubMenuScreen(
+                    title = "Aura Dinámica & Mini Reproductor",
+                    subtitle = "Armonización de color cada 1 segundo y Video Canvas en el Mini Reproductor",
+                    icon = Icons.Default.Palette,
+                    iconTint = MaterialTheme.colorScheme.secondary,
+                    onBack = { activeSubScreen = SettingsSubScreen.VISUAL_BEHAVIOR },
+                    testTag = "subscreen_visual_aura_miniplayer"
+                ) {
+                    auraAndMiniPlayerSettingsSection(
                         isDynamicArtworkColorEnabled = isDynamicArtworkColorEnabled,
                         onToggleDynamicArtworkColor = onToggleDynamicArtworkColor,
                         isMiniPlayerVideoEnabled = isMiniPlayerVideoEnabled,
-                        onToggleMiniPlayerVideo = onToggleMiniPlayerVideo,
+                        onToggleMiniPlayerVideo = onToggleMiniPlayerVideo
+                    )
+                }
+            }
+
+            // SUB-PANTALLA 2.3: MODO JUEGO / AHORRO EN 2DO PLANO
+            SettingsSubScreen.VISUAL_GAME_MODE -> {
+                SettingsSubMenuScreen(
+                    title = "Modo Juego / Ahorro en 2do Plano",
+                    subtitle = "Libera GPU, texturas y visualizador al minimizar la app mientras juegas",
+                    icon = Icons.Default.SportsEsports,
+                    iconTint = MaterialTheme.colorScheme.primary,
+                    onBack = { activeSubScreen = SettingsSubScreen.VISUAL_BEHAVIOR },
+                    testTag = "subscreen_visual_game_mode"
+                ) {
+                    backgroundGameModeSettingsSection(
                         isBackgroundGameModeEnabled = isBackgroundGameModeEnabled,
-                        onToggleBackgroundGameMode = onToggleBackgroundGameMode,
-                        appWallpaperConfig = appWallpaperConfig,
+                        onToggleBackgroundGameMode = onToggleBackgroundGameMode
+                    )
+                }
+            }
+
+            // SUB-PANTALLA 2.4: FONDO DE PANTALLA DE GALERÍA (IMAGEN WEBP O VIDEO CORTO MP4)
+            SettingsSubScreen.VISUAL_GALLERY_WALLPAPER -> {
+                SettingsSubMenuScreen(
+                    title = "Fondo de Pantalla de Galería",
+                    subtitle = "Personaliza el fondo con una foto (WebP) o video corto (MP4), opacidad y blur",
+                    icon = Icons.Default.PermMedia,
+                    iconTint = MaterialTheme.colorScheme.secondary,
+                    onBack = { activeSubScreen = SettingsSubScreen.VISUAL_BEHAVIOR },
+                    testTag = "subscreen_visual_gallery_wallpaper"
+                ) {
+                    appWallpaperSettingsSection(
+                        wallpaperConfig = appWallpaperConfig,
                         onToggleWallpaperEnabled = onToggleWallpaperEnabled,
                         onSelectWallpaperImage = onSelectWallpaperImage,
                         onSelectWallpaperVideo = onSelectWallpaperVideo,
                         onClearWallpaper = onClearWallpaper,
                         onSelectWallpaperScope = onSelectWallpaperScope,
-                        onChangeWallpaperDimAlpha = onChangeWallpaperDimAlpha,
-                        onChangeWallpaperBlurDp = onChangeWallpaperBlurDp,
-                        streamingCacheConfig = streamingCacheConfig,
-                        onSelectStreamingVideoPolicy = onSelectStreamingVideoPolicy,
-                        onChangeStreamingCacheMaxMb = onChangeStreamingCacheMaxMb,
-                        onClearStreamingCache = onClearStreamingCache
+                        onChangeDimAlpha = onChangeWallpaperDimAlpha,
+                        onChangeBlurDp = onChangeWallpaperBlurDp
                     )
                 }
             }

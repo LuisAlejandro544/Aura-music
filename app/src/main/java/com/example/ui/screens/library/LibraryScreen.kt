@@ -64,10 +64,17 @@ fun LibraryScreen(
     onEditTrack: (Long, String, String, String) -> Unit = { _, _, _, _ -> },
     onEditTrackDetails: (Long, String, String, String, android.net.Uri?, Boolean) -> Unit = { _, _, _, _, _, _ -> },
     onRenamePlaylist: (Long, String, String, android.net.Uri?, Boolean) -> Unit = { _, _, _, _, _ -> },
+    onCreateMixtape: ((List<Track>, String, Int, ((Track) -> Unit)?) -> Unit)? = null,
+    onCreateAutoRemix: ((Track, Track, String, com.example.model.AutoRemixStyle, Int, ((Track) -> Unit)?) -> Unit)? = null,
+    isCreatingMixtape: Boolean = false,
+    mixtapeProgress: Float = 0f,
+    mixtapeStatusMessage: String? = null,
     modifier: Modifier = Modifier
 ) {
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
     var playlistToRename by remember { mutableStateOf<Playlist?>(null) }
+    var showAutoRemixDialog by remember { mutableStateOf(false) }
+    var createdRemixTrack by remember { mutableStateOf<Track?>(null) }
 
     // Filtrar pistas por búsqueda
     val filteredTracks = remember(allTracks, searchQuery) {
@@ -237,6 +244,30 @@ fun LibraryScreen(
                         Text("Aleatorio", fontWeight = FontWeight.Bold)
                     }
                 }
+                if (allTracks.count { !it.isStreamingTrack } >= 2 && onCreateAutoRemix != null) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    FilledTonalButton(
+                        onClick = {
+                            createdRemixTrack = null
+                            showAutoRemixDialog = true
+                        },
+                        shape = RoundedCornerShape(20.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
+                            contentColor = MaterialTheme.colorScheme.primary
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("library_autoremix_btn")
+                    ) {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Auto-Remix & Mashup con 2 Canciones (Local)",
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                        )
+                    }
+                }
                 Spacer(modifier = Modifier.height(14.dp))
             }
         }
@@ -386,6 +417,37 @@ fun LibraryScreen(
             playlist = playlistToRename!!,
             onDismissRequest = { playlistToRename = null },
             onRenamePlaylist = onRenamePlaylist
+        )
+    }
+
+    // Cuadro de Diálogo para crear Auto-Remix / Mashup de 2 Canciones o Mixtape desde Biblioteca
+    if (showAutoRemixDialog) {
+        com.example.ui.components.CreateMixtapeDialog(
+            initialTitle = "Aura Biblioteca Mix",
+            tracks = allTracks,
+            isCreating = isCreatingMixtape,
+            progress = mixtapeProgress,
+            statusMessage = mixtapeStatusMessage,
+            onDismissRequest = {
+                showAutoRemixDialog = false
+                createdRemixTrack = null
+            },
+            onCreateMixtape = { title, crossfadeSec ->
+                onCreateMixtape?.invoke(allTracks, title, crossfadeSec) { created ->
+                    createdRemixTrack = created
+                }
+            },
+            onCreateAutoRemix = { trackA, trackB, title, style, crossfadeSec ->
+                onCreateAutoRemix?.invoke(trackA, trackB, title, style, crossfadeSec) { created ->
+                    createdRemixTrack = created
+                }
+            },
+            initialModeAutoRemix = true,
+            createdTrack = createdRemixTrack,
+            onPlayCreatedTrack = { created ->
+                onTrackClick(created, listOf(created))
+                showAutoRemixDialog = false
+            }
         )
     }
 }

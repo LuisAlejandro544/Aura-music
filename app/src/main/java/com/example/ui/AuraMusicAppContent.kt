@@ -457,7 +457,16 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
                                 onEditTrack = { id, t, a, al -> viewModel.updateTrackInfo(id, t, a, al) },
                                 onEditTrackDetails = { id, t, a, al, art, removeArt ->
                                     viewModel.updateTrackDetails(id, t, a, al, art, removeArt)
-                                }
+                                },
+                                onCreateMixtape = { tracksToMix, title, crossfadeSec, onDone ->
+                                    viewModel.createMixtape(tracksToMix, title, crossfadeSec, onDone)
+                                },
+                                onCreateAutoRemix = { trackA, trackB, title, style, crossfadeSec, onDone ->
+                                    viewModel.createAutoRemix(trackA, trackB, title, style, crossfadeSec, onDone)
+                                },
+                                isCreatingMixtape = isCreatingMixtape,
+                                mixtapeProgress = mixtapeProgress,
+                                mixtapeStatusMessage = mixtapeStatusMessage
                             )
 
                             is NavScreen.Import -> ImportMusicScreen(
@@ -518,6 +527,9 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
                                 },
                                 onCreateMixtape = { tracksToMix, title, crossfadeSec, onDone ->
                                     viewModel.createMixtape(tracksToMix, title, crossfadeSec, onDone)
+                                },
+                                onCreateAutoRemix = { trackA, trackB, title, style, crossfadeSec, onDone ->
+                                    viewModel.createAutoRemix(trackA, trackB, title, style, crossfadeSec, onDone)
                                 },
                                 isCreatingMixtape = isCreatingMixtape,
                                 mixtapeProgress = mixtapeProgress,

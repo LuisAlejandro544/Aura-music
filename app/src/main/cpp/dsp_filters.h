@@ -257,10 +257,10 @@ private:
 };
 
 /**
- * Filtro C++20 de Curva de Ecualización DJ Automix (Crossfade con Curva en X).
- * Durante la transición de pistas, atenúa de forma paramétrica y progresiva los subgraves (<160 Hz)
- * y el brillo extremo (>9 kHz) de la canción que está finalizando, abriendo espacio acústico en la mezcla
- * para que la canción entrante entre con pegada limpia sin distorsión por choque de bajos.
+ * Filtro C++20 de Curva de Ecualización Smart AutoMix DJ (Estilo Apple Music / Curva en X).
+ * Durante la transición de pistas locales, atenúa de forma paramétrica y progresiva los subgraves (<120 Hz),
+ * protege la banda vocal central (~2.6 kHz) para evitar choques de voces entre ambas pistas
+ * y suaviza el brillo extremo (>9.5 kHz) de la canción saliente, logrando una mezcla armónica de estudio.
  */
 class DjAutomixFilter {
 public:
@@ -273,6 +273,8 @@ public:
     void reset() {
         mBassCutFilterL.reset();
         mBassCutFilterR.reset();
+        mVocalBlendFilterL.reset();
+        mVocalBlendFilterR.reset();
         mHighTameFilterL.reset();
         mHighTameFilterR.reset();
     }
@@ -301,17 +303,23 @@ public:
 
         sampleL = mBassCutFilterL.process(sampleL);
         sampleR = mBassCutFilterR.process(sampleR);
+        sampleL = mVocalBlendFilterL.process(sampleL);
+        sampleR = mVocalBlendFilterR.process(sampleR);
         sampleL = mHighTameFilterL.process(sampleL);
         sampleR = mHighTameFilterR.process(sampleR);
     }
 
 private:
     void reconfigure() {
-        double bassGainDb = -12.0 * mProgress;
-        double highGainDb = -6.0 * mProgress;
+        // Atenuación progresiva de subgraves (<120 Hz) y bolsillo vocal (~2.6 kHz) estilo Apple Music AutoMix
+        double bassGainDb = -13.5 * mProgress;
+        double vocalPocketDb = -4.8 * std::sin(mProgress * std::numbers::pi);
+        double highGainDb = -6.5 * mProgress;
 
         mBassCutFilterL.configurePeaking(mSampleRate, 120.0, bassGainDb, 0.85);
         mBassCutFilterR.configurePeaking(mSampleRate, 120.0, bassGainDb, 0.85);
+        mVocalBlendFilterL.configurePeaking(mSampleRate, 2600.0, vocalPocketDb, 1.15);
+        mVocalBlendFilterR.configurePeaking(mSampleRate, 2600.0, vocalPocketDb, 1.15);
         mHighTameFilterL.configurePeaking(mSampleRate, 9500.0, highGainDb, 0.95);
         mHighTameFilterR.configurePeaking(mSampleRate, 9500.0, highGainDb, 0.95);
     }
@@ -322,6 +330,8 @@ private:
 
     BiquadPeakingFilter mBassCutFilterL{};
     BiquadPeakingFilter mBassCutFilterR{};
+    BiquadPeakingFilter mVocalBlendFilterL{};
+    BiquadPeakingFilter mVocalBlendFilterR{};
     BiquadPeakingFilter mHighTameFilterL{};
     BiquadPeakingFilter mHighTameFilterR{};
 };

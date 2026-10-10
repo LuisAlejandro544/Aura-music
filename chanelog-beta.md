@@ -35,6 +35,14 @@
    - **Nueva Opción de Video Canvas para Streaming (`Solo con Wi-Fi`, `Siempre (Wi-Fi y Datos Móviles)` o `Desactivado`)**: Configurable en **Ajustes > Aura Dinámica, Streaming & Modo Juego**, controla exclusivamente los videos de fondo en modo streaming sin tocar ni afectar en absoluto tu reproducción local.
    - **Radio Automática de Canciones Similares y Consulta Previa al Cambiar de Pista**: Antes de que termine la canción actual (o antes de saltar hacia la canción anterior/siguiente en streaming), la app consulta a la API una canción similar o relacionada y `yt-dlp` toma su flujo para reproducirla sin pausas, incluyendo **letras sincronizadas automáticas (`LRCLIB`)** y **botón de descarga permanente en 1 toque** hacia tu biblioteca local.
    - **Bypass Temporal de C++20 en Streaming**: Durante la reproducción en streaming, el motor DSP C++20 entra en bypass limpio (`NativeAudioProcessor.isStreamingBypassActive = true`) tal como fue diseñado para esta fase, manteniendo 100% activo el motor C++20 para todas tus canciones locales.
+8. 🎧 **Smart AutoMix Estilo Apple Music (`@jomar_oliver`) & Generador de Auto-Remix / Mashup con 2 Canciones Locales (`SmartAutoRemixEngine`)**:
+   - **Smart AutoMix al Terminar Canciones (Música Local)**: Inspirado en las mezclas de **Apple Music**, cuando una canción local está a punto de acabar el motor C++20 detecta el punto óptimo de salida (*Smart Outro Cue Point*), activa la transición superpuesta **Dual-Deck** (`sin/cos` de igual potencia) y modula progresivamente en vivo la **Curva Armónica en X** (atenuando subgraves `<120 Hz` y abriendo un bolsillo vocal en `2.6 kHz`) para que las voces y el ritmo entrante no choquen. *(Por ahora disponible para música local; más adelante llegará también a streaming)*.
+   - **Auto-Remix / Mashup Automático con 2 Canciones (Manual o Auto-Match Inteligente)**: Accesible directamente desde **Tu Biblioteca**, desde cualquier **Playlist** y dentro del **Creador de Mixtapes/Remixes**:
+     - Puedes **elegir tú mismo las 2 canciones locales** (Canción A y Canción B con botón para intercambiarlas `A ⇄ B`) o pulsar **"Elección Inteligente (Auto-Match 2 Pistas)"** para que el algoritmo escoja las 2 canciones de tu biblioteca cuyos tiempos y energías mejor combinan.
+     - **2 Estilos de Remix Automático en FFmpeg**:
+       1. 🎤 **Mashup (Voz A + Base B)**: Extrae y realza la presencia vocal central de la Canción A y la superpone sobre la base rítmica e instrumental de la Canción B con sincronización de ritmo y limitador de estudio.
+       2. 🎛️ **Remix Alternado DJ (Beat-Sync)**: Estructura ambas canciones en 4 bloques dinámicos estilo DJ Set (*Intro A → Beat Drop B → Vocal Switch A → Outro Finale B*) con ajuste armónico de tempo (`atempo`) y cruces `acrossfade`.
+     - Genera automáticamente su **portada dividida en WebP sin pérdida**, concatena sus **letras `.LRC` para Karaoke** y cambia la carátula y el **Video Canvas en vivo** según el capítulo que esté sonando.
 
 ---
 
@@ -42,13 +50,15 @@
 
 **Aura Beta** es un reproductor musical audiófilo y centro multimedia todo-en-uno para Android, diseñado desde cero para que puedas disfrutar, personalizar, descargar y masterizar tu música directamente desde tu teléfono móvil sin necesidad de una PC.
 
-### 🎛️ 1. Motor de Audio Nativo en ISO C++20 (64-bit DSP), Crossfade Dual-Deck & Modo Bit-Perfect
+### 🎛️ 1. Motor de Audio Nativo en ISO C++20 (64-bit DSP), Smart AutoMix (Estilo Apple Music), Auto-Remix de 2 Pistas & Modo Bit-Perfect
 - **Ecualizador Paramétrico de 10 Bandas ISO Integrado en Modal**:
   - Bandas de precisión calibradas con nombres acústicos intuitivos: `31 Hz (Subgraves)`, `62 Hz (Bajos)`, `125 Hz (Graves)`, `250 Hz (Cuerpo)`, `500 Hz (Medios Bajos)`, `1 kHz (Voces)`, `2 kHz (Claridad)`, `4 kHz (Presencia)`, `8 kHz (Brillo)` y `16 kHz (Aire / Agudos)`.
   - Filtros Bi-cuadráticos (*Peaking Biquads*) en coma flotante de 64 bits con limitador suave anti-clipping (`-15 dB` a `+15 dB`), perfiles rápidos (*Rock, Pop, Electrónica, Jazz, Acústico, Bass Boost, Plano*), alcance configurable (*Solo esta canción* vs *Todas las siguientes*) y refuerzo de subgraves a 60 Hz.
   - Accesible al instante desde el **Mini Reproductor** y desde **Now Playing** sin pantallas aisladas que interrumpan tu navegación.
-- **Crossfade Profesional Dual-Deck & Automix Inteligente DJ con Curva de Ecualización en X**:
-  - Mezcla superpuesta real con dos motores `ExoPlayer` sincronizados: mientras la pista saliente baja con curva `cos(t)`, la pista entrante sube simultáneamente con curva `sin(t)` y atenúa subgraves (`<120 Hz`) para evitar choques de bajos.
+- **Smart AutoMix Estilo Apple Music (Música Local) & Crossfade Profesional Dual-Deck con Curva Armónica en X**:
+  - Mezcla superpuesta real con dos motores `ExoPlayer` sincronizados: detecta el outro acústico de la canción local a punto de terminar y, mientras la pista saliente baja con curva `cos(t)`, la pista entrante sube simultáneamente con curva `sin(t)` modulando en tiempo real la atenuación de subgraves (`<120 Hz`) y el bolsillo vocal (`2.6 kHz`) en C++20 para evitar choques de bajos y de voces.
+- **Generador de Auto-Remix & Mashup con 2 Canciones Locales (`SmartAutoRemixEngine`)**:
+  - Crea remixes automáticos eligiendo manualmente 2 canciones locales o mediante **Auto-Match Inteligente**, con soporte para **Mashup (Voz A + Base B)** y **Remix Alternado DJ con sincronización de ritmo**, portada dividida WebP, letras `.LRC` y capítulos de Video Canvas reactivos.
 - **Clarificador de Voces HD (`VocalClarityProcessor` Mid-Side en C++20)**:
   - Aísla el canal vocal central (*Mid*) del acompañamiento instrumental (*Side*), limpia la turbidez en 180 Hz y realza la articulación vocal en `2.8 kHz` y `5.5 kHz`.
 - **Audio Espacial 8D y 16D Multi-Órbita Binaural en C++20**:

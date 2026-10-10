@@ -317,9 +317,10 @@ class AuraAudioPlayer(
         val outDeck = outgoingExoPlayer
         val previousTrack = _currentTrack.value
         val previousTrackId = previousTrack?.id
-        val effectiveCrossfadeSecs = if (_isDjAutomixEnabled.value && _crossfadeSeconds.value == 0) 5 else _crossfadeSeconds.value
+        val isLocalPair = previousTrack != null && !previousTrack.isStreamingTrack && !track.isStreamingTrack
+        val effectiveCrossfadeSecs = if (_isDjAutomixEnabled.value && isLocalPair && _crossfadeSeconds.value == 0) 6 else _crossfadeSeconds.value
 
-        // Si el Crossfade o Automix DJ está activo y había una pista sonando en el reproductor primario,
+        // Si el Crossfade o Smart AutoMix DJ (música local) está activo y había una pista sonando en el reproductor primario,
         // transferimos la cola final de la pista saliente al Deck B auxiliar para que ambas suenen superpuestas
         var handoffToDualDeckSucceeded = false
         if (effectiveCrossfadeSecs > 0 && outDeck != null && previousTrack != null && previousTrack.id != track.id && player.isPlaying) {
@@ -426,10 +427,18 @@ class AuraAudioPlayer(
                     // En cambio manual de canción con Crossfade activo, mezcla sedosa y rápida (1.6s a 3.0s)
                     (effectiveCrossfadeSecs * 650L).coerceIn(1500L, 3200L)
                 }
+                val applyEqCurve = _isDjEqCurveEnabled.value && isLocalPair
                 fadeController.startDualDeckCrossfade(
                     durationMs = overlapDurationMs,
                     outgoingPlayer = outDeck,
-                    incomingPlayer = player
+                    incomingPlayer = player,
+                    onProgressStep = { progress ->
+                        if (applyEqCurve) {
+                            // Modulación progresiva estilo Apple Music AutoMix (pico de limpieza en el centro de la mezcla)
+                            val bellCurve = kotlin.math.sin(progress * kotlin.math.PI).toFloat().coerceIn(0.15f, 1.0f)
+                            effectManager.setDjAutomixTransition(true, bellCurve)
+                        }
+                    }
                 ) {
                     effectManager.setDjAutomixTransition(false, 0.0f)
                 }
@@ -747,8 +756,9 @@ class AuraAudioPlayer(
                     }
 
                     val crossfadeSecs = _crossfadeSeconds.value
-                    val isDjMix = _isDjAutomixEnabled.value
-                    val effectiveCrossfadeSecs = if (isDjMix && crossfadeSecs == 0) 5 else crossfadeSecs
+                    val isCurrentLocal = _currentTrack.value?.isStreamingTrack != true
+                    val isDjMix = _isDjAutomixEnabled.value && isCurrentLocal
+                    val effectiveCrossfadeSecs = if (isDjMix && crossfadeSecs == 0) 6 else crossfadeSecs
                     val remainingMs = if (dur > 0L) (dur - pos) else Long.MAX_VALUE
                     val crossfadeWindowMs = (effectiveCrossfadeSecs * 1000L).coerceAtLeast(4500L)
                     val isNearTransitionOrEnd = dur > 0L && remainingMs <= (crossfadeWindowMs + 1500L)
@@ -794,8 +804,8 @@ class AuraAudioPlayer(
                             onStreamingNearEndPrefetchCallback?.invoke(curTrack)
                         }
 
-                        // Si el Crossfade profesional o DJ Automix está activo y la pista entra en la ventana
-                        // de los últimos N segundos (y dura al menos el doble del crossfade), disparamos el
+                        // Si el Crossfade profesional o Smart AutoMix DJ (música local) está activo y la pista entra
+                        // en la ventana de los últimos N segundos (y dura al menos el doble del crossfade), disparamos el
                         // cruce Dual-Deck superpuesto: la canción saliente sigue sonando en el Deck B mientras
                         // la siguiente canción arranca simultáneamente en el Deck A sin pausa alguna.
                         val canOverlapNext = effectiveCrossfadeSecs > 0 &&
@@ -806,17 +816,21 @@ class AuraAudioPlayer(
                             !isTransitioningTrack &&
                             crossfadeTriggeredForTrackId != curTrackId
 
+                        // Smart Outro Cue Point (Estilo Apple Music AutoMix para música local):
+                        // Detecta cuando la energía vocal/instrumental de la canción saliente cae en el tramo final
+                        // (o alcanza la ventana armónica de los últimos segundos) para iniciar la mezcla sin choques.
+                        val currentIntensity = if (isDjMix) NativeAudioEngine.getAudioIntensity() else 0.25f
                         val shouldTriggerEarlyOutro = isDjMix &&
-                            remainingMs in 600L..(crossfadeMs + 3500L) &&
-                            NativeAudioEngine.getAudioIntensity() < 0.07f
+                            remainingMs in 800L..(crossfadeMs + 4500L) &&
+                            (currentIntensity < 0.095f || remainingMs <= (crossfadeMs + 1200L))
 
                         val shouldTriggerCrossfadeWindow = remainingMs in 300L..crossfadeMs
 
                         if (canOverlapNext && player.isPlaying && (shouldTriggerCrossfadeWindow || shouldTriggerEarlyOutro)) {
                             crossfadeTriggeredForTrackId = curTrackId
                             isTransitioningTrack = true
-                            if (_isDjEqCurveEnabled.value) {
-                                effectManager.setDjAutomixTransition(true, 0.55f)
+                            if (_isDjEqCurveEnabled.value && isCurrentLocal) {
+                                effectManager.setDjAutomixTransition(true, 0.35f)
                             }
                             playerScope.launch(Dispatchers.Main) {
                                 handleTrackEnded(isAutoCrossfadeOverlap = true)

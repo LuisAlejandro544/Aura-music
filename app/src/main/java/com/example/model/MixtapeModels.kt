@@ -111,3 +111,34 @@ data class MixtapeMetadata(
         }
     }
 }
+
+/**
+ * Estilos de Auto-Remix / Mashup Inteligente para 2 canciones locales.
+ */
+enum class AutoRemixStyle(
+    val title: String,
+    val badge: String,
+    val description: String
+) {
+    VOCAL_MASHUP(
+        title = "Mashup (Voz A + Base B)",
+        badge = "MASHUP",
+        description = "Extrae la presencia vocal central de la Canción A y la superpone sobre la base rítmica e instrumental de la Canción B."
+    ),
+    DJ_ALTERNATING_REMIX(
+        title = "Remix Alternado DJ (Beat-Sync)",
+        badge = "DJ REMIX",
+        description = "Estructura ambas canciones en bloques dinámicos alternados (Intro A → Drop B → Coro A → Cierre B) con ajuste armónico de ritmo."
+    )
+}
+
+/**
+ * Recomendación del algoritmo Auto-Match al emparejar automáticamente 2 canciones locales.
+ */
+data class AutoRemixPairRecommendation(
+    val trackA: Track,
+    val trackB: Track,
+    val compatibilityPercent: Int,
+    val reason: String
+)
+

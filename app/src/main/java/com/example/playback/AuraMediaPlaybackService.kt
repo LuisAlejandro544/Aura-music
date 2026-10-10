@@ -28,6 +28,22 @@ import com.example.debug.AuraDebugManager
  */
 class AuraMediaPlaybackService : MediaSessionService() {
 
+    override fun attachBaseContext(newBase: Context?) {
+        try {
+            newBase?.applicationContext?.resources
+        } catch (_: Throwable) {}
+        super.attachBaseContext(newBase)
+    }
+
+    override fun getResources(): android.content.res.Resources {
+        val appCtx = applicationContext
+        return if (appCtx != null && appCtx !== this) {
+            appCtx.resources
+        } else {
+            super.getResources()
+        }
+    }
+
     @OptIn(UnstableApi::class)
     override fun onCreate() {
         super.onCreate()
@@ -133,24 +149,8 @@ class AuraMediaPlaybackService : MediaSessionService() {
         }
         super.onDestroy()
 
-        // Mitigar la fuga de memoria del sistema Android (ResourcesImpl.mAppContext -> ContextImpl -> Service)
-        // Redirigir cualquier referencia estática residual hacia el ApplicationContext de ciclo de vida del proceso
-        try {
-            val resourcesImplClass = Class.forName("android.content.res.ResourcesImpl")
-            val fields = resourcesImplClass.declaredFields
-            for (field in fields) {
-                if (field.name == "mAppContext") {
-                    field.isAccessible = true
-                    val currentVal = field.get(null)
-                    if (currentVal === baseContext || currentVal === this) {
-                        field.set(null, applicationContext)
-                    }
-                    break
-                }
-            }
-        } catch (_: Throwable) {
-            // Protección ante entornos restrictivos
-        }
+        // Desvincular ContextImpl.mOuterContext -> AuraMediaPlaybackService y limpiar ResourcesImpl.mAppContext
+        com.example.AuraApplication.detachServiceFromContextImplAndOemResources(this)
 
         AuraDebugManager.logInfo(
             "AuraMediaPlaybackService",

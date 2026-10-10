@@ -87,17 +87,17 @@ fun LazyListScope.mainSettingsMenuContent(
         Spacer(modifier = Modifier.height(12.dp))
     }
 
-    // 2. Aura Dinámica (1s), Video, Fondo de Galería y Modo Juego
+    // 2. Aura Dinámica, Streaming & Modo Juego (Menú de 4 Sub-Apartados)
     item {
         val auraStatus = if (isDynamicArtworkColorEnabled) "Aura Dinámica (1s)" else "Aura Dinámica OFF"
         val wallpaperStatus = if (appWallpaperConfig.hasValidMedia) "Fondo Galería activo" else "Fondo OLED"
         val gameModeStatus = if (isBackgroundGameModeEnabled) "Modo Juego ON" else "Modo Juego OFF"
         SettingsNavigationCard(
             icon = Icons.Default.Videocam,
-            title = "Aura Dinámica, Fondo de Galería & Modo Juego",
-            subtitle = "$auraStatus • $wallpaperStatus • $gameModeStatus",
+            title = "Aura Dinámica, Streaming & Modo Juego",
+            subtitle = "Streaming y Caché • $auraStatus • $gameModeStatus • $wallpaperStatus",
             iconTint = MaterialTheme.colorScheme.secondary,
-            badgeText = if (appWallpaperConfig.hasValidMedia) "FONDO" else if (isBackgroundGameModeEnabled) "JUEGO" else null,
+            badgeText = "4 OPCIONES",
             badgeColor = MaterialTheme.colorScheme.secondary,
             onClick = onOpenVisualBehavior,
             testTag = "settings_nav_visual_behavior"
@@ -219,36 +219,102 @@ fun LazyListScope.mainSettingsMenuContent(
     }
 }
 
-fun LazyListScope.visualCustomizationSettingsContent(
+/**
+ * Menú intermedio con 4 tarjetas navegables para el apartado "Aura Dinámica, Streaming & Modo Juego",
+ * evitando tener todas las opciones y controles apretados en una sola pantalla.
+ */
+fun LazyListScope.visualBehaviorMenuSection(
+    isDynamicArtworkColorEnabled: Boolean,
+    isMiniPlayerVideoEnabled: Boolean,
+    isBackgroundGameModeEnabled: Boolean,
+    appWallpaperConfig: AppWallpaperConfig,
+    streamingCacheConfig: com.example.model.StreamingCacheConfig,
+    onOpenStreamingAndCache: () -> Unit,
+    onOpenAuraAndMiniPlayer: () -> Unit,
+    onOpenGameMode: () -> Unit,
+    onOpenGalleryWallpaper: () -> Unit
+) {
+    // 1. Streaming & Caché Inteligente
+    item {
+        SettingsNavigationCard(
+            icon = Icons.Default.Videocam,
+            title = "Streaming & Caché Inteligente",
+            subtitle = "${streamingCacheConfig.videoNetworkPolicy.title} • Caché máx: ${streamingCacheConfig.maxCacheSizeMb} MB (${streamingCacheConfig.usedMbFormatted} en uso)",
+            iconTint = MaterialTheme.colorScheme.primary,
+            badgeText = "${streamingCacheConfig.maxCacheSizeMb} MB",
+            badgeColor = MaterialTheme.colorScheme.primary,
+            onClick = onOpenStreamingAndCache,
+            testTag = "visual_subtab_streaming_cache"
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+    }
+
+    // 2. Aura Dinámica (1s) & Video en Mini Reproductor
+    item {
+        val activeCount = listOf(isDynamicArtworkColorEnabled, isMiniPlayerVideoEnabled).count { it }
+        val auraDesc = if (isDynamicArtworkColorEnabled) "Color reactivo cada 1s activo" else "Color reactivo OFF"
+        val miniDesc = if (isMiniPlayerVideoEnabled) "Video en MiniPlayer ON" else "Video en MiniPlayer OFF"
+        SettingsNavigationCard(
+            icon = Icons.Default.Palette,
+            title = "Aura Dinámica (1s) & Mini Reproductor",
+            subtitle = "$auraDesc • $miniDesc",
+            iconTint = MaterialTheme.colorScheme.secondary,
+            badgeText = if (activeCount > 0) "$activeCount/2 ON" else "OFF",
+            badgeColor = MaterialTheme.colorScheme.secondary,
+            onClick = onOpenAuraAndMiniPlayer,
+            testTag = "visual_subtab_aura_miniplayer"
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+    }
+
+    // 3. Modo Juego / Ahorro en 2do Plano
+    item {
+        SettingsNavigationCard(
+            icon = Icons.Default.SportsEsports,
+            title = "Modo Juego / Ahorro en 2do Plano",
+            subtitle = if (isBackgroundGameModeEnabled) {
+                "Activo • Libera GPU, decodificador de video y visualizador al minimizar la app para jugar"
+            } else {
+                "Desactivado • Los recursos visuales permanecen activos en segundo plano"
+            },
+            iconTint = MaterialTheme.colorScheme.primary,
+            badgeText = if (isBackgroundGameModeEnabled) "ACTIVO" else "OFF",
+            badgeColor = MaterialTheme.colorScheme.primary,
+            onClick = onOpenGameMode,
+            testTag = "visual_subtab_game_mode"
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+    }
+
+    // 4. Fondo de Pantalla de Galería (Imagen WebP o Video corto MP4)
+    item {
+        val wallpaperSummary = if (appWallpaperConfig.hasValidMedia) {
+            "Activo: ${appWallpaperConfig.mediaType.label} • ${appWallpaperConfig.screenScope.label} • Blur ${appWallpaperConfig.blurRadiusDp}dp"
+        } else {
+            "Negro OLED Puro • Elige una foto (WebP) o video corto (MP4) de tu galería"
+        }
+        SettingsNavigationCard(
+            icon = Icons.Default.PermMedia,
+            title = "Fondo de Pantalla de Galería",
+            subtitle = wallpaperSummary,
+            iconTint = MaterialTheme.colorScheme.secondary,
+            badgeText = if (appWallpaperConfig.hasValidMedia) "PERSONALIZADO" else "OLED",
+            badgeColor = MaterialTheme.colorScheme.secondary,
+            onClick = onOpenGalleryWallpaper,
+            testTag = "visual_subtab_gallery_wallpaper"
+        )
+    }
+}
+
+/**
+ * Sub-apartado 2: Aura Dinámica de Carátula y Video (1s) + Video en Mini Reproductor.
+ */
+fun LazyListScope.auraAndMiniPlayerSettingsSection(
     isDynamicArtworkColorEnabled: Boolean,
     onToggleDynamicArtworkColor: (Boolean) -> Unit,
     isMiniPlayerVideoEnabled: Boolean,
-    onToggleMiniPlayerVideo: (Boolean) -> Unit,
-    isBackgroundGameModeEnabled: Boolean = true,
-    onToggleBackgroundGameMode: (Boolean) -> Unit = {},
-    appWallpaperConfig: AppWallpaperConfig = AppWallpaperConfig(),
-    onToggleWallpaperEnabled: (Boolean) -> Unit = {},
-    onSelectWallpaperImage: (Uri) -> Unit = {},
-    onSelectWallpaperVideo: (Uri) -> Unit = {},
-    onClearWallpaper: () -> Unit = {},
-    onSelectWallpaperScope: (WallpaperScreenScope) -> Unit = {},
-    onChangeWallpaperDimAlpha: (Float) -> Unit = {},
-    onChangeWallpaperBlurDp: (Int) -> Unit = {},
-    streamingCacheConfig: com.example.model.StreamingCacheConfig = com.example.model.StreamingCacheConfig(),
-    onSelectStreamingVideoPolicy: (com.example.model.StreamingVideoNetworkPolicy) -> Unit = {},
-    onChangeStreamingCacheMaxMb: (Int) -> Unit = {},
-    onClearStreamingCache: () -> Unit = {}
+    onToggleMiniPlayerVideo: (Boolean) -> Unit
 ) {
-    // Nueva Opción: Video Canvas en Streaming (Solo Wi-Fi, Siempre o Desactivado) y Caché Temporal (50MB-500MB, 30 min TTL)
-    item {
-        com.example.ui.screens.settings.components.appearance.StreamingCacheAndVideoSettingsCard(
-            cacheConfig = streamingCacheConfig,
-            onSelectVideoPolicy = onSelectStreamingVideoPolicy,
-            onChangeMaxCacheMb = onChangeStreamingCacheMaxMb,
-            onClearStreamingCache = onClearStreamingCache
-        )
-        Spacer(modifier = Modifier.height(14.dp))
-    }
     // Opción Avanzada: Aura Dinámica de Carátula y Video (1s)
     item {
         Card(
@@ -285,7 +351,7 @@ fun LazyListScope.visualCustomizationSettingsContent(
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Adapta los colores del reproductor y mini reproductor a la portada o al Video Canvas con muestreo suave cada 1 segundo (1000 ms) sin mareos visuales.",
+                        text = "Adapta los colores del reproductor y mini reproductor (música local y online por YouTube / YT Music) a la portada o al Video Canvas con muestreo suave cada 1 segundo (1000 ms).",
                         style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
                     )
                 }
@@ -361,11 +427,16 @@ fun LazyListScope.visualCustomizationSettingsContent(
                 )
             }
         }
-
-        Spacer(modifier = Modifier.height(14.dp))
     }
+}
 
-    // Opción: Modo Juego / Ahorro Inteligente en 2do Plano
+/**
+ * Sub-apartado 3: Modo Juego / Ahorro Inteligente en 2do Plano.
+ */
+fun LazyListScope.backgroundGameModeSettingsSection(
+    isBackgroundGameModeEnabled: Boolean,
+    onToggleBackgroundGameMode: (Boolean) -> Unit
+) {
     item {
         Card(
             shape = RoundedCornerShape(18.dp),
@@ -420,8 +491,48 @@ fun LazyListScope.visualCustomizationSettingsContent(
             }
         }
     }
+}
 
-    // Nueva Opción: Fondo de Pantalla Personalizado de Galería (Imagen WebP o Video corto MP4)
+fun LazyListScope.visualCustomizationSettingsContent(
+    isDynamicArtworkColorEnabled: Boolean,
+    onToggleDynamicArtworkColor: (Boolean) -> Unit,
+    isMiniPlayerVideoEnabled: Boolean,
+    onToggleMiniPlayerVideo: (Boolean) -> Unit,
+    isBackgroundGameModeEnabled: Boolean = true,
+    onToggleBackgroundGameMode: (Boolean) -> Unit = {},
+    appWallpaperConfig: AppWallpaperConfig = AppWallpaperConfig(),
+    onToggleWallpaperEnabled: (Boolean) -> Unit = {},
+    onSelectWallpaperImage: (Uri) -> Unit = {},
+    onSelectWallpaperVideo: (Uri) -> Unit = {},
+    onClearWallpaper: () -> Unit = {},
+    onSelectWallpaperScope: (WallpaperScreenScope) -> Unit = {},
+    onChangeWallpaperDimAlpha: (Float) -> Unit = {},
+    onChangeWallpaperBlurDp: (Int) -> Unit = {},
+    streamingCacheConfig: com.example.model.StreamingCacheConfig = com.example.model.StreamingCacheConfig(),
+    onSelectStreamingVideoPolicy: (com.example.model.StreamingVideoNetworkPolicy) -> Unit = {},
+    onChangeStreamingCacheMaxMb: (Int) -> Unit = {},
+    onClearStreamingCache: () -> Unit = {}
+) {
+    item {
+        com.example.ui.screens.settings.components.appearance.StreamingCacheAndVideoSettingsCard(
+            cacheConfig = streamingCacheConfig,
+            onSelectVideoPolicy = onSelectStreamingVideoPolicy,
+            onChangeMaxCacheMb = onChangeStreamingCacheMaxMb,
+            onClearStreamingCache = onClearStreamingCache
+        )
+        Spacer(modifier = Modifier.height(14.dp))
+    }
+    auraAndMiniPlayerSettingsSection(
+        isDynamicArtworkColorEnabled = isDynamicArtworkColorEnabled,
+        onToggleDynamicArtworkColor = onToggleDynamicArtworkColor,
+        isMiniPlayerVideoEnabled = isMiniPlayerVideoEnabled,
+        onToggleMiniPlayerVideo = onToggleMiniPlayerVideo
+    )
+    item { Spacer(modifier = Modifier.height(14.dp)) }
+    backgroundGameModeSettingsSection(
+        isBackgroundGameModeEnabled = isBackgroundGameModeEnabled,
+        onToggleBackgroundGameMode = onToggleBackgroundGameMode
+    )
     appWallpaperSettingsSection(
         wallpaperConfig = appWallpaperConfig,
         onToggleWallpaperEnabled = onToggleWallpaperEnabled,

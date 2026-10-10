@@ -265,6 +265,24 @@ class AuraDownloadService : Service() {
     private lateinit var repository: MusicRepository
     private val activeTaskCount = AtomicInteger(0)
 
+    override fun attachBaseContext(newBase: Context?) {
+        // Precalentar los recursos del ApplicationContext antes de adjuntar el ContextImpl del Service
+        // para que ROMs OEM (Xiaomi/MIUI/vivo/ColorOS) nunca registren el ContextImpl del servicio en ResourcesImpl.mAppContext.
+        try {
+            newBase?.applicationContext?.resources
+        } catch (_: Throwable) {}
+        super.attachBaseContext(newBase)
+    }
+
+    override fun getResources(): android.content.res.Resources {
+        val appCtx = applicationContext
+        return if (appCtx != null && appCtx !== this) {
+            appCtx.resources
+        } else {
+            super.getResources()
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         notificationManager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -405,20 +423,8 @@ class AuraDownloadService : Service() {
         serviceScope.cancel()
         super.onDestroy()
 
-        // Mitigar la fuga de memoria del sistema Android OEM (ResourcesImpl.mAppContext -> ContextImpl -> AuraDownloadService)
-        try {
-            val resourcesImplClass = Class.forName("android.content.res.ResourcesImpl")
-            for (field in resourcesImplClass.declaredFields) {
-                if (field.name == "mAppContext") {
-                    field.isAccessible = true
-                    val currentVal = field.get(null)
-                    if (currentVal === baseContext || currentVal === this) {
-                        field.set(null, applicationContext)
-                    }
-                    break
-                }
-            }
-        } catch (_: Throwable) {}
+        // Desvincular ContextImpl.mOuterContext -> AuraDownloadService y limpiar ResourcesImpl.mAppContext
+        AuraApplication.detachServiceFromContextImplAndOemResources(this)
     }
 
     private fun createNotificationChannels() {

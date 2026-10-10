@@ -101,8 +101,9 @@ app/
 │   │       │       │   └── ProceduralArtworkGenerator.kt   # Carátulas matemáticas procedurales
 │   │       │       ├── lyrics/                 # Motor de Letras Sincronizadas (.LRC / .TXT)
 │   │       │       │   └── LyricsManager.kt    # Descarga de letras sincronizadas LRCLIB y caché
-│   │       │       ├── mixtape/                # Motor de Fusión y Capítulos de Mixtape
-│   │       │       │   └── MixtapeEngine.kt    # Fusión FFmpeg acrossfade, collage WebP y capítulos
+│   │       │       ├── mixtape/                # Motor de Fusión Continua y Auto-Remix / Mashup de 2 Canciones Locales
+│   │       │       │   ├── MixtapeEngine.kt         # Fusión FFmpeg acrossfade, collage WebP y capítulos
+│   │       │       │   └── SmartAutoRemixEngine.kt  # Auto-Remix de 2 canciones locales (Mashup Voz A + Base B / Remix Alternado DJ) y Auto-Match
 │   │       │       ├── download/               # Acelerador de Descargas HTTP Range
 │   │       │       │   └── ChunkedStreamDownloader.kt # Descarga acelerada HTTP Range multi-bloque
 │   │       │       └── tiktok/                 # Resolución Directa de TikTok
@@ -249,7 +250,8 @@ app/
 │   │       │       │   └── SettingsDiscoveryBanner.kt # Aviso de recomendación de Ajustes para nuevos usuarios
 │   │       │       ├── dialogs/                # Diálogos Modales Globales
 │   │       │       │   ├── AppUpdateDialog.kt          # Modal de actualización automática de versión APK
-│   │       │       │   ├── CreateMixtapeDialog.kt      # Diálogo de creación de Mixtape continuo en FFmpeg
+│   │       │       │   ├── CreateMixtapeDialog.kt      # Diálogo unificado de Mixtape continuo y Auto-Remix de 2 canciones locales
+│   │       │       │   ├── AutoRemixConfigSection.kt   # Configurador modular del Auto-Remix / Mashup (Manual o Auto-Match)
 │   │       │       │   ├── DownloadFromLinkDialog.kt   # Diálogo de descarga web (YouTube/TikTok) modularizado
 │   │       │       │   ├── EditTrackDialog.kt          # Editor de metadatos, carátula WebP y Video Canvas
 │   │       │       │   ├── SearchLyricsDialog.kt       # Buscador interactivo de letras LRCLIB con versión oficial #1

@@ -103,10 +103,10 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
     - *Modo Sutil (-18 LUFS)*: Preserva el rango dinámico completo para música clásica y acústica.
     - *Modo Estándar Spotify (-14 LUFS)*: Nivel oficial de streaming Spotify, garantizando volumen consistente sin pérdida de pegada.
     - *Modo Alto (-11 LUFS)*: Sonoridad potente y constante para entornos ruidosos o altavoces portátiles.
-- **Automix Inteligente & Crossfade DJ con Curva de Ecualización en X (`DjAutomixFilter` en C++20)**:
-  - Mezcla continua y dinámica entre canciones estilo discoteca/DJ.
-  - **Detección Acústica de Outro**: Si la energía de la canción actual cae por debajo del umbral de silencio (`< 0.07f`) durante los últimos 4 segundos, salta suavemente a la siguiente pista omitiendo silencios muertos.
-  - **Curva de Ecualización DJ en X (Anti Bass Clashing)**: Atenúa progresivamente los subgraves (< 120 Hz) y agudos de la canción que finaliza para abrir espacio acústico a la canción entrante, eliminando saturaciones y choques de frecuencias bajas.
+- **Smart AutoMix Estilo Apple Music (`@jomar_oliver`) & Crossfade DJ con Curva Armónica en X (`DjAutomixFilter` en C++20 • Música Local)**:
+  - Mezcla continua y armónica entre canciones locales a punto de acabar inspirada en Apple Music AutoMix (operativa por ahora en música local, con arquitectura lista para extenderse a streaming).
+  - **Detección Acústica de Outro (*Smart Outro Cue Point*)**: Evalúa en tiempo real la caída de energía de la canción local saliente en los últimos segundos para activar el cruce superpuesto Dual-Deck en el compás más limpio omitiendo silencios muertos.
+  - **Curva Armónica en X (Bajos `<120 Hz` + Bolsillo Vocal `2.6 kHz` en C++20)**: Atenúa progresivamente los subgraves (`< 120 Hz`), abre un bolsillo en la banda vocal central (`2.6 kHz` con envolvente sinusoidal en vivo durante el cruce) y suaviza agudos extremos (`> 9.5 kHz`) de la canción saliente para evitar choques de bajos y de voces con la canción entrante.
 - **Reproducción Continua Automática y Transición Suave (Crossfade / Fade-In)**:
   - Al terminar cualquier canción, avanza y reproduce automáticamente la siguiente pista de la cola o biblioteca de forma ininterrumpida.
   - Fundido de salida progresivo al acercarse al final de la pista y rampa de entrada suave (*fade-in*) calibrada al iniciar la siguiente canción, subiendo poco a poco hasta restaurar el 100% del volumen original sin quedarse atrapado en volumen bajo.
@@ -328,6 +328,12 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
   - Al abrir la tarjeta de Karaoke durante el Mixtape, los versos corren sincronizados con auto-scroll a lo largo de todo el mix continuo.
 - **Portada Collage Oficial en WebP**:
   - Genera automáticamente una portada oficial en collage de 1 a 4 canciones en formato WebP Lossless en `images/`, integrándose como una pista completa en la biblioteca de Aura Music bajo el álbum *"Aura Mixtapes"*.
+- **Generador de Auto-Remix & Mashup con 2 Canciones Locales (`SmartAutoRemixEngine` + `AutoRemixConfigSection`)**:
+  - Disponible directamente en **Tu Biblioteca**, en la cabecera de cualquier **Playlist** y en la pestaña **Auto-Remix (2)** dentro del diálogo de Mixtapes (por ahora exclusivo para música local, más adelante para streaming).
+  - **Selección Manual o Inteligente (`Auto-Match`)**: El usuario puede elegir libremente la **Canción A** y la **Canción B** (o intercambiarlas con un toque `A ⇄ B`), o pulsar **"Elección Inteligente (Auto-Match 2 Pistas)"** para que el motor puntúe y seleccione automáticamente las 2 canciones locales con mejor compatibilidad de estructura temporal y contraste vocal.
+  - **2 Modos de Procesamiento en FFmpeg**:
+    - 🎤 **Mashup (Voz A + Base B)**: Filtra y realza la banda vocal central de la Canción A (`210 Hz – 7.2 kHz` con realce de presencia en `1.85 kHz` y `3.4 kHz`) y la superpone sobre la base rítmica e instrumental de la Canción B (refuerzo de subgraves `65 Hz / 125 Hz`, bolsillo vocal atenuado y sincronización sutil de ritmo `atempo`).
+    - 🎧 **Remix Alternado DJ con Sincronización de Ritmo (Beat-Sync)**: Estructura ambas canciones en 4 capítulos dinámicos (*Intro DJ Set A → Beat Drop B → Vocal Switch A → Outro Finale B*) con ajuste armónico de tempo y transiciones `acrossfade`, generando su carátula dividida WebP, letras `.LRC` sincronizadas y capítulos de Video Canvas en vivo.
 
 ### 14. Modo Bit-Perfect 1:1, Salida AAudio de Ultra-Baja Latencia, Formatos Especiales (DSD/APE/Chiptune) y Widget Interactivo 🔊🎛️
 - **Modo Bit-Perfect Direct Bypass & Motor Nativo AAudio en ISO C++20 (`dsp_bitperfect.h`)**:

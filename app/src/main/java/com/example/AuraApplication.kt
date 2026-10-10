@@ -46,12 +46,93 @@ class AuraApplication : Application() {
         fun shouldSuspendBackgroundVisuals(): Boolean {
             return !_isAppInForegroundFlow.value && isBackgroundGameModeEnabled
         }
+
+        /**
+         * Mitiga de raíz la fuga de memoria reportada en ROMs OEM (Xiaomi/MIUI/HyperOS, vivo, ColorOS):
+         * `ResourcesImpl.mAppContext -> ContextImpl.mOuterContext -> Service`.
+         *
+         * En Android 9+, `ResourcesImpl.mAppContext` suele estar en la lista restringida de APIs ocultas,
+         * pero `ContextImpl` expone `setOuterContext(Context)` / `mOuterContext` dentro de la jerarquía
+         * del `baseContext` del servicio. Al reasignar `mOuterContext` hacia `applicationContext` al
+         * destruirse el servicio, aunque `ResourcesImpl.mAppContext` conserve el `ContextImpl` en memoria
+         * estática, la instancia del `Service` queda 100% desvinculada y libre para el Garbage Collector.
+         */
+        fun detachServiceFromContextImplAndOemResources(service: android.app.Service) {
+            val appCtx = service.applicationContext ?: return
+            // 1. Precalentar / anclar recursos globales sobre el ApplicationContext
+            try {
+                appCtx.resources
+            } catch (_: Throwable) {}
+
+            // 2. Desenvolver cualquier ContextWrapper hasta alcanzar android.app.ContextImpl
+            //    y redirigir mOuterContext -> applicationContext
+            try {
+                var currentCtx: android.content.Context? = service.baseContext
+                var depth = 0
+                while (currentCtx != null && depth < 10) {
+                    if (currentCtx.javaClass.name == "android.app.ContextImpl") {
+                        // Intentar primero el método interno setOuterContext(Context)
+                        var updated = false
+                        try {
+                            val setOuterMethod = currentCtx.javaClass.getDeclaredMethod(
+                                "setOuterContext",
+                                android.content.Context::class.java
+                            )
+                            setOuterMethod.isAccessible = true
+                            setOuterMethod.invoke(currentCtx, appCtx)
+                            updated = true
+                        } catch (_: Throwable) {}
+
+                        // Respaldo por reflexión directa sobre el campo mOuterContext
+                        if (!updated) {
+                            try {
+                                val outerField = currentCtx.javaClass.getDeclaredField("mOuterContext")
+                                outerField.isAccessible = true
+                                val currentOuter = outerField.get(currentCtx)
+                                if (currentOuter === service) {
+                                    outerField.set(currentCtx, appCtx)
+                                }
+                            } catch (_: Throwable) {}
+                        }
+                        break
+                    }
+                    currentCtx = if (currentCtx is android.content.ContextWrapper) {
+                        currentCtx.baseContext
+                    } else {
+                        null
+                    }
+                    depth++
+                }
+            } catch (_: Throwable) {}
+
+            // 3. Limpiar también ResourcesImpl.mAppContext si la ROM permite el acceso reflexivo
+            try {
+                val resourcesImplClass = Class.forName("android.content.res.ResourcesImpl")
+                for (field in resourcesImplClass.declaredFields) {
+                    if (field.name == "mAppContext") {
+                        field.isAccessible = true
+                        val currentVal = field.get(null)
+                        if (currentVal === service.baseContext || currentVal === service) {
+                            field.set(null, appCtx)
+                        }
+                        break
+                    }
+                }
+            } catch (_: Throwable) {}
+        }
     }
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
         super.onCreate()
+        // Anclar desde el primer milisegundo ResourcesImpl.mAppContext al contexto de la aplicación
+        // para evitar que el primer acceso a recursos ocurra dentro de un Service efímero.
+        try {
+            applicationContext.resources
+            resources
+        } catch (_: Throwable) {}
+
         val uiPrefs = getSharedPreferences("aura_music_ui_prefs", MODE_PRIVATE)
         isBackgroundGameModeEnabled = uiPrefs.getBoolean("pref_background_game_mode_enabled", true)
 

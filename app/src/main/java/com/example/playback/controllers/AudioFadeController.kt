@@ -90,6 +90,7 @@ class AudioFadeController(
         durationMs: Long,
         outgoingPlayer: ExoPlayer?,
         incomingPlayer: ExoPlayer?,
+        onProgressStep: ((Float) -> Unit)? = null,
         onCrossfadeCompleted: () -> Unit = {}
     ) {
         val inPlayer = incomingPlayer ?: return
@@ -124,6 +125,7 @@ class AudioFadeController(
                     }
                 } catch (_: Throwable) {}
 
+                onProgressStep?.invoke(t)
                 delay(stepDelay)
             }
 

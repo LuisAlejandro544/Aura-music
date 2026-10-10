@@ -239,7 +239,7 @@ fun TransitionsTabContent(
             }
         }
 
-        // Tarjeta 2: Automix Inteligente & Crossfade DJ con Curva de Ecualización
+        // Tarjeta 2: Smart AutoMix (Estilo Apple Music • Música Local) & Crossfade Dual-Deck con Curva Armónica
         Surface(
             shape = RoundedCornerShape(16.dp),
             color = SurfaceCard,
@@ -263,15 +263,31 @@ fun TransitionsTabContent(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Column {
-                            Text(
-                                text = "Automix DJ & Crossfade Dual-Deck (Estudio)",
-                                style = MaterialTheme.typography.titleSmall.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = TextPrimary
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "Smart AutoMix (Estilo Apple Music)",
+                                    style = MaterialTheme.typography.titleSmall.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = TextPrimary
+                                    )
                                 )
-                            )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = Color(0xFF10B981).copy(alpha = 0.18f)
+                                ) {
+                                    Text(
+                                        text = "LOCAL",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF10B981)
+                                        ),
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
                             Text(
-                                text = "Mezcla superpuesta real de doble reproductor (sin/cos de igual potencia): cuando una canción baja, la siguiente empieza al mismo tiempo sin pausas.",
+                                text = "Detecta el outro acústico de la canción local a punto de acabar y mezcla la siguiente pista en Dual-Deck (sin/cos de igual potencia) sin pausas.",
                                 style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
                             )
                         }
@@ -290,7 +306,7 @@ fun TransitionsTabContent(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Curva de Ecualización DJ en X
+                // Curva Armónica de Ecualización DJ en X (Bajos + Bolsillo Vocal C++20)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -298,14 +314,14 @@ fun TransitionsTabContent(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Curva de Ecualización DJ en X",
+                            text = "Curva Armónica en X (Bajos & Bolsillo Vocal)",
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 fontWeight = FontWeight.SemiBold,
                                 color = TextPrimary
                             )
                         )
                         Text(
-                            text = "Atenúa progresivamente los subgraves (<120 Hz) de la canción que termina para evitar choques de bajos con la entrante.",
+                            text = "Atenúa subgraves (<120 Hz) y abre un bolsillo vocal en 2.6 kHz durante el cruce para que las voces y el ritmo entrante no choquen.",
                             style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
                         )
                     }
@@ -335,7 +351,7 @@ fun TransitionsTabContent(
                     Text(
                         text = when {
                             crossfadeSeconds > 0 -> "${crossfadeSeconds}s (Superpuesto)"
-                            isDjAutomixEnabled -> "5s Auto (DJ Mix)"
+                            isDjAutomixEnabled -> "6s Auto (Smart AutoMix)"
                             else -> "Desactivado (Directo)"
                         },
                         style = MaterialTheme.typography.bodySmall.copy(

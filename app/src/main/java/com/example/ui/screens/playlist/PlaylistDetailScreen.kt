@@ -53,6 +53,7 @@ fun PlaylistDetailScreen(
     onEditTrack: (Long, String, String, String) -> Unit = { _, _, _, _ -> },
     onEditTrackDetails: (Long, String, String, String, android.net.Uri?, Boolean) -> Unit = { _, _, _, _, _, _ -> },
     onCreateMixtape: ((List<Track>, String, Int, ((Track) -> Unit)?) -> Unit)? = null,
+    onCreateAutoRemix: ((Track, Track, String, com.example.model.AutoRemixStyle, Int, ((Track) -> Unit)?) -> Unit)? = null,
     isCreatingMixtape: Boolean = false,
     mixtapeProgress: Float = 0f,
     mixtapeStatusMessage: String? = null,
@@ -77,6 +78,7 @@ fun PlaylistDetailScreen(
     var trackSearchQuery by remember { mutableStateOf("") }
 
     var showCreateMixtapeDialog by remember { mutableStateOf(false) }
+    var openMixtapeInAutoRemixMode by remember { mutableStateOf(false) }
     var createdMixtapeTrack by remember { mutableStateOf<Track?>(null) }
 
     val availableToAdd = remember(allTracks, tracks, trackSearchQuery) {
@@ -272,29 +274,58 @@ fun PlaylistDetailScreen(
                 }
             }
 
-            // Botón destacado de Creación de Mixtape Continuo con Crossfade
+            // Botones destacados de Creación de Mixtape Continuo y Auto-Remix / Mashup de 2 Canciones Locales
             if (tracks.size >= 2) {
                 Spacer(modifier = Modifier.height(10.dp))
-                FilledTonalButton(
-                    onClick = {
-                        createdMixtapeTrack = null
-                        showCreateMixtapeDialog = true
-                    },
-                    shape = RoundedCornerShape(20.dp),
-                    colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f),
-                        contentColor = MaterialTheme.colorScheme.secondary
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("create_mixtape_btn")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(Icons.Default.AllInclusive, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Crear Mixtape Continuo (${tracks.size} pistas)",
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
-                    )
+                    FilledTonalButton(
+                        onClick = {
+                            createdMixtapeTrack = null
+                            openMixtapeInAutoRemixMode = false
+                            showCreateMixtapeDialog = true
+                        },
+                        shape = RoundedCornerShape(20.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f),
+                            contentColor = MaterialTheme.colorScheme.secondary
+                        ),
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("create_mixtape_btn")
+                    ) {
+                        Icon(Icons.Default.AllInclusive, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Mixtape (${tracks.size})",
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                        )
+                    }
+
+                    FilledTonalButton(
+                        onClick = {
+                            createdMixtapeTrack = null
+                            openMixtapeInAutoRemixMode = true
+                            showCreateMixtapeDialog = true
+                        },
+                        shape = RoundedCornerShape(20.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
+                            contentColor = MaterialTheme.colorScheme.primary
+                        ),
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("create_autoremix_playlist_btn")
+                    ) {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Auto-Remix (2)",
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                        )
+                    }
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -458,7 +489,7 @@ fun PlaylistDetailScreen(
         )
     }
 
-    // Cuadro de diálogo para crear Mixtape continuo con FFmpeg
+    // Cuadro de diálogo para crear Mixtape continuo o Auto-Remix de 2 canciones locales con FFmpeg
     if (showCreateMixtapeDialog) {
         com.example.ui.components.CreateMixtapeDialog(
             initialTitle = "${playlist.name} (Continuous Mix)",
@@ -475,6 +506,12 @@ fun PlaylistDetailScreen(
                     createdMixtapeTrack = created
                 }
             },
+            onCreateAutoRemix = { trackA, trackB, title, style, crossfadeSec ->
+                onCreateAutoRemix?.invoke(trackA, trackB, title, style, crossfadeSec) { created ->
+                    createdMixtapeTrack = created
+                }
+            },
+            initialModeAutoRemix = openMixtapeInAutoRemixMode,
             createdTrack = createdMixtapeTrack,
             onPlayCreatedTrack = { created ->
                 onTrackClick(created, listOf(created))
