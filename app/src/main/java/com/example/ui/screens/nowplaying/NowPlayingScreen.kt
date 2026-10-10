@@ -203,8 +203,12 @@ fun NowPlayingScreen(
     }
 
     val isVideoVisual = (videoDisplayMode != VideoDisplayMode.OFF) && !currentTrack.videoUri.isNullOrEmpty()
+    val liveVideoSnapshot by ArtworkColorExtractor.liveVideoColorsFlow.collectAsStateWithLifecycle()
+    var activeSampleIntervalMs by remember {
+        mutableLongStateOf(ArtworkColorExtractor.getAdaptiveSampleIntervalMs(context))
+    }
 
-    // Extracción armónica de color una sola vez por pista/video (sin invocar MediaMetadataRetriever cada segundo)
+    // Extracción inicial y respaldo reactivo cuando cambia la pista, modo de video o preferencia
     LaunchedEffect(
         currentTrack.id,
         currentTrack.albumArtPath,
@@ -212,6 +216,7 @@ fun NowPlayingScreen(
         videoDisplayMode,
         isDynamicArtworkColorEnabled
     ) {
+        activeSampleIntervalMs = ArtworkColorExtractor.getAdaptiveSampleIntervalMs(context)
         activeColors = ArtworkColorExtractor.extractPlaybackColors(
             context = context,
             track = currentTrack,
@@ -219,23 +224,40 @@ fun NowPlayingScreen(
             isDynamicEnabled = isDynamicArtworkColorEnabled,
             fallbackPrimary = fallbackPrimary,
             fallbackSecondary = fallbackSecondary,
-            positionMs = currentPositionMs
+            positionMs = currentPositionFlow?.value ?: currentPositionMs
         )
+    }
+
+    // Recibir instantáneamente cada cambio de paleta emitido en tiempo real por el TextureView del video
+    LaunchedEffect(liveVideoSnapshot, isVideoVisual, isDynamicArtworkColorEnabled, currentTrack.videoUri) {
+        if (isDynamicArtworkColorEnabled && isVideoVisual) {
+            val snapshot = liveVideoSnapshot
+            if (snapshot != null && snapshot.videoUri == currentTrack.videoUri) {
+                activeSampleIntervalMs = snapshot.sampleIntervalMs
+                activeColors = snapshot.colors
+            }
+        }
+    }
+
+    val colorTransitionDurationMs = if (isVideoVisual && isDynamicArtworkColorEnabled) {
+        if (activeSampleIntervalMs <= ArtworkColorExtractor.INTERVAL_NORMAL_MS) 180 else 650
+    } else {
+        400
     }
 
     val animatedPrimary by animateColorAsState(
         targetValue = activeColors.primary,
-        animationSpec = tween(400),
+        animationSpec = tween(colorTransitionDurationMs),
         label = "PrimaryAuraColor"
     )
     val animatedSecondary by animateColorAsState(
         targetValue = activeColors.secondary,
-        animationSpec = tween(400),
+        animationSpec = tween(colorTransitionDurationMs),
         label = "SecondaryAuraColor"
     )
     val animatedTopGlow by animateColorAsState(
         targetValue = activeColors.ambientTopGlow,
-        animationSpec = tween(400),
+        animationSpec = tween(colorTransitionDurationMs),
         label = "TopAuraGlow"
     )
 

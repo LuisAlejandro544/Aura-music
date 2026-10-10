@@ -138,12 +138,26 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
         )
     }
 
-    LaunchedEffect(effectiveTrack?.id, effectiveTrack?.albumArtPath, effectiveTrack?.videoUri, isDynamicArtworkColorEnabled) {
-        if (effectiveTrack != null && isDynamicArtworkColorEnabled) {
-            val isVideo = (videoDisplayMode != VideoDisplayMode.OFF) && !effectiveTrack.videoUri.isNullOrEmpty()
+    val liveVideoSnapshot by ArtworkColorExtractor.liveVideoColorsFlow.collectAsStateWithLifecycle()
+    var miniSampleIntervalMs by remember {
+        mutableLongStateOf(ArtworkColorExtractor.getAdaptiveSampleIntervalMs(context))
+    }
+
+    LaunchedEffect(
+        effectiveTrack?.id,
+        effectiveTrack?.albumArtPath,
+        effectiveTrack?.videoUri,
+        videoDisplayMode,
+        isMiniPlayerVideoEnabled,
+        isDynamicArtworkColorEnabled
+    ) {
+        val track = effectiveTrack
+        if (track != null && isDynamicArtworkColorEnabled) {
+            val isVideo = ((videoDisplayMode != VideoDisplayMode.OFF) || isMiniPlayerVideoEnabled) && !track.videoUri.isNullOrEmpty()
+            miniSampleIntervalMs = ArtworkColorExtractor.getAdaptiveSampleIntervalMs(context)
             miniPlayerColors = ArtworkColorExtractor.extractPlaybackColors(
                 context = context,
-                track = effectiveTrack,
+                track = track,
                 isVideoActive = isVideo,
                 isDynamicEnabled = isDynamicArtworkColorEnabled,
                 fallbackPrimary = defaultMiniPrimary,
@@ -160,14 +174,71 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
         }
     }
 
+    // Reacción en tiempo real en el MiniPlayer cuando el Video Canvas emite cambios de escena
+    LaunchedEffect(
+        liveVideoSnapshot,
+        effectiveTrack?.videoUri,
+        videoDisplayMode,
+        isMiniPlayerVideoEnabled,
+        isDynamicArtworkColorEnabled
+    ) {
+        val track = effectiveTrack
+        val isVideo = track != null && ((videoDisplayMode != VideoDisplayMode.OFF) || isMiniPlayerVideoEnabled) && !track.videoUri.isNullOrEmpty()
+        if (isDynamicArtworkColorEnabled && isVideo) {
+            val snapshot = liveVideoSnapshot
+            if (snapshot != null && snapshot.videoUri == track?.videoUri) {
+                miniSampleIntervalMs = snapshot.sampleIntervalMs
+                miniPlayerColors = snapshot.colors
+            }
+        }
+    }
+
+    // Respaldo periódico para cuando el MiniPlayer tiene la miniatura de video oculta pero la canción tiene video activo
+    LaunchedEffect(
+        effectiveTrack?.id,
+        effectiveTrack?.videoUri,
+        isPlaying,
+        isNowPlayingExpanded,
+        isMiniPlayerVideoEnabled,
+        videoDisplayMode,
+        isDynamicArtworkColorEnabled
+    ) {
+        val track = effectiveTrack
+        val hasVideo = track != null && !track.videoUri.isNullOrEmpty()
+        val isVideoColorActive = hasVideo && (videoDisplayMode != VideoDisplayMode.OFF)
+        val hasActiveTextureSampler = isNowPlayingExpanded || isMiniPlayerVideoEnabled
+        if (track != null && isDynamicArtworkColorEnabled && isVideoColorActive && !hasActiveTextureSampler && isPlaying) {
+            while (true) {
+                val intervalMs = ArtworkColorExtractor.getAdaptiveSampleIntervalMs(context)
+                miniSampleIntervalMs = intervalMs
+                miniPlayerColors = ArtworkColorExtractor.extractPlaybackColors(
+                    context = context,
+                    track = track,
+                    isVideoActive = true,
+                    isDynamicEnabled = true,
+                    fallbackPrimary = defaultMiniPrimary,
+                    fallbackSecondary = defaultMiniSecondary,
+                    positionMs = viewModel.currentPosition.value
+                )
+                kotlinx.coroutines.delay(intervalMs)
+            }
+        }
+    }
+
+    val miniTransitionDurationMs = if (isDynamicArtworkColorEnabled && !effectiveTrack?.videoUri.isNullOrEmpty()) {
+        if (miniSampleIntervalMs <= ArtworkColorExtractor.INTERVAL_NORMAL_MS) 180 else 650
+    } else {
+        500
+    }
+
     val animatedMiniPrimary by animateColorAsState(
         targetValue = miniPlayerColors.primary,
-        animationSpec = tween(600),
+        animationSpec = tween(miniTransitionDurationMs),
         label = "MiniPlayerPrimary"
     )
     val animatedMiniSecondary by animateColorAsState(
         targetValue = miniPlayerColors.secondary,
-        animationSpec = tween(600),
+        animationSpec = tween(miniTransitionDurationMs),
         label = "MiniPlayerSecondary"
     )
 

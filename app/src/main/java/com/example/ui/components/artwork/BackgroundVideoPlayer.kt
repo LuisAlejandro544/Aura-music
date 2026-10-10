@@ -33,22 +33,46 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.example.R
 import com.example.model.Track
+import com.example.ui.theme.ArtworkColorExtractor
 import com.example.ui.theme.CardBorder
+import com.example.ui.theme.ExtractedArtworkColors
+import android.view.TextureView
+import android.view.View
+import androidx.compose.material3.MaterialTheme
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import java.io.File
 import kotlin.math.abs
 
 /**
- * Componente de reproducción de Video de Fondo (Canvas / Video Sincronizado) con aceleración GPU sin colisiones.
+ * Busca recursivamente el [TextureView] interno dentro de la jerarquía de [PlayerView].
+ */
+private fun findInternalTextureView(view: View?): TextureView? {
+    if (view == null) return null
+    if (view is TextureView) return view
+    if (view is ViewGroup) {
+        for (i in 0 until view.childCount) {
+            val found = findInternalTextureView(view.getChildAt(i))
+            if (found != null) return found
+        }
+    }
+    return null
+}
+
+/**
+ * Componente de reproducción de Video de Fondo (Canvas / Video Sincronizado) con aceleración GPU sin colisiones
+ * y muestreo cromático en tiempo real adaptativo por batería.
  *
  * Arquitectura Anti-Lag para Grabación de Pantalla y Multitarea:
  * 1. Usa TextureView (`app:surface_type="texture_view"`) en lugar de SurfaceView para integrarse directamente
  *    en el árbol HWUI/Skia de Jetpack Compose, evitando que SurfaceFlinger y el VirtualDisplay del grabador
- *    de pantalla sufran bloqueos de BufferQueue al aplicar recortes (clip) o transiciones de opacidad (alpha).
+ *    de pantalla sufran bloqueos de BufferQueue al aplicar recortes (clip) o transiciones de opacidad (alpha),
+ *    y permitiendo extraer micro-bitmaps (24x24) en <1ms sin abrir un segundo MediaCodec.
  * 2. Desactiva por completo el renderizador de audio (`C.TRACK_TYPE_AUDIO`) en el reproductor de video de fondo
  *    para que jamás instancie un segundo decodificador de audio ni compita con el motor DSP C++20 principal.
- * 3. Habilita `enableDecoderFallback = true` y operación asíncrona de MediaCodec junto con `SeekParameters.CLOSEST_SYNC`
- *    y ventana de tolerancia de 1850ms con cooldown de 1500ms, erradicando el bucle de micro-seeks que congelaba
- *    la imagen cuando el grabador de pantalla estaba activo.
+ * 3. Muestreo Cromático Adaptativo en Tiempo Real:
+ *    - **180 ms** cuando el teléfono tiene **> 15% de batería** y el modo ahorro de energía está desactivado.
+ *    - **800 ms** cuando el teléfono tiene **<= 15% de batería** o el modo ahorro de energía está activado.
  */
 @OptIn(UnstableApi::class)
 @Composable
@@ -62,9 +86,13 @@ fun BackgroundVideoPlayer(
     placeholderTrack: Track? = null,
     modifier: Modifier = Modifier,
     cornerRadius: androidx.compose.ui.unit.Dp = 24.dp,
-    fitHorizontalInFullscreen: Boolean = false
+    fitHorizontalInFullscreen: Boolean = false,
+    enableLiveColorSampling: Boolean = true,
+    onLiveColorsExtracted: ((ExtractedArtworkColors, Long) -> Unit)? = null
 ) {
     val context = LocalContext.current
+    val fallbackPrimary = MaterialTheme.colorScheme.primary
+    val fallbackSecondary = MaterialTheme.colorScheme.secondary
     var isFirstFrameRendered by remember(videoUriString) { mutableStateOf(false) }
     var videoDimensions by remember(videoUriString) { mutableStateOf<Pair<Int, Int>?>(null) }
 
@@ -169,6 +197,44 @@ fun BackgroundVideoPlayer(
             videoPlayer.play()
         } else {
             videoPlayer.pause()
+        }
+    }
+
+    // Muestreo cromático en tiempo real desde el TextureView con frecuencia adaptativa por batería:
+    // - 180 ms cuando la batería es > 15% y no está activo el ahorro de batería
+    // - 800 ms cuando la batería es <= 15% o está activo el ahorro de batería
+    LaunchedEffect(videoUriString, isFirstFrameRendered, isPlaying, enableLiveColorSampling) {
+        if (!enableLiveColorSampling || !isFirstFrameRendered) return@LaunchedEffect
+
+        var sampledOnceWhenPaused = false
+        while (isActive) {
+            val intervalMs = ArtworkColorExtractor.getAdaptiveSampleIntervalMs(context)
+            if (isPlaying || !sampledOnceWhenPaused) {
+                val textureView = (playerViewRef?.videoSurfaceView as? TextureView)
+                    ?: findInternalTextureView(playerViewRef)
+                if (textureView != null && textureView.isAvailable && textureView.width > 0 && textureView.height > 0) {
+                    val microBitmap = try {
+                        textureView.getBitmap(24, 24)
+                    } catch (_: Throwable) {
+                        null
+                    }
+                    if (microBitmap != null) {
+                        val extracted = ArtworkColorExtractor.extractColorsFromVideoFrame(
+                            frameBitmap = microBitmap,
+                            trackId = placeholderTrack?.id,
+                            videoUri = videoUriString,
+                            fallbackPrimary = fallbackPrimary,
+                            fallbackSecondary = fallbackSecondary,
+                            sampleIntervalMs = intervalMs
+                        )
+                        if (extracted != null) {
+                            onLiveColorsExtracted?.invoke(extracted, intervalMs)
+                            sampledOnceWhenPaused = true
+                        }
+                    }
+                }
+            }
+            delay(intervalMs)
         }
     }
 
