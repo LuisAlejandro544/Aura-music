@@ -179,6 +179,7 @@ fun NowPlayingScreen(
     nowPlayingDesignMode: NowPlayingDesignMode = NowPlayingDesignMode.AUTO,
     onSetNowPlayingDesignMode: (NowPlayingDesignMode) -> Unit = {},
     collectionContextTitle: String = "Tu Biblioteca",
+    onDownloadStreamingTrack: ((Track) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     BackHandler {
@@ -373,7 +374,10 @@ fun NowPlayingScreen(
                 onOpenLyrics = { showLyrics = true },
                 onOpenFullScreenLyrics = { isFullScreenLyricsOpen = true },
                 onOpenDetails = { showDetailsDialog = true },
-                collectionContextTitle = collectionContextTitle
+                collectionContextTitle = collectionContextTitle,
+                onDownloadStreamingTrack = if (currentTrack.isStreamingTrack && onDownloadStreamingTrack != null) {
+                    { onDownloadStreamingTrack(currentTrack) }
+                } else null
             )
         } else {
             Column(
@@ -402,7 +406,10 @@ fun NowPlayingScreen(
                     onToggleLyrics = { showLyrics = !showLyrics },
                     isABLoopActive = abLoopState.isLoopingActive,
                     isVocalClarityActive = vocalClarityConfig.enabled,
-                    onOpenDesignSelector = { showDesignSelectorDialog = true }
+                    onOpenDesignSelector = { showDesignSelectorDialog = true },
+                    onDownloadStreamingTrack = if (currentTrack.isStreamingTrack && onDownloadStreamingTrack != null) {
+                        { onDownloadStreamingTrack(currentTrack) }
+                    } else null
                 )
 
             Spacer(modifier = Modifier.weight(0.5f))

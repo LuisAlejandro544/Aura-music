@@ -47,6 +47,7 @@ fun NowPlayingTopBar(
     isABLoopActive: Boolean = false,
     isVocalClarityActive: Boolean = false,
     onOpenDesignSelector: (() -> Unit)? = null,
+    onDownloadStreamingTrack: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val hasVideo = !currentTrack.videoUri.isNullOrEmpty()
@@ -59,24 +60,50 @@ fun NowPlayingTopBar(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconButton(
-            onClick = onCollapse,
-            modifier = Modifier
-                .size(48.dp)
-                .testTag("now_playing_collapse_btn")
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Icon(
-                imageVector = Icons.Default.KeyboardArrowDown,
-                contentDescription = "Ocultar reproductor",
-                tint = TextPrimary,
-                modifier = Modifier.size(32.dp)
-            )
+            IconButton(
+                onClick = onCollapse,
+                modifier = Modifier
+                    .size(48.dp)
+                    .testTag("now_playing_collapse_btn")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.KeyboardArrowDown,
+                    contentDescription = "Ocultar reproductor",
+                    tint = TextPrimary,
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+
+            currentTrack.streamingPlatform?.let { platform ->
+                com.example.ui.screens.streaming.StreamingPlatformBadge(platform = platform)
+            }
         }
 
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
+            // Botón directo para descargar canción en streaming permanentemente a la biblioteca local
+            if (currentTrack.isStreamingTrack && onDownloadStreamingTrack != null) {
+                IconButton(
+                    onClick = onDownloadStreamingTrack,
+                    modifier = Modifier
+                        .size(42.dp)
+                        .testTag("now_playing_download_streaming_btn")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CloudDownload,
+                        contentDescription = "Descargar pista en biblioteca local",
+                        tint = animatedPrimary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
+
             // Botón de Letras Karaoke (Mic)
             IconButton(
                 onClick = onToggleLyrics,

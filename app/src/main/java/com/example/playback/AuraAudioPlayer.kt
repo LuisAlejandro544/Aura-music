@@ -105,6 +105,19 @@ class AuraAudioPlayer(
     private val nativeAudioProcessor = NativeAudioProcessor()
     private var mediaSessionBridge: MediaSessionBridge? = null
 
+    /**
+     * Interceptor opcional para resolver con la API + yt-dlp (o desde caché de 30 min)
+     * una pista de streaming antes de pasar a la canción anterior o siguiente.
+     */
+    var onStreamingTrackRequestedCallback: ((Track, Boolean) -> Boolean)? = null
+
+    /**
+     * Notificación cuando una pista de streaming entra en el último tramo para pre-consultar
+     * a la API una canción similar y resolverla con yt-dlp por adelantado.
+     */
+    var onStreamingNearEndPrefetchCallback: ((Track) -> Unit)? = null
+    private var streamingPrefetchTriggeredForId: Long = 0L
+
     companion object {
         /**
          * Referencia estática compatible con AuraMediaPlaybackService.
@@ -297,8 +310,11 @@ class AuraAudioPlayer(
         _currentPosition.value = 0L
         _duration.value = track.durationMs
         crossfadeTriggeredForTrackId = -1L
+        streamingPrefetchTriggeredForId = 0L
         abLoopController.reset()
-        if (previousTrackId != track.id) {
+        // En modo Streaming omitimos por ahora el motor C++20 DSP; en modo local lo mantenemos 100% activo
+        NativeAudioProcessor.isStreamingBypassActive = track.isStreamingTrack
+        if (previousTrackId != track.id && !track.isStreamingTrack) {
             effectManager.onTrackChanged(track.id)
         }
         effectManager.flushBuffers()
@@ -312,8 +328,14 @@ class AuraAudioPlayer(
 
         try {
             val artworkUri = if (!track.albumArtPath.isNullOrBlank()) {
-                val artFile = File(track.albumArtPath)
-                if (artFile.exists()) Uri.fromFile(artFile) else null
+                if (track.albumArtPath.startsWith("http://", ignoreCase = true) ||
+                    track.albumArtPath.startsWith("https://", ignoreCase = true)
+                ) {
+                    Uri.parse(track.albumArtPath)
+                } else {
+                    val artFile = File(track.albumArtPath)
+                    if (artFile.exists()) Uri.fromFile(artFile) else null
+                }
             } else null
 
             val mediaMetadata = MediaMetadata.Builder()
@@ -327,9 +349,18 @@ class AuraAudioPlayer(
                 }
                 .build()
 
-            val clipBounds = AudioSilenceTrimmer.getClippingBounds(context, track.uriString)
+            val clipBounds = if (track.isStreamingTrack) {
+                null
+            } else {
+                AudioSilenceTrimmer.getClippingBounds(context, track.uriString)
+            }
+            val resolvedMediaUri = if (track.uriString.startsWith("/")) {
+                Uri.fromFile(File(track.uriString))
+            } else {
+                Uri.parse(track.uriString)
+            }
             val mediaItemBuilder = MediaItem.Builder()
-                .setUri(Uri.parse(track.uriString))
+                .setUri(resolvedMediaUri)
                 .setMediaMetadata(mediaMetadata)
 
             if (clipBounds != null && clipBounds.endMs > clipBounds.startMs) {
@@ -547,7 +578,12 @@ class AuraAudioPlayer(
         }
 
         val nextIndex = queueController.getNextIndex() ?: return
-        playTrack(q[nextIndex], isAutoCrossfadeOverlap = isAutoCrossfadeOverlap)
+        val nextTrack = q[nextIndex]
+        if (nextTrack.isStreamingTrack) {
+            val intercepted = onStreamingTrackRequestedCallback?.invoke(nextTrack, isAutoCrossfadeOverlap) ?: false
+            if (intercepted) return
+        }
+        playTrack(nextTrack, isAutoCrossfadeOverlap = isAutoCrossfadeOverlap)
     }
 
     fun playPrevious() {
@@ -561,7 +597,22 @@ class AuraAudioPlayer(
         if (q.isEmpty()) return
 
         val prevIndex = queueController.getPreviousIndex() ?: return
-        playTrack(q[prevIndex], isAutoCrossfadeOverlap = false)
+        val prevTrack = q[prevIndex]
+        if (prevTrack.isStreamingTrack) {
+            val intercepted = onStreamingTrackRequestedCallback?.invoke(prevTrack, false) ?: false
+            if (intercepted) return
+        }
+        playTrack(prevTrack, isAutoCrossfadeOverlap = false)
+    }
+
+    /**
+     * Encola una canción similar de streaming o actualiza su URI (ej. cuando ya está en la caché de 30 min).
+     */
+    fun appendOrUpdateStreamingTrack(track: Track) {
+        queueController.appendOrUpdateTrack(track)
+        if (_currentTrack.value?.id == track.id) {
+            _currentTrack.value = track
+        }
     }
 
     fun toggleShuffle() {
@@ -686,8 +737,20 @@ class AuraAudioPlayer(
                             _currentPosition.value = aMs
                         }
                     } else {
-                        val curTrackId = _currentTrack.value?.id ?: -1L
+                        val curTrack = _currentTrack.value
+                        val curTrackId = curTrack?.id ?: -1L
                         val crossfadeMs = (effectiveCrossfadeSecs * 1000L).coerceIn(0L, 12000L)
+
+                        // Si es una pista en modo Streaming y le quedan menos de 35 segundos (o superó el 65%),
+                        // notificamos una sola vez al coordinador para que consulte a la API una canción similar
+                        // y la resuelva con yt-dlp antes de terminar la canción actual.
+                        if (curTrack != null && curTrack.isStreamingTrack &&
+                            streamingPrefetchTriggeredForId != curTrackId &&
+                            dur > 5000L && (remainingMs in 1..35000L || pos > (dur * 65L / 100L))
+                        ) {
+                            streamingPrefetchTriggeredForId = curTrackId
+                            onStreamingNearEndPrefetchCallback?.invoke(curTrack)
+                        }
 
                         // Si el Crossfade profesional o DJ Automix está activo y la pista entra en la ventana
                         // de los últimos N segundos (y dura al menos el doble del crossfade), disparamos el

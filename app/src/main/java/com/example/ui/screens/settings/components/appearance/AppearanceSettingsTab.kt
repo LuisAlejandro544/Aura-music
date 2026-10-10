@@ -233,8 +233,22 @@ fun LazyListScope.visualCustomizationSettingsContent(
     onClearWallpaper: () -> Unit = {},
     onSelectWallpaperScope: (WallpaperScreenScope) -> Unit = {},
     onChangeWallpaperDimAlpha: (Float) -> Unit = {},
-    onChangeWallpaperBlurDp: (Int) -> Unit = {}
+    onChangeWallpaperBlurDp: (Int) -> Unit = {},
+    streamingCacheConfig: com.example.model.StreamingCacheConfig = com.example.model.StreamingCacheConfig(),
+    onSelectStreamingVideoPolicy: (com.example.model.StreamingVideoNetworkPolicy) -> Unit = {},
+    onChangeStreamingCacheMaxMb: (Int) -> Unit = {},
+    onClearStreamingCache: () -> Unit = {}
 ) {
+    // Nueva Opción: Video Canvas en Streaming (Solo Wi-Fi, Siempre o Desactivado) y Caché Temporal (50MB-500MB, 30 min TTL)
+    item {
+        com.example.ui.screens.settings.components.appearance.StreamingCacheAndVideoSettingsCard(
+            cacheConfig = streamingCacheConfig,
+            onSelectVideoPolicy = onSelectStreamingVideoPolicy,
+            onChangeMaxCacheMb = onChangeStreamingCacheMaxMb,
+            onClearStreamingCache = onClearStreamingCache
+        )
+        Spacer(modifier = Modifier.height(14.dp))
+    }
     // Opción Avanzada: Aura Dinámica de Carátula y Video (1s)
     item {
         Card(

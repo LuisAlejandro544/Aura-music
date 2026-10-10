@@ -156,6 +156,23 @@ Todo el panel de efectos se despliega al instante en una hoja modal desde el **M
 
 </details>
 
+<details>
+<summary><b>🌐 6. Modo Streaming Híbrido Estilo Spotify (`Explorar`), Caché No Lineal (50–500 MB • 30 min) y Radio Similar</b></summary>
+<br/>
+
+- **Buscador API Dual (`YT MUSIC` + `YOUTUBE`) + Reproducción con `yt-dlp`**:
+  - Nueva pestaña **Explorar** en la barra inferior: busca canciones al instante mediante nuestra **API de consulta dual** (sin usar `yt-dlp` para buscar), mostrando indicadores visuales claros para distinguir pistas de **`YT MUSIC`** (YouTube Music) y **`YOUTUBE`** (con soporte nativo en `yt-dlp` para extraer y reproducir temas de YouTube Music).
+  - Cuando eliges una canción (o antes de pasar a la canción anterior o siguiente), la app consulta la API y **`yt-dlp`** resuelve el flujo de reproducción con letras sincronizadas automáticas desde **LRCLIB**.
+- **Pre-Descarga No Lineal Adelantada (Read-Ahead Buffer) & Caché Inteligente de 30 Minutos (`StreamingCacheManager`)**:
+  - Mientras escuchas una canción en streaming, Aura Music **pre-descarga por adelantado los siguientes minutos** de la canción (igual que hace YouTube) en segundo plano mediante bloques `HTTP Range`.
+  - **Caché para Música y Videos de Fondo (50 MB por defecto hasta 500 MB)**: Configurable por el usuario en **Ajustes > Aura Dinámica, Streaming & Modo Juego**. Permite volver a la canción anterior o repetirla en bucle de forma instantánea sin gastar datos. Los archivos en caché se eliminan automáticamente tras **30 minutos sin usarse**, o eliminando primero las canciones más antiguas (*LRU*) si se llena el límite de hasta 500 MB.
+- **Política de Red Exclusiva para Video Canvas en Streaming**:
+  - Nueva opción en Ajustes para elegir cómo se comportan los videos de fondo en streaming: **Solo con Wi-Fi**, **Siempre (incluso con datos móviles)** o **Desactivado** (afecta únicamente al streaming sin alterar jamás tus videos locales).
+- **Radio Automática de Canciones Similares y Descarga Permanente en 1 Toque**:
+  - Antes de que finalice la pista en reproducción, la API busca automáticamente una canción similar y la prepara con `yt-dlp` para ofrecer reproducción continua infinita. Además, puedes pulsar el botón **Descargar** en cualquier resultado o dentro del reproductor para guardarla permanentemente en tu biblioteca offline (durante la reproducción en streaming, los efectos DSP C++20 permanecen en bypass directo).
+
+</details>
+
 ---
 
 ## 📲 Descarga e Instalación (Guía de APKs)

@@ -220,12 +220,14 @@ object YtDlpNativeEngine {
         val ffmpegBin = FFmpegNativeEngine.getBinaryFile(context)
         val qjsBin = getQuickJsExecutable(context)
 
-        val cleanUrl = url.trim()
-        if (!cleanUrl.startsWith("http://", ignoreCase = true) && !cleanUrl.startsWith("https://", ignoreCase = true)) {
+        val rawTrimmedUrl = url.trim()
+        if (!rawTrimmedUrl.startsWith("http://", ignoreCase = true) && !rawTrimmedUrl.startsWith("https://", ignoreCase = true)) {
             return@withContext Result.failure(
                 IllegalArgumentException("URL inválida o insegura para resolver con yt-dlp: $url")
             )
         }
+        // Normalizar enlaces de YouTube Music (music.youtube.com) para compatibilidad 100% con yt-dlp
+        val cleanUrl = normalizeYouTubeMusicUrlForYtDlp(rawTrimmedUrl)
 
         val pythonEnvDir = File(context.filesDir, "env/python")
         ensureTlsCertificates(pythonEnvDir)
@@ -729,5 +731,24 @@ object YtDlpNativeEngine {
                 entryFile.setExecutable(true, false)
             }
         }
+    }
+
+    /**
+     * Normaliza cualquier URL de YouTube Music (`music.youtube.com/watch?v=...` o `music.youtube.com/playlist?list=...`)
+     * al formato canónico compatible para que `yt-dlp` pueda extraer tanto audio de alta calidad como Video Canvas
+     * sin errores de extractor en pistas de YouTube Music.
+     */
+    fun normalizeYouTubeMusicUrlForYtDlp(rawUrl: String): String {
+        val trimmed = rawUrl.trim()
+        if (!trimmed.contains("music.youtube.com", ignoreCase = true)) {
+            return trimmed
+        }
+        val videoIdRegex = Regex("(?:v=|youtu\\.be/|shorts/)([a-zA-Z0-9_-]{11})")
+        val match = videoIdRegex.find(trimmed)
+        if (match != null) {
+            val videoId = match.groupValues[1]
+            return "https://www.youtube.com/watch?v=$videoId"
+        }
+        return trimmed.replace(Regex("https?://(www\\.)?music\\.youtube\\.com", RegexOption.IGNORE_CASE), "https://www.youtube.com")
     }
 }

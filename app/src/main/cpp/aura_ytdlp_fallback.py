@@ -14,6 +14,7 @@ import re
 
 def extract_youtube_id(url):
     patterns = [
+        r'music\.youtube\.com\/watch\?.*v=([0-9A-Za-z_-]{11})',
         r'(?:v=|\/)([0-9A-Za-z_-]{11}).*',
         r'(?:youtu\.be\/)([0-9A-Za-z_-]{11})',
         r'(?:shorts\/)([0-9A-Za-z_-]{11})'

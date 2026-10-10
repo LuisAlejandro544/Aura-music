@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de implementación para la Carpeta de Usuario Personalizada y Exportador de Vídeos con Audio Completo en Ajustes > Medios & Almacenamiento. Incluye selección de carpeta sin restricciones mediante SAF (OpenDocumentTree), estructura escalable (subcarpeta Videos/ lista para futuras subcarpetas Images/), unión ultrarrápida de vídeo y audio en FFmpeg (-c copy), visualización de la ruta exacta elegida por el usuario y botones de exportación individual y masiva en Ajustes > Medios.",
-  "updatedAt":  "2026-10-10T07:46:31.901960172Z",
+  "summary":  "Plan de arquitectura e implementación para el nuevo Modo Streaming tipo Spotify en Aura Music: nueva pestaña Explorar/Streaming con búsqueda unificada e insignias de origen (YT Music / YouTube), resolución híbrida con yt-dlp e InnerTube, pre-consulta automática de canción similar antes de finalizar la pista, caché temporal inteligente configurable (50 MB por defecto hasta 500 MB con expiración de 30 minutos para audio y Video Canvas), política de red para Video Canvas en streaming (Solo Wi-Fi, Siempre o Desactivado), bypass de DSP C++20 exclusivo para streaming, descarga permanente con 1 toque y actualización de toda la documentación (.md y chanelog-beta.md).",
+  "updatedAt":  "2026-10-10T15:50:47.502156031Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

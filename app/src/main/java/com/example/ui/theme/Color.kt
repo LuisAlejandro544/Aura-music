@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.Color
 val BackgroundDark = Color(0xFF090D16)
 val SurfaceDark = Color(0xFF111827)
 val SurfaceElevatedDark = Color(0xFF1E293B)
+val SurfaceVariantDark = Color(0xFF1E293B)
 val SurfaceCard = Color(0xFF161F33)
 val CardBorder = Color(0xFF26334D)
 

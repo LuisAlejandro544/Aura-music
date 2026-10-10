@@ -172,4 +172,19 @@ class PlayerQueueController {
             }
         }
     }
+
+    /**
+     * Añade una pista al final de la cola (ej. canción similar pre-cargada en streaming)
+     * o actualiza su instancia si ya existía con el mismo ID.
+     */
+    fun appendOrUpdateTrack(track: Track) {
+        val currentQ = _queue.value.toMutableList()
+        val existingIdx = currentQ.indexOfFirst { it.id == track.id }
+        if (existingIdx != -1) {
+            currentQ[existingIdx] = track
+        } else {
+            currentQ.add(track)
+        }
+        _queue.value = currentQ
+    }
 }

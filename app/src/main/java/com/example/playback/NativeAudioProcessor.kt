@@ -27,19 +27,28 @@ class NativeAudioProcessor : BaseAudioProcessor() {
         if (remaining == 0) return
 
         val outputBuffer = replaceOutputBuffer(remaining)
-        val pos = inputBuffer.position()
 
         // Copiar los datos del buffer de entrada al buffer de salida
         outputBuffer.put(inputBuffer)
         outputBuffer.flip()
 
-        // Procesar en el buffer de salida mediante el motor DSP nativo
+        // Si es una pista en modo Streaming, omitimos por ahora el procesamiento C++20 DSP
+        if (isStreamingBypassActive) {
+            return
+        }
+
+        // Procesar en el buffer de salida mediante el motor DSP nativo C++20 para pistas locales
         NativeAudioEngine.processPcmBuffer(outputBuffer, 0, remaining)
     }
 
     override fun onFlush() {
         super.onFlush()
         NativeAudioEngine.flushBuffers()
+    }
+
+    companion object {
+        @Volatile
+        var isStreamingBypassActive: Boolean = false
     }
 }
 

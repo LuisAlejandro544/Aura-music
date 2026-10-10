@@ -107,6 +107,10 @@ app/
 │   │       │       │   └── ChunkedStreamDownloader.kt # Descarga acelerada HTTP Range multi-bloque
 │   │       │       └── tiktok/                 # Resolución Directa de TikTok
 │   │       │           └── TikTokMediaResolver.kt # Extracción libre de audio/video TikTok
+│   │       │   │
+│   │       │   └── streaming/                  # Modo Streaming Híbrido (API Dual + yt-dlp + Caché 30 min)
+│   │       │       ├── StreamingApiService.kt  # Búsqueda API dual (YT Music + YouTube), Radio Similar y resolución yt-dlp
+│   │       │       └── StreamingCacheManager.kt # Caché inteligente (50-500 MB, 30 min TTL, LRU) y Pre-descarga No Lineal
 │   │       │
 │   │       ├── widget/                         # Sistema de 2 Widgets Interactivos de Escritorio
 │   │       │   ├── AuraMusicWidgetProvider.kt  # Widget 1: Reproductor adaptativo (Compacto, Mediano, Expandido) con color de imagen
@@ -138,11 +142,13 @@ app/
 │   │       │       ├── LyricsCoordinator.kt             # Coordinación de letras sincronizadas
 │   │       │       ├── IncomingMediaCoordinator.kt      # Recepción de Intents externos
 │   │       │       ├── HeadphoneSettingsCoordinator.kt  # Ajustes de acústica, Bit-Perfect y auriculares
-│   │       │       └── MixtapeCoordinator.kt            # Coordinador reactivo de Mixtapes y capítulos
+│   │       │       ├── MixtapeCoordinator.kt            # Coordinador reactivo de Mixtapes y capítulos
+│   │       │       └── StreamingModeCoordinator.kt      # Orquestador del Modo Streaming (API Dual, yt-dlp, Caché y Radio)
 │   │       │
 │   │       ├── model/                          # Modelos de Dominio y Datos
 │   │       │   ├── Track.kt
 │   │       │   ├── Playlist.kt
+│   │       │   ├── StreamingModels.kt               # Modelos de búsqueda streaming, plataformas (YT Music/YouTube) y caché
 │   │       │   ├── WidgetModels.kt                  # Modelos de configuración y estado persistido de Widgets
 │   │       │   ├── AppUpdateModels.kt               # Modelos de estado y metadatos de actualización APK
 │   │       │   ├── MixtapeModels.kt                 # Modelos de capítulos y metadatos de Mixtape
@@ -169,6 +175,8 @@ app/
 │   │       │   ├── screens/                    # Pantallas de la aplicación
 │   │       │   │   ├── home/
 │   │       │   │   │   └── HomeScreen.kt
+│   │       │   │   ├── streaming/
+│   │       │   │   │   └── StreamingExploreScreen.kt # Pestaña Explorar / Streaming con API Dual y Descarga en 1 toque
 │   │       │   │   ├── library/
 │   │       │   │   │   ├── LibraryScreen.kt
 │   │       │   │   │   └── components/

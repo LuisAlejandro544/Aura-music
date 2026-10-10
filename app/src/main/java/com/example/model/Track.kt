@@ -57,7 +57,35 @@ data class Track(
             lowerMime.contains("ogg") || lowerUri.endsWith(".ogg") -> "OGG"
             lowerMime.contains("aac") || lowerUri.endsWith(".aac") -> "AAC"
             lowerMime.contains("m4a") || lowerUri.endsWith(".m4a") -> "M4A"
+            folderName.startsWith("STREAM:YT_MUSIC") -> "YT MUSIC"
+            folderName.startsWith("STREAM:YOUTUBE") -> "YOUTUBE"
             else -> "MP3"
         }
     }
+
+    /**
+     * Indica si la pista actual corresponde a una reproducción en modo Streaming (ID negativo o prefijo STREAM:).
+     */
+    val isStreamingTrack: Boolean
+        get() = id < 0L || folderName.startsWith("STREAM:")
+
+    /**
+     * Extrae el ID de video original (YouTube / YT Music) si la pista es de Streaming.
+     */
+    val streamingVideoId: String?
+        get() {
+            if (!isStreamingTrack) return null
+            val parts = folderName.split(":")
+            return if (parts.size >= 3) parts[2].takeIf { it.isNotBlank() } else null
+        }
+
+    /**
+     * Retorna la plataforma de origen si es una pista de Streaming.
+     */
+    val streamingPlatform: StreamingSourcePlatform?
+        get() {
+            if (!isStreamingTrack) return null
+            val parts = folderName.split(":")
+            return if (parts.size >= 2) StreamingSourcePlatform.fromId(parts[1]) else StreamingSourcePlatform.YT_MUSIC
+        }
 }

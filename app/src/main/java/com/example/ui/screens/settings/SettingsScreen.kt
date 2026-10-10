@@ -124,6 +124,11 @@ fun SettingsScreen(
     onDeleteTrackArtwork: (Track) -> Unit = {},
     onDeleteTrackVideo: (Track) -> Unit = {},
     onOpenOnboarding: () -> Unit = {},
+    // Configuración de Streaming (Video Canvas Wi-Fi/Datos + Caché 50MB-500MB 30 min)
+    streamingCacheConfig: com.example.model.StreamingCacheConfig = com.example.model.StreamingCacheConfig(),
+    onSelectStreamingVideoPolicy: (com.example.model.StreamingVideoNetworkPolicy) -> Unit = {},
+    onChangeStreamingCacheMaxMb: (Int) -> Unit = {},
+    onClearStreamingCache: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var activeSubScreen by remember { mutableStateOf(SettingsSubScreen.MAIN_MENU) }
@@ -237,8 +242,8 @@ fun SettingsScreen(
             // PANTALLA INDEPENDIENTE 2: AURA DINÁMICA, FONDO DE GALERÍA & MODO JUEGO EN 2DO PLANO
             SettingsSubScreen.VISUAL_BEHAVIOR -> {
                 SettingsSubMenuScreen(
-                    title = "Aura Dinámica, Fondo & Modo Juego",
-                    subtitle = "Colores a 1s, Fondo de Galería (Foto/Video) y ahorro al jugar en 2do plano",
+                    title = "Aura Dinámica, Streaming & Modo Juego",
+                    subtitle = "Videos Canvas en Streaming (Wi-Fi/Datos), Caché 50-500MB, Colores a 1s y Modo Juego",
                     icon = Icons.Default.Videocam,
                     iconTint = MaterialTheme.colorScheme.secondary,
                     onBack = { activeSubScreen = SettingsSubScreen.MAIN_MENU },
@@ -258,7 +263,11 @@ fun SettingsScreen(
                         onClearWallpaper = onClearWallpaper,
                         onSelectWallpaperScope = onSelectWallpaperScope,
                         onChangeWallpaperDimAlpha = onChangeWallpaperDimAlpha,
-                        onChangeWallpaperBlurDp = onChangeWallpaperBlurDp
+                        onChangeWallpaperBlurDp = onChangeWallpaperBlurDp,
+                        streamingCacheConfig = streamingCacheConfig,
+                        onSelectStreamingVideoPolicy = onSelectStreamingVideoPolicy,
+                        onChangeStreamingCacheMaxMb = onChangeStreamingCacheMaxMb,
+                        onClearStreamingCache = onClearStreamingCache
                     )
                 }
             }

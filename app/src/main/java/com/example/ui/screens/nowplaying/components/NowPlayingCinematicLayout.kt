@@ -83,6 +83,7 @@ fun NowPlayingCinematicLayout(
     onOpenFullScreenLyrics: () -> Unit,
     onOpenDetails: () -> Unit,
     collectionContextTitle: String = "Tu Biblioteca",
+    onDownloadStreamingTrack: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -115,18 +116,26 @@ fun NowPlayingCinematicLayout(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(
-                    onClick = onCollapse,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .testTag("cinematic_collapse_btn")
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.KeyboardArrowDown,
-                        contentDescription = "Ocultar reproductor",
-                        tint = TextPrimary,
-                        modifier = Modifier.size(32.dp)
-                    )
+                    IconButton(
+                        onClick = onCollapse,
+                        modifier = Modifier
+                            .size(48.dp)
+                            .testTag("cinematic_collapse_btn")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowDown,
+                            contentDescription = "Ocultar reproductor",
+                            tint = TextPrimary,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                    currentTrack.streamingPlatform?.let { platform ->
+                        com.example.ui.screens.streaming.StreamingPlatformBadge(platform = platform)
+                    }
                 }
 
                 Column(
@@ -158,6 +167,21 @@ fun NowPlayingCinematicLayout(
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (currentTrack.isStreamingTrack && onDownloadStreamingTrack != null) {
+                        IconButton(
+                            onClick = onDownloadStreamingTrack,
+                            modifier = Modifier
+                                .size(42.dp)
+                                .testTag("cinematic_download_streaming_btn")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CloudDownload,
+                                contentDescription = "Descargar pista en biblioteca local",
+                                tint = animatedPrimary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
                     IconButton(
                         onClick = onOpenDesignSelector,
                         modifier = Modifier
@@ -176,7 +200,7 @@ fun NowPlayingCinematicLayout(
                         modifier = Modifier
                             .size(42.dp)
                             .testTag("cinematic_more_btn")
-                    ) {
+                        ) {
                         Icon(
                             imageVector = Icons.Default.MoreVert,
                             contentDescription = "Opciones y ficha técnica",

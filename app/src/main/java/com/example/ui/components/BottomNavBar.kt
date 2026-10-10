@@ -8,10 +8,12 @@ import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.TravelExplore
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.TravelExplore
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -59,6 +61,26 @@ fun BottomNavBar(
                 unselectedTextColor = TextMuted
             ),
             modifier = Modifier.testTag("nav_home")
+        )
+
+        NavigationBarItem(
+            selected = currentScreen is NavScreen.Streaming,
+            onClick = { onNavigate(NavScreen.Streaming) },
+            icon = {
+                Icon(
+                    imageVector = if (currentScreen is NavScreen.Streaming) Icons.Filled.TravelExplore else Icons.Outlined.TravelExplore,
+                    contentDescription = "Explorar Streaming"
+                )
+            },
+            label = { Text("Explorar") },
+            colors = NavigationBarItemDefaults.colors(
+                selectedIconColor = Color.White,
+                selectedTextColor = MaterialTheme.colorScheme.primary,
+                indicatorColor = MaterialTheme.colorScheme.primary,
+                unselectedIconColor = TextMuted,
+                unselectedTextColor = TextMuted
+            ),
+            modifier = Modifier.testTag("nav_streaming")
         )
 
         NavigationBarItem(

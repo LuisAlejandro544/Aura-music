@@ -356,6 +356,22 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
   - Integrado en el entorno de depuración para auditoría y detección en tiempo real de fugas de memoria en la JVM.
   - **Fuga de `ResourcesImpl.mAppContext` en `AuraMediaPlaybackService` Erradicada**: Corrección de la retención del servicio de reproducción multimedia mediante el uso exclusivo de `applicationContext` en constructores de proveedores de notificación y neutralización por reflexión del campo estático del framework de Android al destruirse el servicio.
 
+### 16. Modo Streaming Híbrido Estilo Spotify (`Explorar`), Caché Inteligente No Lineal (50–500 MB • 30 min TTL), Radio Similar y Política de Red 🌐🎵
+- **Búsqueda por API Dual (`YT MUSIC` + `YOUTUBE`) + Reproducción con `yt-dlp` (`StreamingApiService` & `StreamingModeCoordinator`)**:
+  - **Nueva Pestaña `Explorar` en la Barra Inferior (`StreamingExploreScreen`)**: Permite buscar millones de canciones al instante mediante consulta simultánea a la API de **YouTube Music (`WEB_REMIX`)** y **YouTube (`WEB`)**, sin usar `yt-dlp` para buscar.
+  - **Insignias Distintivas y Soporte YT Music en `yt-dlp`**: Cada resultado muestra claramente si proviene de **`YT MUSIC`** o **`YOUTUBE`**. Además, `YtDlpNativeEngine` y `aura_ytdlp_fallback.py` normalizan los enlaces `music.youtube.com` para que `yt-dlp` pueda extraer, reproducir y descargar canciones de YouTube Music sin restricciones.
+  - **Consulta a la API + `yt-dlp` al Cambiar de Pista**: Antes de pasar a la canción anterior o siguiente en streaming, la app consulta a la API y `yt-dlp` toma el flujo (o lo recupera de la caché temporal) para reproducirlo con **letras sincronizadas `.LRC` automáticas desde `LRCLIB`**.
+- **Pre-Descarga No Lineal Adelantada (Read-Ahead Buffer) y Caché Temporal de 30 Minutos (`StreamingCacheManager`)**:
+  - Mientras el usuario escucha una pista en streaming, el motor descarga por adelantado los próximos minutos de la canción mediante bloques `HTTP Range` no lineales (igual que hace YouTube) hacia la caché temporal.
+  - **Caché para Música y Videos de Fondo (50 MB por defecto • Máximo 500 MB)**: Configurable en **Ajustes > Aura Dinámica, Streaming & Modo Juego**. Permite volver hacia atrás a la canción anterior o reproducirla en bucle de forma instantánea.
+  - **Expiración Automática (30 Minutos) y Desalojo LRU**: Todo archivo en caché que lleve **más de 30 minutos sin usarse** se elimina automáticamente, y si la caché alcanza el límite elegido por el usuario (hasta 500 MB), elimina primero las canciones y videos más antiguos.
+- **Política de Red Exclusiva para Video Canvas en Streaming (`StreamingVideoNetworkPolicy`)**:
+  - Nueva configuración en Ajustes con 3 modos para los videos de fondo en streaming: **Videos solo con Wi-Fi**, **Siempre (incluso con datos móviles)** o **Desactivado**. Esta opción actúa exclusivamente sobre el streaming sin tocar ni alterar jamás la reproducción de tus canciones y videos locales.
+- **Radio Automática de Canciones Similares, Descarga Permanente en 1 Toque y Bypass de C++20**:
+  - Cuando quedan ~35 segundos para terminar la canción actual en streaming, consulta automáticamente a la API una canción similar y la pre-resuelve con `yt-dlp` para continuar la reproducción sin silencios.
+  - Incluye botón de **Descarga Permanente** tanto en las tarjetas de búsqueda como en la barra superior de *Now Playing* para guardar la canción con su carátula WebP y Video Canvas en la biblioteca local (`AuraDownloadService`).
+  - Durante la reproducción en streaming, el procesador DSP en C++20 permanece en bypass limpio (`NativeAudioProcessor.isStreamingBypassActive = true`), reservando el procesamiento C++20 para las pistas locales.
+
 ---
 
 ## 📱 Requisitos del Sistema

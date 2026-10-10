@@ -392,6 +392,37 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
                                 }
                             )
 
+                            is NavScreen.Streaming -> {
+                                val streamingQuery by viewModel.streamingSearchQuery.collectAsStateWithLifecycle()
+                                val streamingFilter by viewModel.streamingSelectedFilter.collectAsStateWithLifecycle()
+                                val streamingResults by viewModel.streamingSearchResults.collectAsStateWithLifecycle()
+                                val isStreamingSearching by viewModel.isStreamingSearching.collectAsStateWithLifecycle()
+                                val isResolvingStream by viewModel.isResolvingStream.collectAsStateWithLifecycle()
+                                val resolvingVideoId by viewModel.resolvingVideoId.collectAsStateWithLifecycle()
+                                val nextSimilarPreview by viewModel.nextSimilarTrackPreview.collectAsStateWithLifecycle()
+                                val streamingCacheCfg by viewModel.streamingCacheConfig.collectAsStateWithLifecycle()
+                                val downloadingIds by viewModel.downloadingStreamingIds.collectAsStateWithLifecycle()
+
+                                com.example.ui.screens.streaming.StreamingExploreScreen(
+                                    searchQuery = streamingQuery,
+                                    selectedFilter = streamingFilter,
+                                    searchResults = streamingResults,
+                                    isSearching = isStreamingSearching,
+                                    isResolvingStream = isResolvingStream,
+                                    resolvingVideoId = resolvingVideoId,
+                                    currentTrack = effectiveTrack,
+                                    nextSimilarTrackPreview = nextSimilarPreview,
+                                    cacheConfig = streamingCacheCfg,
+                                    downloadingVideoIds = downloadingIds,
+                                    onSearchQueryChange = { viewModel.updateStreamingSearchQuery(it) },
+                                    onSearchSubmit = { viewModel.performStreamingSearch(it) },
+                                    onFilterChange = { viewModel.setStreamingSearchFilter(it) },
+                                    onPlayStreamingItem = { viewModel.playStreamingItem(it) },
+                                    onDownloadStreamingItem = { viewModel.downloadStreamingItemPermanently(it) },
+                                    onOpenNowPlaying = { viewModel.setNowPlayingExpanded(true) }
+                                )
+                            }
+
                             is NavScreen.Library -> LibraryScreen(
                                 allTracks = allTracks,
                                 favoriteTracks = favoriteTracks,
@@ -535,7 +566,11 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
                                     onSetHeadsetAction = { type, action -> viewModel.setHeadsetAction(type, action) },
                                     allTracks = allTracks,
                                     onDeleteTrackArtwork = { viewModel.deleteTrackArtwork(it) },
-                                    onDeleteTrackVideo = { viewModel.deleteTrackVideo(it) }
+                                    onDeleteTrackVideo = { viewModel.deleteTrackVideo(it) },
+                                    streamingCacheConfig = viewModel.streamingCacheConfig.collectAsStateWithLifecycle().value,
+                                    onSelectStreamingVideoPolicy = { viewModel.setStreamingVideoNetworkPolicy(it) },
+                                    onChangeStreamingCacheMaxMb = { viewModel.setStreamingCacheMaxSizeMb(it) },
+                                    onClearStreamingCache = { viewModel.clearStreamingCache() }
                                 )
                             }
                         }
@@ -599,6 +634,7 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
                 nowPlayingDesignMode = nowPlayingDesignMode,
                 onSetNowPlayingDesignMode = { viewModel.setNowPlayingDesignMode(it) },
                 collectionContextTitle = selectedPlaylist?.name ?: currentTrack?.album ?: "Tu Biblioteca",
+                onDownloadStreamingTrack = { track -> viewModel.downloadCurrentStreamingTrackPermanently(track) },
                 isDynamicArtworkColorEnabled = isDynamicArtworkColorEnabled,
                 onToggleVideoCanvas = { viewModel.toggleVideoCanvas() },
                 onSetVideoDisplayMode = { viewModel.setVideoDisplayMode(it) },

@@ -6,6 +6,7 @@ package com.example.ui.navigation
  */
 sealed class NavScreen(val route: String) {
     object Home : NavScreen("home")
+    object Streaming : NavScreen("streaming")
     object Library : NavScreen("library")
     object Import : NavScreen("import")
     object PlaylistDetail : NavScreen("playlist_detail")

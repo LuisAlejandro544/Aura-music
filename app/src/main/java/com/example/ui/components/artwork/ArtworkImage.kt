@@ -41,8 +41,15 @@ fun ArtworkImage(
 
     val imageRequest = remember(artPath, context) {
         if (!artPath.isNullOrBlank()) {
+            val dataModel: Any = if (artPath.startsWith("http://", ignoreCase = true) ||
+                artPath.startsWith("https://", ignoreCase = true)
+            ) {
+                artPath
+            } else {
+                File(artPath)
+            }
             ImageRequest.Builder(context)
-                .data(File(artPath))
+                .data(dataModel)
                 .memoryCacheKey(artPath)
                 .diskCacheKey(artPath)
                 .memoryCachePolicy(CachePolicy.ENABLED)

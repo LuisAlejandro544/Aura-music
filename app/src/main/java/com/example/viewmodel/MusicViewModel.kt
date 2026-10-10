@@ -218,6 +218,24 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val pendingIncomingVideoUri: StateFlow<Uri?> = incomingMediaCoordinator.pendingIncomingVideoUri
     val pendingIncomingWebLink: StateFlow<String?> = incomingMediaCoordinator.pendingIncomingWebLink
 
+    // Coordinador del Modo Streaming Híbrido (Estilo Spotify: Búsqueda API dual, yt-dlp, Caché 30 min y Radio)
+    val streamingCoordinator = StreamingModeCoordinator(
+        context = application,
+        audioPlayer = audioPlayer,
+        scope = viewModelScope,
+        onLoadLyricsForTrack = { track -> lyricsCoordinator.loadLyrics(track) },
+        onStatusMessage = { msg -> trackLibraryCoordinator.setImporting(false, msg) }
+    )
+    val streamingSearchQuery: StateFlow<String> = streamingCoordinator.searchQuery
+    val streamingSelectedFilter: StateFlow<StreamingSearchFilter> = streamingCoordinator.selectedFilter
+    val streamingSearchResults: StateFlow<List<StreamingSearchItem>> = streamingCoordinator.searchResults
+    val isStreamingSearching: StateFlow<Boolean> = streamingCoordinator.isSearching
+    val isResolvingStream: StateFlow<Boolean> = streamingCoordinator.isResolvingStream
+    val resolvingVideoId: StateFlow<String?> = streamingCoordinator.resolvingVideoId
+    val nextSimilarTrackPreview: StateFlow<StreamingSearchItem?> = streamingCoordinator.nextSimilarTrackPreview
+    val streamingCacheConfig: StateFlow<StreamingCacheConfig> = streamingCoordinator.cacheConfig
+    val downloadingStreamingIds: StateFlow<Set<String>> = streamingCoordinator.downloadingVideoIds
+
     init {
         // Hilo de renderizado de espectro FFT C++20 optimizado:
         // - Pausa por completo el muestreo JNI y entra en suspensión profunda cuando la app está en segundo plano
@@ -674,6 +692,24 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     fun clearPendingIncomingWebLink() = incomingMediaCoordinator.clearPendingIncomingWebLink()
     fun handleIncomingAudioUri(uri: Uri, trimSilence: Boolean = false) = incomingMediaCoordinator.handleIncomingAudioUri(uri, trimSilence)
     fun handleIncomingMultipleAudioUris(uris: List<Uri>, trimSilence: Boolean = false) = incomingMediaCoordinator.handleIncomingMultipleAudioUris(uris, trimSilence)
+
+    // --- Modo Streaming (YT Music & YouTube API + yt-dlp + Caché 30 min + Radio) ---
+    fun updateStreamingSearchQuery(query: String) = streamingCoordinator.updateSearchQuery(query)
+    fun performStreamingSearch(query: String = streamingSearchQuery.value) = streamingCoordinator.performSearch(query)
+    fun setStreamingSearchFilter(filter: StreamingSearchFilter) = streamingCoordinator.setSearchFilter(filter)
+    fun playStreamingItem(item: StreamingSearchItem) {
+        streamingCoordinator.playStreamingItem(item)
+        setNowPlayingExpanded(true)
+    }
+    fun downloadStreamingItemPermanently(item: StreamingSearchItem) =
+        streamingCoordinator.downloadStreamingItemPermanently(item, includeVideoCanvas = true)
+    fun downloadCurrentStreamingTrackPermanently(track: Track) =
+        streamingCoordinator.downloadCurrentStreamingTrackPermanently(track)
+    fun setStreamingVideoNetworkPolicy(policy: StreamingVideoNetworkPolicy) =
+        streamingCoordinator.setStreamingVideoNetworkPolicy(policy)
+    fun setStreamingCacheMaxSizeMb(sizeMb: Int) =
+        streamingCoordinator.setStreamingCacheMaxSizeMb(sizeMb)
+    fun clearStreamingCache() = streamingCoordinator.clearStreamingCache()
 
     override fun onCleared() {
         super.onCleared()
