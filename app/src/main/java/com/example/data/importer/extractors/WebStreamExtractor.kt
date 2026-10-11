@@ -21,10 +21,32 @@ enum class YoutubeExtractionEngine(val label: String, val description: String) {
         "InnerTube + Invidious",
         "API directa de YouTube Music (ANDROID_VR / IOS / TV) + Proxy Invidious."
     ),
+    INVIDIOUS(
+        "Invidious Proxy",
+        "Red de instancias abiertas con túnel proxy local=true (/latest_version)."
+    ),
     WEBVIEW(
         "WebView Real",
         "Navegador móvil en segundo plano que captura flujos y refresca cookies.txt."
-    )
+    );
+
+    val badgeText: String
+        get() = when (this) {
+            YTDLP -> "YT-DLP"
+            PIPED -> "PIPED API"
+            INNERTUBE -> "INNERTUBE"
+            INVIDIOUS -> "INVIDIOUS"
+            WEBVIEW -> "WEBVIEW"
+        }
+
+    companion object {
+        const val PREF_ONLINE_EXTRACTION_ENGINE = "pref_online_extraction_engine"
+
+        fun fromPreferenceName(name: String?): YoutubeExtractionEngine {
+            if (name.isNullOrBlank()) return YTDLP
+            return entries.firstOrNull { it.name.equals(name.trim(), ignoreCase = true) } ?: YTDLP
+        }
+    }
 }
 
 /**
@@ -63,13 +85,37 @@ object WebStreamExtractor {
     }
 
     /**
+     * Obtiene el motor de extracción online seleccionado por el usuario en Ajustes (por defecto [YoutubeExtractionEngine.YTDLP]).
+     */
+    fun getSelectedEngine(context: Context): YoutubeExtractionEngine {
+        return try {
+            val prefs = context.applicationContext.getSharedPreferences("aura_music_ui_prefs", Context.MODE_PRIVATE)
+            YoutubeExtractionEngine.fromPreferenceName(
+                prefs.getString(YoutubeExtractionEngine.PREF_ONLINE_EXTRACTION_ENGINE, YoutubeExtractionEngine.YTDLP.name)
+            )
+        } catch (_: Throwable) {
+            YoutubeExtractionEngine.YTDLP
+        }
+    }
+
+    /**
+     * Guarda el motor de extracción online seleccionado por el usuario en Ajustes.
+     */
+    fun setSelectedEngine(context: Context, engine: YoutubeExtractionEngine) {
+        try {
+            val prefs = context.applicationContext.getSharedPreferences("aura_music_ui_prefs", Context.MODE_PRIVATE)
+            prefs.edit().putString(YoutubeExtractionEngine.PREF_ONLINE_EXTRACTION_ENGINE, engine.name).apply()
+        } catch (_: Throwable) {}
+    }
+
+    /**
      * Resuelve los flujos multimedia usando el motor preferido y aplicando fallback automático en cascada
      * entre `yt-dlp + cookies.txt`, `Piped API`, `InnerTube`, `Invidious Proxy` y `Headless WebView`.
      */
     suspend fun resolveStream(
         context: Context,
         url: String,
-        preferredEngine: YoutubeExtractionEngine = YoutubeExtractionEngine.YTDLP
+        preferredEngine: YoutubeExtractionEngine = getSelectedEngine(context)
     ): Result<OnlineVideoAudioImporter.ResolvedMediaInfo> = withContext(Dispatchers.IO) {
         val cleanUrl = url.trim()
         val videoId = extractVideoId(cleanUrl)
@@ -116,6 +162,19 @@ object WebStreamExtractor {
                 }
             }
 
+            YoutubeExtractionEngine.INVIDIOUS -> {
+                if (videoId != null) {
+                    InvidiousStreamResolver.resolve(videoId, cleanUrl)?.let { return@withContext Result.success(it) }
+                    PipedStreamResolver.resolve(videoId, cleanUrl)?.let { return@withContext Result.success(it) }
+                    InnerTubeClient.resolve(videoId, cleanUrl)?.let { return@withContext Result.success(it) }
+                }
+                val ytdlpFallback = YtDlpNativeEngine.resolveStream(context, cleanUrl)
+                if (ytdlpFallback.isSuccess) return@withContext ytdlpFallback
+                if (videoId != null) {
+                    HeadlessWebViewExtractor.resolve(context, videoId, cleanUrl)?.let { return@withContext Result.success(it) }
+                }
+            }
+
             YoutubeExtractionEngine.WEBVIEW -> {
                 if (videoId != null) {
                     HeadlessWebViewExtractor.resolve(context, videoId, cleanUrl)?.let { return@withContext Result.success(it) }
@@ -133,3 +192,4 @@ object WebStreamExtractor {
         )
     }
 }
+

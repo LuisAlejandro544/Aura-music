@@ -130,8 +130,8 @@ Todo el panel de efectos se despliega al instante en una hoja modal desde el **M
   - Selecciona cualquier video de tu galería y extrae el audio directo a `.m4a` sin perder calidad (*Direct Stream Copy*), generando su portada WebP y vinculando el video de fondo al instante.
 - **Puente Inteligente "Abrir con..." y "Compartir con..."**:
   - Comparte archivos de audio, videos o enlaces directamente desde **SnapTube, navegadores, Telegram, WhatsApp o gestores de archivos** hacia Aura Music: la app detecta qué es, lo guarda en tu biblioteca permanente y lo reproduce de inmediato.
-- **Creador de Mixtapes (Fusión Continua con Capítulos Reactivos)**:
-  - Une varias canciones de una Playlist en un solo archivo continuo `.m4a` con transiciones suaves de 3s, 5s, 8s o 10s. Mientras suena el Mixtape, Aura Music cambia automáticamente el título, la portada, el Video Canvas y la letra sincronizada en cada capítulo.
+- **Creador de Mixtapes y Generador de Auto-Remix / Mashup con Detección Real de BPM & Energía (`SmartAutoRemixEngine` & `AutoRemixAcousticAnalyzer`)**:
+  - Une varias canciones de una Playlist en un solo archivo continuo `.m4a` con transiciones suaves de 3s, 5s, 8s o 10s, o crea un **Auto-Remix / Mashup de 2 canciones locales** (eligiendo manualmente o con **Auto-Match Acústico Real** que detecta los **BPM** y la **energía RMS** del audio y sincroniza el tempo con `atempo` en FFmpeg). Mientras suena el Mixtape o Auto-Remix, Aura Music cambia automáticamente el título, la portada, el Video Canvas y la letra sincronizada en cada capítulo.
 - **Recorte Automático de Silencios (`AudioSilenceTrimmer`)**:
   - Interruptor disponible antes de cada importación o descarga para detectar y recortar los silencios al inicio y al final de la pista (`-42 dB` RMS).
 
@@ -144,8 +144,9 @@ Todo el panel de efectos se despliega al instante en una hoja modal desde el **M
 - **Letras Estilo Karaoke con Descarga Automática (`LRCLIB`)**:
   - Descarga letras sincronizadas automáticamente sin registro, o usa el **Buscador Interactivo** que destaca la versión `⭐ OFICIAL / RECOMENDADA` en primer lugar y te permite comparar variantes comunitarias o importar tus propios archivos `.lrc` y `.txt`.
   - **Modo Karaoke a Pantalla Completa**: Vista inmersiva estilo *Apple Music Sing / Spotify* con letra grande iluminada en neón, auto-scroll y salto de tiempo al tocar cualquier verso.
-- **Temas OLED, Material You, Collages, 2 Widgets Interactivos y Android Auto**:
-  - 5 paletas de acento neón (*Material You dinámico, Nebula Violet, Cyber Mint, Sunset Ember, Ocean Abyss*) y Playlists con portada personalizada o collage automático de 1 a 4 fotos.
+- **Temas OLED, Material You, Portadas y Descripciones Personalizadas en Playlists/Álbumes/Artistas, 2 Widgets Interactivos y Android Auto**:
+  - 5 paletas de acento neón (*Material You dinámico, Nebula Violet, Cyber Mint, Sunset Ember, Ocean Abyss*).
+  - **Personalización Total de Playlists, Álbumes y Artistas**: Asigna una **foto personalizada en WebP sin pérdida** y una **descripción o biografía** a cualquier Playlist, Álbum o Artista directamente desde su pantalla de detalle (tocando su foto o el icono de lápiz `✏️`), o deja que la app muestre su collage dinámico automático de 1 a 4 fotos.
   - **2 Widgets Interactivos con Color Dinámico de la Imagen y Reanudación en Segundo Plano**:
     - **Widget 1 (Reproductor Adaptativo)**: Reacciona automáticamente a los colores de la carátula de la canción actual, permite reanudar la música que estabas escuchando directamente en segundo plano (incluso tras cerrar la app), incluye botón de **Favorito ❤️** y **se adapta al estirarlo** en tu pantalla de inicio (*Compacto 4x1*, *Mediano 4x2 con barra de progreso y tiempos* y *Expandido 4x3 de estudio*).
     - **Widget 2 Independiente (Top 4 Canciones & 4 Playlists)**: Un segundo widget de buen tamaño (cuadrícula 2x2) que muestra tus **4 canciones más escuchadas** o tus **4 Playlists principales** (con su portada o collage dinámico) para reproducirlas con un solo toque, todo 100% configurable con vista previa en vivo desde el nuevo apartado **Ajustes > Widget**.
@@ -160,9 +161,9 @@ Todo el panel de efectos se despliega al instante en una hoja modal desde el **M
 <summary><b>🌐 6. Modo Streaming Híbrido Estilo Spotify (`Explorar`), Caché No Lineal (50–500 MB • 30 min) y Radio Similar</b></summary>
 <br/>
 
-- **Buscador API Dual (`YT MUSIC` + `YOUTUBE`) + Reproducción con `yt-dlp`**:
-  - Nueva pestaña **Explorar** en la barra inferior: busca canciones al instante mediante nuestra **API de consulta dual** (sin usar `yt-dlp` para buscar), mostrando indicadores visuales claros para distinguir pistas de **`YT MUSIC`** (YouTube Music) y **`YOUTUBE`** (con soporte nativo en `yt-dlp` para extraer y reproducir temas de YouTube Music).
-  - Cuando eliges una canción (o antes de pasar a la canción anterior o siguiente), la app consulta la API y **`yt-dlp`** resuelve el flujo de reproducción con letras sincronizadas automáticas desde **LRCLIB**.
+- **Buscador API Dual (`YT MUSIC` + `YOUTUBE`) + Motor de Reproducción Online Configurable (`yt-dlp` por defecto)**:
+  - Nueva pestaña **Explorar** en la barra inferior: busca canciones al instante mediante nuestra **API de consulta dual** (sin usar `yt-dlp` para buscar), mostrando indicadores visuales claros para distinguir pistas de **`YT MUSIC`** (YouTube Music) y **`YOUTUBE`**.
+  - **Nuevo Apartado en Ajustes ("Motor de Reproducción & Descarga Online")**: Elige desde una tarjeta dedicada en el menú principal de **Ajustes** con qué motor escuchar y descargar videos online (**`yt-dlp + Cookies`** seleccionado por defecto por ser el más estable, o **Piped API**, **InnerTube Nativo**, **Invidious Proxy** o **WebView Móvil**). Si el motor seleccionado falla, en compilaciones Debug registra el código crudo exacto en **Aura Monitor** y en **Aura Beta** muestra un aviso claro en pantalla.
 - **Pre-Descarga No Lineal Adelantada (Read-Ahead Buffer) & Caché Inteligente de 30 Minutos (`StreamingCacheManager`)**:
   - Mientras escuchas una canción en streaming, Aura Music **pre-descarga por adelantado los siguientes minutos** de la canción (igual que hace YouTube) en segundo plano mediante bloques `HTTP Range`.
   - **Caché para Música y Videos de Fondo (50 MB por defecto hasta 500 MB)**: Configurable por el usuario en **Ajustes > Aura Dinámica, Streaming & Modo Juego**. Permite volver a la canción anterior o repetirla en bucle de forma instantánea sin gastar datos. Los archivos en caché se eliminan automáticamente tras **30 minutos sin usarse**, o eliminando primero las canciones más antiguas (*LRU*) si se llena el límite de hasta 500 MB.

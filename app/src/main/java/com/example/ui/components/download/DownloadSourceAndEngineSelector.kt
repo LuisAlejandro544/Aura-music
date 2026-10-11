@@ -117,6 +117,12 @@ fun DownloadSourceAndEngineSelector(
                     modifier = Modifier.testTag("engine_chip_innertube")
                 )
                 FilterChip(
+                    selected = selectedEngine == YoutubeExtractionEngine.INVIDIOUS,
+                    onClick = { onEngineSelected(YoutubeExtractionEngine.INVIDIOUS) },
+                    label = { Text("Invidious", fontSize = 11.sp) },
+                    modifier = Modifier.testTag("engine_chip_invidious")
+                )
+                FilterChip(
                     selected = selectedEngine == YoutubeExtractionEngine.WEBVIEW,
                     onClick = { onEngineSelected(YoutubeExtractionEngine.WEBVIEW) },
                     label = { Text("WebView", fontSize = 11.sp) },
@@ -128,6 +134,7 @@ fun DownloadSourceAndEngineSelector(
                     YoutubeExtractionEngine.YTDLP -> "✅ Motor nativo con cookies reales del WebView (--cookies cookies.txt) y respaldo automático Piped / InnerTube / Invidious."
                     YoutubeExtractionEngine.PIPED -> "🌐 Red abierta de servidores Piped API sin anuncios con proxy anti-403 para YouTube y YouTube Music."
                     YoutubeExtractionEngine.INNERTUBE -> "⚡ API directa de YouTube Music (ANDROID_VR / IOS / TV + visitorData) con respaldo Invidious Proxy."
+                    YoutubeExtractionEngine.INVIDIOUS -> "🛡️ Nodos abiertos Invidious API v1 con túnel proxy ?local=true para eludir bloqueos de IP."
                     YoutubeExtractionEngine.WEBVIEW -> "🌍 Navegador móvil en segundo plano que extrae el flujo en vivo y refresca automáticamente cookies.txt."
                 },
                 style = MaterialTheme.typography.labelSmall.copy(

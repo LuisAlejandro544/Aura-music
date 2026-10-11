@@ -741,22 +741,28 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
     }
 
     // -------------------------------------------------------------------------
-    // 4. Aprovisionamiento de FFmpeg Nativo Puro Multi-ABI + Lanzador PIE (Sin Duplicación .zip.so ni librerías no usadas)
+    // 4. Aprovisionamiento de FFmpeg Nativo Puro Multi-ABI + Lanzador PIE (Sin Duplicación .zip.so ni ffmpeg-kit Java/abidetect)
     // -------------------------------------------------------------------------
     val resolvedFfmpegFiles = try { ffmpegRuntimeFiles.files } catch (_: Throwable) { emptySet<File>() }
     val ffmpegAarFile = resolvedFfmpegFiles.firstOrNull { it.name.endsWith(".aar") || it.name.endsWith(".zip") }
     val ffmpegLauncherC = File(cppDir, "native_ffmpeg_launcher.c")
+    val avdeviceStubC = File(cppDir, "native_avdevice_stub.c")
+    val avdeviceVer = File(cppDir, "libavdevice.ver")
+    val cxxRuntimeStubC = File(cppDir, "native_cxx_runtime_stub.c")
     val prunedFfmpegLibs = setOf(
       "libc++_shared.so",
       "libavdevice.so",
       "libavdevice_neon.so",
-      "libffmpegkit_abidetect.so"
+      "libffmpegkit_abidetect.so",
+      "libffmpegkit.so",
+      "libffmpegkit_armv7a_neon.so"
     )
 
     for (abi in abis) {
       val abiDir = File(jniLibsDir, abi).apply { mkdirs() }
-      // Eliminar cualquier libffmpeg.zip.so duplicado anterior y librerías FFmpeg innecesarias (libavdevice, abidetect)
+      // Eliminar cualquier libffmpeg.zip.so duplicado anterior y librerías pesadas o de ffmpeg-kit obsoletas
       File(abiDir, "libffmpeg.zip.so").delete()
+      File(abiDir, "libffmpeg_cli_neon.so").delete()
       prunedFfmpegLibs.forEach { File(abiDir, it).delete() }
       val ffmpegSo = File(abiDir, "libffmpeg.so")
 
@@ -766,10 +772,15 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
           while (entries.hasMoreElements()) {
             val entry = entries.nextElement()
             if (!entry.isDirectory && entry.name.startsWith("jni/$abi/") && entry.name.endsWith(".so")) {
-              val soName = File(entry.name).name
-              if (soName !in prunedFfmpegLibs) {
+              val rawSoName = File(entry.name).name
+              // Renombrar el punto de entrada C de FFmpeg a libffmpeg_cli.so puro para independencia total en las 4 ABIs
+              val targetSoName = when (rawSoName) {
+                "libffmpegkit.so", "libffmpegkit_armv7a_neon.so" -> "libffmpeg_cli.so"
+                else -> rawSoName
+              }
+              if (rawSoName !in prunedFfmpegLibs || targetSoName == "libffmpeg_cli.so") {
                 val soBytes = aarZip.getInputStream(entry).use { it.readBytes() }
-                val directSo = File(abiDir, soName)
+                val directSo = File(abiDir, targetSoName)
                 directSo.writeBytes(soBytes)
                 directSo.setExecutable(true, false)
               }
@@ -781,6 +792,50 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
       val compilerInfo = findCompilerForAbi(abi)
       if (compilerInfo != null) {
         val (clangBin, archFlags) = compilerInfo
+
+        // 4.1 Compilar implementación C17 ultra-ligera (~4 KB) de libc++_shared.so requerida por DT_NEEDED de libavcodec.so
+        if (cxxRuntimeStubC.exists()) {
+          val cxxSo = File(abiDir, "libc++_shared.so")
+          val cxxCmd = mutableListOf(clangBin, "-shared", "-fPIC") +
+            archFlags +
+            listOf(
+              "-Oz",
+              "-fvisibility=default",
+              "-Wl,-soname,libc++_shared.so",
+              "-Wl,-s",
+              cxxRuntimeStubC.absolutePath,
+              "-lc",
+              "-o",
+              cxxSo.absolutePath
+            )
+          ProcessBuilder(cxxCmd).start().waitFor()
+          cxxSo.setExecutable(true, false)
+        }
+
+        // 4.2 Compilar implementación C17 ultra-ligera (~4 KB) de libavdevice.so con versión ELF LIBAVDEVICE_60 exacta
+        if (avdeviceStubC.exists() && avdeviceVer.exists()) {
+          val avdeviceSo = File(abiDir, "libavdevice.so")
+          val avdevCmd = mutableListOf(clangBin, "-shared", "-fPIC") +
+            archFlags +
+            listOf(
+              "-Oz",
+              "-fvisibility=default",
+              "-Wl,-soname,libavdevice.so",
+              "-Wl,--version-script=${avdeviceVer.absolutePath}",
+              "-Wl,-s",
+              avdeviceStubC.absolutePath,
+              "-lc",
+              "-o",
+              avdeviceSo.absolutePath
+            )
+          ProcessBuilder(avdevCmd).start().waitFor()
+          avdeviceSo.setExecutable(true, false)
+          if (abi == "armeabi-v7a") {
+            avdeviceSo.copyTo(File(abiDir, "libavdevice_neon.so"), overwrite = true)
+          }
+        }
+
+        // 4.3 Compilar lanzador PIE nativo libffmpeg.so enlazado con rpath $ORIGIN
         val cmd = mutableListOf(clangBin, "-pie", "-fPIE") + sizeOptFlags + archFlags +
           listOf("-Wl,-rpath,\$ORIGIN", ffmpegLauncherC.absolutePath, "-ldl", "-o", ffmpegSo.absolutePath)
         ProcessBuilder(cmd).start().waitFor()
@@ -822,7 +877,7 @@ val ensureDebugKeystore = tasks.register<EnsureDebugKeystoreTask>("ensureDebugKe
 
 val provisionNativeDeps = tasks.register<ProvisionNativeDepsTask>("provisionNativeDeps") {
   dependsOn(ensureDebugKeystore)
-  provisionVersion.set("v2.4-ytdlp-vevo-restored")
+  provisionVersion.set("v2.5-pure-ffmpeg-cli-no-abidetect")
   val mobileOnlyMode = gradle.startParameter.taskNames.any { it.contains("Beta", ignoreCase = true) } ||
     System.getenv("AURA_BETA_MOBILE_ONLY") == "true" ||
     System.getenv("AURA_SPLIT_APKS") == "true"

@@ -48,7 +48,10 @@ app/
 │   │   │   ├── dsp_crossfeed.h                 # Filtro Crossfeed acústico binaural Chu Moy
 │   │   │   ├── dsp_reverb.h                    # Reverb digital Schroeder con líneas de retardo
 │   │   │   ├── dsp_bitperfect.h                # Motor Bit-Perfect 1:1 y salida AAudio Ultra-Baja Latencia
-│   │   │   ├── native_ffmpeg_launcher.c        # Invocación directa POSIX a FFmpeg
+│   │   │   ├── native_ffmpeg_launcher.c        # Invocación directa POSIX a libffmpeg_cli.so (0% ffmpeg-kit/abidetect)
+│   │   │   ├── native_avdevice_stub.c          # Implementación C17 ligera (~4 KB) de LIBAVDEVICE_60 para linker64
+│   │   │   ├── native_cxx_runtime_stub.c       # Implementación C17 ligera (~5 KB) de ABI C++ para libavcodec.so
+│   │   │   ├── libavdevice.ver                 # Script de versionado ELF LIBAVDEVICE_60
 │   │   │   ├── native_quickjs_cli.c            # Intérprete QuickJS C99
 │   │   │   └── native_python_launcher.c        # Embebedor CPython 3.11
 │   │   │
@@ -104,8 +107,9 @@ app/
 │   │       │       ├── lyrics/                 # Motor de Letras Sincronizadas (.LRC / .TXT)
 │   │       │       │   └── LyricsManager.kt    # Descarga de letras sincronizadas LRCLIB y caché
 │   │       │       ├── mixtape/                # Motor de Fusión Continua y Auto-Remix / Mashup de 2 Canciones Locales
-│   │       │       │   ├── MixtapeEngine.kt         # Fusión FFmpeg acrossfade, collage WebP y capítulos
-│   │       │       │   └── SmartAutoRemixEngine.kt  # Auto-Remix de 2 canciones locales (Mashup Voz A + Base B / Remix Alternado DJ) y Auto-Match
+│   │       │       │   ├── MixtapeEngine.kt              # Fusión FFmpeg acrossfade, collage WebP y capítulos
+│   │       │       │   ├── SmartAutoRemixEngine.kt       # Auto-Remix de 2 canciones locales (Mashup Voz A + Base B / Remix Alternado DJ) con sincronización atempo
+│   │       │       │   └── AutoRemixAcousticAnalyzer.kt  # Analizador acústico real de BPM (autocorrelación de onsets) y energía RMS para Auto-Match y atempo
 │   │       │       ├── download/               # Acelerador de Descargas HTTP Range
 │   │       │       │   └── ChunkedStreamDownloader.kt # Descarga acelerada HTTP Range multi-bloque
 │   │       │       └── tiktok/                 # Resolución Directa de TikTok
@@ -151,10 +155,11 @@ app/
 │   │       ├── model/                          # Modelos de Dominio y Datos
 │   │       │   ├── Track.kt
 │   │       │   ├── Playlist.kt
+│   │       │   ├── CollectionCustomMetadata.kt      # Metadatos personalizados (foto WebP y descripción/biografía) de Álbumes y Artistas
 │   │       │   ├── StreamingModels.kt               # Modelos de búsqueda streaming, plataformas (YT Music/YouTube) y caché
 │   │       │   ├── WidgetModels.kt                  # Modelos de configuración y estado persistido de Widgets
 │   │       │   ├── AppUpdateModels.kt               # Modelos de estado y metadatos de actualización APK
-│   │       │   ├── MixtapeModels.kt                 # Modelos de capítulos y metadatos de Mixtape
+│   │       │   ├── MixtapeModels.kt                 # Modelos de capítulos, perfil acústico BPM/Energía y metadatos de Mixtape
 │   │       │   ├── LyricsState.kt
 │   │       │   ├── LyricSearchResult.kt
 │   │       │   ├── EqualizerConfig.kt

@@ -67,6 +67,8 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
     val selectedPlaylist by viewModel.selectedPlaylist.collectAsStateWithLifecycle()
     val selectedPlaylistTracks by viewModel.selectedPlaylistTracks.collectAsStateWithLifecycle()
+    val customAlbumsMetadata by viewModel.customAlbumsMetadata.collectAsStateWithLifecycle()
+    val customArtistsMetadata by viewModel.customArtistsMetadata.collectAsStateWithLifecycle()
 
     // Estados de UI y Ecualizador
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
@@ -469,7 +471,9 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
                                 },
                                 isCreatingMixtape = isCreatingMixtape,
                                 mixtapeProgress = mixtapeProgress,
-                                mixtapeStatusMessage = mixtapeStatusMessage
+                                mixtapeStatusMessage = mixtapeStatusMessage,
+                                customAlbumsMetadata = customAlbumsMetadata,
+                                customArtistsMetadata = customArtistsMetadata
                             )
 
                             is NavScreen.Import -> ImportMusicScreen(
@@ -541,6 +545,7 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
 
                             is NavScreen.Settings -> {
                                 val widgetConfig by viewModel.widgetConfig.collectAsStateWithLifecycle()
+                                val onlineExtractionEngine by viewModel.onlineExtractionEngine.collectAsStateWithLifecycle()
                                 SettingsScreen(
                                     currentTheme = viewModel.currentTheme.collectAsStateWithLifecycle().value,
                                     onSelectTheme = { viewModel.setTheme(it) },
@@ -561,6 +566,8 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
                                     onChangeWallpaperBlurDp = { viewModel.setAppWallpaperBlurDp(it) },
                                     nowPlayingDesignMode = nowPlayingDesignMode,
                                     onSetNowPlayingDesignMode = { viewModel.setNowPlayingDesignMode(it) },
+                                    onlineExtractionEngine = onlineExtractionEngine,
+                                    onSelectOnlineExtractionEngine = { viewModel.setOnlineExtractionEngine(it) },
                                     widgetConfig = widgetConfig,
                                     currentTrack = effectiveTrack,
                                     topPlayedTracks = topPlayedTracks,

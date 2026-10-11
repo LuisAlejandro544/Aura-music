@@ -289,10 +289,15 @@ class AuraDownloadService : Service() {
     private val activeTaskCount = AtomicInteger(0)
 
     override fun attachBaseContext(newBase: Context?) {
-        // Precalentar los recursos del ApplicationContext antes de adjuntar el ContextImpl del Service
-        // para que ROMs OEM (Xiaomi/MIUI/vivo/ColorOS) nunca registren el ContextImpl del servicio en ResourcesImpl.mAppContext.
+        // Precalentar los recursos y servicios base del ApplicationContext antes de adjuntar el ContextImpl del Service
+        // para que ROMs OEM (TECNO HiOS, Xiaomi/MIUI, vivo, ColorOS) nunca registren el ContextImpl del servicio
+        // en ResourcesImpl.mAppContext ni inicialicen VirtualDeviceManager sobre el Service.
         try {
-            newBase?.applicationContext?.resources
+            val appCtx = newBase?.applicationContext
+            appCtx?.resources
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                appCtx?.getSystemService("virtualdevice")
+            }
         } catch (_: Throwable) {}
         super.attachBaseContext(newBase)
     }
@@ -304,6 +309,16 @@ class AuraDownloadService : Service() {
         } else {
             super.getResources()
         }
+    }
+
+    override fun getSystemService(name: String): Any? {
+        val appCtx = applicationContext
+        if (appCtx != null && appCtx !== this) {
+            // Delegar servicios de sistema (especialmente VirtualDeviceManager en Android 14+ y NotificationManager)
+            // al ApplicationContext para evitar que ContextImpl.mServiceCache retenga mContext = AuraDownloadService.
+            return appCtx.getSystemService(name)
+        }
+        return super.getSystemService(name)
     }
 
     override fun onCreate() {

@@ -36,6 +36,7 @@ import com.example.model.WidgetGridContentMode
 import com.example.ui.screens.settings.components.*
 import com.example.ui.screens.settings.components.about.behindTheProjectSettingsContent
 import com.example.ui.screens.settings.components.appearance.appWallpaperSettingsSection
+import com.example.ui.screens.settings.components.appearance.onlineExtractionEngineSettingsSection
 import com.example.ui.screens.settings.components.widgets.widgetSettingsContent
 import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.TextPrimary
@@ -50,6 +51,7 @@ import androidx.compose.ui.graphics.Color
 enum class SettingsSubScreen {
     MAIN_MENU,
     PLAYER_DESIGN,
+    ONLINE_EXTRACTION_ENGINE,
     VISUAL_BEHAVIOR,
     VISUAL_STREAMING_AND_CACHE,
     VISUAL_AURA_AND_MINIPLAYER,
@@ -96,6 +98,9 @@ fun SettingsScreen(
     onChangeWallpaperBlurDp: (Int) -> Unit = {},
     nowPlayingDesignMode: NowPlayingDesignMode = NowPlayingDesignMode.AUTO,
     onSetNowPlayingDesignMode: (NowPlayingDesignMode) -> Unit = {},
+    // Motor de descarga y reproducción online para escuchar videos (por defecto yt-dlp)
+    onlineExtractionEngine: com.example.data.importer.YoutubeExtractionEngine = com.example.data.importer.YoutubeExtractionEngine.YTDLP,
+    onSelectOnlineExtractionEngine: (com.example.data.importer.YoutubeExtractionEngine) -> Unit = {},
     // Configuración de Widgets de Escritorio
     widgetConfig: WidgetConfig = WidgetConfig(),
     currentTrack: Track? = null,
@@ -216,11 +221,13 @@ fun SettingsScreen(
                         isBackgroundGameModeEnabled = isBackgroundGameModeEnabled,
                         appWallpaperConfig = appWallpaperConfig,
                         nowPlayingDesignMode = nowPlayingDesignMode,
+                        onlineExtractionEngine = onlineExtractionEngine,
                         isHeadphoneConnected = headphoneConfig.isHeadphoneConnected,
                         connectedDeviceName = headphoneConfig.connectedDeviceName,
                         mediaCount = mediaCount,
                         widgetConfig = widgetConfig,
                         onOpenPlayerDesign = { activeSubScreen = SettingsSubScreen.PLAYER_DESIGN },
+                        onOpenOnlineEngine = { activeSubScreen = SettingsSubScreen.ONLINE_EXTRACTION_ENGINE },
                         onOpenVisualBehavior = { activeSubScreen = SettingsSubScreen.VISUAL_BEHAVIOR },
                         onOpenThemePalettes = { activeSubScreen = SettingsSubScreen.THEME_PALETTES },
                         onOpenWidgets = { activeSubScreen = SettingsSubScreen.WIDGETS },
@@ -246,6 +253,23 @@ fun SettingsScreen(
                     playerDesignSettingsContent(
                         currentDesignMode = nowPlayingDesignMode,
                         onSetDesignMode = onSetNowPlayingDesignMode
+                    )
+                }
+            }
+
+            // PANTALLA INDEPENDIENTE 2: MOTOR DE REPRODUCCIÓN & DESCARGA ONLINE (YT-DLP POR DEFECTO)
+            SettingsSubScreen.ONLINE_EXTRACTION_ENGINE -> {
+                SettingsSubMenuScreen(
+                    title = "Motor de Reproducción Online",
+                    subtitle = "Selecciona el motor para escuchar y descargar videos online (yt-dlp por defecto)",
+                    icon = Icons.Default.Build,
+                    iconTint = MaterialTheme.colorScheme.primary,
+                    onBack = { activeSubScreen = SettingsSubScreen.MAIN_MENU },
+                    testTag = "subscreen_online_extraction_engine"
+                ) {
+                    onlineExtractionEngineSettingsSection(
+                        selectedEngine = onlineExtractionEngine,
+                        onSelectEngine = onSelectOnlineExtractionEngine
                     )
                 }
             }

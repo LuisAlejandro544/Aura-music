@@ -133,12 +133,31 @@ enum class AutoRemixStyle(
 }
 
 /**
+ * Perfil acústico detectado de una canción local (BPM rítmico y nivel de energía).
+ */
+data class TrackAcousticProfile(
+    val trackId: Long,
+    val bpm: Int,
+    val energyPercent: Int,
+    val isAnalyzedFromAudio: Boolean = true
+) {
+    val badgeText: String
+        get() = "$bpm BPM • Energía $energyPercent%"
+}
+
+/**
  * Recomendación del algoritmo Auto-Match al emparejar automáticamente 2 canciones locales.
  */
 data class AutoRemixPairRecommendation(
     val trackA: Track,
     val trackB: Track,
     val compatibilityPercent: Int,
-    val reason: String
+    val reason: String,
+    val bpmA: Int = 120,
+    val bpmB: Int = 120,
+    val energyA: Int = 80,
+    val energyB: Int = 80,
+    val targetAtempoB: Double = 1.0
 )
+
 
