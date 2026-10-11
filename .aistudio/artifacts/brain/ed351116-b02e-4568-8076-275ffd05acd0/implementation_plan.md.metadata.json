@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan técnico de actualización a v0.2.0-beta-1a (NEBULA-00200A), corrección del desbordamiento de textos en filas y botones de Ajustes, animación continua de flecha descendente durante la descarga de pistas en Streaming con confirmación (✓) solo al completarse en la biblioteca, y reactividad garantizada de las 28 bandas del visualizador en canciones de Streaming.",
-  "updatedAt":  "2026-10-11T02:22:29.624643418Z",
+  "summary":  "Plan de implementación para:\n1. Pulido del Emparejador de Auto-Remix (SmartAutoRemixEngine) con detección real de BPM y energía acústica sobre audio local y sincronización exacta de tempo (atempo) en FFmpeg.\n2. Soporte completo para asignar foto personalizada (WebP Lossless) y descripción a Álbumes y Artistas desde su pantalla de detalle (icono lápiz / tocar foto), persistido reactivamente en Room.\n3. Actualización aditiva de chanelog-beta.md y sincronización de todos los documentos .md (README.md, READMEAI.md, ROADMAP.md, STRUCTURE.md, AI_CONTEXT.md y AGENTS.md).",
+  "updatedAt":  "2026-10-11T05:06:14.981879096Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

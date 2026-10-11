@@ -35,7 +35,8 @@ object OnlineVideoAudioImporter {
         val audioUrl: String?,
         val coverUrl: String?,
         val durationSeconds: Long,
-        val httpHeaders: Map<String, String> = emptyMap()
+        val httpHeaders: Map<String, String> = emptyMap(),
+        val videoHttpHeaders: Map<String, String> = emptyMap()
     )
 
     /**
@@ -151,6 +152,7 @@ object OnlineVideoAudioImporter {
             // 2. Si no había audio directo o falló, descargar flujo de video (o usar caché local) y demuxear
             if (!audioReady) {
                 val localCachedVideo = if (resolvedInfo.videoUrl.startsWith("/")) File(resolvedInfo.videoUrl) else null
+                val effectiveVideoHeaders = resolvedInfo.videoHttpHeaders.ifEmpty { resolvedInfo.httpHeaders }
                 val downloadVideoSuccess = if (localCachedVideo != null && localCachedVideo.exists() && localCachedVideo.length() > 0L) {
                     localCachedVideo.copyTo(tempVideoFile, overwrite = true)
                     tempVideoFile.exists() && tempVideoFile.length() > 0L
@@ -159,7 +161,7 @@ object OnlineVideoAudioImporter {
                         url = resolvedInfo.videoUrl,
                         targetFile = tempVideoFile,
                         phase = "Descargando flujo multimedia...",
-                        customHeaders = resolvedInfo.httpHeaders,
+                        customHeaders = effectiveVideoHeaders,
                         httpClient = httpClient,
                         onProgress = onProgressUpdate
                     )
@@ -209,21 +211,22 @@ object OnlineVideoAudioImporter {
                 }
             }
 
-            // 3. Fallback inteligente de autoreparación: si el stream devolvió 403 (ej. pistas VEVO protegidas) o falló
+            // 3. Fallback inteligente de autoreparación: si el stream devolvió 403 (ej. pistas VEVO / disqueras protegidas)
             if (!audioReady && WebStreamExtractor.isWebVideoUrl(resolvedInfo.originalUrl)) {
                 val ytId = WebStreamExtractor.extractVideoId(resolvedInfo.originalUrl)
                 if (ytId != null) {
                     AuraDebugManager.logInfo(
                         "OnlineImporter",
-                        "El stream inicial requirió autoreparación (posible bloqueo VEVO/403). Resolviendo stream firmado con yt-dlp / InnerTube / Invidious..."
+                        "El stream inicial requirió autoreparación (posible bloqueo VEVO/403). Probando en cascada InnerTube -> Invidious -> descarga directa yt-dlp -> WebView..."
                     )
-                    val freshInfo = (if (YtDlpNativeEngine.isAvailable(context)) {
-                        YtDlpNativeEngine.resolveStream(context, resolvedInfo.originalUrl).getOrNull()
-                    } else null)
-                        ?: InnerTubeClient.resolve(ytId, resolvedInfo.originalUrl)
-                        ?: InvidiousStreamResolver.resolve(ytId, resolvedInfo.originalUrl)
 
-                    if (freshInfo != null) {
+                    val fallbackCandidates = listOfNotNull(
+                        InnerTubeClient.resolve(ytId, resolvedInfo.originalUrl),
+                        InvidiousStreamResolver.resolve(ytId, resolvedInfo.originalUrl)
+                    )
+
+                    for (freshInfo in fallbackCandidates) {
+                        if (audioReady) break
                         if (!freshInfo.audioUrl.isNullOrBlank()) {
                             val backupAudioSuccess = ChunkedStreamDownloader.downloadUrlToFile(
                                 url = freshInfo.audioUrl,
@@ -235,15 +238,16 @@ object OnlineVideoAudioImporter {
                             )
                             if (backupAudioSuccess && audioFile.exists() && audioFile.length() > 0L) {
                                 audioReady = true
+                                break
                             }
                         }
 
-                        if (!audioReady && !freshInfo.videoUrl.isNullOrBlank()) {
+                        if (!audioReady && freshInfo.videoUrl.isNotBlank()) {
                             val backupVideoSuccess = ChunkedStreamDownloader.downloadUrlToFile(
                                 url = freshInfo.videoUrl,
                                 targetFile = tempVideoFile,
                                 phase = "Descargando flujo multimedia...",
-                                customHeaders = freshInfo.httpHeaders,
+                                customHeaders = freshInfo.videoHttpHeaders.ifEmpty { freshInfo.httpHeaders },
                                 httpClient = httpClient,
                                 onProgress = onProgressUpdate
                             )
@@ -274,6 +278,38 @@ object OnlineVideoAudioImporter {
                                     tempVideoFile.copyTo(audioFile, overwrite = true)
                                     audioReady = true
                                 }
+                            }
+                        }
+                    }
+
+                    // Si OkHttp siguió recibiendo 403 en el CDN, ejecutar descarga directa nativa desde el propio proceso de yt-dlp
+                    if (!audioReady && YtDlpNativeEngine.isAvailable(context)) {
+                        val directYtDlpOk = YtDlpNativeEngine.downloadStreamDirectWithYtDlp(
+                            context = context,
+                            url = resolvedInfo.originalUrl,
+                            targetFile = audioFile,
+                            videoOnly480p = false,
+                            onProgress = onProgressUpdate
+                        )
+                        if (directYtDlpOk && audioFile.exists() && audioFile.length() > 0L) {
+                            audioReady = true
+                        }
+                    }
+
+                    // Última línea de defensa: HeadlessWebViewExtractor
+                    if (!audioReady) {
+                        val webFallback = HeadlessWebViewExtractor.resolve(context, ytId, resolvedInfo.originalUrl)
+                        if (webFallback != null && !webFallback.audioUrl.isNullOrBlank()) {
+                            val webOk = ChunkedStreamDownloader.downloadUrlToFile(
+                                url = webFallback.audioUrl,
+                                targetFile = audioFile,
+                                phase = "Descargando audio con motor WebView...",
+                                customHeaders = webFallback.httpHeaders,
+                                httpClient = httpClient,
+                                onProgress = onProgressUpdate
+                            )
+                            if (webOk && audioFile.exists() && audioFile.length() > 0L) {
+                                audioReady = true
                             }
                         }
                     }

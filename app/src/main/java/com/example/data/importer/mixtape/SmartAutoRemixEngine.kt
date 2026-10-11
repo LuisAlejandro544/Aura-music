@@ -61,7 +61,8 @@ object SmartAutoRemixEngine {
     }
 
     /**
-     * Selecciona automáticamente las 2 canciones locales que mejor combinan para un Auto-Remix / Mashup.
+     * Selecciona automáticamente las 2 canciones locales que mejor combinan para un Auto-Remix / Mashup
+     * evaluando afinidad real de BPM (o relación armónica 2:1), energía acústica, duración y contraste vocal.
      * Si [seedIteration] cambia, rota entre las mejores combinaciones puntuadas para ofrecer variedad al usuario.
      */
     fun findBestMatchingPair(
@@ -75,7 +76,12 @@ object SmartAutoRemixEngine {
             val a: Track,
             val b: Track,
             val score: Int,
-            val reason: String
+            val reason: String,
+            val bpmA: Int,
+            val bpmB: Int,
+            val energyA: Int,
+            val energyB: Int,
+            val targetAtempoB: Double
         )
 
         val candidates = mutableListOf<ScoredPair>()
@@ -87,26 +93,49 @@ object SmartAutoRemixEngine {
                 val t2 = subset[j]
                 val dur1 = t1.durationMs.coerceAtLeast(30_000L)
                 val dur2 = t2.durationMs.coerceAtLeast(30_000L)
-                val ratio = min(dur1, dur2).toDouble() / max(dur1, dur2).toDouble()
+                val durRatio = min(dur1, dur2).toDouble() / max(dur1, dur2).toDouble()
 
-                // Puntuación base por cercanía de estructura temporal (75 a 98%)
-                var score = (72 + (ratio * 22.0)).toInt().coerceIn(72, 96)
+                val profile1 = AutoRemixAcousticAnalyzer.getCachedOrFastProfile(t1)
+                val profile2 = AutoRemixAcousticAnalyzer.getCachedOrFastProfile(t2)
+                val (rhythmicScore, bpmDeltaPct) = AutoRemixAcousticAnalyzer.evaluateRhythmicCompatibility(profile1, profile2)
+                val atempoB = AutoRemixAcousticAnalyzer.computeOptimalAtempoForTrackB(profile1.bpm, profile2.bpm)
+
+                var score = (rhythmicScore * 0.78 + (74.0 + durRatio * 22.0) * 0.22).toInt()
                 val differentArtist = !t1.artist.equals(t2.artist, ignoreCase = true)
-                if (differentArtist) score += 3
-                if (t1.isFavorite || t2.isFavorite) score += 2
+                if (differentArtist) score += 2
+                if (t1.isFavorite || t2.isFavorite) score += 1
                 if (!t1.videoUri.isNullOrBlank() || !t2.videoUri.isNullOrBlank()) score += 1
                 val clampedScore = score.coerceIn(78, 99)
 
-                val reason = when {
-                    ratio >= 0.88 && differentArtist ->
-                        "Compatibilidad rítmica del $clampedScore% • Estructuras de duración gemelas y contraste vocal ideal"
-                    differentArtist ->
-                        "Compatibilidad armónica del $clampedScore% • Contraste de voces (${t1.artist} × ${t2.artist})"
-                    else ->
-                        "Compatibilidad de estudio del $clampedScore% • Mismo estilo acústico y cadencia fluida"
+                val tempoShiftPct = ((atempoB - 1.0) * 100.0)
+                val tempoShiftLabel = if (abs(tempoShiftPct) < 0.35) {
+                    "Tempo exacto 1:1"
+                } else {
+                    String.format(Locale.US, "Beat-Sync %+.1f%%", tempoShiftPct)
                 }
 
-                candidates.add(ScoredPair(t1, t2, clampedScore, reason))
+                val reason = when {
+                    bpmDeltaPct <= 4.5 && differentArtist ->
+                        "Compatibilidad rítmica del $clampedScore% • ${profile1.bpm} BPM × ${profile2.bpm} BPM ($tempoShiftLabel) y energía complementaria (${profile1.energyPercent}% / ${profile2.energyPercent}%)"
+                    differentArtist ->
+                        "Compatibilidad armónica del $clampedScore% • ${profile1.bpm} BPM × ${profile2.bpm} BPM ($tempoShiftLabel) • Contraste vocal (${t1.artist} × ${t2.artist})"
+                    else ->
+                        "Compatibilidad de estudio del $clampedScore% • ${profile1.bpm} BPM × ${profile2.bpm} BPM ($tempoShiftLabel) y energía al ${profile1.energyPercent}%"
+                }
+
+                candidates.add(
+                    ScoredPair(
+                        a = t1,
+                        b = t2,
+                        score = clampedScore,
+                        reason = reason,
+                        bpmA = profile1.bpm,
+                        bpmB = profile2.bpm,
+                        energyA = profile1.energyPercent,
+                        energyB = profile2.energyPercent,
+                        targetAtempoB = atempoB
+                    )
+                )
             }
         }
 
@@ -116,11 +145,24 @@ object SmartAutoRemixEngine {
         val chosen = topPool[abs(seedIteration) % topPool.size]
         val swapOrder = (abs(seedIteration) % 2) == 1
 
+        val finalA = if (swapOrder) chosen.b else chosen.a
+        val finalB = if (swapOrder) chosen.a else chosen.b
+        val finalBpmA = if (swapOrder) chosen.bpmB else chosen.bpmA
+        val finalBpmB = if (swapOrder) chosen.bpmA else chosen.bpmB
+        val finalEnergyA = if (swapOrder) chosen.energyB else chosen.energyA
+        val finalEnergyB = if (swapOrder) chosen.energyA else chosen.energyB
+        val finalAtempoB = AutoRemixAcousticAnalyzer.computeOptimalAtempoForTrackB(finalBpmA, finalBpmB)
+
         return AutoRemixPairRecommendation(
-            trackA = if (swapOrder) chosen.b else chosen.a,
-            trackB = if (swapOrder) chosen.a else chosen.b,
+            trackA = finalA,
+            trackB = finalB,
             compatibilityPercent = chosen.score,
-            reason = chosen.reason
+            reason = chosen.reason,
+            bpmA = finalBpmA,
+            bpmB = finalBpmB,
+            energyA = finalEnergyA,
+            energyB = finalEnergyB,
+            targetAtempoB = finalAtempoB
         )
     }
 
@@ -174,13 +216,31 @@ object SmartAutoRemixEngine {
             val realDurAMs = resolveRealAudioDurationMs(fileA, trackA.durationMs).coerceIn(12_000L, 360_000L)
             val realDurBMs = resolveRealAudioDurationMs(fileB, trackB.durationMs).coerceIn(12_000L, 360_000L)
 
+            onProgress?.invoke(0.19f, "Detectando BPM y energía rítmica para sincronizar tempo...")
+            val profileA = AutoRemixAcousticAnalyzer.analyzeTrack(context, trackA)
+            val profileB = AutoRemixAcousticAnalyzer.analyzeTrack(context, trackB)
+            val bpmBasedAtempoB = AutoRemixAcousticAnalyzer.computeOptimalAtempoForTrackB(
+                bpmA = profileA.bpm,
+                bpmB = profileB.bpm,
+                minTempo = 0.88,
+                maxTempo = 1.14
+            )
+
             val (primaryFilterComplex, expectedDurationMs, chapters) = when (style) {
-                AutoRemixStyle.VOCAL_MASHUP -> buildVocalMashupPlan(trackA, trackB, realDurAMs, realDurBMs, useCompatibleFiltersOnly = false)
+                AutoRemixStyle.VOCAL_MASHUP -> buildVocalMashupPlan(
+                    trackA = trackA,
+                    trackB = trackB,
+                    durAMs = realDurAMs,
+                    durBMs = realDurBMs,
+                    targetAtempoB = bpmBasedAtempoB,
+                    useCompatibleFiltersOnly = false
+                )
                 AutoRemixStyle.DJ_ALTERNATING_REMIX -> buildAlternatingDjRemixPlan(
                     trackA = trackA,
                     trackB = trackB,
                     durAMs = realDurAMs,
                     durBMs = realDurBMs,
+                    targetAtempoB = bpmBasedAtempoB,
                     crossfadeSeconds = crossfadeSeconds.coerceIn(3, 10),
                     useCompatibleFiltersOnly = false
                 )
@@ -209,7 +269,7 @@ object SmartAutoRemixEngine {
             )
 
             val styleLabel = if (style == AutoRemixStyle.VOCAL_MASHUP) "Mashup Vocal + Base" else "Remix Alternado DJ"
-            onProgress?.invoke(0.24f, "Renderizando $styleLabel en estudio...")
+            onProgress?.invoke(0.24f, "Renderizando $styleLabel (${profileA.bpm} BPM × ${profileB.bpm} BPM)...")
 
             var success = executeFFmpeg(
                 context = context,
@@ -233,12 +293,20 @@ object SmartAutoRemixEngine {
                 )
                 if (outputAudioFile.exists()) outputAudioFile.delete()
                 val (compatFilterComplex, _, _) = when (style) {
-                    AutoRemixStyle.VOCAL_MASHUP -> buildVocalMashupPlan(trackA, trackB, realDurAMs, realDurBMs, useCompatibleFiltersOnly = true)
+                    AutoRemixStyle.VOCAL_MASHUP -> buildVocalMashupPlan(
+                        trackA = trackA,
+                        trackB = trackB,
+                        durAMs = realDurAMs,
+                        durBMs = realDurBMs,
+                        targetAtempoB = bpmBasedAtempoB,
+                        useCompatibleFiltersOnly = true
+                    )
                     AutoRemixStyle.DJ_ALTERNATING_REMIX -> buildAlternatingDjRemixPlan(
                         trackA = trackA,
                         trackB = trackB,
                         durAMs = realDurAMs,
                         durBMs = realDurBMs,
+                        targetAtempoB = bpmBasedAtempoB,
                         crossfadeSeconds = crossfadeSeconds.coerceIn(3, 10),
                         useCompatibleFiltersOnly = true
                     )
@@ -343,20 +411,21 @@ object SmartAutoRemixEngine {
     }
 
     /**
-     * Construye el grafo FFmpeg para el Modo 1: Mashup (Voz Canción A + Base Instrumental Canción B).
+     * Construye el grafo FFmpeg para el Modo 1: Mashup (Voz Canción A + Base Instrumental Canción B)
+     * sincronizando el tempo (`atempo`) de la Base B con el BPM real detectado de la Canción A.
      */
     private fun buildVocalMashupPlan(
         trackA: Track,
         trackB: Track,
         durAMs: Long,
         durBMs: Long,
+        targetAtempoB: Double,
         useCompatibleFiltersOnly: Boolean
     ): Triple<String, Long, List<MixtapeChapter>> {
         val targetDurationSec = (min(durAMs, durBMs).coerceIn(12_000L, 210_000L) / 1000L).toInt().coerceAtLeast(10)
         val targetDurationMs = targetDurationSec * 1000L
 
-        val rawRatio = durBMs.toDouble() / durAMs.toDouble()
-        val safeTempoB = rawRatio.coerceIn(0.94, 1.06)
+        val safeTempoB = targetAtempoB.coerceIn(0.88, 1.14)
         val tempoFilterB = String.format(Locale.US, "atempo=%.3f,", safeTempoB)
 
         val filter = StringBuilder()
@@ -417,13 +486,15 @@ object SmartAutoRemixEngine {
     }
 
     /**
-     * Construye el grafo FFmpeg para el Modo 2: Remix Alternado DJ con Sincronización de Ritmo.
+     * Construye el grafo FFmpeg para el Modo 2: Remix Alternado DJ con Sincronización de Ritmo (`atempo`)
+     * calculado a partir de la relación real de BPM entre ambas canciones.
      */
     private fun buildAlternatingDjRemixPlan(
         trackA: Track,
         trackB: Track,
         durAMs: Long,
         durBMs: Long,
+        targetAtempoB: Double,
         crossfadeSeconds: Int,
         useCompatibleFiltersOnly: Boolean
     ): Triple<String, Long, List<MixtapeChapter>> {
@@ -447,8 +518,7 @@ object SmartAutoRemixEngine {
         val b2Start = min(totalBSec / 2, max(0, totalBSec - segBSec))
         val b2End = min(totalBSec, b2Start + segBSec).coerceAtLeast(b2Start + cf + 2)
 
-        val rawRatio = durBMs.toDouble() / durAMs.toDouble()
-        val safeTempoB = rawRatio.coerceIn(0.95, 1.05)
+        val safeTempoB = targetAtempoB.coerceIn(0.88, 1.14)
         val tempoFilterB = String.format(Locale.US, "atempo=%.3f,", safeTempoB)
 
         val filter = StringBuilder()

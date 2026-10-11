@@ -1,0 +1,4 @@
+LIBAVDEVICE_60 {
+    global:
+        *;
+};

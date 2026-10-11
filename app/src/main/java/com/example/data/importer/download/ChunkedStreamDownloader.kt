@@ -180,8 +180,28 @@ object ChunkedStreamDownloader {
 
         // 2. Descarga lineal estándar de respaldo
         return try {
-            val defaultUa = customHeaders["User-Agent"]
-                ?: customHeaders["user-agent"]
+            val alignedHeaders = if (isGoogleVideoHost || isYoutubeStream) {
+                com.example.data.streaming.StreamingHttpDataSourceConfig.resolveHeadersForStream(
+                    videoId = null,
+                    rawUrl = cleanUrl
+                ).toMutableMap().apply {
+                    for ((k, v) in customHeaders) {
+                        if (!k.equals("User-Agent", ignoreCase = true) &&
+                            !k.equals("Origin", ignoreCase = true) &&
+                            !k.equals("Referer", ignoreCase = true)
+                        ) {
+                            this[k] = v
+                        } else if (!this.containsKey(k)) {
+                            this[k] = v
+                        }
+                    }
+                }
+            } else {
+                customHeaders
+            }
+
+            val defaultUa = alignedHeaders["User-Agent"]
+                ?: alignedHeaders["user-agent"]
                 ?: "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
 
             val reqBuilder = Request.Builder().url(cleanUrl)
@@ -189,32 +209,27 @@ object ChunkedStreamDownloader {
                 .header("Accept", "*/*")
                 .header("Accept-Encoding", "identity")
 
-            for ((k, v) in customHeaders) {
+            for ((k, v) in alignedHeaders) {
                 if (!k.equals("Range", ignoreCase = true) && !k.equals("Accept-Encoding", ignoreCase = true)) {
                     reqBuilder.header(k, v)
                 }
             }
 
-            if (isYoutubeStream && isTrustedYoutubeOrGoogleVideoHost(cleanUrl)) {
-                if (customHeaders.isEmpty()) {
-                    reqBuilder.header("Referer", "https://m.youtube.com/")
-                }
-                try {
-                    val cookies = android.webkit.CookieManager.getInstance().getCookie("https://m.youtube.com")
-                    if (!cookies.isNullOrBlank() && !customHeaders.containsKey("Cookie")) {
-                        reqBuilder.header("Cookie", cookies)
-                    }
-                } catch (_: Throwable) {}
-            }
-
             var response = httpClient.newCall(reqBuilder.build()).execute()
 
-            if (response.code == 403 && (isYoutubeStream || cleanUrl.contains("googlevideo.com"))) {
+            if (response.code == 403 && (isYoutubeStream || isGoogleVideoHost)) {
                 response.close()
+                // Reintentar con el User-Agent nativo inferido de c= sin cabeceras ni cookies adicionales
+                val strictInferredHeaders = com.example.data.streaming.StreamingHttpDataSourceConfig.resolveHeadersForStream(
+                    videoId = null,
+                    rawUrl = cleanUrl
+                )
+                val fallbackUa = strictInferredHeaders["User-Agent"] ?: defaultUa
                 val fallbackReq = Request.Builder()
                     .url(cleanUrl)
-                    .header("User-Agent", defaultUa)
+                    .header("User-Agent", fallbackUa)
                     .header("Accept", "*/*")
+                    .header("Accept-Encoding", "identity")
                     .build()
                 response = httpClient.newCall(fallbackReq).execute()
             }
@@ -305,8 +320,24 @@ object ChunkedStreamDownloader {
         onProgress: (DownloadProgress) -> Unit
     ): Boolean {
         return try {
-            val signedUa = customHeaders["User-Agent"]
-                ?: customHeaders["user-agent"]
+            val alignedHeaders = com.example.data.streaming.StreamingHttpDataSourceConfig.resolveHeadersForStream(
+                videoId = null,
+                rawUrl = url
+            ).toMutableMap().apply {
+                for ((k, v) in customHeaders) {
+                    if (!k.equals("User-Agent", ignoreCase = true) &&
+                        !k.equals("Origin", ignoreCase = true) &&
+                        !k.equals("Referer", ignoreCase = true)
+                    ) {
+                        this[k] = v
+                    } else if (!this.containsKey(k)) {
+                        this[k] = v
+                    }
+                }
+            }
+
+            val signedUa = alignedHeaders["User-Agent"]
+                ?: alignedHeaders["user-agent"]
                 ?: "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
 
             val probeBuilder = Request.Builder()
@@ -314,7 +345,7 @@ object ChunkedStreamDownloader {
                 .header("User-Agent", signedUa)
                 .header("Accept", "*/*")
 
-            for ((k, v) in customHeaders) {
+            for ((k, v) in alignedHeaders) {
                 if (!k.equals("Range", ignoreCase = true) && !k.equals("Accept-Encoding", ignoreCase = true)) {
                     probeBuilder.header(k, v)
                 }

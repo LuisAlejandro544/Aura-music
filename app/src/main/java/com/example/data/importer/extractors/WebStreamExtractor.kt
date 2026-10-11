@@ -2,138 +2,225 @@ package com.example.data.importer
 
 import android.content.Context
 import com.example.debug.AuraDebugManager
-import java.util.regex.Pattern
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
- * Motores de extracción disponibles para YouTube y video web:
- * - YTDLP: Extractor nativo local basado en yt-dlp y FFmpeg con descifrado de firmas en el dispositivo.
- * - INNERTUBE: API nativa directa de YouTube (sin navegador, ultrarrápida, con respaldo multi-cliente e Invidious).
- * - WEBVIEW: Navegador efímero que ejecuta scripts y el reproductor móvil en memoria para capturar el stream.
+ * Motores de extracción seleccionables por el usuario para enlaces de YouTube y Web
+ * tanto al descargar video/música local como al escuchar en Streaming.
  */
 enum class YoutubeExtractionEngine(val label: String, val description: String) {
     YTDLP(
-        "⭐ yt-dlp + FFmpeg (Recomendado • 98%)",
-        "El más recomendable: tiene un 98% de probabilidad de funcionar. Si en algún intento falla, basta con cerrar el cuadro, volver a entrar y pegar el enlace de nuevo."
+        "yt-dlp Nativo",
+        "Motor nativo limpio (Python 3.11 + QuickJS sin cookies) con respaldo automático."
     ),
-    INNERTUBE("InnerTube (Rápido)", "API nativa directa de alta velocidad con bypass inteligente"),
-    WEBVIEW("Motor WebView", "Navegador efímero móvil con ejecución de scripts en segundo plano")
+    INNERTUBE_YTDLP(
+        "InnerTube + yt-dlp",
+        "Modo Híbrido: InnerTube intercepta y resuelve al instante (<300ms) y delega en yt-dlp si requiere descifrado o descarga directa."
+    ),
+    PIPED(
+        "Piped API",
+        "Red abierta sin anuncios con proxy anti-403 para YouTube y YouTube Music."
+    ),
+    INNERTUBE(
+        "InnerTube + Invidious",
+        "API directa de YouTube Music (ANDROID_VR / IOS / TV) + Proxy Invidious."
+    ),
+    INVIDIOUS(
+        "Invidious Proxy",
+        "Red de instancias abiertas con túnel proxy local=true (/latest_version)."
+    ),
+    WEBVIEW(
+        "WebView Real",
+        "Navegador móvil en segundo plano que intercepta flujos directos googlevideo."
+    );
+
+    val badgeText: String
+        get() = when (this) {
+            YTDLP -> "YT-DLP"
+            INNERTUBE_YTDLP -> "INNERTUBE + YT-DLP"
+            PIPED -> "PIPED API"
+            INNERTUBE -> "INNERTUBE"
+            INVIDIOUS -> "INVIDIOUS"
+            WEBVIEW -> "WEBVIEW"
+        }
+
+    companion object {
+        const val PREF_ONLINE_EXTRACTION_ENGINE = "pref_online_extraction_engine"
+
+        fun fromPreferenceName(name: String?): YoutubeExtractionEngine {
+            if (name.isNullOrBlank()) return YTDLP
+            return entries.firstOrNull { it.name.equals(name.trim(), ignoreCase = true) } ?: YTDLP
+        }
+    }
 }
 
 /**
- * Orquestador principal para la extracción de flujos multimedia de alta fidelidad desde YouTube y video web.
- *
- * Arquitectura de 4 Niveles de Resiliencia:
- * 1. Motor yt-dlp Local (YtDlpNativeEngine): Extracción en el propio teléfono con capacidad de auto-actualización OTA.
- * 2. InnerTube Nativo (InnerTubeClient): Consulta endpoints de YouTube con clientes sin fricción (ANDROID_VR y VISIONOS).
- * 3. Bypass de Respaldo Invidious (InvidiousStreamResolver): Para canciones con restricciones de derechos estrictas.
- * 4. Motor Headless WebView (HeadlessWebViewExtractor): Navegador efímero sobre 'm.youtube.com' con descarga en cascada de carátulas.
+ * Orquestador de Extracción de Video/Audio Web con Arquitectura Resiliente:
+ * - `YTDLP` (yt-dlp Nativo limpio): Motor nativo ejecutado localmente con Python 3.11 + QuickJS sin cookies.
+ * - `INNERTUBE_YTDLP` (InnerTube + yt-dlp Híbrido): InnerTube localiza e intercepta la URL al instante (<300ms) y se coordina con `yt-dlp` para descifrado/descarga cuando se requiere.
+ * - `PIPED` (Piped API): Red de servidores abiertos con proxy anti-403 (`pipedproxy`) para YouTube y YT Music.
+ * - `INNERTUBE` (InnerTube): Clientes directos (`ANDROID_VR` Oculus, `IOS`, `TVHTML5_SIMPLY_EMBEDDED_PLAYER`).
+ * - `INVIDIOUS` (Invidious API v1): Espejos públicos con auto-descubrimiento y proxy `local=true` (`/latest_version`).
+ * - `WEBVIEW` (Headless WebView): Navegador real sobre `m.youtube.com` que intercepta flujos directos.
  */
 object WebStreamExtractor {
 
-    private val YOUTUBE_ID_PATTERN = Pattern.compile(
-        "(?:youtu\\.be/|youtube\\.com/(?:embed/|v/|shorts/|watch\\?v=|watch\\?.+&v=))([a-zA-Z0-9_-]{11})"
+    private val YOUTUBE_ID_REGEX = Regex(
+        "(?:youtube\\.com/(?:[^/]+/.+/|(?:v|e(?:mbed)?|shorts|live)/|.*[?&]v=)|youtu\\.be/)([^\"&?/\\s]{11})",
+        RegexOption.IGNORE_CASE
     )
 
-    fun isWebVideoUrl(url: String): Boolean {
-        val clean = url.trim()
-        return clean.contains("youtube.com", ignoreCase = true) ||
-                clean.contains("youtu.be", ignoreCase = true)
+    fun extractVideoId(url: String): String? {
+        return YOUTUBE_ID_REGEX.find(url)?.groupValues?.getOrNull(1)
     }
 
-    fun extractVideoId(url: String): String? {
-        val matcher = YOUTUBE_ID_PATTERN.matcher(url.trim())
-        return if (matcher.find()) matcher.group(1) else null
+    fun isWebVideoUrl(url: String): Boolean {
+        val lower = url.lowercase()
+        return lower.contains("youtube.com") ||
+                lower.contains("youtu.be") ||
+                lower.contains("music.youtube.com") ||
+                lower.contains("piped.video") ||
+                lower.contains("vimeo.com") ||
+                lower.contains("dailymotion.com") ||
+                lower.contains("soundcloud.com") ||
+                lower.contains("facebook.com/watch") ||
+                lower.contains("fb.watch") ||
+                lower.contains("instagram.com/reel") ||
+                lower.contains("x.com/") ||
+                lower.contains("twitter.com/")
     }
 
     /**
-     * Resuelve el enlace web y retorna la información de audio, video y carátula.
-     * Permite especificar el motor preferido con fallback automático transparente.
+     * Obtiene el motor de extracción online seleccionado por el usuario en Ajustes (por defecto [YoutubeExtractionEngine.YTDLP]).
+     */
+    fun getSelectedEngine(context: Context): YoutubeExtractionEngine {
+        return try {
+            val prefs = context.applicationContext.getSharedPreferences("aura_music_ui_prefs", Context.MODE_PRIVATE)
+            YoutubeExtractionEngine.fromPreferenceName(
+                prefs.getString(YoutubeExtractionEngine.PREF_ONLINE_EXTRACTION_ENGINE, YoutubeExtractionEngine.YTDLP.name)
+            )
+        } catch (_: Throwable) {
+            YoutubeExtractionEngine.YTDLP
+        }
+    }
+
+    /**
+     * Guarda el motor de extracción online seleccionado por el usuario en Ajustes.
+     */
+    fun setSelectedEngine(context: Context, engine: YoutubeExtractionEngine) {
+        try {
+            val prefs = context.applicationContext.getSharedPreferences("aura_music_ui_prefs", Context.MODE_PRIVATE)
+            prefs.edit().putString(YoutubeExtractionEngine.PREF_ONLINE_EXTRACTION_ENGINE, engine.name).apply()
+        } catch (_: Throwable) {}
+    }
+
+    /**
+     * Resuelve los flujos multimedia usando el motor preferido y aplicando fallback automático en cascada
+     * entre `yt-dlp Nativo`, `InnerTube + yt-dlp`, `Piped API`, `InnerTube`, `Invidious Proxy` y `Headless WebView`.
      */
     suspend fun resolveStream(
         context: Context,
         url: String,
-        preferredEngine: YoutubeExtractionEngine = YoutubeExtractionEngine.YTDLP
-    ): Result<OnlineVideoAudioImporter.ResolvedMediaInfo> {
-        val videoId = extractVideoId(url)
-            ?: return Result.failure(IllegalArgumentException("No se pudo identificar el ID del video de YouTube"))
+        preferredEngine: YoutubeExtractionEngine = getSelectedEngine(context)
+    ): Result<OnlineVideoAudioImporter.ResolvedMediaInfo> = withContext(Dispatchers.IO) {
+        val cleanUrl = url.trim()
+        val videoId = extractVideoId(cleanUrl)
 
-        // Opción 1: Solicitado yt-dlp prioritario
-        if (preferredEngine == YoutubeExtractionEngine.YTDLP) {
-            if (YtDlpAutoUpdater.isYtDlpTemporarilyBlocked()) {
-                AuraDebugManager.logInfo("WebStreamExtractor", "yt-dlp en actualización. Fallback automático transparente a InnerTube...")
-            } else {
-                val ytdlpResult = YtDlpNativeEngine.resolveStream(context, url)
-                if (ytdlpResult.isSuccess) {
-                    return ytdlpResult
+        when (preferredEngine) {
+            YoutubeExtractionEngine.YTDLP -> {
+                // 1º Intentar con yt-dlp nativo limpio (sin cookies)
+                val ytdlpResult = YtDlpNativeEngine.resolveStream(context, cleanUrl)
+                if (ytdlpResult.isSuccess) return@withContext ytdlpResult
+
+                AuraDebugManager.logInfo("WebStreamExtractor", "yt-dlp no resolvió ($cleanUrl), activando cascada InnerTube -> Piped -> Invidious -> WebView...")
+                if (videoId != null) {
+                    InnerTubeClient.resolve(videoId, cleanUrl)?.let { return@withContext Result.success(it) }
+                    PipedStreamResolver.resolve(videoId, cleanUrl)?.let { return@withContext Result.success(it) }
+                    InvidiousStreamResolver.resolve(videoId, cleanUrl)?.let { return@withContext Result.success(it) }
+                    HeadlessWebViewExtractor.resolve(context, videoId, cleanUrl)?.let { return@withContext Result.success(it) }
                 }
-                AuraDebugManager.logWarning("WebStreamExtractor", "yt-dlp no pudo resolver el stream. Continuando con InnerTube...")
+                return@withContext ytdlpResult
+            }
+
+            YoutubeExtractionEngine.INNERTUBE_YTDLP -> {
+                // Modo Híbrido InnerTube + yt-dlp:
+                // 1º InnerTube intercepta el videoId, obtiene metadatos y verifica alcanzabilidad HTTP 206 en <300ms
+                if (videoId != null) {
+                    val innerTubeFast = InnerTubeClient.resolve(videoId, cleanUrl)
+                    if (innerTubeFast != null && (!innerTubeFast.audioUrl.isNullOrBlank() || innerTubeFast.videoUrl.isNotBlank())) {
+                        AuraDebugManager.logInfo("WebStreamExtractor", "Modo Híbrido [InnerTube + yt-dlp]: InnerTube interceptó el flujo verificando HTTP 206 en <300ms ($videoId).")
+                        return@withContext Result.success(innerTubeFast)
+                    }
+                }
+                // 2º Si el video requiere descifrado n-sig en JS o InnerTube no entregó stream directo, delega la URL canónica a yt-dlp limpio
+                val canonicalTarget = if (videoId != null) "https://www.youtube.com/watch?v=$videoId" else cleanUrl
+                AuraDebugManager.logInfo("WebStreamExtractor", "Modo Híbrido [InnerTube + yt-dlp]: Pasando URL interceptada ($canonicalTarget) a yt-dlp nativo...")
+                val ytdlpHybrid = YtDlpNativeEngine.resolveStream(context, canonicalTarget)
+                if (ytdlpHybrid.isSuccess) return@withContext ytdlpHybrid
+
+                if (videoId != null) {
+                    PipedStreamResolver.resolve(videoId, cleanUrl)?.let { return@withContext Result.success(it) }
+                    InvidiousStreamResolver.resolve(videoId, cleanUrl)?.let { return@withContext Result.success(it) }
+                    HeadlessWebViewExtractor.resolve(context, videoId, cleanUrl)?.let { return@withContext Result.success(it) }
+                }
+                return@withContext ytdlpHybrid
+            }
+
+            YoutubeExtractionEngine.PIPED -> {
+                if (videoId != null) {
+                    PipedStreamResolver.resolve(videoId, cleanUrl)?.let { return@withContext Result.success(it) }
+                    InvidiousStreamResolver.resolve(videoId, cleanUrl)?.let { return@withContext Result.success(it) }
+                    InnerTubeClient.resolve(videoId, cleanUrl)?.let { return@withContext Result.success(it) }
+                }
+                val ytdlpFallback = YtDlpNativeEngine.resolveStream(context, cleanUrl)
+                if (ytdlpFallback.isSuccess) return@withContext ytdlpFallback
+                if (videoId != null) {
+                    HeadlessWebViewExtractor.resolve(context, videoId, cleanUrl)?.let { return@withContext Result.success(it) }
+                }
+            }
+
+            YoutubeExtractionEngine.INNERTUBE -> {
+                if (videoId != null) {
+                    InnerTubeClient.resolve(videoId, cleanUrl)?.let { return@withContext Result.success(it) }
+                    PipedStreamResolver.resolve(videoId, cleanUrl)?.let { return@withContext Result.success(it) }
+                    InvidiousStreamResolver.resolve(videoId, cleanUrl)?.let { return@withContext Result.success(it) }
+                }
+                val ytdlpFallback = YtDlpNativeEngine.resolveStream(context, cleanUrl)
+                if (ytdlpFallback.isSuccess) return@withContext ytdlpFallback
+                if (videoId != null) {
+                    HeadlessWebViewExtractor.resolve(context, videoId, cleanUrl)?.let { return@withContext Result.success(it) }
+                }
+            }
+
+            YoutubeExtractionEngine.INVIDIOUS -> {
+                if (videoId != null) {
+                    InvidiousStreamResolver.resolve(videoId, cleanUrl)?.let { return@withContext Result.success(it) }
+                    PipedStreamResolver.resolve(videoId, cleanUrl)?.let { return@withContext Result.success(it) }
+                    InnerTubeClient.resolve(videoId, cleanUrl)?.let { return@withContext Result.success(it) }
+                }
+                val ytdlpFallback = YtDlpNativeEngine.resolveStream(context, cleanUrl)
+                if (ytdlpFallback.isSuccess) return@withContext ytdlpFallback
+                if (videoId != null) {
+                    HeadlessWebViewExtractor.resolve(context, videoId, cleanUrl)?.let { return@withContext Result.success(it) }
+                }
+            }
+
+            YoutubeExtractionEngine.WEBVIEW -> {
+                if (videoId != null) {
+                    HeadlessWebViewExtractor.resolve(context, videoId, cleanUrl)?.let { return@withContext Result.success(it) }
+                    PipedStreamResolver.resolve(videoId, cleanUrl)?.let { return@withContext Result.success(it) }
+                    InnerTubeClient.resolve(videoId, cleanUrl)?.let { return@withContext Result.success(it) }
+                    InvidiousStreamResolver.resolve(videoId, cleanUrl)?.let { return@withContext Result.success(it) }
+                }
+                val ytdlpFallback = YtDlpNativeEngine.resolveStream(context, cleanUrl)
+                if (ytdlpFallback.isSuccess) return@withContext ytdlpFallback
             }
         }
 
-        return if (preferredEngine == YoutubeExtractionEngine.INNERTUBE || preferredEngine == YoutubeExtractionEngine.YTDLP) {
-            // Nivel 1: InnerTube directo (Ultra-rápido <300ms)
-            val innerTubeResult = InnerTubeClient.resolve(videoId, url)
-            if (innerTubeResult != null) {
-                return Result.success(innerTubeResult)
-            }
-
-            // Nivel 2: Bypass Invidious para canciones con protección estricta / LOGIN_REQUIRED
-            AuraDebugManager.logInfo("WebStreamExtractor", "InnerTube requirió bypass de sesión. Consultando motor de respaldo...")
-            val invidiousResult = InvidiousStreamResolver.resolve(videoId, url)
-            if (invidiousResult != null) {
-                return Result.success(invidiousResult)
-            }
-
-            // Nivel 3: Motor yt-dlp local si aún no se intentó
-            if (preferredEngine != YoutubeExtractionEngine.YTDLP && YtDlpNativeEngine.isAvailable(context)) {
-                AuraDebugManager.logInfo("WebStreamExtractor", "Probando motor local yt-dlp...")
-                val ytdlpResult = YtDlpNativeEngine.resolveStream(context, url)
-                if (ytdlpResult.isSuccess) {
-                    return ytdlpResult
-                }
-            }
-
-            // Nivel 4: Fallback a WebView móvil
-            AuraDebugManager.logWarning("WebStreamExtractor", "InnerTube e Invidious no devolvieron streams. Intentando con Motor WebView...")
-            val webViewResult = HeadlessWebViewExtractor.resolve(context, videoId, url)
-            if (webViewResult != null) {
-                Result.success(webViewResult)
-            } else {
-                // Último intento: yt-dlp
-                val finalYtdlp = YtDlpNativeEngine.resolveStream(context, url)
-                if (finalYtdlp.isSuccess) {
-                    finalYtdlp
-                } else {
-                    Result.failure(Exception("No se pudo extraer el audio de YouTube con ninguno de los motores disponibles. Verifica el enlace."))
-                }
-            }
-        } else {
-            // Solicitado expresamente por el usuario: Motor WebView primero
-            val webViewResult = HeadlessWebViewExtractor.resolve(context, videoId, url)
-            if (webViewResult != null) {
-                return Result.success(webViewResult)
-            }
-
-            // Fallback 1: InnerTube
-            AuraDebugManager.logWarning("WebStreamExtractor", "Motor WebView falló. Intentando con InnerTube...")
-            val innerTubeResult = InnerTubeClient.resolve(videoId, url)
-            if (innerTubeResult != null) {
-                return Result.success(innerTubeResult)
-            }
-
-            // Fallback 2: Invidious
-            val invidiousResult = InvidiousStreamResolver.resolve(videoId, url)
-            if (invidiousResult != null) {
-                return Result.success(invidiousResult)
-            }
-
-            // Fallback 3: yt-dlp
-            val ytdlpResult = YtDlpNativeEngine.resolveStream(context, url)
-            if (ytdlpResult.isSuccess) {
-                ytdlpResult
-            } else {
-                Result.failure(Exception("No se pudo extraer el audio con WebView, InnerTube, Invidious ni yt-dlp."))
-            }
-        }
+        Result.failure(
+            IllegalStateException("No se pudo extraer la pista multimedia de este enlace. Verifica tu conexión o intenta con otro enlace.")
+        )
     }
 }
+

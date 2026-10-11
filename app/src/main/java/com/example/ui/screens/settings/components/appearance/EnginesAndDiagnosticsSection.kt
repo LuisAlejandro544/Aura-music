@@ -116,6 +116,8 @@ fun LazyListScope.enginesAndDiagnosticsSettingsContent(
                     if (com.example.data.importer.FFmpegNativeEngine.isAvailable(context)) "Listo en dispositivo" else "Habilitado (CLI / NDK)"
                 )
                 SettingDetailRow("Versión yt-dlp", ytdlpVersion)
+                SettingDetailRow("Modo Híbrido", "InnerTube + yt-dlp disponible")
+                SettingDetailRow("Piped API & Invidious", "Activos (Proxy Anti-403 + YT Music)")
 
                 if (updateMessage != null) {
                     Spacer(modifier = Modifier.height(8.dp))

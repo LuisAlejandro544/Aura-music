@@ -57,6 +57,12 @@ class NavigationCoordinator(
     private val _selectedPlaylistTracks = MutableStateFlow<List<Track>>(emptyList())
     val selectedPlaylistTracks: StateFlow<List<Track>> = _selectedPlaylistTracks.asStateFlow()
 
+    private val _customAlbumsMetadata = MutableStateFlow<Map<String, com.example.model.CollectionCustomMetadata>>(emptyMap())
+    val customAlbumsMetadata: StateFlow<Map<String, com.example.model.CollectionCustomMetadata>> = _customAlbumsMetadata.asStateFlow()
+
+    private val _customArtistsMetadata = MutableStateFlow<Map<String, com.example.model.CollectionCustomMetadata>>(emptyMap())
+    val customArtistsMetadata: StateFlow<Map<String, com.example.model.CollectionCustomMetadata>> = _customArtistsMetadata.asStateFlow()
+
     private var selectedCollectionJob: Job? = null
 
     private val _isNowPlayingExpanded = MutableStateFlow(false)
@@ -135,6 +141,16 @@ class NavigationCoordinator(
     )
     val nowPlayingDesignMode: StateFlow<NowPlayingDesignMode> = _nowPlayingDesignMode.asStateFlow()
 
+    private val _onlineExtractionEngine = MutableStateFlow(
+        com.example.data.importer.YoutubeExtractionEngine.fromPreferenceName(
+            appPrefs.getString(
+                com.example.data.importer.YoutubeExtractionEngine.PREF_ONLINE_EXTRACTION_ENGINE,
+                com.example.data.importer.YoutubeExtractionEngine.YTDLP.name
+            )
+        )
+    )
+    val onlineExtractionEngine: StateFlow<com.example.data.importer.YoutubeExtractionEngine> = _onlineExtractionEngine.asStateFlow()
+
     private val prefsChangeListener = SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
         when (key) {
             "pref_aura_theme" -> {
@@ -173,6 +189,13 @@ class NavigationCoordinator(
                 try {
                     _nowPlayingDesignMode.value = NowPlayingDesignMode.valueOf(design ?: NowPlayingDesignMode.AUTO.name)
                 } catch (_: Exception) {}
+            }
+            com.example.data.importer.YoutubeExtractionEngine.PREF_ONLINE_EXTRACTION_ENGINE -> {
+                val engineName = prefs.getString(
+                    key,
+                    com.example.data.importer.YoutubeExtractionEngine.YTDLP.name
+                )
+                _onlineExtractionEngine.value = com.example.data.importer.YoutubeExtractionEngine.fromPreferenceName(engineName)
             }
             "pref_has_visited_settings" -> {
                 _hasVisitedSettings.value = prefs.getBoolean(key, false)
@@ -236,12 +259,28 @@ class NavigationCoordinator(
                 }
                 -2L -> {
                     repository.allTracks.collect { tracks ->
-                        _selectedPlaylistTracks.value = tracks.filter { it.album == playlist.name }
+                        val filtered = tracks.filter { it.album == playlist.name }
+                        _selectedPlaylistTracks.value = filtered
+                        val cur = _selectedPlaylist.value
+                        if (cur != null && cur.id == -2L && cur.name == playlist.name) {
+                            _selectedPlaylist.value = cur.copy(
+                                trackCount = filtered.size,
+                                previewTracks = filtered.take(4)
+                            )
+                        }
                     }
                 }
                 -3L -> {
                     repository.allTracks.collect { tracks ->
-                        _selectedPlaylistTracks.value = tracks.filter { it.artist == playlist.name }
+                        val filtered = tracks.filter { it.artist == playlist.name }
+                        _selectedPlaylistTracks.value = filtered
+                        val cur = _selectedPlaylist.value
+                        if (cur != null && cur.id == -3L && cur.name == playlist.name) {
+                            _selectedPlaylist.value = cur.copy(
+                                trackCount = filtered.size,
+                                previewTracks = filtered.take(4)
+                            )
+                        }
                     }
                 }
                 else -> {
@@ -263,17 +302,20 @@ class NavigationCoordinator(
 
     fun openAlbum(albumName: String) {
         val albumTracks = getAllTracks().filter { it.album == albumName }
-        val artistSubtitle = albumTracks.map { it.artist }.distinct().let { artists ->
+        val customMeta = _customAlbumsMetadata.value[albumName]
+        val defaultSubtitle = albumTracks.map { it.artist }.distinct().let { artists ->
             if (artists.size == 1) "Álbum de ${artists.first()}"
             else if (artists.isNotEmpty()) "Álbum • ${artists.size} artistas"
             else "Álbum musical"
         }
+        val effectiveDescription = customMeta?.description?.takeIf { it.isNotBlank() } ?: defaultSubtitle
         openPlaylist(
             Playlist(
                 id = -2L,
                 name = albumName,
-                description = artistSubtitle,
+                description = effectiveDescription,
                 trackCount = albumTracks.size,
+                customArtPath = customMeta?.customArtPath,
                 previewTracks = albumTracks.take(4)
             )
         )
@@ -281,16 +323,85 @@ class NavigationCoordinator(
 
     fun openArtist(artistName: String) {
         val artistTracks = getAllTracks().filter { it.artist == artistName }
+        val customMeta = _customArtistsMetadata.value[artistName]
         val albumCount = artistTracks.map { it.album }.distinct().size
+        val defaultSubtitle = "Artista • $albumCount álbum(es) en tu biblioteca"
+        val effectiveDescription = customMeta?.description?.takeIf { it.isNotBlank() } ?: defaultSubtitle
         openPlaylist(
             Playlist(
                 id = -3L,
                 name = artistName,
-                description = "Artista • $albumCount álbum(es) en tu biblioteca",
+                description = effectiveDescription,
                 trackCount = artistTracks.size,
+                customArtPath = customMeta?.customArtPath,
                 previewTracks = artistTracks.take(4)
             )
         )
+    }
+
+    fun setInitialCollectionsCustomMetadata(
+        albums: Map<String, com.example.model.CollectionCustomMetadata>,
+        artists: Map<String, com.example.model.CollectionCustomMetadata>
+    ) {
+        _customAlbumsMetadata.value = albums
+        _customArtistsMetadata.value = artists
+    }
+
+    fun updateAlbumCustomMetadata(
+        albumName: String,
+        description: String,
+        customArtPath: String?
+    ) {
+        val updatedEntry = com.example.model.CollectionCustomMetadata(
+            name = albumName,
+            isArtist = false,
+            description = description.trim(),
+            customArtPath = customArtPath
+        )
+        val newMap = _customAlbumsMetadata.value.toMutableMap()
+        newMap[albumName] = updatedEntry
+        _customAlbumsMetadata.value = newMap
+
+        val current = _selectedPlaylist.value
+        if (current != null && current.id == -2L && current.name == albumName) {
+            val albumTracks = getAllTracks().filter { it.album == albumName }
+            val fallbackDesc = albumTracks.map { it.artist }.distinct().let { artists ->
+                if (artists.size == 1) "Álbum de ${artists.first()}"
+                else if (artists.isNotEmpty()) "Álbum • ${artists.size} artistas"
+                else "Álbum musical"
+            }
+            _selectedPlaylist.value = current.copy(
+                description = updatedEntry.description.ifBlank { fallbackDesc },
+                customArtPath = customArtPath
+            )
+        }
+    }
+
+    fun updateArtistCustomMetadata(
+        artistName: String,
+        description: String,
+        customArtPath: String?
+    ) {
+        val updatedEntry = com.example.model.CollectionCustomMetadata(
+            name = artistName,
+            isArtist = true,
+            description = description.trim(),
+            customArtPath = customArtPath
+        )
+        val newMap = _customArtistsMetadata.value.toMutableMap()
+        newMap[artistName] = updatedEntry
+        _customArtistsMetadata.value = newMap
+
+        val current = _selectedPlaylist.value
+        if (current != null && current.id == -3L && current.name == artistName) {
+            val artistTracks = getAllTracks().filter { it.artist == artistName }
+            val albumCount = artistTracks.map { it.album }.distinct().size
+            val fallbackDesc = "Artista • $albumCount álbum(es) en tu biblioteca"
+            _selectedPlaylist.value = current.copy(
+                description = updatedEntry.description.ifBlank { fallbackDesc },
+                customArtPath = customArtPath
+            )
+        }
     }
 
     fun setNowPlayingExpanded(expanded: Boolean) {
@@ -372,6 +483,13 @@ class NavigationCoordinator(
     fun setNowPlayingDesignMode(mode: NowPlayingDesignMode) {
         _nowPlayingDesignMode.value = mode
         appPrefs.edit().putString("pref_now_playing_design_mode", mode.name).apply()
+    }
+
+    fun setOnlineExtractionEngine(engine: com.example.data.importer.YoutubeExtractionEngine) {
+        _onlineExtractionEngine.value = engine
+        appPrefs.edit()
+            .putString(com.example.data.importer.YoutubeExtractionEngine.PREF_ONLINE_EXTRACTION_ENGINE, engine.name)
+            .apply()
     }
 
     fun updateSelectedPlaylistMetadata(id: Long, name: String, description: String, artPath: String?) {

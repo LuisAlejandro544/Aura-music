@@ -193,11 +193,13 @@ class StreamingModeCoordinator(
                     return@launch
                 }
 
-                // 2. Resolver con yt-dlp (normalizado para YT y YT Music) + InnerTube
+                // 2. Resolver con el motor seleccionado por el usuario en Ajustes (yt-dlp por defecto)
                 val resolvedResult = StreamingApiService.resolvePlayableStreamWithYtDlp(context, item)
                 val resolved = resolvedResult.getOrNull()
                 if (resolved == null) {
-                    onStatusMessage("No se pudo iniciar el stream de \"${item.title}\". Intenta con otra pista.")
+                    val errMsg = resolvedResult.exceptionOrNull()?.message
+                        ?: "No se pudo iniciar el stream de \"${item.title}\". Intenta con otra pista."
+                    onStatusMessage(errMsg)
                     return@launch
                 }
 
@@ -310,7 +312,8 @@ class StreamingModeCoordinator(
                     thumbnailUrl = targetTrack.albumArtPath ?: "https://i.ytimg.com/vi/$videoId/hqdefault.jpg",
                     platform = platform
                 )
-                val resolved = StreamingApiService.resolvePlayableStreamWithYtDlp(context, baseItem).getOrNull()
+                val resolvedResult = StreamingApiService.resolvePlayableStreamWithYtDlp(context, baseItem)
+                val resolved = resolvedResult.getOrNull()
                 if (resolved != null) {
                     val playableAudioUrl = resolved.audioUrl?.takeIf { it.isNotBlank() } ?: resolved.videoUrl
                     val allowVideo = cacheManager.isStreamingVideoAllowedByNetwork()
@@ -337,6 +340,11 @@ class StreamingModeCoordinator(
                         }
                     }
                     prefetchNextSimilarTrackForRadio(resolvedTrack)
+                } else {
+                    onStatusMessage(
+                        resolvedResult.exceptionOrNull()?.message
+                            ?: "No se pudo resolver \"${targetTrack.title}\" con el motor seleccionado."
+                    )
                 }
             } finally {
                 _isResolvingStream.value = false
@@ -350,7 +358,7 @@ class StreamingModeCoordinator(
      * Recuperación transparente cuando ExoPlayer recibe `ERROR_CODE_IO_BAD_HTTP_STATUS` (ej. HTTP 403 Forbidden):
      * 1. Si `StreamingCacheManager` ya descargó el archivo en la caché temporal, conmuta al archivo local y
      *    continúa desde [resumePositionMs] sin interrupción.
-     * 2. Si aún no está en caché, solicita un stream fresco con `forceBypassYtDlp = true` (respaldo directo)
+     * 2. Si aún no está en caché, solicita un stream fresco con el motor seleccionado por el usuario
      *    y reanuda la reproducción en [resumePositionMs].
      */
     private fun handleStreamingHttpErrorRecovery(
@@ -394,11 +402,25 @@ class StreamingModeCoordinator(
                     thumbnailUrl = failedTrack.albumArtPath ?: "https://i.ytimg.com/vi/$videoId/hqdefault.jpg",
                     platform = platform
                 )
-                val resolved = StreamingApiService.resolvePlayableStreamWithYtDlp(
-                    context = context,
-                    item = baseItem,
-                    forceBypassYtDlp = true
-                ).getOrNull()
+                // Si el stream activo recibió HTTP 403, primero probamos rescate directo verificado con HTTP 206 (InnerTubeClient -> Piped -> motor seleccionado)
+                val directVerified = com.example.data.importer.InnerTubeClient.resolve(videoId, baseItem.canonicalWatchUrl)
+                    ?: com.example.data.importer.PipedStreamResolver.resolve(videoId, baseItem.canonicalWatchUrl)
+                val resolvedResult = if (directVerified != null) {
+                    com.example.data.streaming.StreamingHttpDataSourceConfig.registerStreamHeaders(
+                        videoId = videoId,
+                        audioUrl = directVerified.audioUrl,
+                        videoUrl = directVerified.videoUrl,
+                        headers = directVerified.httpHeaders
+                    )
+                    Result.success(directVerified)
+                } else {
+                    StreamingApiService.resolvePlayableStreamWithYtDlp(
+                        context = context,
+                        item = baseItem,
+                        forceBypassYtDlp = true
+                    )
+                }
+                val resolved = resolvedResult.getOrNull()
                 if (resolved != null) {
                     val freshAudioUrl = resolved.audioUrl?.takeIf { it.isNotBlank() } ?: resolved.videoUrl
                     val allowVideo = cacheManager.isStreamingVideoAllowedByNetwork()
@@ -422,6 +444,10 @@ class StreamingModeCoordinator(
                         }
                     }
                 } else {
+                    onStatusMessage(
+                        resolvedResult.exceptionOrNull()?.message
+                            ?: "No se pudo recuperar el stream de \"${failedTrack.title}\"."
+                    )
                     withContext(Dispatchers.Main) {
                         audioPlayer.playNext()
                     }
@@ -436,7 +462,7 @@ class StreamingModeCoordinator(
 
     /**
      * Consulta automáticamente a la API por una canción similar y resuelve su stream
-     * (`yt-dlp` para YouTube, `InnerTube` para YT Music) + pre-descarga en caché temporal antes de que termine la pista actual.
+     * con el motor seleccionado por el usuario + pre-descarga en caché temporal antes de que termine la pista actual.
      */
     fun prefetchNextSimilarTrackForRadio(currentTrack: Track) {
         val videoId = currentTrack.streamingVideoId ?: return
@@ -457,7 +483,7 @@ class StreamingModeCoordinator(
                 itemRegistry[similarItem.videoId] = similarItem
                 _nextSimilarTrackPreview.value = similarItem
 
-                // Resolver según plataforma (yt-dlp para YouTube, InnerTube para YT Music) y pre-almacenar en caché temporal de 30 minutos
+                // Resolver con el motor seleccionado y pre-almacenar en caché temporal de 30 minutos
                 val resolved = StreamingApiService.resolvePlayableStreamWithYtDlp(context, similarItem).getOrNull()
                     ?: return@launch
 
@@ -512,7 +538,9 @@ class StreamingModeCoordinator(
                 val resolved = resolvedResult.getOrNull()
                 if (resolved == null) {
                     _downloadingVideoIds.value = _downloadingVideoIds.value - item.videoId
-                    onStatusMessage("No se pudo iniciar la descarga de \"${item.title}\".")
+                    val errMsg = resolvedResult.exceptionOrNull()?.message
+                        ?: "No se pudo iniciar la descarga de \"${item.title}\"."
+                    onStatusMessage(errMsg)
                     return@launch
                 }
 

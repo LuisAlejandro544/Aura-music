@@ -54,6 +54,7 @@ fun CreateMixtapeDialog(
     createdTrack: Track? = null,
     onPlayCreatedTrack: (Track) -> Unit = {}
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val localTracks = remember(tracks) { SmartAutoRemixEngine.filterLocalTracks(tracks) }
     var isAutoRemixMode by remember(initialModeAutoRemix) { mutableStateOf(initialModeAutoRemix) }
 
@@ -71,6 +72,31 @@ fun CreateMixtapeDialog(
     }
     var autoMatchReason by remember {
         mutableStateOf(initialPair?.reason ?: "Selecciona 2 canciones locales o usa el botón de Selección Inteligente.")
+    }
+    var acousticProfileA by remember(selectedTrackA) {
+        mutableStateOf(selectedTrackA?.let { com.example.data.importer.mixtape.AutoRemixAcousticAnalyzer.getCachedOrFastProfile(it) })
+    }
+    var acousticProfileB by remember(selectedTrackB) {
+        mutableStateOf(selectedTrackB?.let { com.example.data.importer.mixtape.AutoRemixAcousticAnalyzer.getCachedOrFastProfile(it) })
+    }
+
+    // Analizar en segundo plano el BPM real y la energía de las pistas seleccionadas y de la lista local
+    LaunchedEffect(selectedTrackA) {
+        val trkA = selectedTrackA ?: return@LaunchedEffect
+        acousticProfileA = com.example.data.importer.mixtape.AutoRemixAcousticAnalyzer.analyzeTrack(context, trkA)
+    }
+    LaunchedEffect(selectedTrackB) {
+        val trkB = selectedTrackB ?: return@LaunchedEffect
+        acousticProfileB = com.example.data.importer.mixtape.AutoRemixAcousticAnalyzer.analyzeTrack(context, trkB)
+    }
+    LaunchedEffect(localTracks, isAutoRemixMode) {
+        if (isAutoRemixMode && localTracks.size >= 2) {
+            com.example.data.importer.mixtape.AutoRemixAcousticAnalyzer.warmupProfiles(context, localTracks, maxTracks = 16)
+            val refreshedPair = SmartAutoRemixEngine.findBestMatchingPair(localTracks, autoMatchSeed)
+            if (refreshedPair != null && selectedTrackA?.id == refreshedPair.trackA.id && selectedTrackB?.id == refreshedPair.trackB.id) {
+                autoMatchReason = refreshedPair.reason
+            }
+        }
     }
 
     // Si las pistas locales se cargan o actualizan asíncronamente desde Room, rellenar automáticamente las ranuras vacías
@@ -393,6 +419,8 @@ fun CreateMixtapeDialog(
                         localTracks = localTracks,
                         selectedTrackA = selectedTrackA,
                         selectedTrackB = selectedTrackB,
+                        acousticProfileA = acousticProfileA,
+                        acousticProfileB = acousticProfileB,
                         autoMatchReason = autoMatchReason,
                         selectedRemixStyle = selectedRemixStyle,
                         remixTitle = remixTitle,
