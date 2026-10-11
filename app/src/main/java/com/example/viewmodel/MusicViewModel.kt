@@ -220,13 +220,13 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val pendingIncomingVideoUri: StateFlow<Uri?> = incomingMediaCoordinator.pendingIncomingVideoUri
     val pendingIncomingWebLink: StateFlow<String?> = incomingMediaCoordinator.pendingIncomingWebLink
 
-    // Coordinador del Modo Streaming Híbrido (Estilo Spotify: Búsqueda API dual, yt-dlp, Caché 30 min y Radio)
+    // Coordinador del Modo Streaming Híbrido (Búsqueda API dual, yt-dlp para YouTube, Caché 30 min y Radio)
     val streamingCoordinator = StreamingModeCoordinator(
         context = application,
         audioPlayer = audioPlayer,
         scope = viewModelScope,
         onLoadLyricsForTrack = { track -> lyricsCoordinator.loadLyrics(track) },
-        onStatusMessage = { msg -> trackLibraryCoordinator.setImporting(false, msg) }
+        onStatusMessage = { msg -> trackLibraryCoordinator.setStatusMessage(msg) }
     )
     val streamingSearchQuery: StateFlow<String> = streamingCoordinator.searchQuery
     val streamingSelectedFilter: StateFlow<StreamingSearchFilter> = streamingCoordinator.selectedFilter

@@ -210,23 +210,32 @@ object MediaAssetProcessor {
         onProgressUpdate: (DownloadProgress) -> Unit,
         downloadFunction: (url: String, target: File, phase: String, headers: Map<String, String>) -> Boolean
     ): String? {
-        // 1. Si aún no tenemos tempVideoFile y videoUrl es distinto de audioUrl, descargarlo directamente
+        // 1. Si aún no tenemos tempVideoFile y videoUrl es distinto de audioUrl, descargarlo o copiarlo si ya estaba en caché local
         if (!isValidVideoFile(tempVideoFile) &&
             !resolvedInfo.videoUrl.isNullOrBlank() &&
             resolvedInfo.videoUrl != resolvedInfo.audioUrl
         ) {
-            downloadFunction(
-                resolvedInfo.videoUrl,
-                tempVideoFile,
-                "Descargando Video Canvas de fondo (480p)...",
-                resolvedInfo.httpHeaders
-            )
+            val localCachedVid = if (resolvedInfo.videoUrl.startsWith("/")) File(resolvedInfo.videoUrl) else null
+            if (localCachedVid != null && localCachedVid.exists() && localCachedVid.length() > 4096L) {
+                try {
+                    localCachedVid.copyTo(tempVideoFile, overwrite = true)
+                } catch (_: Throwable) {}
+            } else {
+                downloadFunction(
+                    resolvedInfo.videoUrl,
+                    tempVideoFile,
+                    "Descargando Video Canvas de fondo (480p)...",
+                    resolvedInfo.httpHeaders
+                )
+            }
         }
 
         // 2. Si videoUrl == audioUrl, verificar si audioFile era un contenedor combinado
         if (!isValidVideoFile(tempVideoFile) && resolvedInfo.videoUrl == resolvedInfo.audioUrl) {
             if (isValidVideoFile(audioFile)) {
-                audioFile.copyTo(tempVideoFile, overwrite = true)
+                try {
+                    audioFile.copyTo(tempVideoFile, overwrite = true)
+                } catch (_: Throwable) {}
             }
         }
 
@@ -239,6 +248,17 @@ object MediaAssetProcessor {
                     "Resolviendo flujo de Video Canvas 480p dedicado para $ytId..."
                 )
                 val videoCandidates = mutableListOf<Pair<String, Map<String, String>>>()
+                val isStandardYoutube = !resolvedInfo.originalUrl.contains("music.youtube.com", ignoreCase = true)
+
+                if (isStandardYoutube && YtDlpNativeEngine.isAvailable(context)) {
+                    val ytdlpFallback = YtDlpNativeEngine.resolveStream(context, resolvedInfo.originalUrl).getOrNull()
+                    if (ytdlpFallback != null &&
+                        ytdlpFallback.videoUrl.isNotBlank() &&
+                        ytdlpFallback.videoUrl != ytdlpFallback.audioUrl
+                    ) {
+                        videoCandidates.add(ytdlpFallback.videoUrl to ytdlpFallback.httpHeaders)
+                    }
+                }
 
                 val innerTubeFallback = InnerTubeClient.resolve(ytId, resolvedInfo.originalUrl)
                 if (innerTubeFallback != null &&
@@ -254,16 +274,6 @@ object MediaAssetProcessor {
                     invidiousFallback.videoUrl != invidiousFallback.audioUrl
                 ) {
                     videoCandidates.add(invidiousFallback.videoUrl to invidiousFallback.httpHeaders)
-                }
-
-                if (YtDlpNativeEngine.isAvailable(context)) {
-                    val ytdlpFallback = YtDlpNativeEngine.resolveStream(context, resolvedInfo.originalUrl).getOrNull()
-                    if (ytdlpFallback != null &&
-                        ytdlpFallback.videoUrl.isNotBlank() &&
-                        ytdlpFallback.videoUrl != ytdlpFallback.audioUrl
-                    ) {
-                        videoCandidates.add(ytdlpFallback.videoUrl to ytdlpFallback.httpHeaders)
-                    }
                 }
 
                 for ((candidateVideoUrl, candidateHeaders) in videoCandidates) {

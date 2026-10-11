@@ -124,6 +124,14 @@ class AuraAudioPlayer(
     var onStreamingNearEndPrefetchCallback: ((Track) -> Unit)? = null
     private var streamingPrefetchTriggeredForId: Long = 0L
 
+    /**
+     * Callback invocado cuando ExoPlayer recibe un rechazo HTTP (ej. HTTP 403 Forbidden por firma o token expirado)
+     * en una pista de Streaming para conmutar a la copia en caché o regenerar el flujo automáticamente.
+     */
+    var onStreamingHttpErrorRecoveryCallback: ((Track, Long) -> Boolean)? = null
+    private var lastHttpRecoveryTrackId: Long = 0L
+    private var lastHttpRecoveryTimestampMs: Long = 0L
+
     companion object {
         /**
          * Referencia estática compatible con AuraMediaPlaybackService.
@@ -152,7 +160,13 @@ class AuraAudioPlayer(
             }
         }
 
-        val player = ExoPlayer.Builder(context, renderersFactory).build()
+        val mediaSourceFactory = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(
+            com.example.data.streaming.StreamingHttpDataSourceConfig.buildExoPlayerDataSourceFactory(context)
+        )
+
+        val player = ExoPlayer.Builder(context, renderersFactory)
+            .setMediaSourceFactory(mediaSourceFactory)
+            .build()
         exoPlayer = player
 
         // Inicializar segundo reproductor auxiliar (Deck B Saliente) para Crossfade Dual-Deck superpuesto real
@@ -170,7 +184,9 @@ class AuraAudioPlayer(
                 return auxAudioSink
             }
         }
-        outgoingExoPlayer = ExoPlayer.Builder(context, auxRenderersFactory).build()
+        outgoingExoPlayer = ExoPlayer.Builder(context, auxRenderersFactory)
+            .setMediaSourceFactory(mediaSourceFactory)
+            .build()
 
         player.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -219,11 +235,34 @@ class AuraAudioPlayer(
             }
 
             override fun onPlayerError(error: PlaybackException) {
+                val activeTrack = _currentTrack.value
+                val isBadHttpStatus = error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS
+
+                // Recuperación transparente ante HTTP 403 / 416 en pistas de Streaming:
+                // En lugar de re-preparar la misma URL rechazada, delegamos al coordinador para usar el archivo
+                // en caché o resolver un stream fresco con cabeceras firmadas y continuar en la posición actual.
+                if (isBadHttpStatus && activeTrack?.isStreamingTrack == true) {
+                    val now = System.currentTimeMillis()
+                    val canAttemptRecovery = lastHttpRecoveryTrackId != activeTrack.id || (now - lastHttpRecoveryTimestampMs) > 6000L
+                    if (canAttemptRecovery) {
+                        lastHttpRecoveryTrackId = activeTrack.id
+                        lastHttpRecoveryTimestampMs = now
+                        _isBuffering.value = true
+                        val resumePos = player.currentPosition.coerceAtLeast(_currentPosition.value)
+                        com.example.debug.AuraDebugManager.logWarning(
+                            "ExoPlayer",
+                            "Detectado rechazo HTTP en stream (${error.errorCodeName}). Regenerando flujo firmado automáticamente..."
+                        )
+                        val handled = onStreamingHttpErrorRecoveryCallback?.invoke(activeTrack, resumePos) ?: false
+                        if (handled) return
+                    }
+                }
+
                 val isNetworkError = error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ||
                     error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT ||
                     error.errorCode == PlaybackException.ERROR_CODE_IO_UNSPECIFIED
 
-                if (isNetworkError && _currentTrack.value?.isStreamingTrack == true) {
+                if (isNetworkError && activeTrack?.isStreamingTrack == true) {
                     _isBuffering.value = true
                     _isNetworkStalled.value = true
                     com.example.debug.AuraDebugManager.logWarning(
@@ -252,7 +291,7 @@ class AuraAudioPlayer(
                 )
 
                 val p = exoPlayer
-                if (p != null && _currentTrack.value != null) {
+                if (p != null && activeTrack != null && !activeTrack.isStreamingTrack) {
                     try {
                         _playbackSpeed.value = 1.0f
                         _playbackPitch.value = 1.0f

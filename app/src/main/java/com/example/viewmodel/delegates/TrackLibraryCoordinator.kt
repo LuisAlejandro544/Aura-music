@@ -73,10 +73,12 @@ class TrackLibraryCoordinator(
                 val callback = pendingDownloadSuccessCallback
                 pendingDownloadSuccessCallback = null
                 if (event.autoPlayImmediately) {
-                    if (callback != null) {
-                        callback.invoke(event.track)
-                    } else {
-                        audioPlayer.playTrack(event.track)
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        if (callback != null) {
+                            callback.invoke(event.track)
+                        } else {
+                            audioPlayer.playTrack(event.track)
+                        }
                     }
                 }
             }

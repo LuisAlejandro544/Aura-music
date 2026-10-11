@@ -218,7 +218,12 @@ fun BackgroundVideoPlayer(
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
 
+        val mediaSourceFactory = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(
+            com.example.data.streaming.StreamingHttpDataSourceConfig.buildExoPlayerDataSourceFactory(appCtx)
+        )
+
         ExoPlayer.Builder(appCtx, renderersFactory)
+            .setMediaSourceFactory(mediaSourceFactory)
             .setLoadControl(loadControl)
             .build()
             .apply {

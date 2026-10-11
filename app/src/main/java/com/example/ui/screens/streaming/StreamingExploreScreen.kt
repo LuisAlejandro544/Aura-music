@@ -512,7 +512,7 @@ private fun StreamingResultCard(
 
             // Botón de Descarga Permanente en Biblioteca Local (mínimo 48dp de área táctil)
             IconButton(
-                onClick = onDownloadClick,
+                onClick = { if (!isDownloading) onDownloadClick() },
                 modifier = Modifier
                     .size(48.dp)
                     .clip(CircleShape)
@@ -522,12 +522,20 @@ private fun StreamingResultCard(
                     )
                     .testTag("download_streaming_${item.videoId}")
             ) {
-                Icon(
-                    imageVector = if (isDownloading) Icons.Filled.CheckCircle else Icons.Filled.CloudDownload,
-                    contentDescription = "Descargar canción para siempre",
-                    tint = if (isDownloading) MaterialTheme.colorScheme.primary else TextPrimary,
-                    modifier = Modifier.size(22.dp)
-                )
+                if (isDownloading) {
+                    CircularProgressIndicator(
+                        color = MaterialTheme.colorScheme.primary,
+                        strokeWidth = 2.2.dp,
+                        modifier = Modifier.size(20.dp)
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Filled.CloudDownload,
+                        contentDescription = "Descargar canción para siempre",
+                        tint = TextPrimary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
             }
         }
     }

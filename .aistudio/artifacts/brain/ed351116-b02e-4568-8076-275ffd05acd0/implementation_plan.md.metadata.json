@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de implementación actualizado sin nombres de usuario externos.",
-  "updatedAt":  "2026-10-10T20:50:10.074213184Z",
+  "summary":  "Plan de arquitectura y corrección para eliminar el cierre inesperado al descargar música/video desde el reproductor online (Streaming) y establecer yt-dlp exclusivamente para pistas de YouTube estándar con respaldo automático.",
+  "updatedAt":  "2026-10-11T00:11:43.779703925Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

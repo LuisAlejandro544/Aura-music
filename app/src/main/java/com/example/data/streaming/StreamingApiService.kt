@@ -139,61 +139,105 @@ object StreamingApiService {
 
     /**
      * Toma un elemento de búsqueda o canción similar de la API (`YT Music` o `YouTube`)
-     * y resuelve los flujos listos para reproducir en ExoPlayer y pre-cargar en caché:
-     * 1. Primero intenta `InnerTubeClient` nativo (`<300ms`, 0% sobrecarga térmica de CPU).
-     * 2. Si InnerTube no devuelve stream, utiliza `YtDlpNativeEngine` (CPython + QuickJS) como respaldo.
-     * 3. Como tercer nivel, utiliza `WebStreamExtractor`.
+     * y resuelve los flujos listos para reproducir en ExoPlayer, pre-cargar en caché o descargar:
+     * - Si la plataforma es `YOUTUBE` (`StreamingSourcePlatform.YOUTUBE`):
+     *   1º Utiliza exclusivamente `yt-dlp` (`YtDlpNativeEngine`, CPython + QuickJS) en primer lugar.
+     *   2º Si el video presenta bloqueo o restricción, aplica respaldo automático con `InnerTubeClient` y `WebStreamExtractor`.
+     * - Si la plataforma es `YT_MUSIC` (`StreamingSourcePlatform.YT_MUSIC`):
+     *   1º Resuelve directamente con `InnerTubeClient` (`<300ms`) y respaldo `InvidiousStreamResolver`,
+     *      sin invocar `yt-dlp` (ya que `yt-dlp` se reserva exclusivamente para pistas de YouTube).
      */
     suspend fun resolvePlayableStreamWithYtDlp(
         context: Context,
-        item: StreamingSearchItem
+        item: StreamingSearchItem,
+        forceBypassYtDlp: Boolean = false
     ): Result<OnlineVideoAudioImporter.ResolvedMediaInfo> = withContext(Dispatchers.IO) {
-        val normalizedUrl = YtDlpNativeEngine.normalizeYouTubeMusicUrlForYtDlp(
-            if (item.platform == StreamingSourcePlatform.YT_MUSIC) item.musicWatchUrl else item.canonicalWatchUrl
-        )
+        val watchUrl = item.canonicalWatchUrl
 
-        // 1. Nivel 1 Térmico (<300ms, sin proceso externo): Resolución directa con InnerTubeClient multi-cliente
-        val innerTubeInfo = InnerTubeClient.resolve(
-            videoId = item.videoId,
-            originalUrl = normalizedUrl
-        )
-        if (innerTubeInfo != null && (!innerTubeInfo.audioUrl.isNullOrBlank() || innerTubeInfo.videoUrl.isNotBlank())) {
-            return@withContext Result.success(
-                innerTubeInfo.copy(
-                    suggestedTitle = item.title.ifBlank { innerTubeInfo.suggestedTitle },
-                    suggestedArtist = item.artist.ifBlank { innerTubeInfo.suggestedArtist },
-                    coverUrl = item.thumbnailUrl.ifBlank { innerTubeInfo.coverUrl },
-                    durationSeconds = if (item.durationSeconds > 0) item.durationSeconds else innerTubeInfo.durationSeconds
-                )
-            )
-        }
-
-        // 2. Nivel 2 Respaldo: Motor nativo yt-dlp (CPython 3.11 + QuickJS) si InnerTube es restringido
-        if (!YtDlpAutoUpdaterIsBlockedSafe()) {
-            val ytdlpResult = YtDlpNativeEngine.resolveStream(context, normalizedUrl)
-            if (ytdlpResult.isSuccess) {
-                val info = ytdlpResult.getOrNull()
-                if (info != null) {
-                    return@withContext Result.success(
-                        info.copy(
-                            suggestedTitle = item.title.ifBlank { info.suggestedTitle },
-                            suggestedArtist = item.artist.ifBlank { info.suggestedArtist },
-                            coverUrl = item.thumbnailUrl.ifBlank { info.coverUrl },
-                            durationSeconds = if (item.durationSeconds > 0) item.durationSeconds else info.durationSeconds
-                        )
-                    )
-                }
-            }
-        }
-
-        // 3. Nivel 3: WebStreamExtractor completo
-        val webResult = WebStreamExtractor.resolveStream(context, normalizedUrl)
-        webResult.map { info ->
-            info.copy(
+        fun enrichAndRegister(info: OnlineVideoAudioImporter.ResolvedMediaInfo): Result<OnlineVideoAudioImporter.ResolvedMediaInfo> {
+            val enriched = info.copy(
                 suggestedTitle = item.title.ifBlank { info.suggestedTitle },
                 suggestedArtist = item.artist.ifBlank { info.suggestedArtist },
                 coverUrl = item.thumbnailUrl.ifBlank { info.coverUrl },
                 durationSeconds = if (item.durationSeconds > 0) item.durationSeconds else info.durationSeconds
+            )
+            StreamingHttpDataSourceConfig.registerStreamHeaders(
+                videoId = item.videoId,
+                audioUrl = enriched.audioUrl,
+                videoUrl = enriched.videoUrl,
+                headers = enriched.httpHeaders
+            )
+            return Result.success(enriched)
+        }
+
+        if (item.platform == StreamingSourcePlatform.YOUTUBE) {
+            // === PLATAFORMA YOUTUBE: Usar yt-dlp en primer lugar ===
+            if (!forceBypassYtDlp && !YtDlpAutoUpdaterIsBlockedSafe()) {
+                val ytdlpResult = YtDlpNativeEngine.resolveStream(context, watchUrl)
+                val info = ytdlpResult.getOrNull()
+                if (info != null && (!info.audioUrl.isNullOrBlank() || info.videoUrl.isNotBlank())) {
+                    return@withContext enrichAndRegister(info)
+                }
+            }
+
+            // Respaldo automático si el video de YouTube tiene bloqueo en yt-dlp o recibió HTTP 403
+            val innerTubeFallback = InnerTubeClient.resolve(
+                videoId = item.videoId,
+                originalUrl = watchUrl
+            )
+            if (innerTubeFallback != null && (!innerTubeFallback.audioUrl.isNullOrBlank() || innerTubeFallback.videoUrl.isNotBlank())) {
+                return@withContext enrichAndRegister(innerTubeFallback)
+            }
+
+            val invidiousFallback = com.example.data.importer.InvidiousStreamResolver.resolve(
+                videoId = item.videoId,
+                originalUrl = watchUrl
+            )
+            if (invidiousFallback != null && (!invidiousFallback.audioUrl.isNullOrBlank() || invidiousFallback.videoUrl.isNotBlank())) {
+                return@withContext enrichAndRegister(invidiousFallback)
+            }
+
+            val webFallback = com.example.data.importer.HeadlessWebViewExtractor.resolve(
+                context = context,
+                videoId = item.videoId,
+                originalUrl = watchUrl
+            )
+            if (webFallback != null) {
+                return@withContext enrichAndRegister(webFallback)
+            }
+
+            return@withContext Result.failure(
+                IllegalStateException("No se pudo resolver la pista de YouTube \"${item.title}\".")
+            )
+        } else {
+            // === PLATAFORMA YT MUSIC: Resolución directa sin usar yt-dlp ===
+            val innerTubeInfo = InnerTubeClient.resolve(
+                videoId = item.videoId,
+                originalUrl = watchUrl
+            )
+            if (innerTubeInfo != null && (!innerTubeInfo.audioUrl.isNullOrBlank() || innerTubeInfo.videoUrl.isNotBlank())) {
+                return@withContext enrichAndRegister(innerTubeInfo)
+            }
+
+            val invidiousInfo = com.example.data.importer.InvidiousStreamResolver.resolve(
+                videoId = item.videoId,
+                originalUrl = watchUrl
+            )
+            if (invidiousInfo != null && (!invidiousInfo.audioUrl.isNullOrBlank() || invidiousInfo.videoUrl.isNotBlank())) {
+                return@withContext enrichAndRegister(invidiousInfo)
+            }
+
+            val webFallback = com.example.data.importer.HeadlessWebViewExtractor.resolve(
+                context = context,
+                videoId = item.videoId,
+                originalUrl = watchUrl
+            )
+            if (webFallback != null) {
+                return@withContext enrichAndRegister(webFallback)
+            }
+
+            return@withContext Result.failure(
+                IllegalStateException("No se pudo resolver la pista de YT Music \"${item.title}\".")
             )
         }
     }
@@ -201,7 +245,7 @@ object StreamingApiService {
     private fun YtDlpAutoUpdaterIsBlockedSafe(): Boolean {
         return try {
             com.example.data.importer.YtDlpAutoUpdater.isYtDlpTemporarilyBlocked()
-        } catch (_: Exception) {
+        } catch (_: Throwable) {
             false
         }
     }

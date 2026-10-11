@@ -224,6 +224,7 @@ class StreamingCacheManager(private val context: Context) {
 
                 // Descarga acelerada por bloques HTTP Range (estilo YouTube Read-Ahead)
                 val success = downloadNonLinearRangeWindow(
+                    safeId = safeId,
                     streamUrl = streamUrl,
                     outputFile = tempFile,
                     maxPreloadBytes = MAX_SINGLE_AUDIO_CACHE_BYTES
@@ -282,6 +283,7 @@ class StreamingCacheManager(private val context: Context) {
                 val tempFile = File(videoCacheDir, "stream_video_${safeId}.part")
 
                 val success = downloadNonLinearRangeWindow(
+                    safeId = safeId,
                     streamUrl = videoStreamUrl,
                     outputFile = tempFile,
                     maxPreloadBytes = MAX_SINGLE_VIDEO_CACHE_BYTES
@@ -311,64 +313,74 @@ class StreamingCacheManager(private val context: Context) {
      * varios minutos en la reproducción sin sufrir el estrangulamiento lineal de conexiones simples.
      */
     private suspend fun downloadNonLinearRangeWindow(
+        safeId: String,
         streamUrl: String,
         outputFile: File,
         maxPreloadBytes: Long
     ): Boolean = withContext(Dispatchers.IO) {
         try {
-            // Intentar primero con el acelerador multihilo por bloques HTTP Range
-            val chunkedOk = ChunkedStreamDownloader.downloadUrlToFile(
-                url = streamUrl,
-                targetFile = outputFile,
-                phase = "Pre-cargando caché en segundo plano...",
-                customHeaders = mapOf("User-Agent" to USER_AGENT),
-                onProgress = {}
-            )
-            if (chunkedOk && outputFile.exists() && outputFile.length() > MIN_VALID_AUDIO_BYTES) {
-                return@withContext true
-            }
+                    val resolvedHeaders = StreamingHttpDataSourceConfig.resolveHeadersForStream(
+                        videoId = safeId,
+                        rawUrl = streamUrl
+                    )
 
-            // Respaldo por ventanas de rango secuenciales rápidas de 512 KB
-            var downloaded = 0L
-            val chunkSize = 512 * 1024L
-            RandomAccessFile(outputFile, "rw").use { raf ->
-                while (downloaded < maxPreloadBytes) {
-                    val endByte = downloaded + chunkSize - 1
-                    val conn = (URL(streamUrl).openConnection() as HttpURLConnection).apply {
-                        connectTimeout = 8000
-                        readTimeout = 10000
-                        setRequestProperty("User-Agent", USER_AGENT)
-                        setRequestProperty("Range", "bytes=$downloaded-$endByte")
+                    // Intentar primero con el acelerador multihilo por bloques HTTP Range
+                    val chunkedOk = ChunkedStreamDownloader.downloadUrlToFile(
+                        url = streamUrl,
+                        targetFile = outputFile,
+                        phase = "Pre-cargando caché en segundo plano...",
+                        customHeaders = resolvedHeaders,
+                        onProgress = {}
+                    )
+                    if (chunkedOk && outputFile.exists() && outputFile.length() > MIN_VALID_AUDIO_BYTES) {
+                        return@withContext true
                     }
-                    val code = conn.responseCode
-                    if (code != HttpURLConnection.HTTP_PARTIAL && code != HttpURLConnection.HTTP_OK) {
-                        conn.disconnect()
-                        break
-                    }
-                    val stream = conn.inputStream
-                    val buffer = ByteArray(32 * 1024)
-                    var readInChunk = 0L
-                    var n: Int
-                    while (stream.read(buffer).also { n = it } != -1) {
-                        raf.write(buffer, 0, n)
-                        downloaded += n
-                        readInChunk += n
-                        if (downloaded >= maxPreloadBytes) break
-                    }
-                    stream.close()
-                    conn.disconnect()
 
-                    // Si el servidor no soportó Range (devolvió 200 completo) o llegó al EOF
-                    if (code == HttpURLConnection.HTTP_OK || readInChunk < chunkSize / 2) {
-                        break
+                    // Respaldo por ventanas de rango secuenciales rápidas de 512 KB
+                    var downloaded = 0L
+                    val chunkSize = 512 * 1024L
+                    RandomAccessFile(outputFile, "rw").use { raf ->
+                        while (downloaded < maxPreloadBytes) {
+                            val endByte = downloaded + chunkSize - 1
+                            val conn = (URL(streamUrl).openConnection() as HttpURLConnection).apply {
+                                connectTimeout = 8000
+                                readTimeout = 10000
+                                resolvedHeaders.forEach { (k, v) ->
+                                    if (!k.equals("Range", ignoreCase = true)) {
+                                        setRequestProperty(k, v)
+                                    }
+                                }
+                                setRequestProperty("Range", "bytes=$downloaded-$endByte")
+                            }
+                            val code = conn.responseCode
+                            if (code != HttpURLConnection.HTTP_PARTIAL && code != HttpURLConnection.HTTP_OK) {
+                                conn.disconnect()
+                                break
+                            }
+                            val stream = conn.inputStream
+                            val buffer = ByteArray(32 * 1024)
+                            var readInChunk = 0L
+                            var n: Int
+                            while (stream.read(buffer).also { n = it } != -1) {
+                                raf.write(buffer, 0, n)
+                                downloaded += n
+                                readInChunk += n
+                                if (downloaded >= maxPreloadBytes) break
+                            }
+                            stream.close()
+                            conn.disconnect()
+
+                            // Si el servidor no soportó Range (devolvió 200 completo) o llegó al EOF
+                            if (code == HttpURLConnection.HTTP_OK || readInChunk < chunkSize / 2) {
+                                break
+                            }
+                        }
                     }
+                    outputFile.exists() && outputFile.length() > MIN_VALID_AUDIO_BYTES
+                } catch (_: Exception) {
+                    false
                 }
             }
-            outputFile.exists() && outputFile.length() > MIN_VALID_AUDIO_BYTES
-        } catch (_: Exception) {
-            false
-        }
-    }
 
     /**
      * Guarda una miniatura en la caché temporal para acelerar su visualización y reutilizarla si el usuario descarga la pista.

@@ -127,31 +127,43 @@ object OnlineVideoAudioImporter {
             var audioReady = false
             var durationMs = resolvedInfo.durationSeconds * 1000L
 
-            // 1. Descarga prioritaria del audio de alta fidelidad si está disponible por separado
+            // 1. Descarga prioritaria del audio de alta fidelidad (o copia instantánea si ya estaba en caché de streaming)
             if (!resolvedInfo.audioUrl.isNullOrBlank()) {
-                val downloadedAudio = ChunkedStreamDownloader.downloadUrlToFile(
-                    url = resolvedInfo.audioUrl,
-                    targetFile = audioFile,
-                    phase = "Descargando audio de alta fidelidad...",
-                    customHeaders = resolvedInfo.httpHeaders,
-                    httpClient = httpClient,
-                    onProgress = onProgressUpdate
-                )
-                if (downloadedAudio && audioFile.exists() && audioFile.length() > 0L) {
-                    audioReady = true
+                val localCachedAudio = if (resolvedInfo.audioUrl.startsWith("/")) File(resolvedInfo.audioUrl) else null
+                if (localCachedAudio != null && localCachedAudio.exists() && localCachedAudio.length() > 0L) {
+                    localCachedAudio.copyTo(audioFile, overwrite = true)
+                    audioReady = audioFile.exists() && audioFile.length() > 0L
+                } else {
+                    val downloadedAudio = ChunkedStreamDownloader.downloadUrlToFile(
+                        url = resolvedInfo.audioUrl,
+                        targetFile = audioFile,
+                        phase = "Descargando audio de alta fidelidad...",
+                        customHeaders = resolvedInfo.httpHeaders,
+                        httpClient = httpClient,
+                        onProgress = onProgressUpdate
+                    )
+                    if (downloadedAudio && audioFile.exists() && audioFile.length() > 0L) {
+                        audioReady = true
+                    }
                 }
             }
 
-            // 2. Si no había audio directo o falló, descargar flujo de video y demuxear
+            // 2. Si no había audio directo o falló, descargar flujo de video (o usar caché local) y demuxear
             if (!audioReady) {
-                val downloadVideoSuccess = ChunkedStreamDownloader.downloadUrlToFile(
-                    url = resolvedInfo.videoUrl,
-                    targetFile = tempVideoFile,
-                    phase = "Descargando flujo multimedia...",
-                    customHeaders = resolvedInfo.httpHeaders,
-                    httpClient = httpClient,
-                    onProgress = onProgressUpdate
-                )
+                val localCachedVideo = if (resolvedInfo.videoUrl.startsWith("/")) File(resolvedInfo.videoUrl) else null
+                val downloadVideoSuccess = if (localCachedVideo != null && localCachedVideo.exists() && localCachedVideo.length() > 0L) {
+                    localCachedVideo.copyTo(tempVideoFile, overwrite = true)
+                    tempVideoFile.exists() && tempVideoFile.length() > 0L
+                } else {
+                    ChunkedStreamDownloader.downloadUrlToFile(
+                        url = resolvedInfo.videoUrl,
+                        targetFile = tempVideoFile,
+                        phase = "Descargando flujo multimedia...",
+                        customHeaders = resolvedInfo.httpHeaders,
+                        httpClient = httpClient,
+                        onProgress = onProgressUpdate
+                    )
+                }
                 if (downloadVideoSuccess && tempVideoFile.exists() && tempVideoFile.length() > 0L) {
                     try {
                         val videoUri = Uri.fromFile(tempVideoFile)
@@ -390,9 +402,9 @@ object OnlineVideoAudioImporter {
 
             onProgressUpdate(DownloadProgress(isDownloading = false))
             Result.success(createdTrack)
-        } catch (e: Exception) {
+        } catch (t: Throwable) {
             onProgressUpdate(DownloadProgress(isDownloading = false))
-            Result.failure(e)
+            Result.failure(if (t is Exception) t else IllegalStateException(t.localizedMessage ?: "Error procesando descarga", t))
         }
     }
 }

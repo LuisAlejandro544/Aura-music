@@ -53,12 +53,20 @@ class AuraDownloadService : Service() {
         val customArtist: String,
         val attachAsCanvas: Boolean,
         val trimSilence: Boolean,
-        val loopStyle: FFmpegNativeEngine.CanvasLoopStyle
+        val loopStyle: FFmpegNativeEngine.CanvasLoopStyle,
+        val autoPlayOnComplete: Boolean = true,
+        val sourceVideoId: String? = null
     )
 
     data class DownloadCompletedEvent(
         val track: Track,
-        val autoPlayImmediately: Boolean
+        val autoPlayImmediately: Boolean,
+        val sourceVideoId: String? = null
+    )
+
+    data class DownloadFinishedEvent(
+        val sourceVideoId: String?,
+        val success: Boolean
     )
 
     companion object {
@@ -87,6 +95,9 @@ class AuraDownloadService : Service() {
 
         private val _completedEvents = MutableSharedFlow<DownloadCompletedEvent>(extraBufferCapacity = 8)
         val completedEvents: SharedFlow<DownloadCompletedEvent> = _completedEvents.asSharedFlow()
+
+        private val _taskFinishedEvents = MutableSharedFlow<DownloadFinishedEvent>(extraBufferCapacity = 16)
+        val taskFinishedEvents: SharedFlow<DownloadFinishedEvent> = _taskFinishedEvents.asSharedFlow()
 
         private fun ensurePackageChannel(context: Context, nm: NotificationManager) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -132,7 +143,7 @@ class AuraDownloadService : Service() {
                     .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                     .build()
                 nm.notify(NOTIFICATION_ID_PACKAGE_UPDATE, notification)
-            } catch (_: Exception) {}
+            } catch (_: Throwable) {}
         }
 
         fun notifyPackageUpToDate(context: Context, version: String) {
@@ -152,7 +163,7 @@ class AuraDownloadService : Service() {
                     .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                     .build()
                 nm.notify(NOTIFICATION_ID_PACKAGE_UPDATE, notification)
-            } catch (_: Exception) {}
+            } catch (_: Throwable) {}
         }
 
         fun notifyPackageDownloadProgress(context: Context, percent: Int, version: String) {
@@ -175,7 +186,7 @@ class AuraDownloadService : Service() {
                     .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                     .build()
                 nm.notify(NOTIFICATION_ID_PACKAGE_UPDATE, notification)
-            } catch (_: Exception) {}
+            } catch (_: Throwable) {}
         }
 
         fun notifyPackageRestartRequired(context: Context, version: String) {
@@ -214,7 +225,7 @@ class AuraDownloadService : Service() {
                     .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                     .build()
                 nm.notify(NOTIFICATION_ID_PACKAGE_UPDATE, notification)
-            } catch (_: Exception) {}
+            } catch (_: Throwable) {}
         }
 
         fun dismissPackageNotification(context: Context) {
@@ -222,11 +233,13 @@ class AuraDownloadService : Service() {
                 val appContext = context.applicationContext
                 val nm = appContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                 nm.cancel(NOTIFICATION_ID_PACKAGE_UPDATE)
-            } catch (_: Exception) {}
+            } catch (_: Throwable) {}
         }
 
         /**
          * Encola e inicia una descarga en segundo plano respaldada por ForegroundService y notificación nativa.
+         * Si [autoPlayOnComplete] es `false` (ej. al descargar desde el reproductor online), guarda la pista
+         * y su Video Canvas en la biblioteca local sin interrumpir la canción que está sonando.
          */
         fun startDownload(
             context: Context,
@@ -235,7 +248,9 @@ class AuraDownloadService : Service() {
             customArtist: String,
             attachAsCanvas: Boolean,
             trimSilence: Boolean,
-            loopStyle: FFmpegNativeEngine.CanvasLoopStyle = FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE
+            loopStyle: FFmpegNativeEngine.CanvasLoopStyle = FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE,
+            autoPlayOnComplete: Boolean = true,
+            sourceVideoId: String? = null
         ) {
             val taskId = taskIdCounter.incrementAndGet()
             pendingTasks[taskId] = PendingDownloadTask(
@@ -244,7 +259,9 @@ class AuraDownloadService : Service() {
                 customArtist = customArtist,
                 attachAsCanvas = attachAsCanvas,
                 trimSilence = trimSilence,
-                loopStyle = loopStyle
+                loopStyle = loopStyle,
+                autoPlayOnComplete = autoPlayOnComplete,
+                sourceVideoId = sourceVideoId
             )
 
             val appContext = context.applicationContext
@@ -253,9 +270,15 @@ class AuraDownloadService : Service() {
             }
             try {
                 ContextCompat.startForegroundService(appContext, intent)
-            } catch (e: Exception) {
-                AuraDebugManager.logError(TAG, "Error iniciando AuraDownloadService: ${e.message}", e)
-                appContext.startService(intent)
+            } catch (t: Throwable) {
+                AuraDebugManager.logWarning(TAG, "Aviso al iniciar AuraDownloadService en foreground, intentando startService: ${t.message}")
+                try {
+                    appContext.startService(intent)
+                } catch (inner: Throwable) {
+                    AuraDebugManager.logError(TAG, "No se pudo iniciar el servicio de descarga: ${inner.message}", inner)
+                    pendingTasks.remove(taskId)
+                    _taskFinishedEvents.tryEmit(DownloadFinishedEvent(sourceVideoId = sourceVideoId, success = false))
+                }
             }
         }
     }
@@ -303,7 +326,9 @@ class AuraDownloadService : Service() {
 
         if (task == null) {
             if (activeTaskCount.get() == 0) {
-                stopSelfResult(startId)
+                try {
+                    stopSelfResult(startId)
+                } catch (_: Throwable) {}
             }
             return START_NOT_STICKY
         }
@@ -319,13 +344,12 @@ class AuraDownloadService : Service() {
         )
         _downloadProgress.value = initialProgress
 
-        val fgNotification = buildProgressNotification(
-            title = displayTitle,
-            artist = displayArtist,
-            progress = initialProgress
-        )
-
         try {
+            val fgNotification = buildProgressNotification(
+                title = displayTitle,
+                artist = displayArtist,
+                progress = initialProgress
+            )
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 startForeground(
                     NOTIFICATION_ID_PROGRESS,
@@ -335,11 +359,12 @@ class AuraDownloadService : Service() {
             } else {
                 startForeground(NOTIFICATION_ID_PROGRESS, fgNotification)
             }
-        } catch (e: Exception) {
-            AuraDebugManager.logWarning(TAG, "Aviso al promover servicio a primer plano: ${e.message}")
+        } catch (t: Throwable) {
+            AuraDebugManager.logWarning(TAG, "Aviso al promover servicio a primer plano: ${t.message}")
         }
 
         serviceScope.launch {
+            var succeeded = false
             try {
                 _statusMessages.tryEmit("Descargando \"$displayTitle\"...")
                 var lastNotifUpdateMs = 0L
@@ -368,47 +393,61 @@ class AuraDownloadService : Service() {
                 _downloadProgress.value = DownloadProgress(isDownloading = false)
 
                 result.onSuccess { rawTrack ->
+                    succeeded = true
                     val savedTrack = repository.insertCustomTrack(applicationContext, rawTrack)
 
                     // Precargar letras sincronizadas LRC en segundo plano sin bloquear
                     launch(Dispatchers.IO) {
                         try {
                             LyricsManager.fetchLyricsOnline(savedTrack, storageManager)
-                        } catch (_: Exception) {}
+                        } catch (_: Throwable) {}
                     }
 
                     val isUserInsideApp = AuraApplication.isAppInForeground
+                    val shouldAutoPlay = task.autoPlayOnComplete && isUserInsideApp
                     val canvasInfo = if (savedTrack.videoUri != null) " con Video Canvas" else ""
-                    _statusMessages.tryEmit("¡Éxito! Se descargó \"${savedTrack.title}\"$canvasInfo.")
+                    if (task.autoPlayOnComplete) {
+                        _statusMessages.tryEmit("¡Éxito! Se descargó \"${savedTrack.title}\"$canvasInfo.")
+                    } else {
+                        _statusMessages.tryEmit("¡Guardado en tu biblioteca! \"${savedTrack.title}\"$canvasInfo.")
+                    }
 
-                    // Emitir evento al ViewModel: solo reproducir automáticamente si el usuario sigue dentro de la app
+                    // Emitir evento al ViewModel respetando si se solicitó guardar sin interrumpir lo que suena
                     _completedEvents.tryEmit(
                         DownloadCompletedEvent(
                             track = savedTrack,
-                            autoPlayImmediately = isUserInsideApp
+                            autoPlayImmediately = shouldAutoPlay,
+                            sourceVideoId = task.sourceVideoId
                         )
                     )
 
-                    // Mostrar notificación final en la barra de estado:
-                    // Si el usuario está fuera de la app, le avisa que ya terminó y al tocarla reproduce la canción.
-                    showCompletionNotification(savedTrack, autoPlayHint = !isUserInsideApp)
+                    // Mostrar notificación final en la barra de estado
+                    showCompletionNotification(savedTrack, autoPlayHint = !shouldAutoPlay)
                 }.onFailure { error ->
                     _statusMessages.tryEmit("Error al descargar: ${error.message ?: "Verifica tu conexión y el enlace"}")
                     showErrorNotification(displayTitle)
                 }
-            } catch (e: Exception) {
-                AuraDebugManager.logError(TAG, "Error durante la descarga en segundo plano", e)
+            } catch (t: Throwable) {
+                AuraDebugManager.logError(TAG, "Error durante la descarga en segundo plano", t)
                 _downloadProgress.value = DownloadProgress(isDownloading = false)
-                _statusMessages.tryEmit("Error al descargar: ${e.localizedMessage ?: "Fallo de red"}")
+                _statusMessages.tryEmit("Error al descargar: ${t.localizedMessage ?: "Fallo al procesar el archivo"}")
                 showErrorNotification(displayTitle)
             } finally {
+                _taskFinishedEvents.tryEmit(
+                    DownloadFinishedEvent(
+                        sourceVideoId = task.sourceVideoId,
+                        success = succeeded
+                    )
+                )
                 if (activeTaskCount.decrementAndGet() <= 0) {
                     activeTaskCount.set(0)
                     pendingTasks.clear()
                     try {
                         stopForeground(STOP_FOREGROUND_REMOVE)
-                    } catch (_: Exception) {}
-                    stopSelf()
+                    } catch (_: Throwable) {}
+                    try {
+                        stopSelf()
+                    } catch (_: Throwable) {}
                 }
             }
         }
@@ -535,22 +574,24 @@ class AuraDownloadService : Service() {
 
             val artPath = track.albumArtPath
             if (!artPath.isNullOrBlank() && File(artPath).exists()) {
-                val opts = BitmapFactory.Options().apply {
-                    inSampleSize = 2
-                    inPreferredConfig = android.graphics.Bitmap.Config.RGB_565
-                }
-                val bitmap = BitmapFactory.decodeFile(artPath, opts)
-                if (bitmap != null) {
-                    builder.setLargeIcon(bitmap)
-                }
+                try {
+                    val opts = BitmapFactory.Options().apply {
+                        inSampleSize = 2
+                        inPreferredConfig = android.graphics.Bitmap.Config.RGB_565
+                    }
+                    val bitmap = BitmapFactory.decodeFile(artPath, opts)
+                    if (bitmap != null) {
+                        builder.setLargeIcon(bitmap)
+                    }
+                } catch (_: Throwable) {}
             }
 
             notificationManager.notify(
                 completionNotificationIdCounter.incrementAndGet(),
                 builder.build()
             )
-        } catch (e: Exception) {
-            AuraDebugManager.logWarning(TAG, "No se pudo mostrar notificación final: ${e.message}")
+        } catch (t: Throwable) {
+            AuraDebugManager.logWarning(TAG, "No se pudo mostrar notificación final: ${t.message}")
         }
     }
 
@@ -579,6 +620,6 @@ class AuraDownloadService : Service() {
                 completionNotificationIdCounter.incrementAndGet(),
                 notification
             )
-        } catch (_: Exception) {}
+        } catch (_: Throwable) {}
     }
 }

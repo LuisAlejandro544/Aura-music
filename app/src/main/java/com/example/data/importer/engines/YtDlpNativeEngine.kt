@@ -238,6 +238,8 @@ object YtDlpNativeEngine {
             add(ytdlpFile.absolutePath)
             add("--dump-single-json")
             add("--no-warnings")
+            add("--extractor-args")
+            add("youtube:player_client=android_vr,ios,web")
             add("--format")
             add("bestvideo[height<=480][ext=mp4][vcodec^=avc1][protocol^=http]+bestaudio[ext=m4a][protocol^=http]/bestvideo[height<=480][ext=mp4][protocol^=http]+bestaudio[protocol^=http]/best[height<=480][ext=mp4][protocol^=http]/best[height<=480]")
             if (qjsBin != null && qjsBin.exists()) {

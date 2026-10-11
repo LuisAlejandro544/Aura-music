@@ -87,9 +87,24 @@ class StreamingModeCoordinator(
         audioPlayer.onStreamingNearEndPrefetchCallback = { currentTrack ->
             prefetchNextSimilarTrackForRadio(currentTrack)
         }
+        audioPlayer.onStreamingHttpErrorRecoveryCallback = { failedTrack, resumePositionMs ->
+            handleStreamingHttpErrorRecovery(failedTrack, resumePositionMs)
+        }
 
         // Cargar catálogo inicial de tendencias al arrancar
         loadInitialTrendingIfNeeded()
+
+        // Limpiar estado de descarga del botón cuando AuraDownloadService termina (éxito o error)
+        scope.launch {
+            AuraDownloadService.taskFinishedEvents.collect { event ->
+                val vid = event.sourceVideoId
+                if (!vid.isNullOrBlank()) {
+                    _downloadingVideoIds.value = _downloadingVideoIds.value - vid
+                } else {
+                    _downloadingVideoIds.value = emptySet()
+                }
+            }
+        }
     }
 
     fun loadInitialTrendingIfNeeded() {
@@ -264,14 +279,16 @@ class StreamingModeCoordinator(
                 uriString = cachedAudio.absolutePath,
                 videoUri = cachedVideo?.absolutePath ?: if (cacheManager.isStreamingVideoAllowedByNetwork()) targetTrack.videoUri else null
             )
-            audioPlayer.appendOrUpdateStreamingTrack(readyTrack)
-            audioPlayer.playTrack(readyTrack, isAutoCrossfadeOverlap = isAutoCrossfade)
-            onLoadLyricsForTrack(readyTrack)
+            scope.launch(Dispatchers.Main) {
+                audioPlayer.appendOrUpdateStreamingTrack(readyTrack)
+                audioPlayer.playTrack(readyTrack, isAutoCrossfadeOverlap = isAutoCrossfade)
+                onLoadLyricsForTrack(readyTrack)
+            }
             prefetchNextSimilarTrackForRadio(readyTrack)
             return true
         }
 
-        // Si aún no tiene archivo en caché o su URL era un marcador pendiente, consultamos la API y yt-dlp
+        // Si aún no tiene archivo en caché o su URL era un marcador pendiente, consultamos la API y yt-dlp (solo para YouTube)
         playResolutionJob?.cancel()
         playResolutionJob = scope.launch {
             _isResolvingStream.value = true
@@ -295,8 +312,8 @@ class StreamingModeCoordinator(
                         videoUri = if (allowVideo) resolved.videoUrl.takeIf { it.isNotBlank() } else null,
                         durationMs = if (targetTrack.durationMs > 0) targetTrack.durationMs else resolved.durationSeconds * 1000L
                     )
-                    audioPlayer.appendOrUpdateStreamingTrack(resolvedTrack)
                     withContext(Dispatchers.Main) {
+                        audioPlayer.appendOrUpdateStreamingTrack(resolvedTrack)
                         audioPlayer.playTrack(resolvedTrack, isAutoCrossfadeOverlap = isAutoCrossfade)
                         onLoadLyricsForTrack(resolvedTrack)
                     }
@@ -323,8 +340,96 @@ class StreamingModeCoordinator(
     }
 
     /**
-     * Consulta automáticamente a la API por una canción similar y resuelve su stream con `yt-dlp`
-     * + pre-descarga en caché temporal antes de que termine la pista actual.
+     * Recuperación transparente cuando ExoPlayer recibe `ERROR_CODE_IO_BAD_HTTP_STATUS` (ej. HTTP 403 Forbidden):
+     * 1. Si `StreamingCacheManager` ya descargó el archivo en la caché temporal, conmuta al archivo local y
+     *    continúa desde [resumePositionMs] sin interrupción.
+     * 2. Si aún no está en caché, solicita un stream fresco con `forceBypassYtDlp = true` (respaldo directo)
+     *    y reanuda la reproducción en [resumePositionMs].
+     */
+    private fun handleStreamingHttpErrorRecovery(
+        failedTrack: Track,
+        resumePositionMs: Long
+    ): Boolean {
+        val videoId = failedTrack.streamingVideoId ?: return false
+        val platform = failedTrack.streamingPlatform ?: StreamingSourcePlatform.YT_MUSIC
+
+        val cachedAudio = cacheManager.getCachedAudioFile(videoId)
+        val cachedVideo = if (cacheManager.isStreamingVideoAllowedByNetwork()) {
+            cacheManager.getCachedVideoFile(videoId)
+        } else null
+
+        if (cachedAudio != null) {
+            val localReadyTrack = failedTrack.copy(
+                uriString = cachedAudio.absolutePath,
+                videoUri = cachedVideo?.absolutePath ?: failedTrack.videoUri
+            )
+            scope.launch(Dispatchers.Main) {
+                audioPlayer.appendOrUpdateStreamingTrack(localReadyTrack)
+                audioPlayer.playTrack(localReadyTrack, isAutoCrossfadeOverlap = false)
+                if (resumePositionMs > 1000L) {
+                    audioPlayer.seekTo(resumePositionMs)
+                }
+            }
+            return true
+        }
+
+        playResolutionJob?.cancel()
+        playResolutionJob = scope.launch {
+            _isResolvingStream.value = true
+            _resolvingVideoId.value = videoId
+            try {
+                val baseItem = itemRegistry[videoId] ?: StreamingSearchItem(
+                    videoId = videoId,
+                    title = failedTrack.title,
+                    artist = failedTrack.artist,
+                    album = failedTrack.album,
+                    durationSeconds = failedTrack.durationMs / 1000L,
+                    thumbnailUrl = failedTrack.albumArtPath ?: "https://i.ytimg.com/vi/$videoId/hqdefault.jpg",
+                    platform = platform
+                )
+                val resolved = StreamingApiService.resolvePlayableStreamWithYtDlp(
+                    context = context,
+                    item = baseItem,
+                    forceBypassYtDlp = true
+                ).getOrNull()
+                if (resolved != null) {
+                    val freshAudioUrl = resolved.audioUrl?.takeIf { it.isNotBlank() } ?: resolved.videoUrl
+                    val allowVideo = cacheManager.isStreamingVideoAllowedByNetwork()
+                    val recoveredTrack = failedTrack.copy(
+                        uriString = freshAudioUrl,
+                        videoUri = if (allowVideo) resolved.videoUrl.takeIf { it.isNotBlank() } else null
+                    )
+                    withContext(Dispatchers.Main) {
+                        audioPlayer.appendOrUpdateStreamingTrack(recoveredTrack)
+                        audioPlayer.playTrack(recoveredTrack, isAutoCrossfadeOverlap = false)
+                        if (resumePositionMs > 1000L) {
+                            audioPlayer.seekTo(resumePositionMs)
+                        }
+                    }
+                    scope.launch(Dispatchers.IO) {
+                        cacheManager.prefetchAudioAheadAsync(videoId, freshAudioUrl) { file ->
+                            audioPlayer.appendOrUpdateStreamingTrack(
+                                recoveredTrack.copy(uriString = file.absolutePath),
+                                updateCurrentTrackIfSame = false
+                            )
+                        }
+                    }
+                } else {
+                    withContext(Dispatchers.Main) {
+                        audioPlayer.playNext()
+                    }
+                }
+            } finally {
+                _isResolvingStream.value = false
+                _resolvingVideoId.value = null
+            }
+        }
+        return true
+    }
+
+    /**
+     * Consulta automáticamente a la API por una canción similar y resuelve su stream
+     * (`yt-dlp` para YouTube, `InnerTube` para YT Music) + pre-descarga en caché temporal antes de que termine la pista actual.
      */
     fun prefetchNextSimilarTrackForRadio(currentTrack: Track) {
         val videoId = currentTrack.streamingVideoId ?: return
@@ -345,7 +450,7 @@ class StreamingModeCoordinator(
                 itemRegistry[similarItem.videoId] = similarItem
                 _nextSimilarTrackPreview.value = similarItem
 
-                // Resolver con yt-dlp y pre-almacenar en caché temporal de 30 minutos
+                // Resolver según plataforma (yt-dlp para YouTube, InnerTube para YT Music) y pre-almacenar en caché temporal de 30 minutos
                 val resolved = StreamingApiService.resolvePlayableStreamWithYtDlp(context, similarItem).getOrNull()
                     ?: return@launch
 
@@ -363,50 +468,70 @@ class StreamingModeCoordinator(
                 )
 
                 // Añadir a la cola activa para que al finalizar o pulsar Siguiente suene sin esperas
-                audioPlayer.appendOrUpdateStreamingTrack(nextTrack)
+                audioPlayer.appendOrUpdateStreamingTrack(nextTrack, updateCurrentTrackIfSame = false)
 
                 // Pre-descargar los primeros minutos de la canción similar en la caché temporal
                 cacheManager.prefetchAudioAheadAsync(similarItem.videoId, playableAudioUrl) { readyAudioFile ->
-                    audioPlayer.appendOrUpdateStreamingTrack(nextTrack.copy(uriString = readyAudioFile.absolutePath))
+                    audioPlayer.appendOrUpdateStreamingTrack(nextTrack.copy(uriString = readyAudioFile.absolutePath), updateCurrentTrackIfSame = false)
                 }
                 if (allowVideo && resolved.videoUrl.isNotBlank()) {
                     cacheManager.prefetchVideoCanvasAsync(similarItem.videoId, resolved.videoUrl) { readyVideoFile ->
-                        audioPlayer.appendOrUpdateStreamingTrack(nextTrack.copy(videoUri = readyVideoFile.absolutePath))
+                        audioPlayer.appendOrUpdateStreamingTrack(nextTrack.copy(videoUri = readyVideoFile.absolutePath), updateCurrentTrackIfSame = false)
                     }
                 }
-            } catch (_: Exception) {}
+            } catch (_: Throwable) {}
         }
     }
 
     /**
-     * Descarga permanentemente una canción de streaming (desde la pestaña Explorar o desde Now Playing)
-     * hacia la biblioteca local (`songs/`, `images/`, `videos/`, `lyrics/`) mediante `AuraDownloadService`.
+     * Descarga permanentemente una canción o video de streaming (desde el reproductor online o desde Now Playing)
+     * hacia la biblioteca local (`songs/`, `images/`, `videos/`, `lyrics/`) mediante `AuraDownloadService`,
+     * incluyendo su audio y su Video Canvas 480p sin interrumpir la canción que está sonando.
      */
     fun downloadStreamingItemPermanently(
         item: StreamingSearchItem,
         includeVideoCanvas: Boolean = true
     ) {
+        if (_downloadingVideoIds.value.contains(item.videoId)) {
+            onStatusMessage("Ya se está descargando \"${item.title}\" en segundo plano...")
+            return
+        }
         _downloadingVideoIds.value = _downloadingVideoIds.value + item.videoId
         onStatusMessage("Preparando descarga de \"${item.title}\" (${item.platform.badgeText}) en tu biblioteca local...")
 
         scope.launch(Dispatchers.IO) {
-            val resolvedResult = StreamingApiService.resolvePlayableStreamWithYtDlp(context, item)
-            val resolved = resolvedResult.getOrNull()
-            if (resolved == null) {
-                _downloadingVideoIds.value = _downloadingVideoIds.value - item.videoId
-                onStatusMessage("No se pudo iniciar la descarga de \"${item.title}\".")
-                return@launch
-            }
+            try {
+                val resolvedResult = StreamingApiService.resolvePlayableStreamWithYtDlp(context, item)
+                val resolved = resolvedResult.getOrNull()
+                if (resolved == null) {
+                    _downloadingVideoIds.value = _downloadingVideoIds.value - item.videoId
+                    onStatusMessage("No se pudo iniciar la descarga de \"${item.title}\".")
+                    return@launch
+                }
 
-            AuraDownloadService.startDownload(
-                context = context,
-                resolvedInfo = resolved,
-                customTitle = item.title,
-                customArtist = item.artist,
-                attachAsCanvas = includeVideoCanvas,
-                trimSilence = false,
-                loopStyle = FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE
-            )
+                // Reutilizar archivos si ya estaban en la caché temporal de 30 minutos para acelerar la descarga y evitar fallos de red
+                val cachedAudio = cacheManager.getCachedAudioFile(item.videoId)
+                val cachedVideo = cacheManager.getCachedVideoFile(item.videoId)
+                val optimizedResolved = resolved.copy(
+                    audioUrl = cachedAudio?.absolutePath ?: resolved.audioUrl,
+                    videoUrl = cachedVideo?.absolutePath ?: resolved.videoUrl
+                )
+
+                AuraDownloadService.startDownload(
+                    context = context,
+                    resolvedInfo = optimizedResolved,
+                    customTitle = item.title,
+                    customArtist = item.artist,
+                    attachAsCanvas = includeVideoCanvas,
+                    trimSilence = false,
+                    loopStyle = FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE,
+                    autoPlayOnComplete = false,
+                    sourceVideoId = item.videoId
+                )
+            } catch (t: Throwable) {
+                _downloadingVideoIds.value = _downloadingVideoIds.value - item.videoId
+                onStatusMessage("Error al preparar descarga de \"${item.title}\": ${t.localizedMessage ?: "Intenta nuevamente"}")
+            }
         }
     }
 
