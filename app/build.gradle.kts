@@ -56,7 +56,11 @@ android {
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-    if (!isBetaTaskRequested) {
+    val isMobileSplitRequested = isBetaTaskRequested ||
+      System.getenv("AURA_SPLIT_APKS") == "true" ||
+      System.getenv("AURA_BETA_MOBILE_ONLY") == "true"
+
+    if (!isMobileSplitRequested) {
       ndk {
         abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
       }
@@ -88,13 +92,13 @@ android {
     }
   }
 
-  // En compilación Beta generamos exactamente 3 APKs móviles: arm64-v8a, armeabi-v7a y universal (sin arquitecturas de PC)
-  val isBetaSplitEnabled = gradle.startParameter.taskNames.any {
+  // En compilación Beta o en el workflow de GitHub Actions con AURA_SPLIT_APKS=true generamos exactamente 3 APKs móviles: arm64-v8a, armeabi-v7a y universal
+  val isAbiSplitEnabled = gradle.startParameter.taskNames.any {
     it.contains("Beta", ignoreCase = true)
-  }
+  } || System.getenv("AURA_SPLIT_APKS") == "true" || System.getenv("AURA_BETA_MOBILE_ONLY") == "true"
   splits {
     abi {
-      isEnable = isBetaSplitEnabled
+      isEnable = isAbiSplitEnabled
       reset()
       include("arm64-v8a", "armeabi-v7a")
       isUniversalApk = true
@@ -819,9 +823,10 @@ val ensureDebugKeystore = tasks.register<EnsureDebugKeystoreTask>("ensureDebugKe
 val provisionNativeDeps = tasks.register<ProvisionNativeDepsTask>("provisionNativeDeps") {
   dependsOn(ensureDebugKeystore)
   provisionVersion.set("v2.4-ytdlp-vevo-restored")
-  val betaMode = gradle.startParameter.taskNames.any { it.contains("Beta", ignoreCase = true) } ||
-    System.getenv("AURA_BETA_MOBILE_ONLY") == "true"
-  mobileOnlyAbis.set(betaMode)
+  val mobileOnlyMode = gradle.startParameter.taskNames.any { it.contains("Beta", ignoreCase = true) } ||
+    System.getenv("AURA_BETA_MOBILE_ONLY") == "true" ||
+    System.getenv("AURA_SPLIT_APKS") == "true"
+  mobileOnlyAbis.set(mobileOnlyMode)
   cppDirectory.set(layout.projectDirectory.dir("src/main/cpp"))
   pythonRuntimeFiles.from(pythonNativeRuntime)
   ffmpegRuntimeFiles.from(ffmpegNativeRuntime)

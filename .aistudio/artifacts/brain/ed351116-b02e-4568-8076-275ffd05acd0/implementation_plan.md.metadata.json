@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de implementación para eliminar referencias a marcas registradas (Apple Music / Spotify), perfeccionar el cruce simultáneo de volumen 100% a 0% y 0% a 100% en Crossfade Dual-Deck, y corregir el indicador falso de buscando/cargando red en canciones locales.",
-  "updatedAt":  "2026-10-11T00:53:18.435205651Z",
+  "summary":  "Plan técnico y de experiencia de usuario para reparar de raíz tanto el generador de Auto-Remix y Mashup de 2 canciones (FFmpeg) como el Smart AutoMix DJ de transiciones en vivo (Dual-Deck), además de actualizar el workflow de compilación de APK Debug en GitHub Actions para generar y publicar los 3 APKs móviles separados (arm64-v8a, armeabi-v7a y universal) junto con SHA256SUMS.txt en Artifacts.",
+  "updatedAt":  "2026-10-11T01:28:06.148295118Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

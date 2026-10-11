@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Rect
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import com.example.data.importer.FFmpegNativeEngine
 import com.example.data.importer.IncomingMediaHandler
@@ -37,9 +38,10 @@ import kotlinx.coroutines.withContext
  * - Analizar una lista de canciones locales y elegir automáticamente el mejor par compatible (`findBestMatchingPair`)
  *   evaluando proporción de duración, contraste de artista/álbum y compatibilidad rítmica estimada.
  * - Generar Remixes reales en segundo plano mediante `FFmpegNativeEngine` exclusivamente sobre música local:
- *   1. `VOCAL_MASHUP` (Mashup Voz A + Base B): Aísla la banda vocal central de la Canción A (filtro paso-altos 220 Hz,
- *      realce de formantes vocales 1.6 kHz - 4.2 kHz y enfoque Mid) y la superpone sobre la base rítmica/instrumental
- *      de la Canción B (refuerzo de subgraves 55 Hz - 140 Hz y atenuación de centro vocal), nivelando el resultado con `alimiter`.
+ *   1. `VOCAL_MASHUP` (Mashup Voz A + Base B): Aísla la banda vocal central de la Canción A (filtro paso-altos 210 Hz,
+ *      realce de formantes vocales 1.8 kHz - 3.4 kHz y enfoque Mid) y la superpone sobre la base rítmica/instrumental
+ *      de la Canción B (refuerzo de subgraves 65 Hz - 125 Hz y atenuación de centro vocal), con fallback compatible
+ *      instantáneo si algún filtro paramétrico opcional no está habilitado en una arquitectura específica.
  *   2. `DJ_ALTERNATING_REMIX` (Remix Alternado DJ con Sincronización de Ritmo): Divide ambas canciones en 4 bloques
  *      dinámicos (Sección 1 de A -> Drop de B -> Clímax de A -> Outro de B) ajustando sutilmente el tempo (`atempo`)
  *      y entrelazándolos con `acrossfade` y ecualización libre de choques de bajos.
@@ -143,46 +145,59 @@ object SmartAutoRemixEngine {
         val tempFiles = mutableListOf<File>()
 
         try {
-            onProgress?.invoke(0.06f, "Verificando motor FFmpeg nativo...")
-            if (!FFmpegNativeEngine.isAvailable(context)) {
+            onProgress?.invoke(0.06f, "Inicializando motor FFmpeg nativo...")
+            FFmpegNativeEngine.init(context)
+            val ffmpegBinFile = FFmpegNativeEngine.getBinaryFile(context)
+            if (ffmpegBinFile == null || !ffmpegBinFile.canExecute()) {
                 AuraDebugManager.logError(TAG, "FFmpeg nativo no disponible para generar Auto-Remix.")
                 return@withContext null
             }
 
-            onProgress?.invoke(0.14f, "Analizando pistas locales: '${trackA.title}' y '${trackB.title}'...")
+            onProgress?.invoke(0.14f, "Preparando pistas locales: '${trackA.title}' y '${trackB.title}'...")
             val fileA = prepareSafeLocalAudioFile(context, trackA, 0, tempFiles)
             val fileB = prepareSafeLocalAudioFile(context, trackB, 1, tempFiles)
-            if (fileA == null || fileB == null) {
-                AuraDebugManager.logError(TAG, "No se pudieron preparar los archivos de audio locales para el Auto-Remix.")
+            if (fileA == null || !fileA.exists() || fileA.length() < 512L ||
+                fileB == null || !fileB.exists() || fileB.length() < 512L
+            ) {
+                AuraDebugManager.logError(
+                    TAG,
+                    "No se pudieron leer los archivos de audio locales para el Auto-Remix (A=${fileA?.absolutePath}, B=${fileB?.absolutePath})."
+                )
                 return@withContext null
             }
 
             val timestamp = System.currentTimeMillis()
             val outputAudioFile = File(storageManager.songsDir, "aura_autoremix_${timestamp}.m4a")
-            val ffmpegBin = FFmpegNativeEngine.getBinaryFile(context)?.absolutePath ?: return@withContext null
+            if (outputAudioFile.exists()) outputAudioFile.delete()
+            val ffmpegBin = ffmpegBinFile.absolutePath
 
-            val durAMs = trackA.durationMs.coerceIn(25_000L, 360_000L)
-            val durBMs = trackB.durationMs.coerceIn(25_000L, 360_000L)
+            val realDurAMs = resolveRealAudioDurationMs(fileA, trackA.durationMs).coerceIn(12_000L, 360_000L)
+            val realDurBMs = resolveRealAudioDurationMs(fileB, trackB.durationMs).coerceIn(12_000L, 360_000L)
 
-            val (filterComplex, expectedDurationMs, chapters) = when (style) {
-                AutoRemixStyle.VOCAL_MASHUP -> buildVocalMashupPlan(trackA, trackB, durAMs, durBMs)
+            val (primaryFilterComplex, expectedDurationMs, chapters) = when (style) {
+                AutoRemixStyle.VOCAL_MASHUP -> buildVocalMashupPlan(trackA, trackB, realDurAMs, realDurBMs, useCompatibleFiltersOnly = false)
                 AutoRemixStyle.DJ_ALTERNATING_REMIX -> buildAlternatingDjRemixPlan(
                     trackA = trackA,
                     trackB = trackB,
-                    durAMs = durAMs,
-                    durBMs = durBMs,
-                    crossfadeSeconds = crossfadeSeconds.coerceIn(3, 10)
+                    durAMs = realDurAMs,
+                    durBMs = realDurBMs,
+                    crossfadeSeconds = crossfadeSeconds.coerceIn(3, 10),
+                    useCompatibleFiltersOnly = false
                 )
             }
 
-            val cmd = arrayListOf(
+            val safeInputA = FFmpegNativeEngine.sanitizeFilePath(fileA)
+            val safeInputB = FFmpegNativeEngine.sanitizeFilePath(fileB)
+            val safeOutput = FFmpegNativeEngine.sanitizeFilePath(outputAudioFile)
+
+            fun buildFfmpegCommand(filterGraph: String): Array<String> = arrayOf(
                 ffmpegBin,
                 "-y",
                 "-hide_banner",
                 "-loglevel", "info",
-                "-i", fileA.canonicalPath,
-                "-i", fileB.canonicalPath,
-                "-filter_complex", filterComplex,
+                "-i", safeInputA,
+                "-i", safeInputB,
+                "-filter_complex", filterGraph,
                 "-map", "[outa]",
                 "-vn",
                 "-c:a", "aac",
@@ -190,24 +205,57 @@ object SmartAutoRemixEngine {
                 "-ar", "44100",
                 "-ac", "2",
                 "-movflags", "+faststart",
-                outputAudioFile.canonicalPath
+                safeOutput
             )
 
             val styleLabel = if (style == AutoRemixStyle.VOCAL_MASHUP) "Mashup Vocal + Base" else "Remix Alternado DJ"
-            onProgress?.invoke(0.26f, "Renderizando $styleLabel en estudio...")
+            onProgress?.invoke(0.24f, "Renderizando $styleLabel en estudio...")
 
-            val success = executeFFmpeg(
+            var success = executeFFmpeg(
                 context = context,
-                args = cmd.toTypedArray(),
+                args = buildFfmpegCommand(primaryFilterComplex),
                 totalDurationMs = expectedDurationMs,
                 onProgress = { ffProgress ->
-                    val mapped = 0.26f + (ffProgress * 0.56f)
+                    val mapped = 0.24f + (ffProgress * 0.58f)
                     onProgress?.invoke(
-                        mapped.coerceIn(0.26f, 0.82f),
+                        mapped.coerceIn(0.24f, 0.82f),
                         "Mezclando $styleLabel (${(ffProgress * 100).toInt()}%)..."
                     )
                 }
             )
+
+            // Si el grafo con ecualizadores paramétricos avanzados falló por algún filtro no soportado o formato particular,
+            // ejecutamos de inmediato el grafo compatible de alta fidelidad (aformat + highpass/lowpass + atempo + amix/acrossfade).
+            if (!success || !outputAudioFile.exists() || outputAudioFile.length() < 1024L) {
+                AuraDebugManager.logWarning(
+                    TAG,
+                    "Reintentando Auto-Remix con grafo acústico universal compatible para '${trackA.title}' × '${trackB.title}'..."
+                )
+                if (outputAudioFile.exists()) outputAudioFile.delete()
+                val (compatFilterComplex, _, _) = when (style) {
+                    AutoRemixStyle.VOCAL_MASHUP -> buildVocalMashupPlan(trackA, trackB, realDurAMs, realDurBMs, useCompatibleFiltersOnly = true)
+                    AutoRemixStyle.DJ_ALTERNATING_REMIX -> buildAlternatingDjRemixPlan(
+                        trackA = trackA,
+                        trackB = trackB,
+                        durAMs = realDurAMs,
+                        durBMs = realDurBMs,
+                        crossfadeSeconds = crossfadeSeconds.coerceIn(3, 10),
+                        useCompatibleFiltersOnly = true
+                    )
+                }
+                success = executeFFmpeg(
+                    context = context,
+                    args = buildFfmpegCommand(compatFilterComplex),
+                    totalDurationMs = expectedDurationMs,
+                    onProgress = { ffProgress ->
+                        val mapped = 0.28f + (ffProgress * 0.54f)
+                        onProgress?.invoke(
+                            mapped.coerceIn(0.28f, 0.82f),
+                            "Mezclando $styleLabel (${(ffProgress * 100).toInt()}%)..."
+                        )
+                    }
+                )
+            }
 
             if (!success || !outputAudioFile.exists() || outputAudioFile.length() < 1024L) {
                 AuraDebugManager.logError(TAG, "FFmpeg no generó un archivo de Auto-Remix válido.")
@@ -226,6 +274,7 @@ object SmartAutoRemixEngine {
             val titleClean = customTitle.trim().ifBlank { defaultRemixTitle }
             val artistClean = "${trackA.artist} × ${trackB.artist}"
 
+            val actualOutDurationMs = resolveRealAudioDurationMs(outputAudioFile, expectedDurationMs)
             val database = AppDatabase.getInstance(context)
             val repository = MusicRepository(database)
 
@@ -234,7 +283,7 @@ object SmartAutoRemixEngine {
                 title = titleClean,
                 artist = artistClean,
                 album = "Aura Auto-Remixes",
-                durationMs = expectedDurationMs,
+                durationMs = actualOutDurationMs,
                 uriString = Uri.fromFile(outputAudioFile).toString(),
                 albumArtPath = splitCoverFile?.absolutePath ?: trackA.albumArtPath ?: trackB.albumArtPath,
                 videoUri = chapters.firstOrNull { !it.videoUri.isNullOrBlank() }?.videoUri,
@@ -253,7 +302,7 @@ object SmartAutoRemixEngine {
             val metadata = MixtapeMetadata(
                 mixtapeId = insertedTrack.id,
                 title = titleClean,
-                totalDurationMs = expectedDurationMs,
+                totalDurationMs = actualOutDurationMs,
                 crossfadeSeconds = crossfadeSeconds.coerceIn(3, 10),
                 chapters = chapters
             )
@@ -263,7 +312,7 @@ object SmartAutoRemixEngine {
             AuraDebugManager.logInfo(TAG, "Auto-Remix '${insertedTrack.title}' creado exitosamente (${style.name}).")
             insertedTrack
         } catch (e: Exception) {
-            AuraDebugManager.logError(TAG, "Error creando Auto-Remix: ${e.message}")
+            AuraDebugManager.logError(TAG, "Error creando Auto-Remix: ${e.message}", e)
             null
         } finally {
             tempFiles.forEach { file ->
@@ -273,49 +322,73 @@ object SmartAutoRemixEngine {
     }
 
     /**
+     * Obtiene la duración real en milisegundos del archivo de audio local mediante MediaMetadataRetriever,
+     * usando [fallbackDurationMs] si el metadato no está disponible.
+     */
+    private fun resolveRealAudioDurationMs(audioFile: File, fallbackDurationMs: Long): Long {
+        val retriever = MediaMetadataRetriever()
+        return try {
+            retriever.setDataSource(audioFile.absolutePath)
+            val extracted = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
+            if (extracted != null && extracted > 3000L) {
+                extracted
+            } else {
+                fallbackDurationMs.takeIf { it > 3000L } ?: 60_000L
+            }
+        } catch (_: Throwable) {
+            fallbackDurationMs.takeIf { it > 3000L } ?: 60_000L
+        } finally {
+            try { retriever.release() } catch (_: Throwable) {}
+        }
+    }
+
+    /**
      * Construye el grafo FFmpeg para el Modo 1: Mashup (Voz Canción A + Base Instrumental Canción B).
-     * - Canción A (Voz): Filtro paso-altos en 210 Hz, filtro paso-bajos en 6800 Hz, realce de formantes vocales
-     *   en 1850 Hz y 3400 Hz, manteniendo la voz nítida al frente.
-     * - Canción B (Base Rítmica): Realce de subgraves/bombo en 65 Hz y 125 Hz, atenuación profunda del bolsillo
-     *   vocal central (1800 Hz y 3200 Hz) para dejar espacio a la voz de la Canción A, ajustando suavemente
-     *   el tempo si las duraciones difieren ligeramente.
      */
     private fun buildVocalMashupPlan(
         trackA: Track,
         trackB: Track,
         durAMs: Long,
-        durBMs: Long
+        durBMs: Long,
+        useCompatibleFiltersOnly: Boolean
     ): Triple<String, Long, List<MixtapeChapter>> {
-        val targetDurationSec = (min(durAMs, durBMs).coerceIn(30_000L, 210_000L) / 1000L).toInt()
+        val targetDurationSec = (min(durAMs, durBMs).coerceIn(12_000L, 210_000L) / 1000L).toInt().coerceAtLeast(10)
         val targetDurationMs = targetDurationSec * 1000L
 
-        // Ajuste sutil de ritmo en la base B (entre 0.94x y 1.06x) para empatar compases sin deformar el audio
         val rawRatio = durBMs.toDouble() / durAMs.toDouble()
         val safeTempoB = rawRatio.coerceIn(0.94, 1.06)
         val tempoFilterB = String.format(Locale.US, "atempo=%.3f,", safeTempoB)
 
         val filter = StringBuilder()
-        // Rama A: Enfoque Vocal (Canción A)
-        filter.append("[0:a]aresample=44100,aformat=sample_rates=44100:channel_layouts=stereo,")
-        filter.append("highpass=f=210,lowpass=f=7200,")
-        filter.append("equalizer=f=1850:t=q:w=1.2:g=4.5,equalizer=f=3400:t=q:w=1.4:g=3.5,")
-        filter.append("atrim=0:$targetDurationSec,asetpts=PTS-STARTPTS,volume=1.08[voca];")
+        if (!useCompatibleFiltersOnly) {
+            // Rama A: Enfoque Vocal (Canción A)
+            filter.append("[0:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,")
+            filter.append("highpass=f=210,lowpass=f=7200,")
+            filter.append("equalizer=f=1850:t=q:w=1.2:g=4.5,equalizer=f=3400:t=q:w=1.4:g=3.5,")
+            filter.append("atrim=0:$targetDurationSec,asetpts=PTS-STARTPTS,volume=1.08[voca];")
 
-        // Rama B: Base Rítmica e Instrumental (Canción B) con bolsillo vocal atenuado
-        filter.append("[1:a]aresample=44100,aformat=sample_rates=44100:channel_layouts=stereo,")
-        filter.append(tempoFilterB)
-        filter.append("equalizer=f=65:t=q:w=1.1:g=4.2,equalizer=f=125:t=q:w=1.2:g=2.8,")
-        filter.append("equalizer=f=1800:t=q:w=1.0:g=-7.5,equalizer=f=3200:t=q:w=1.1:g=-6.5,")
-        filter.append("atrim=0:$targetDurationSec,asetpts=PTS-STARTPTS,volume=0.88[beatb];")
+            // Rama B: Base Rítmica e Instrumental (Canción B) con bolsillo vocal atenuado
+            filter.append("[1:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,")
+            filter.append(tempoFilterB)
+            filter.append("equalizer=f=65:t=q:w=1.1:g=4.2,equalizer=f=125:t=q:w=1.2:g=2.8,")
+            filter.append("equalizer=f=1800:t=q:w=1.0:g=-7.5,equalizer=f=3200:t=q:w=1.1:g=-6.5,")
+            filter.append("atrim=0:$targetDurationSec,asetpts=PTS-STARTPTS,volume=0.88[beatb];")
+        } else {
+            // Grafo universal compatible (100% libre de filtros opcionales específicos)
+            filter.append("[0:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,")
+            filter.append("highpass=f=220,lowpass=f=7000,")
+            filter.append("atrim=0:$targetDurationSec,asetpts=PTS-STARTPTS,volume=1.12[voca];")
 
-        // Mezcla armónica de ambas ramas con limitador de estudio y fade-out suave en los últimos 3s
-        val fadeOutStart = (targetDurationSec - 3).coerceAtLeast(5)
+            filter.append("[1:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,")
+            filter.append(tempoFilterB)
+            filter.append("lowpass=f=3800,")
+            filter.append("atrim=0:$targetDurationSec,asetpts=PTS-STARTPTS,volume=0.86[beatb];")
+        }
+
+        val fadeOutStart = (targetDurationSec - 3).coerceAtLeast(3)
         filter.append("[voca][beatb]amix=inputs=2:duration=shortest:dropout_transition=2,")
-        filter.append("alimiter=limit=0.95:level=disabled,")
         filter.append("afade=t=in:st=0:d=2,afade=t=out:st=$fadeOutStart:d=3[outa]")
 
-        // Dividimos visualmente el Mashup en 2 capítulos mitad y mitad para que el usuario disfrute
-        // tanto la carátula/Video Canvas de la Canción A como la de la Canción B durante la reproducción
         val halfMs = targetDurationMs / 2L
         val chapters = listOf(
             MixtapeChapter(
@@ -345,30 +418,34 @@ object SmartAutoRemixEngine {
 
     /**
      * Construye el grafo FFmpeg para el Modo 2: Remix Alternado DJ con Sincronización de Ritmo.
-     * Alterna 4 segmentos energéticos (Intro/Verso A -> Drop B -> Puente/Coro A -> Cierre B)
-     * con ajuste armónico de tempo y transiciones `acrossfade` con curva de igual potencia.
      */
     private fun buildAlternatingDjRemixPlan(
         trackA: Track,
         trackB: Track,
         durAMs: Long,
         durBMs: Long,
-        crossfadeSeconds: Int
+        crossfadeSeconds: Int,
+        useCompatibleFiltersOnly: Boolean
     ): Triple<String, Long, List<MixtapeChapter>> {
-        val cf = crossfadeSeconds.coerceIn(3, 8)
-        val segSec = 28 // Cada bloque DJ dura ~28 segundos para un remix ágil y dinámico (~1:40 min total)
+        val totalASec = (durAMs / 1000L).toInt().coerceAtLeast(12)
+        val totalBSec = (durBMs / 1000L).toInt().coerceAtLeast(12)
+
+        val segASec = min(28, (totalASec / 2).coerceAtLeast(6))
+        val segBSec = min(28, (totalBSec / 2).coerceAtLeast(6))
+        val maxSafeCf = (min(segASec, segBSec) / 2).coerceAtLeast(2)
+        val cf = crossfadeSeconds.coerceIn(2, min(8, maxSafeCf))
 
         val a1Start = 0
-        val a1End = min((durAMs / 1000L).toInt(), segSec).coerceAtLeast(14)
+        val a1End = min(totalASec, segASec).coerceAtLeast(cf + 2)
 
-        val b1Start = min(((durBMs / 1000L).toInt() / 5), 15).coerceAtLeast(0)
-        val b1End = min((durBMs / 1000L).toInt(), b1Start + segSec).coerceAtLeast(b1Start + 14)
+        val b1Start = min(totalBSec / 5, max(0, totalBSec - segBSec))
+        val b1End = min(totalBSec, b1Start + segBSec).coerceAtLeast(b1Start + cf + 2)
 
-        val a2Start = min((durAMs / 1000L).toInt() / 2, a1End)
-        val a2End = min((durAMs / 1000L).toInt(), a2Start + segSec).coerceAtLeast(a2Start + 14)
+        val a2Start = min(totalASec / 2, max(0, totalASec - segASec))
+        val a2End = min(totalASec, a2Start + segASec).coerceAtLeast(a2Start + cf + 2)
 
-        val b2Start = min((durBMs / 1000L).toInt() / 2, b1End)
-        val b2End = min((durBMs / 1000L).toInt(), b2Start + segSec).coerceAtLeast(b2Start + 14)
+        val b2Start = min(totalBSec / 2, max(0, totalBSec - segBSec))
+        val b2End = min(totalBSec, b2Start + segBSec).coerceAtLeast(b2Start + cf + 2)
 
         val rawRatio = durBMs.toDouble() / durAMs.toDouble()
         val safeTempoB = rawRatio.coerceIn(0.95, 1.05)
@@ -376,30 +453,40 @@ object SmartAutoRemixEngine {
 
         val filter = StringBuilder()
         // Segmento 1 (Intro/Verso Canción A)
-        filter.append("[0:a]aresample=44100,aformat=sample_rates=44100:channel_layouts=stereo,")
+        filter.append("[0:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,")
         filter.append("atrim=$a1Start:$a1End,asetpts=PTS-STARTPTS[s0];")
         // Segmento 2 (Drop Canción B sincronizado)
-        filter.append("[1:a]aresample=44100,aformat=sample_rates=44100:channel_layouts=stereo,")
+        filter.append("[1:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,")
         filter.append("atrim=$b1Start:$b1End,asetpts=PTS-STARTPTS,$tempoFilterB")
-        filter.append("equalizer=f=75:t=q:w=1.1:g=2.5[s1];")
+        if (!useCompatibleFiltersOnly) {
+            filter.append("equalizer=f=75:t=q:w=1.1:g=2.5[s1];")
+        } else {
+            filter.append("volume=1.02[s1];")
+        }
         // Segmento 3 (Coro/Clímax Canción A)
-        filter.append("[0:a]aresample=44100,aformat=sample_rates=44100:channel_layouts=stereo,")
+        filter.append("[0:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,")
         filter.append("atrim=$a2Start:$a2End,asetpts=PTS-STARTPTS,")
-        filter.append("equalizer=f=2400:t=q:w=1.2:g=2.0[s2];")
+        if (!useCompatibleFiltersOnly) {
+            filter.append("equalizer=f=2400:t=q:w=1.2:g=2.0[s2];")
+        } else {
+            filter.append("volume=1.02[s2];")
+        }
         // Segmento 4 (Outro/Cierre Canción B)
-        filter.append("[1:a]aresample=44100,aformat=sample_rates=44100:channel_layouts=stereo,")
+        val fadeOutStart = (b2End - b2Start - 3).coerceAtLeast(2)
+        filter.append("[1:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,")
         filter.append("atrim=$b2Start:$b2End,asetpts=PTS-STARTPTS,$tempoFilterB")
-        filter.append("afade=t=out:st=${(b2End - b2Start - 3).coerceAtLeast(4)}:d=3[s3];")
+        filter.append("afade=t=out:st=$fadeOutStart:d=2[s3];")
 
         // Encadenamiento con acrossfade DJ
-        filter.append("[s0][s1]acrossfade=d=$cf:c1=qsin:c2=qsin[m01];")
-        filter.append("[m01][s2]acrossfade=d=$cf:c1=qsin:c2=qsin[m02];")
-        filter.append("[m02][s3]acrossfade=d=$cf:c1=qsin:c2=qsin,alimiter=limit=0.95:level=disabled[outa]")
+        val curveType = if (!useCompatibleFiltersOnly) "qsin" else "tri"
+        filter.append("[s0][s1]acrossfade=d=$cf:c1=$curveType:c2=$curveType[m01];")
+        filter.append("[m01][s2]acrossfade=d=$cf:c1=$curveType:c2=$curveType[m02];")
+        filter.append("[m02][s3]acrossfade=d=$cf:c1=$curveType:c2=$curveType[outa]")
 
-        val d0Ms = (a1End - a1Start) * 1000L
-        val d1Ms = (b1End - b1Start) * 1000L
-        val d2Ms = (a2End - a2Start) * 1000L
-        val d3Ms = (b2End - b2Start) * 1000L
+        val d0Ms = (a1End - a1Start).coerceAtLeast(4) * 1000L
+        val d1Ms = (b1End - b1Start).coerceAtLeast(4) * 1000L
+        val d2Ms = (a2End - a2Start).coerceAtLeast(4) * 1000L
+        val d3Ms = (b2End - b2Start).coerceAtLeast(4) * 1000L
         val cfMs = cf * 1000L
 
         val c0Start = 0L
@@ -454,7 +541,35 @@ object SmartAutoRemixEngine {
             )
         )
 
-        return Triple(filter.toString(), c3End.coerceAtLeast(15_000L), chapters)
+        return Triple(filter.toString(), c3End.coerceAtLeast(10_000L), chapters)
+    }
+
+    /**
+     * Verifica que un archivo local sea seguro de leer (incluyendo explícitamente el directorio `songs/`
+     * de Aura Music tanto en almacenamiento externo de la app como en el fallback interno `filesDir/songs`).
+     */
+    private fun isSafeAudioFileForAutoRemix(context: Context, file: File): Boolean {
+        return try {
+            if (!file.exists() || !file.isFile || !file.canRead()) return false
+            val canonical = file.canonicalFile.toPath()
+            val storageManager = AppStorageManager(context)
+            val songsDirPath = storageManager.songsDir.canonicalFile.toPath()
+            if (canonical.startsWith(songsDirPath)) {
+                return true
+            }
+            val internalSongsDir = File(context.filesDir, "songs").canonicalFile.toPath()
+            if (canonical.startsWith(internalSongsDir)) {
+                return true
+            }
+            val dataDir = context.applicationInfo.dataDir?.let { File(it).canonicalFile.toPath() }
+            val filesDir = context.filesDir.canonicalFile.toPath()
+            if ((dataDir != null && canonical.startsWith(dataDir)) || canonical.startsWith(filesDir)) {
+                return false
+            }
+            true
+        } catch (_: Exception) {
+            false
+        }
     }
 
     private fun prepareSafeLocalAudioFile(
@@ -463,19 +578,28 @@ object SmartAutoRemixEngine {
         index: Int,
         tempFiles: MutableList<File>
     ): File? {
-        val uriStr = track.uriString
+        val uriStr = track.uriString.trim()
+        if (uriStr.isBlank()) return null
+
         if (uriStr.startsWith("/")) {
             val f = File(uriStr)
-            if (f.exists() && f.isFile && f.canRead()) return f.canonicalFile
+            if (isSafeAudioFileForAutoRemix(context, f)) return f.canonicalFile
             return null
-        } else if (uriStr.startsWith("file://")) {
-            val f = File(Uri.parse(uriStr).path ?: "")
-            if (f.exists() && f.isFile && f.canRead()) return f.canonicalFile
+        } else if (uriStr.startsWith("file://", ignoreCase = true)) {
+            val parsedPath = Uri.parse(uriStr).path ?: uriStr.removePrefix("file://")
+            val f = File(parsedPath)
+            if (isSafeAudioFileForAutoRemix(context, f)) return f.canonicalFile
             return null
         }
 
         return try {
             val uri = Uri.parse(uriStr)
+            val scheme = uri.scheme?.lowercase()
+            if (scheme == "file") {
+                val f = File(uri.path ?: "")
+                if (isSafeAudioFileForAutoRemix(context, f)) return f.canonicalFile
+                return null
+            }
             if (!IncomingMediaHandler.isSafeExternalUri(context, uri)) return null
             val tempFile = File(context.cacheDir, "autoremix_in_${index}_${System.currentTimeMillis()}.tmp")
             tempFiles.add(tempFile)
@@ -484,8 +608,9 @@ object SmartAutoRemixEngine {
                     input.copyTo(output)
                 }
             }
-            if (tempFile.exists() && tempFile.length() > 0L) tempFile else null
-        } catch (_: Exception) {
+            if (tempFile.exists() && tempFile.length() > 512L) tempFile else null
+        } catch (e: Exception) {
+            AuraDebugManager.logWarning(TAG, "Error preparando archivo de entrada '${track.title}': ${e.message}")
             null
         }
     }
@@ -587,6 +712,7 @@ object SmartAutoRemixEngine {
         onProgress: ((Float) -> Unit)?
     ): Boolean {
         val timePattern = Pattern.compile("time=(\\d{2}):(\\d{2}):(\\d{2})\\.(\\d{2})")
+        val logBuilder = StringBuilder()
         return try {
             val nativeDir = context.applicationInfo.nativeLibraryDir
             val envLibDir = File(context.filesDir, "env/ffmpeg/usr/lib")
@@ -606,6 +732,7 @@ object SmartAutoRemixEngine {
                 var line: String?
                 while (reader.readLine().also { line = it } != null) {
                     val currentLine = line ?: continue
+                    logBuilder.append(currentLine).append("\n")
                     if (onProgress != null && totalDurationMs > 0L) {
                         val matcher = timePattern.matcher(currentLine)
                         if (matcher.find()) {
@@ -624,9 +751,14 @@ object SmartAutoRemixEngine {
                 onProgress?.invoke(1.0f)
                 true
             } else {
+                AuraDebugManager.logWarning(
+                    TAG,
+                    "FFmpeg Auto-Remix finalizó con código $exitCode. Salida: ${logBuilder.takeLast(350)}"
+                )
                 false
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            AuraDebugManager.logWarning(TAG, "Excepción ejecutando FFmpeg en Auto-Remix: ${e.message}")
             false
         }
     }

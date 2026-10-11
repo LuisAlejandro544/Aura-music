@@ -63,15 +63,35 @@ fun CreateMixtapeDialog(
     // Estado del modo Auto-Remix de 2 canciones locales
     var autoMatchSeed by remember { mutableIntStateOf(0) }
     val initialPair = remember(localTracks) { SmartAutoRemixEngine.findBestMatchingPair(localTracks, 0) }
-    var selectedTrackA by remember(localTracks) {
+    var selectedTrackA by remember {
         mutableStateOf(initialPair?.trackA ?: localTracks.getOrNull(0))
     }
-    var selectedTrackB by remember(localTracks) {
+    var selectedTrackB by remember {
         mutableStateOf(initialPair?.trackB ?: localTracks.getOrNull(1) ?: localTracks.getOrNull(0))
     }
-    var autoMatchReason by remember(initialPair) {
+    var autoMatchReason by remember {
         mutableStateOf(initialPair?.reason ?: "Selecciona 2 canciones locales o usa el botón de Selección Inteligente.")
     }
+
+    // Si las pistas locales se cargan o actualizan asíncronamente desde Room, rellenar automáticamente las ranuras vacías
+    LaunchedEffect(localTracks, initialPair) {
+        if (localTracks.isNotEmpty()) {
+            if (selectedTrackA == null || localTracks.none { it.id == selectedTrackA?.id }) {
+                selectedTrackA = initialPair?.trackA ?: localTracks.getOrNull(0)
+            }
+            if (selectedTrackB == null || localTracks.none { it.id == selectedTrackB?.id } ||
+                (localTracks.size >= 2 && selectedTrackB?.id == selectedTrackA?.id)
+            ) {
+                selectedTrackB = initialPair?.trackB
+                    ?: localTracks.firstOrNull { it.id != selectedTrackA?.id }
+                    ?: localTracks.getOrNull(0)
+            }
+            if (initialPair != null) {
+                autoMatchReason = initialPair.reason
+            }
+        }
+    }
+
     var selectedRemixStyle by remember { mutableStateOf(AutoRemixStyle.VOCAL_MASHUP) }
     var remixTitle by remember(selectedTrackA, selectedTrackB, selectedRemixStyle) {
         val aTitle = selectedTrackA?.title ?: "Canción A"
@@ -228,6 +248,47 @@ fun CreateMixtapeDialog(
                         }
                     }
                     Spacer(modifier = Modifier.height(14.dp))
+                }
+
+                // Aviso de estado o error si la creación previa reportó algún problema
+                if (!isCreating && createdTrack == null && !statusMessage.isNullOrBlank()) {
+                    val isErrorMsg = statusMessage.contains("No se pudo", ignoreCase = true) ||
+                        statusMessage.contains("Error", ignoreCase = true) ||
+                        statusMessage.contains("Verifica", ignoreCase = true) ||
+                        statusMessage.contains("solo para", ignoreCase = true)
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isErrorMsg) Color(0xFFEF4444).copy(alpha = 0.14f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
+                        border = BorderStroke(
+                            1.dp,
+                            if (isErrorMsg) Color(0xFFEF4444).copy(alpha = 0.45f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("mixtape_status_alert_card")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = if (isErrorMsg) Icons.Default.ErrorOutline else Icons.Default.Info,
+                                contentDescription = null,
+                                tint = if (isErrorMsg) Color(0xFFEF4444) else MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = statusMessage,
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    color = TextPrimary,
+                                    fontWeight = FontWeight.Medium
+                                ),
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
                 }
 
                 if (createdTrack != null && !isCreating) {

@@ -215,18 +215,23 @@ object MixtapeEngine {
      */
     private fun isSafeAudioFileForMixtape(context: Context, file: File): Boolean {
         return try {
+            if (!file.exists() || !file.isFile || !file.canRead()) return false
             val canonical = file.canonicalFile.toPath()
             val storageManager = AppStorageManager(context)
             val songsDirPath = storageManager.songsDir.canonicalFile.toPath()
             if (canonical.startsWith(songsDirPath)) {
-                return file.exists() && file.isFile && file.canRead()
+                return true
+            }
+            val internalSongsDir = File(context.filesDir, "songs").canonicalFile.toPath()
+            if (canonical.startsWith(internalSongsDir)) {
+                return true
             }
             val dataDir = context.applicationInfo.dataDir?.let { File(it).canonicalFile.toPath() }
             val filesDir = context.filesDir.canonicalFile.toPath()
             if ((dataDir != null && canonical.startsWith(dataDir)) || canonical.startsWith(filesDir)) {
                 return false
             }
-            file.exists() && file.isFile && file.canRead()
+            true
         } catch (_: Exception) {
             false
         }

@@ -100,7 +100,9 @@ class AudioFadeController(
         dualCrossfadeJob?.cancel()
 
         val safeDurationMs = durationMs.coerceIn(800L, 12000L)
-        if (outgoingPlayer == null || !outgoingPlayer.isPlaying) {
+        val isOutgoingReadyOrStarting = outgoingPlayer != null &&
+            (outgoingPlayer.isPlaying || outgoingPlayer.playWhenReady || outgoingPlayer.playbackState == androidx.media3.common.Player.STATE_BUFFERING)
+        if (outgoingPlayer == null || !isOutgoingReadyOrStarting) {
             startSmoothFadeIn(safeDurationMs.coerceAtMost(2500L), inPlayer)
             onCrossfadeCompleted()
             return
@@ -114,10 +116,16 @@ class AudioFadeController(
         inPlayer.volume = 0.0f
 
         dualCrossfadeJob = scope.launch(Dispatchers.Main) {
-            // Esperar un breve instante (máx 350ms) si el reproductor entrante aún está preparando el primer buffer PCM
+            // Esperar un breve instante (máx 400ms) si los reproductores aún están preparando el primer buffer PCM
             // para que ambas rampas (100% -> 0% y 0% -> 100%) arranquen exactamente al unísono
             var waitTicks = 0
-            while (isActive && !inPlayer.isPlaying && inPlayer.playbackState == androidx.media3.common.Player.STATE_BUFFERING && waitTicks < 14) {
+            while (
+                isActive &&
+                (!inPlayer.isPlaying || !outgoingPlayer.isPlaying) &&
+                (inPlayer.playbackState == androidx.media3.common.Player.STATE_BUFFERING ||
+                    outgoingPlayer.playbackState == androidx.media3.common.Player.STATE_BUFFERING) &&
+                waitTicks < 16
+            ) {
                 delay(25L)
                 waitTicks++
             }
@@ -128,17 +136,15 @@ class AudioFadeController(
             for (step in 1..steps) {
                 if (!isActive) break
                 val t = (step.toFloat() / steps.toFloat()).coerceIn(0.0f, 1.0f)
-                // Rampas progresivas 100% simultáneas:
-                // Canción B sube de 0% a 100% (t) mientras Canción A baja de 100% a 0% (1 - t)
-                val inGain = t
-                val outGain = (1.0f - t).coerceIn(0.0f, 1.0f)
+                // Curva de igual potencia / rampa simultánea:
+                // Canción B sube de 0% a 100% mientras Canción A baja de 100% a 0%
+                val inGain = sin(t * (PI / 2.0)).toFloat().coerceIn(0.0f, 1.0f)
+                val outGain = cos(t * (PI / 2.0)).toFloat().coerceIn(0.0f, 1.0f)
 
                 val currentBase = baseVolume.coerceIn(0.0f, 1.0f)
                 inPlayer.volume = (currentBase * inGain).coerceIn(0.0f, 1.0f)
                 try {
-                    if (outgoingPlayer.isPlaying) {
-                        outgoingPlayer.volume = (currentBase * outGain).coerceIn(0.0f, 1.0f)
-                    }
+                    outgoingPlayer.volume = (currentBase * outGain).coerceIn(0.0f, 1.0f)
                 } catch (_: Throwable) {}
 
                 onProgressStep?.invoke(t)

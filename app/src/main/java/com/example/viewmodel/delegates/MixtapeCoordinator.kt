@@ -88,13 +88,14 @@ class MixtapeCoordinator(
         crossfadeSeconds: Int = 6,
         onCreated: ((Track) -> Unit)? = null
     ) {
+        if (_isCreatingMixtape.value) return
         if (trackA.isStreamingTrack || trackB.isStreamingTrack) {
             _mixtapeStatusMessage.value = "El Auto-Remix está disponible por ahora solo para música local."
             return
         }
         scope.launch {
             _isCreatingMixtape.value = true
-            _mixtapeProgress.value = 0f
+            _mixtapeProgress.value = 0.04f
             _mixtapeStatusMessage.value = "Iniciando preparación del Auto-Remix..."
 
             val resultTrack = com.example.data.importer.mixtape.SmartAutoRemixEngine.createAutoRemix(
@@ -112,10 +113,11 @@ class MixtapeCoordinator(
 
             _isCreatingMixtape.value = false
             if (resultTrack != null) {
+                _mixtapeProgress.value = 1.0f
                 _mixtapeStatusMessage.value = "¡Auto-Remix '${resultTrack.title}' creado exitosamente!"
                 onCreated?.invoke(resultTrack)
             } else {
-                _mixtapeStatusMessage.value = "No se pudo generar el Auto-Remix. Verifica las pistas locales."
+                _mixtapeStatusMessage.value = "No se pudo generar el Auto-Remix. Verifica que ambas canciones locales sean válidas."
             }
         }
     }

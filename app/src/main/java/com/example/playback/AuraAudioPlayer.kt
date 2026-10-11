@@ -140,8 +140,22 @@ class AuraAudioPlayer(
             get() = MediaSessionBridge.activeMediaSession
     }
 
+    private val transitionPrefs by lazy {
+        context.getSharedPreferences("aura_transitions_prefs", Context.MODE_PRIVATE)
+    }
+
     init {
+        loadPersistedTransitionSettings()
         initPlayer()
+    }
+
+    private fun loadPersistedTransitionSettings() {
+        try {
+            _crossfadeSeconds.value = transitionPrefs.getInt("crossfade_seconds", 0).coerceIn(0, 15)
+            _isGaplessEnabled.value = transitionPrefs.getBoolean("gapless_enabled", true)
+            _isDjAutomixEnabled.value = transitionPrefs.getBoolean("dj_automix_enabled", false)
+            _isDjEqCurveEnabled.value = transitionPrefs.getBoolean("dj_eq_curve_enabled", true)
+        } catch (_: Throwable) {}
     }
 
     @OptIn(UnstableApi::class)
@@ -366,15 +380,34 @@ class AuraAudioPlayer(
         // Si el Crossfade o Smart AutoMix DJ (música local) está activo y había una pista sonando en el reproductor primario,
         // transferimos la cola final de la pista saliente al Deck B auxiliar para que ambas suenen superpuestas
         var handoffToDualDeckSucceeded = false
-        if (effectiveCrossfadeSecs > 0 && outDeck != null && previousTrack != null && previousTrack.id != track.id && player.isPlaying) {
-            val outgoingItem = player.currentMediaItem
+        if (effectiveCrossfadeSecs > 0 && outDeck != null && previousTrack != null && previousTrack.id != track.id && (player.isPlaying || player.playWhenReady)) {
             val outgoingPos = player.currentPosition.coerceAtLeast(0L)
             val outgoingDur = player.duration
-            if (outgoingItem != null && (outgoingDur <= 0L || (outgoingDur - outgoingPos) > 350L)) {
+            if (outgoingDur <= 0L || (outgoingDur - outgoingPos) > 350L) {
                 try {
                     outDeck.stop()
                     outDeck.clearMediaItems()
-                    outDeck.setMediaItem(outgoingItem, outgoingPos)
+                    val prevMediaUri = if (previousTrack.uriString.startsWith("/")) {
+                        Uri.fromFile(File(previousTrack.uriString))
+                    } else {
+                        Uri.parse(previousTrack.uriString)
+                    }
+                    val prevClipBounds = if (previousTrack.isStreamingTrack) {
+                        null
+                    } else {
+                        AudioSilenceTrimmer.getClippingBounds(context, previousTrack.uriString)
+                    }
+                    val absoluteSeekPos = (prevClipBounds?.startMs ?: 0L) + outgoingPos
+                    val outItemBuilder = MediaItem.Builder().setUri(prevMediaUri)
+                    if (prevClipBounds != null && prevClipBounds.endMs > absoluteSeekPos) {
+                        outItemBuilder.setClippingConfiguration(
+                            MediaItem.ClippingConfiguration.Builder()
+                                .setStartPositionMs(0L)
+                                .setEndPositionMs(prevClipBounds.endMs)
+                                .build()
+                        )
+                    }
+                    outDeck.setMediaItem(outItemBuilder.build(), absoluteSeekPos)
                     outDeck.playbackParameters = player.playbackParameters
                     // La Canción A comienza la transición al 100% del volumen base para bajar simultáneamente de 100% a 0%
                     outDeck.volume = fadeController.getVolume().coerceIn(0.0f, 1.0f)
@@ -578,11 +611,18 @@ class AuraAudioPlayer(
     }
 
     fun setCrossfadeSeconds(seconds: Int) {
-        _crossfadeSeconds.value = seconds.coerceIn(0, 15)
+        val clamped = seconds.coerceIn(0, 15)
+        _crossfadeSeconds.value = clamped
+        try {
+            transitionPrefs.edit().putInt("crossfade_seconds", clamped).apply()
+        } catch (_: Throwable) {}
     }
 
     fun setDjAutomixEnabled(enabled: Boolean) {
         _isDjAutomixEnabled.value = enabled
+        try {
+            transitionPrefs.edit().putBoolean("dj_automix_enabled", enabled).apply()
+        } catch (_: Throwable) {}
         if (!enabled) {
             effectManager.setDjAutomixTransition(false, 0.0f)
         }
@@ -590,6 +630,9 @@ class AuraAudioPlayer(
 
     fun setDjEqCurveEnabled(enabled: Boolean) {
         _isDjEqCurveEnabled.value = enabled
+        try {
+            transitionPrefs.edit().putBoolean("dj_eq_curve_enabled", enabled).apply()
+        } catch (_: Throwable) {}
         if (!enabled) {
             effectManager.setDjAutomixTransition(false, 0.0f)
         }
@@ -597,6 +640,9 @@ class AuraAudioPlayer(
 
     fun setGaplessEnabled(enabled: Boolean) {
         _isGaplessEnabled.value = enabled
+        try {
+            transitionPrefs.edit().putBoolean("gapless_enabled", enabled).apply()
+        } catch (_: Throwable) {}
     }
 
     // --- Controles del Repetidor de Segmento A-B (Delegados en ABLoopController) ---

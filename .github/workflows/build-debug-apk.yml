@@ -1,7 +1,9 @@
-name: Compilar APK Debug (Aura Music)
+name: Compilar APK Debug (Aura Music - 3 Arquitecturas Móviles)
 
 # Este flujo de trabajo se activa EXCLUSIVAMENTE de forma manual (workflow_dispatch)
 # cumpliendo la directiva de no ejecutarse en cada commit automático.
+# Genera y publica en Artifacts los 3 APKs móviles separados (arm64-v8a, armeabi-v7a y universal)
+# junto con el archivo SHA256SUMS.txt, idéntico al esquema del APK Beta.
 on:
   workflow_dispatch:
     inputs:
@@ -23,7 +25,7 @@ on:
 
 jobs:
   build-debug-apk:
-    name: Compilación APK Debug con Motores Nativos Puros (C++20, CPython 3.11, FFmpeg, QuickJS) en Gradle
+    name: Compilación de 3 APKs Debug Móviles (arm64-v8a, armeabi-v7a y Universal) + Motores Nativos Puros
     runs-on: ubuntu-latest
 
     steps:
@@ -98,9 +100,9 @@ jobs:
           path: |
             app/src/main/jniLibs
             app/src/main/assets/bin
-          key: native-pure-${{ runner.os }}-${{ hashFiles('app/build.gradle.kts', 'gradle/libs.versions.toml', 'app/src/main/cpp/*') }}
+          key: native-pure-mobile-${{ runner.os }}-${{ hashFiles('app/build.gradle.kts', 'gradle/libs.versions.toml', 'app/src/main/cpp/*') }}
           restore-keys: |
-            native-pure-${{ runner.os }}-
+            native-pure-mobile-${{ runner.os }}-
 
       - name: 🔧 7. Preparar Gradle Wrapper
         run: |
@@ -127,29 +129,87 @@ jobs:
             -dname "CN=AuraMusicDebug, OU=Engineering, O=AuraSound, L=Local, ST=State, C=US"
           base64 debug.keystore > debug.keystore.base64
 
-      - name: ⚙️ 9. Ejecutar Aprovisionamiento Nativo Puro en Gradle (provisionNativeDeps)
+      - name: ⚙️ 9. Ejecutar Aprovisionamiento Nativo Puro en Gradle (arm64-v8a y armeabi-v7a)
         if: steps.cache-native-deps.outputs.cache-hit != 'true' || inputs.force_rebuild_native == true
+        env:
+          AURA_SPLIT_APKS: "true"
+          AURA_BETA_MOBILE_ONLY: "true"
         run: |
-          echo "=== Ejecutando tarea Gradle :app:provisionNativeDeps (Cero .sh) ==="
+          echo "=== Limpiando residuos de arquitecturas de PC (x86 / x86_64) ==="
+          rm -rf app/src/main/jniLibs/x86 app/src/main/jniLibs/x86_64
+          echo "=== Ejecutando tarea Gradle :app:provisionNativeDeps (Cero .sh, Móvil 32/64 bits) ==="
           ./gradlew :app:provisionNativeDeps --no-daemon --rerun-tasks --stacktrace
 
-      - name: 🔍 10. Auditar Binarios Nativos Puros Ensamblados (Multi-ABI y Assets)
+      - name: 🔍 10. Auditar Binarios Nativos Puros Ensamblados (Multi-ABI Móvil y Assets)
         run: |
+          rm -rf app/src/main/jniLibs/x86 app/src/main/jniLibs/x86_64
           echo "=== Auditoría de módulos JNI generados (app/src/main/jniLibs) ==="
           ls -lhR app/src/main/jniLibs/ || true
           echo ""
           echo "=== Auditoría de ejecutables en Assets (app/src/main/assets/bin) ==="
           ls -lh app/src/main/assets/bin/ || true
 
-      - name: 🚀 11. Compilar APK Debug con Motor DSP C++20 y Motores Puros
+      - name: 🚀 11. Compilar los 3 APKs de Aura Music Debug (arm64-v8a, armeabi-v7a y Universal)
+        env:
+          AURA_SPLIT_APKS: "true"
+          AURA_BETA_MOBILE_ONLY: "true"
         run: |
-          echo "Iniciando compilación de Aura Music Debug APK..."
+          echo "Iniciando compilación de los 3 APKs Debug (arm64-v8a, armeabi-v7a y universal)..."
           ./gradlew :app:assembleDebug --no-daemon --stacktrace
 
-      - name: 📦 12. Publicar APK Debug Individual como Artefacto Descargable
+      - name: 📂 12. Organizar y Renombrar Estratégicamente los 3 APKs Debug + Sumas SHA-256
+        run: |
+          mkdir -p dist-debug
+          echo "=== Localizando los 3 APKs generados en app/build/outputs/apk/debug/ ==="
+          ls -lh app/build/outputs/apk/debug/
+
+          ARM64_APK=$(find app/build/outputs/apk/debug -name "*arm64-v8a*.apk" | head -n 1)
+          ARMV7_APK=$(find app/build/outputs/apk/debug -name "*armeabi-v7a*.apk" | head -n 1)
+          UNIV_APK=$(find app/build/outputs/apk/debug -name "*universal*.apk" | head -n 1)
+
+          if [ -z "$ARM64_APK" ] || [ -z "$ARMV7_APK" ] || [ -z "$UNIV_APK" ]; then
+            echo "❌ Error: No se encontraron los 3 APKs Debug esperados."
+            exit 1
+          fi
+
+          cp "$ARM64_APK" "dist-debug/AuraMusic-Debug-arm64-v8a.apk"
+          cp "$ARMV7_APK" "dist-debug/AuraMusic-Debug-armeabi-v7a.apk"
+          cp "$UNIV_APK"  "dist-debug/AuraMusic-Debug-universal.apk"
+
+          cd dist-debug
+          sha256sum *.apk > SHA256SUMS.txt
+          echo "=== APKs Debug listos para Artifacts ==="
+          ls -lh
+          cat SHA256SUMS.txt
+
+      - name: 📦 13A. Publicar APK Debug ARM 64-bits (arm64-v8a) en Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: AuraMusic-Debug.apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: AuraMusic-Debug-arm64-v8a.apk
+          path: dist-debug/AuraMusic-Debug-arm64-v8a.apk
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: 📦 13B. Publicar APK Debug ARM 32-bits (armeabi-v7a) en Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: AuraMusic-Debug-armeabi-v7a.apk
+          path: dist-debug/AuraMusic-Debug-armeabi-v7a.apk
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: 📦 13C. Publicar APK Debug Universal (32+64 bits) en Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: AuraMusic-Debug-universal.apk
+          path: dist-debug/AuraMusic-Debug-universal.apk
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: 📦 13D. Publicar Sumas SHA-256 Debug en Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: AuraMusic-Debug-SHA256SUMS.txt
+          path: dist-debug/SHA256SUMS.txt
           retention-days: 14
           if-no-files-found: error
