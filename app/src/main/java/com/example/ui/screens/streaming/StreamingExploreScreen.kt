@@ -77,7 +77,7 @@ import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 
 /**
- * Pantalla modular de Exploración y Modo Streaming Híbrido (Estilo Spotify).
+ * Pantalla modular de Exploración y Modo Streaming Híbrido.
  *
  * Rol Arquitectónico:
  * - Permite buscar canciones y videos musicales en tiempo real mediante API (sin usar yt-dlp para buscar)

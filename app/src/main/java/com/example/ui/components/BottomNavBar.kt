@@ -26,7 +26,7 @@ import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 
 /**
- * Barra de navegación inferior principal con estilo Spotify pero acentos vibrantes modernos.
+ * Barra de navegación inferior principal con estética oscura moderna y acentos vibrantes.
  * Conecta las pantallas modulares para una experiencia fluida y organizada.
  */
 @Composable

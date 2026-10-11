@@ -74,15 +74,15 @@ data class PlaybackTransitionConfig(
 )
 
 /**
- * Configuración de Normalización de Volumen Inteligente (Loudness Normalizer estilo Spotify / EBU R128).
+ * Configuración de Normalización de Volumen Inteligente (Loudness Normalizer EBU R128).
  * Nivela automáticamente la energía acústica entre canciones dispares para eliminar saltos bruscos de volumen.
- * - targetLufs: Nivel objetivo (-14.0f es el estándar oficial de Spotify).
- * - mode: 0 = Sutil (-18 LUFS), 1 = Estándar Spotify (-14 LUFS), 2 = Alto (-11 LUFS).
+ * - targetLufs: Nivel objetivo (-14.0f es el estándar oficial de sonoridad).
+ * - mode: 0 = Sutil (-18 LUFS), 1 = Estándar (-14 LUFS), 2 = Alto (-11 LUFS).
  */
 data class VolumeNormalizationConfig(
     val enabled: Boolean = false,
     val targetLufs: Float = -14.0f,
-    val mode: Int = 1 // 0 = Sutil (-18 LUFS), 1 = Estándar Spotify (-14 LUFS), 2 = Alto (-11 LUFS)
+    val mode: Int = 1 // 0 = Sutil (-18 LUFS), 1 = Estándar (-14 LUFS), 2 = Alto (-11 LUFS)
 )
 
 /**

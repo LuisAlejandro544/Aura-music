@@ -6,7 +6,7 @@ import com.example.ui.theme.*
 
 /**
  * Representa un esquema de color personalizado seleccionable por el usuario.
- * Ofrece combinaciones estéticas modernas superiores al clásico verde plano de Spotify.
+ * Ofrece combinaciones estéticas modernas con gradientes luminosos y alto contraste.
  */
 enum class AuraTheme(
     val title: String,

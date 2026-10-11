@@ -619,7 +619,7 @@ object FFmpegNativeEngine {
     }
 
     /**
-     * Convierte un video horizontal (16:9 / panorámico) en un lienzo vertical cinemático 9:16 estilo Spotify/TikTok Canvas.
+     * Convierte un video horizontal (16:9 / panorámico) en un lienzo vertical cinemático 9:16 para Video Canvas.
      *
      * Composición:
      * - Capa de fondo: El video escalado para cubrir verticalmente 9:16 (ej. 480x854), con desenfoque 'boxblur=16:2' y leve oscurecimiento para contraste.

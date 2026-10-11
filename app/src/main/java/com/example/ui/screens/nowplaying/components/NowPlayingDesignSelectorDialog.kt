@@ -28,7 +28,7 @@ import com.example.ui.theme.TextSecondary
 /**
  * Diálogo modal para elegir el diseño de pantalla completa de Now Playing:
  * - AUTO: Inteligente (Cinemático si hay Video Canvas, Clásico si es solo Carátula).
- * - CINEMATIC_CANVAS: Estilo Spotify Canvas con video completo, minicarátula y controles ergonómicos.
+ * - CINEMATIC_CANVAS: Diseño inmersivo con video completo, minicarátula y controles ergonómicos.
  * - CLASSIC: Carátula central grande 1:1, visualizador de 28 bandas y controles tradicionales.
  */
 @Composable

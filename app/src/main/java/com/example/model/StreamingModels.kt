@@ -1,7 +1,7 @@
 package com.example.model
 
 /**
- * Modelos de datos y configuración para el Modo Streaming Híbrido (Estilo Spotify),
+ * Modelos de datos y configuración para el Modo Streaming Híbrido,
  * Política de Datos para Video Canvas y Caché Temporal Inteligente (30 min TTL, 50MB - 500MB).
  *
  * Rol Arquitectónico:

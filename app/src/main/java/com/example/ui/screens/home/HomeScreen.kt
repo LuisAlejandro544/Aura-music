@@ -175,7 +175,7 @@ fun HomeScreen(
                 }
             }
         } else {
-            // Cuadrícula de accesos directos estilo Spotify con gradientes modernos
+            // Cuadrícula de accesos directos con gradientes modernos
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),

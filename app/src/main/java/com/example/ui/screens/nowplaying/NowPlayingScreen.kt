@@ -206,11 +206,15 @@ fun NowPlayingScreen(
     }
 
     val isVideoVisual = (videoDisplayMode != VideoDisplayMode.OFF) && !currentTrack.videoUri.isNullOrEmpty()
+    val isRemoteVideo = isVideoVisual && (
+        currentTrack.videoUri.orEmpty().startsWith("http://", ignoreCase = true) ||
+            currentTrack.videoUri.orEmpty().startsWith("https://", ignoreCase = true)
+        )
     val liveVideoSnapshot by ArtworkColorExtractor.liveVideoColorsFlow.collectAsStateWithLifecycle()
     val isVideoBufferingLive by com.example.ui.components.BackgroundVideoLoadingState.isVideoBufferingFlow.collectAsStateWithLifecycle()
     val isVideoNetworkStalledLive by com.example.ui.components.BackgroundVideoLoadingState.isVideoNetworkStalledFlow.collectAsStateWithLifecycle()
-    val effectiveVideoLoading = isVideoVisual && isVideoBufferingLive
-    val effectiveWaitingNetwork = isWaitingForNetwork || (isVideoVisual && isVideoNetworkStalledLive)
+    val effectiveVideoLoading = currentTrack.isStreamingTrack && isRemoteVideo && isVideoBufferingLive
+    val effectiveWaitingNetwork = currentTrack.isStreamingTrack && (isWaitingForNetwork || (isRemoteVideo && isVideoNetworkStalledLive))
     var activeSampleIntervalMs by remember {
         mutableLongStateOf(ArtworkColorExtractor.getAdaptiveSampleIntervalMs(context))
     }

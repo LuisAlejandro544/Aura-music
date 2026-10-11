@@ -83,8 +83,10 @@ class AudioFadeController(
 
     /**
      * Ejecuta una mezcla superpuesta real de estudio (Dual-Deck Crossfade) entre [outgoingPlayer]
-     * (la canción que está terminando o saliendo) e [incomingPlayer] (la nueva canción que empieza),
-     * aplicando una curva de igual potencia (coseno para la saliente, seno para la entrante).
+     * (Canción A que está saliendo) e [incomingPlayer] (Canción B que empieza),
+     * aplicando dos rampas progresivas 100% simultáneas:
+     * - Canción A desciende progresivamente de 100% (baseVolume) a 0% (0.0f).
+     * - Canción B asciende progresivamente de 0% (0.0f) a 100% (baseVolume) en el mismo instante.
      */
     fun startDualDeckCrossfade(
         durationMs: Long,
@@ -104,24 +106,38 @@ class AudioFadeController(
             return
         }
 
-        val initialOutgoingVol = outgoingPlayer.volume.coerceIn(0.15f * baseVolume, baseVolume)
-        inPlayer.volume = 0.02f * baseVolume
+        // La Canción A inicia al 100% del volumen base y la Canción B inicia en 0%
+        val startVol = baseVolume.coerceIn(0.0f, 1.0f)
+        try {
+            outgoingPlayer.volume = startVol
+        } catch (_: Throwable) {}
+        inPlayer.volume = 0.0f
 
         dualCrossfadeJob = scope.launch(Dispatchers.Main) {
-            val steps = (safeDurationMs / 40L).toInt().coerceIn(20, 200)
-            val stepDelay = (safeDurationMs / steps).coerceAtLeast(25L)
+            // Esperar un breve instante (máx 350ms) si el reproductor entrante aún está preparando el primer buffer PCM
+            // para que ambas rampas (100% -> 0% y 0% -> 100%) arranquen exactamente al unísono
+            var waitTicks = 0
+            while (isActive && !inPlayer.isPlaying && inPlayer.playbackState == androidx.media3.common.Player.STATE_BUFFERING && waitTicks < 14) {
+                delay(25L)
+                waitTicks++
+            }
+
+            val steps = (safeDurationMs / 35L).toInt().coerceIn(25, 240)
+            val stepDelay = (safeDurationMs / steps).coerceAtLeast(20L)
 
             for (step in 1..steps) {
                 if (!isActive) break
                 val t = (step.toFloat() / steps.toFloat()).coerceIn(0.0f, 1.0f)
-                // Curva Equal-Power (sin^2 + cos^2 = 1): mantiene la energía acústica constante en el cruce
-                val inGain = sin(t * (PI / 2.0)).toFloat().coerceIn(0.0f, 1.0f)
-                val outGain = cos(t * (PI / 2.0)).toFloat().coerceIn(0.0f, 1.0f)
+                // Rampas progresivas 100% simultáneas:
+                // Canción B sube de 0% a 100% (t) mientras Canción A baja de 100% a 0% (1 - t)
+                val inGain = t
+                val outGain = (1.0f - t).coerceIn(0.0f, 1.0f)
 
-                inPlayer.volume = (baseVolume * inGain).coerceIn(0.0f, 1.0f)
+                val currentBase = baseVolume.coerceIn(0.0f, 1.0f)
+                inPlayer.volume = (currentBase * inGain).coerceIn(0.0f, 1.0f)
                 try {
                     if (outgoingPlayer.isPlaying) {
-                        outgoingPlayer.volume = (initialOutgoingVol * outGain).coerceIn(0.0f, 1.0f)
+                        outgoingPlayer.volume = (currentBase * outGain).coerceIn(0.0f, 1.0f)
                     }
                 } catch (_: Throwable) {}
 
@@ -131,6 +147,7 @@ class AudioFadeController(
 
             inPlayer.volume = baseVolume
             try {
+                outgoingPlayer.volume = 0.0f
                 outgoingPlayer.pause()
                 outgoingPlayer.stop()
                 outgoingPlayer.clearMediaItems()
@@ -145,7 +162,7 @@ class AudioFadeController(
         if (crossfadeMs > 0 && player.duration > 0 && player.isPlaying && fadeInJob?.isActive != true && dualCrossfadeJob?.isActive != true) {
             if (remainingMs in 0..crossfadeMs) {
                 val t = (1.0f - (remainingMs.toFloat() / crossfadeMs.toFloat())).coerceIn(0.0f, 1.0f)
-                val factor = cos(t * (PI / 2.0)).toFloat().coerceIn(0.05f, 1.0f)
+                val factor = (1.0f - t).coerceIn(0.0f, 1.0f)
                 player.volume = (baseVolume * factor).coerceIn(0.0f, 1.0f)
             }
         }

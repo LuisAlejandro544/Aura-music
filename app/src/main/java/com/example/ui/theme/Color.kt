@@ -5,7 +5,7 @@ import androidx.compose.ui.graphics.Color
 
 /**
  * Paleta de colores para Aura Music.
- * Diseñado con una estética moderna estilo Spotify pero con colores vibrantes,
+ * Diseñado con una estética moderna de colores vibrantes,
  * gradientes de neón y fondos profundos OLED de alto contraste visual.
  */
 

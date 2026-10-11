@@ -24,7 +24,7 @@ import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Coordinador MVVM del Modo Streaming Híbrido (Estilo Spotify).
+ * Coordinador MVVM del Modo Streaming Híbrido.
  *
  * Responsabilidades:
  * 1. Búsqueda y Exploración en Tiempo Real mediante API (sin usar yt-dlp para buscar) con soporte

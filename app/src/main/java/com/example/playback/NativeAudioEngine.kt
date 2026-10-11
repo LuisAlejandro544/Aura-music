@@ -227,7 +227,7 @@ object NativeAudioEngine {
     }
 
     /**
-     * Activa o desactiva la Normalización de Volumen Inteligente (Spotify -14 LUFS / EBU R128).
+     * Activa o desactiva la Normalización de Volumen Inteligente (-14 LUFS / EBU R128).
      */
     fun setVolumeNormalization(enabled: Boolean, targetLufs: Float = -14.0f, mode: Int = 1) {
         if (isLoaded) {

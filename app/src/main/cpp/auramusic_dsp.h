@@ -398,7 +398,7 @@ public:
                     mReverbProcessor.processSample(sampleL, sampleR);
                 }
 
-                // Normalización Inteligente de Volumen (Loudness Normalizer estilo Spotify / EBU R128)
+                // Normalización Inteligente de Volumen (Loudness Normalizer EBU R128)
                 if (mVolumeNormalizer.isEnabled()) {
                     mVolumeNormalizer.processSample(sampleL, sampleR);
                 }

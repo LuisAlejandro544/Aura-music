@@ -141,7 +141,7 @@ class AudioEffectsCoordinator(
         audioPlayer.setVolume(1.0f)
     }
 
-    // Normalización de Volumen Inteligente (Spotify -14 LUFS / EBU R128)
+    // Normalización de Volumen Inteligente (-14 LUFS / EBU R128)
     fun setVolumeNormalizationEnabled(enabled: Boolean) = effectManager.setVolumeNormalizationEnabled(enabled)
     fun setVolumeNormalizationMode(mode: Int) = effectManager.setVolumeNormalizationMode(mode)
 

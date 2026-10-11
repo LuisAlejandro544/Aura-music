@@ -166,14 +166,16 @@ fun BackgroundVideoPlayer(
             override fun onPlaybackStateChanged(playbackState: Int) {
                 when (playbackState) {
                     Player.STATE_BUFFERING -> {
-                        isVideoBuffering = true
+                        if (isRemoteStream) {
+                            isVideoBuffering = true
+                        }
                     }
                     Player.STATE_READY -> {
                         isVideoBuffering = false
                         isVideoNetworkStalled = false
                     }
                     Player.STATE_ENDED, Player.STATE_IDLE -> {
-                        if (isFirstFrameRendered) {
+                        if (isFirstFrameRendered || !isRemoteStream) {
                             isVideoBuffering = false
                         }
                     }
@@ -186,6 +188,7 @@ fun BackgroundVideoPlayer(
                     isVideoNetworkStalled = true
                 } else {
                     isVideoBuffering = false
+                    isVideoNetworkStalled = false
                 }
             }
 

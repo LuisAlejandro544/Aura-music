@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de arquitectura y corrección para eliminar el cierre inesperado al descargar música/video desde el reproductor online (Streaming) y establecer yt-dlp exclusivamente para pistas de YouTube estándar con respaldo automático.",
-  "updatedAt":  "2026-10-11T00:11:43.779703925Z",
+  "summary":  "Plan de implementación para eliminar referencias a marcas registradas (Apple Music / Spotify), perfeccionar el cruce simultáneo de volumen 100% a 0% y 0% a 100% en Crossfade Dual-Deck, y corregir el indicador falso de buscando/cargando red en canciones locales.",
+  "updatedAt":  "2026-10-11T00:53:18.435205651Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

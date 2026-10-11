@@ -187,10 +187,10 @@ private:
 };
 
 /**
- * Procesador C++20 de Normalización de Volumen Inteligente (Loudness Normalizer estilo Spotify / EBU R128).
+ * Procesador C++20 de Normalización de Volumen Inteligente (Loudness Normalizer EBU R128).
  * Mide continuamente la energía envolvente de la señal de audio (RMS aproximado) con seguimiento suave
  * (ataque de 120ms, decaimiento de 600ms) y calcula una ganancia de compensación dinámica hacia el nivel
- * objetivo (por defecto -14.0 LUFS / Spotify).
+ * objetivo (por defecto -14.0 LUFS).
  *
  * Incluye filtro IIR de suavizado para evitar cambios abruptos ("pumping") y limitador suave softClip.
  */
@@ -222,7 +222,7 @@ public:
     [[nodiscard]] float getTargetLufs() const { return mTargetLufs; }
 
     void setMode(int mode) {
-        mMode = std::clamp(mode, 0, 2); // 0 = Sutil (-18 LUFS), 1 = Estándar Spotify (-14 LUFS), 2 = Alto (-11 LUFS)
+        mMode = std::clamp(mode, 0, 2); // 0 = Sutil (-18 LUFS), 1 = Estándar (-14 LUFS), 2 = Alto (-11 LUFS)
         if (mMode == 0) mTargetLufs = -18.0f;
         else if (mMode == 1) mTargetLufs = -14.0f;
         else mTargetLufs = -11.0f;
@@ -250,14 +250,14 @@ public:
 private:
     int mSampleRate{44100};
     bool mEnabled{false};
-    float mTargetLufs{-14.0f}; // Spotify estándar
+    float mTargetLufs{-14.0f}; // Nivel estándar
     int mMode{1};              // 0 = Sutil, 1 = Estándar, 2 = Alto
     double mCurrentRms{0.15};
     double mCurrentGain{1.0};
 };
 
 /**
- * Filtro C++20 de Curva de Ecualización Smart AutoMix DJ (Estilo Apple Music / Curva en X).
+ * Filtro C++20 de Curva de Ecualización Smart AutoMix DJ (Curva en X).
  * Durante la transición de pistas locales, atenúa de forma paramétrica y progresiva los subgraves (<120 Hz),
  * protege la banda vocal central (~2.6 kHz) para evitar choques de voces entre ambas pistas
  * y suaviza el brillo extremo (>9.5 kHz) de la canción saliente, logrando una mezcla armónica de estudio.
@@ -311,7 +311,7 @@ public:
 
 private:
     void reconfigure() {
-        // Atenuación progresiva de subgraves (<120 Hz) y bolsillo vocal (~2.6 kHz) estilo Apple Music AutoMix
+        // Atenuación progresiva de subgraves (<120 Hz) y bolsillo vocal (~2.6 kHz) en Smart AutoMix DJ
         double bassGainDb = -13.5 * mProgress;
         double vocalPocketDb = -4.8 * std::sin(mProgress * std::numbers::pi);
         double highGainDb = -6.5 * mProgress;

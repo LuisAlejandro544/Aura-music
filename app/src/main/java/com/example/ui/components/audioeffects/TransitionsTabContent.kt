@@ -239,7 +239,7 @@ fun TransitionsTabContent(
             }
         }
 
-        // Tarjeta 2: Smart AutoMix (Estilo Apple Music • Música Local) & Crossfade Dual-Deck con Curva Armónica
+        // Tarjeta 2: Smart AutoMix DJ (Música Local) & Crossfade Dual-Deck con Curva Armónica
         Surface(
             shape = RoundedCornerShape(16.dp),
             color = SurfaceCard,
@@ -265,7 +265,7 @@ fun TransitionsTabContent(
                         Column {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
-                                    text = "Smart AutoMix (Estilo Apple Music)",
+                                    text = "Smart AutoMix DJ",
                                     style = MaterialTheme.typography.titleSmall.copy(
                                         fontWeight = FontWeight.Bold,
                                         color = TextPrimary
@@ -287,7 +287,7 @@ fun TransitionsTabContent(
                                 }
                             }
                             Text(
-                                text = "Detecta el outro acústico de la canción local a punto de acabar y mezcla la siguiente pista en Dual-Deck (sin/cos de igual potencia) sin pausas.",
+                                text = "Detecta el outro acústico de la canción local y aplica un cruce Dual-Deck 100% simultáneo (Canción A de 100% a 0% mientras Canción B sube de 0% a 100%).",
                                 style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
                             )
                         }
@@ -351,7 +351,7 @@ fun TransitionsTabContent(
                     Text(
                         text = when {
                             crossfadeSeconds > 0 -> "${crossfadeSeconds}s (Superpuesto)"
-                            isDjAutomixEnabled -> "6s Auto (Smart AutoMix)"
+                            isDjAutomixEnabled -> "6s Auto (Smart AutoMix DJ)"
                             else -> "Desactivado (Directo)"
                         },
                         style = MaterialTheme.typography.bodySmall.copy(
@@ -436,7 +436,7 @@ fun TransitionsTabContent(
             }
         }
 
-        // Tarjeta 3: Normalización de Volumen Inteligente (Loudness Normalizer Spotify / EBU R128)
+        // Tarjeta 3: Normalización de Volumen Inteligente (Loudness Normalizer EBU R128)
         Surface(
             shape = RoundedCornerShape(16.dp),
             color = SurfaceCard,
@@ -527,7 +527,7 @@ fun TransitionsTabContent(
                             }
                         }
 
-                        // Modo 1: Estándar Spotify (-14 LUFS)
+                        // Modo 1: Estándar (-14 LUFS)
                         Surface(
                             shape = RoundedCornerShape(10.dp),
                             color = if (volumeNormalizationMode == 1) Color(0xFF10B981).copy(alpha = 0.2f) else Color(0xFF161A26),
@@ -552,7 +552,7 @@ fun TransitionsTabContent(
                                     )
                                     Spacer(modifier = Modifier.width(3.dp))
                                     Text(
-                                        text = "Spotify",
+                                        text = "Estándar",
                                         style = MaterialTheme.typography.labelMedium.copy(
                                             fontWeight = FontWeight.Bold,
                                             color = if (volumeNormalizationMode == 1) Color(0xFF10B981) else TextPrimary
@@ -560,7 +560,7 @@ fun TransitionsTabContent(
                                     )
                                 }
                                 Text(
-                                    text = "-14 LUFS (Estándar)",
+                                    text = "-14 LUFS (Recomendado)",
                                     style = MaterialTheme.typography.labelSmall.copy(color = TextSecondary)
                                 )
                             }
@@ -602,7 +602,7 @@ fun TransitionsTabContent(
                         text = when (volumeNormalizationMode) {
                             0 -> "Máximo rango dinámico para grabaciones acústicas o de alta fidelidad sin compresión."
                             2 -> "Volumen constante y potente, ideal para entornos ruidosos o altavoces portátiles."
-                            else -> "Nivel recomendado de streaming Spotify: balance ideal entre dinámica y volumen constante."
+                            else -> "Nivel estándar de estudio (-14 LUFS): balance ideal entre dinámica y volumen constante."
                         },
                         style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
                     )

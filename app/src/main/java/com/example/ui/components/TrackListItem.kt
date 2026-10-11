@@ -29,8 +29,8 @@ import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 
 /**
- * Elemento de fila para cada canción en la lista, inspirado en el diseño de Spotify
- * pero enriquecido con etiquetas de formato de audio, estado activo iluminado,
+ * Elemento de fila para cada canción en la lista, con diseño moderno de tarjetas
+ * enriquecido con etiquetas de formato de audio, estado activo iluminado,
  * desplazamiento tipo marquesina en la canción en reproducción y acciones rápidas.
  */
 @OptIn(ExperimentalFoundationApi::class)

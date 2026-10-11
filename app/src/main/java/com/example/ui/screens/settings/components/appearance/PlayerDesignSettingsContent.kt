@@ -26,7 +26,7 @@ import com.example.ui.theme.TextSecondary
  * Contenido de la pantalla independiente a pantalla completa de "Diseño del Reproductor".
  * Permite al usuario elegir entre:
  * - Automático Inteligente (NowPlayingDesignMode.AUTO)
- * - Modo Cinemático Canvas estilo Spotify (NowPlayingDesignMode.CINEMATIC_CANVAS)
+ * - Modo Cinemático Canvas (NowPlayingDesignMode.CINEMATIC_CANVAS)
  * - Modo Clásico con Carátula 1:1 (NowPlayingDesignMode.CLASSIC)
  */
 fun LazyListScope.playerDesignSettingsContent(

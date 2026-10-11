@@ -22,7 +22,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * Cliente de API para el Modo Streaming Híbrido (Estilo Spotify).
+ * Cliente de API para el Modo Streaming Híbrido.
  *
  * Rol Arquitectónico:
  * 1. Búsqueda Unificada por API (sin usar yt-dlp para buscar):

@@ -229,7 +229,11 @@ class AuraAudioPlayer(
                         _isBuffering.value = false
                     }
                     Player.STATE_BUFFERING -> {
-                        _isBuffering.value = true
+                        val cur = _currentTrack.value
+                        val isRemoteStream = cur?.isStreamingTrack == true &&
+                            (cur.uriString.startsWith("http://", ignoreCase = true) ||
+                                cur.uriString.startsWith("https://", ignoreCase = true))
+                        _isBuffering.value = isRemoteStream
                     }
                 }
             }
@@ -372,7 +376,8 @@ class AuraAudioPlayer(
                     outDeck.clearMediaItems()
                     outDeck.setMediaItem(outgoingItem, outgoingPos)
                     outDeck.playbackParameters = player.playbackParameters
-                    outDeck.volume = player.volume.coerceIn(0.25f * fadeController.getVolume(), fadeController.getVolume())
+                    // La Canción A comienza la transición al 100% del volumen base para bajar simultáneamente de 100% a 0%
+                    outDeck.volume = fadeController.getVolume().coerceIn(0.0f, 1.0f)
                     outDeck.prepare()
                     outDeck.play()
                     handoffToDualDeckSucceeded = true
@@ -473,7 +478,7 @@ class AuraAudioPlayer(
                     incomingPlayer = player,
                     onProgressStep = { progress ->
                         if (applyEqCurve) {
-                            // Modulación progresiva estilo Apple Music AutoMix (pico de limpieza en el centro de la mezcla)
+                            // Modulación progresiva Smart AutoMix DJ (pico de limpieza en el centro de la mezcla)
                             val bellCurve = kotlin.math.sin(progress * kotlin.math.PI).toFloat().coerceIn(0.15f, 1.0f)
                             effectManager.setDjAutomixTransition(true, bellCurve)
                         }
@@ -855,7 +860,7 @@ class AuraAudioPlayer(
                             !isTransitioningTrack &&
                             crossfadeTriggeredForTrackId != curTrackId
 
-                        // Smart Outro Cue Point (Estilo Apple Music AutoMix para música local):
+                        // Smart Outro Cue Point (Smart AutoMix DJ para música local):
                         // Detecta cuando la energía vocal/instrumental de la canción saliente cae en el tramo final
                         // (o alcanza la ventana armónica de los últimos segundos) para iniciar la mezcla sin choques.
                         val currentIntensity = if (isDjMix) NativeAudioEngine.getAudioIntensity() else 0.25f

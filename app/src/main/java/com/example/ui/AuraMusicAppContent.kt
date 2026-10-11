@@ -323,9 +323,9 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
                                 dynamicSecondary = animatedMiniSecondary,
                                 isMiniPlayerVideoEnabled = isMiniPlayerVideoEnabled && !isNowPlayingExpanded,
                                 playbackSpeed = playbackSpeed,
-                                isLoadingOrBuffering = isAudioBuffering || isResolvingStreamGlobal,
-                                isVideoLoading = isMiniPlayerVideoEnabled && !effectiveTrack?.videoUri.isNullOrEmpty() && isVideoBufferingGlobal,
-                                isWaitingForNetwork = isNetworkStalled || (isMiniPlayerVideoEnabled && !effectiveTrack?.videoUri.isNullOrEmpty() && isVideoNetworkStalledGlobal)
+                                isLoadingOrBuffering = effectiveTrack?.isStreamingTrack == true && (isAudioBuffering || isResolvingStreamGlobal),
+                                isVideoLoading = effectiveTrack?.isStreamingTrack == true && isMiniPlayerVideoEnabled && !effectiveTrack?.videoUri.isNullOrEmpty() && isVideoBufferingGlobal,
+                                isWaitingForNetwork = effectiveTrack?.isStreamingTrack == true && (isNetworkStalled || (isMiniPlayerVideoEnabled && !effectiveTrack?.videoUri.isNullOrEmpty() && isVideoNetworkStalledGlobal))
                             )
                         }
 
@@ -655,8 +655,8 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
                 onSetNowPlayingDesignMode = { viewModel.setNowPlayingDesignMode(it) },
                 collectionContextTitle = selectedPlaylist?.name ?: currentTrack?.album ?: "Tu Biblioteca",
                 onDownloadStreamingTrack = { track -> viewModel.downloadCurrentStreamingTrackPermanently(track) },
-                isLoadingOrBuffering = isAudioBuffering || isResolvingStreamGlobal,
-                isWaitingForNetwork = isNetworkStalled,
+                isLoadingOrBuffering = effectiveTrack?.isStreamingTrack == true && (isAudioBuffering || isResolvingStreamGlobal),
+                isWaitingForNetwork = effectiveTrack?.isStreamingTrack == true && isNetworkStalled,
                 isDynamicArtworkColorEnabled = isDynamicArtworkColorEnabled,
                 onToggleVideoCanvas = { viewModel.toggleVideoCanvas() },
                 onSetVideoDisplayMode = { viewModel.setVideoDisplayMode(it) },

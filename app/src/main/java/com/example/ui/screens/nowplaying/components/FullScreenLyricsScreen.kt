@@ -51,7 +51,7 @@ import kotlinx.coroutines.launch
 
 /**
  * Vista Inmersiva de Letras y Karaoke a Pantalla Completa (Full Screen Lyrics).
- * Experiencia de alta fidelidad estilo Spotify / Apple Music Sing:
+ * Experiencia de alta fidelidad de estudio:
  * - Lienzo a pantalla completa con fondo degradado dinámico y halo ambiental que respira con el audio en C++20.
  * - Desplazamiento automático inteligente con seguimiento de tempo en tiempo real.
  * - Tipografía ampliada con resaltado neón, escala dinámica y resplandor para la frase activa.
