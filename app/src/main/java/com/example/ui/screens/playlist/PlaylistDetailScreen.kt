@@ -69,11 +69,10 @@ fun PlaylistDetailScreen(
     val isAlbumVirtual = playlist.id == -2L
     val isArtistVirtual = playlist.id == -3L
     val isVirtualCollection = playlist.id < 0L
-    val canCustomizeCollection = !isFavoritesVirtual
 
     var showRenameDialog by remember { mutableStateOf(false) }
-    var renameName by remember(playlist.name) { mutableStateOf(playlist.name) }
-    var renameDesc by remember(playlist.description) { mutableStateOf(playlist.description) }
+    var renameName by remember { mutableStateOf(playlist.name) }
+    var renameDesc by remember { mutableStateOf(playlist.description) }
 
     var showAddTracksDialog by remember { mutableStateOf(false) }
     var trackSearchQuery by remember { mutableStateOf("") }
@@ -123,7 +122,7 @@ fun PlaylistDetailScreen(
                     modifier = Modifier.weight(1f)
                 )
 
-                if (canCustomizeCollection) {
+                if (!isVirtualCollection) {
                     IconButton(
                         onClick = {
                             renameName = playlist.name
@@ -134,7 +133,7 @@ fun PlaylistDetailScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Edit,
-                            contentDescription = "Personalizar colección",
+                            contentDescription = "Editar lista",
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }
@@ -155,7 +154,7 @@ fun PlaylistDetailScreen(
                         .size(108.dp)
                         .clip(RoundedCornerShape(18.dp))
                         .then(
-                            if (canCustomizeCollection) {
+                            if (!isVirtualCollection) {
                                 Modifier.clickable {
                                     renameName = playlist.name
                                     renameDesc = playlist.description
@@ -170,7 +169,7 @@ fun PlaylistDetailScreen(
                         modifier = Modifier.fillMaxSize(),
                         cornerRadius = 18.dp
                     )
-                    if (canCustomizeCollection) {
+                    if (!isVirtualCollection) {
                         Surface(
                             shape = RoundedCornerShape(8.dp),
                             color = MaterialTheme.colorScheme.primary.copy(alpha = 0.88f),
@@ -182,7 +181,7 @@ fun PlaylistDetailScreen(
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     imageVector = Icons.Default.AddPhotoAlternate,
-                                    contentDescription = "Cambiar imagen de portada",
+                                    contentDescription = "Cambiar imagen de lista",
                                     tint = Color.White,
                                     modifier = Modifier.size(16.dp)
                                 )
@@ -212,7 +211,7 @@ fun PlaylistDetailScreen(
                         Text(
                             text = playlist.description,
                             style = MaterialTheme.typography.bodyMedium.copy(color = TextSecondary),
-                            maxLines = 3
+                            maxLines = 2
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                     }
@@ -389,8 +388,8 @@ fun PlaylistDetailScreen(
         }
     }
 
-    // Cuadro de diálogo para editar nombre, descripción e imagen de la playlist, álbum o artista
-    if (showRenameDialog && canCustomizeCollection) {
+    // Cuadro de diálogo para editar nombre, descripción e imagen de la playlist
+    if (showRenameDialog && !isVirtualCollection) {
         com.example.ui.screens.library.components.RenamePlaylistDialog(
             playlist = playlist,
             tracksPreview = tracks.take(4),

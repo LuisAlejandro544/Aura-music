@@ -45,30 +45,13 @@ object AuraDebugManager {
             defaultExceptionHandler = Thread.getDefaultUncaughtExceptionHandler()
             Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
                 try {
-                    val msg = throwable.message ?: ""
-                    val stack = throwable.stackTraceToString()
-                    val isBenignChromiumUnbindBug = throwable is IllegalArgumentException &&
-                        msg.contains("Service not registered", ignoreCase = true) &&
-                        (thread.name.contains("Chrome_ProcessLauncherThread", ignoreCase = true) ||
-                            stack.contains("chromium-", ignoreCase = true) ||
-                            stack.contains("WV.", ignoreCase = true))
-
-                    if (isBenignChromiumUnbindBug && thread.name != "main") {
-                        // Bug conocido de Chromium SystemWebView en Android 14 (doble unbindService del proceso sandboxed en Chrome_ProcessLauncherThread).
-                        // Al ocurrir en un HandlerThread interno de Chromium, absorber la excepción evita que Android mate el proceso de la app.
-                        logWarning(
-                            tag = "WebViewSandbox",
-                            message = "Neutralizado unbindService duplicado benigno de Chromium WebView en hilo ${thread.name}: $msg"
-                        )
-                        return@setDefaultUncaughtExceptionHandler
-                    }
-
                     logCrash(throwable, thread)
                 } catch (e: Throwable) {
                     Log.e(TAG, "Error crítico dentro del capturador de excepciones: ${e.message}", e)
+                } finally {
+                    // Ceder el control al manejador estándar del sistema
+                    defaultExceptionHandler?.uncaughtException(thread, throwable)
                 }
-                // Ceder el control al manejador estándar del sistema para crashes reales
-                defaultExceptionHandler?.uncaughtException(thread, throwable)
             }
 
             logInfo("Init", "AuraDebugManager inicializado con éxito. Persistencia activa.")

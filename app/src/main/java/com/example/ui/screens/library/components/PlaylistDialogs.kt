@@ -173,12 +173,8 @@ fun RenamePlaylistDialog(
     onDismissRequest: () -> Unit,
     onRenamePlaylist: (Long, String, String, Uri?, Boolean) -> Unit
 ) {
-    val isAlbumCollection = playlist.id == -2L
-    val isArtistCollection = playlist.id == -3L
-    val isAlbumOrArtist = isAlbumCollection || isArtistCollection
-
-    var renamePlaylistName by remember(playlist.name) { mutableStateOf(playlist.name) }
-    var renamePlaylistDesc by remember(playlist.description) { mutableStateOf(playlist.description) }
+    var renamePlaylistName by remember { mutableStateOf(playlist.name) }
+    var renamePlaylistDesc by remember { mutableStateOf(playlist.description) }
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
     var removeCustomImage by remember { mutableStateOf(false) }
 
@@ -193,27 +189,9 @@ fun RenamePlaylistDialog(
 
     val hasExistingCustomArt = !playlist.customArtPath.isNullOrEmpty() && File(playlist.customArtPath).exists()
 
-    val dialogTitle = when {
-        isAlbumCollection -> "Personalizar Álbum"
-        isArtistCollection -> "Personalizar Artista"
-        else -> "Editar Lista de Reproducción"
-    }
-
-    val nameFieldLabel = when {
-        isAlbumCollection -> "Álbum"
-        isArtistCollection -> "Artista"
-        else -> "Nombre de la lista"
-    }
-
-    val descFieldLabel = when {
-        isAlbumCollection -> "Descripción o reseña del álbum"
-        isArtistCollection -> "Biografía o descripción del artista"
-        else -> "Descripción (opcional)"
-    }
-
     AlertDialog(
         onDismissRequest = onDismissRequest,
-        title = { Text(dialogTitle, fontWeight = FontWeight.Bold, color = TextPrimary) },
+        title = { Text("Editar Lista de Reproducción", fontWeight = FontWeight.Bold, color = TextPrimary) },
         text = {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Box(
@@ -233,7 +211,7 @@ fun RenamePlaylistDialog(
                         selectedImageUri != null -> {
                             AsyncImage(
                                 model = selectedImageUri,
-                                contentDescription = "Nueva imagen personalizada",
+                                contentDescription = "Nueva imagen de lista",
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxSize()
                             )
@@ -249,7 +227,7 @@ fun RenamePlaylistDialog(
                         hasExistingCustomArt -> {
                             AsyncImage(
                                 model = File(playlist.customArtPath!!),
-                                contentDescription = "Imagen actual personalizada",
+                                contentDescription = "Imagen actual de lista",
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxSize()
                             )
@@ -299,7 +277,7 @@ fun RenamePlaylistDialog(
                     ) {
                         Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Elegir Foto", style = MaterialTheme.typography.labelMedium)
+                        Text("Elegir Imagen", style = MaterialTheme.typography.labelMedium)
                     }
 
                     if ((hasExistingCustomArt || selectedImageUri != null) && !removeCustomImage) {
@@ -321,9 +299,8 @@ fun RenamePlaylistDialog(
 
                 OutlinedTextField(
                     value = renamePlaylistName,
-                    onValueChange = { if (!isAlbumOrArtist) renamePlaylistName = it },
-                    readOnly = isAlbumOrArtist,
-                    label = { Text(nameFieldLabel) },
+                    onValueChange = { renamePlaylistName = it },
+                    label = { Text("Nombre de la lista") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -331,11 +308,8 @@ fun RenamePlaylistDialog(
                 OutlinedTextField(
                     value = renamePlaylistDesc,
                     onValueChange = { renamePlaylistDesc = it },
-                    label = { Text(descFieldLabel) },
-                    maxLines = 4,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("collection_description_input")
+                    label = { Text("Descripción (opcional)") },
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         },
@@ -367,4 +341,3 @@ fun RenamePlaylistDialog(
         shape = RoundedCornerShape(20.dp)
     )
 }
-

@@ -62,8 +62,7 @@ object FFmpegNativeEngine {
             val ffmpegZip = File(nativeLibDir, "libffmpeg.zip.so")
 
             // Soporte de respaldo solo si algún entorno legado provee exclusivamente libffmpeg.zip.so sin librerías directas
-            val hasDirectLibs = File(nativeLibDir, "libffmpeg_cli.so").exists() ||
-                    File(nativeLibDir, "libavcodec.so").exists()
+            val hasDirectLibs = File(nativeLibDir, "libavcodec.so").exists() || File(nativeLibDir, "libffmpegkit.so").exists()
             if (!hasDirectLibs && ffmpegZip.exists()) {
                 val versionMarker = File(legacyFfmpegEnvDir, ".version")
                 val currentSignature = "${ffmpegZip.length()}_${ffmpegZip.lastModified()}"

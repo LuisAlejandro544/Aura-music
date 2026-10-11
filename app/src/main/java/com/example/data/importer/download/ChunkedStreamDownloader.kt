@@ -125,14 +125,11 @@ object ChunkedStreamDownloader {
 
         val isYoutubeStream = isTrustedYoutubeOrGoogleVideoHost(url)
 
-        // 1. Si la URL contiene rangos parciales (&range=0-...) y no está protegida en sparams, probar primero sin rango
-        val sparams = try {
-            Uri.parse(url).getQueryParameter("sparams")?.lowercase() ?: ""
-        } catch (_: Exception) {
-            ""
-        }
-        val cleanUrl = if (isYoutubeStream && url.contains("&range=") && !sparams.contains("range")) {
+        // 1. Si la URL contiene rangos parciales (&range=0-...), probar primero sin rango para descargar el archivo completo
+        val cleanUrl = if (isYoutubeStream && url.contains("&range=")) {
             url.replace(Regex("&range=[^&]+"), "")
+                .replace(Regex("&rn=[^&]+"), "")
+                .replace(Regex("&rbuf=[^&]+"), "")
         } else {
             url
         }
@@ -150,50 +147,6 @@ object ChunkedStreamDownloader {
             }
         }
         return false
-    }
-
-    /**
-     * Infiere el User-Agent nativo exacto exigido por los nodos CDN de `googlevideo.com`
-     * según el parámetro `c=` embebido en la firma de la URL.
-     */
-    private fun resolveEffectiveUserAgent(url: String, customHeaders: Map<String, String>): String {
-        val explicitUa = customHeaders["User-Agent"] ?: customHeaders["user-agent"]
-        if (!explicitUa.isNullOrBlank()) return explicitUa
-
-        val clientParam = try {
-            Uri.parse(url).getQueryParameter("c")?.uppercase() ?: ""
-        } catch (_: Exception) {
-            ""
-        }
-        return when {
-            clientParam.contains("ANDROID_VR") ->
-                "com.google.android.apps.youtube.vr.oculus/1.62.27 (Linux; U; Android 12; en_US; Quest 3; Build/SQ3A.220605.009.A1; Cronet/132.0.6808.3)"
-            clientParam.contains("IOS") ->
-                "com.google.ios.youtube/20.10.4 (iPhone16,2; U; CPU iOS 18_3_2 like Mac OS X;)"
-            clientParam.contains("ANDROID_TESTSUITE") ->
-                "com.google.android.youtube/1.9 (Linux; U; Android 14; en_US) gzip"
-            clientParam.contains("ANDROID") ->
-                "com.google.android.youtube/19.44.38 (Linux; U; Android 14; en_US) gzip"
-            clientParam.contains("TVHTML5") ->
-                "Mozilla/5.0 (PlayStation; PlayStation 4/12.00) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.4 Safari/605.1.15"
-            else ->
-                "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
-        }
-    }
-
-    /**
-     * Determina si la URL de `googlevideo.com` fue firmada para un cliente Web (`WEB`, `MWEB`, `WEB_REMIX`, etc.)
-     * o si pertenece a un cliente de app nativa (`ANDROID_VR`, `IOS`, `ANDROID_TESTSUITE`) que NO debe llevar
-     * `Referer: https://m.youtube.com/` ni cookies de navegador web.
-     */
-    private fun isWebSignedGoogleVideoStream(url: String): Boolean {
-        val clientParam = try {
-            Uri.parse(url).getQueryParameter("c")?.uppercase() ?: ""
-        } catch (_: Exception) {
-            ""
-        }
-        if (clientParam.isEmpty()) return false
-        return clientParam.startsWith("WEB") || clientParam.startsWith("MWEB") || clientParam.contains("TVHTML5")
     }
 
     private fun executeDownload(
@@ -227,7 +180,9 @@ object ChunkedStreamDownloader {
 
         // 2. Descarga lineal estándar de respaldo
         return try {
-            val defaultUa = resolveEffectiveUserAgent(cleanUrl, customHeaders)
+            val defaultUa = customHeaders["User-Agent"]
+                ?: customHeaders["user-agent"]
+                ?: "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
 
             val reqBuilder = Request.Builder().url(cleanUrl)
                 .header("User-Agent", defaultUa)
@@ -240,18 +195,13 @@ object ChunkedStreamDownloader {
                 }
             }
 
-            // Solo adjuntar Referer/Cookies de m.youtube.com si el flujo fue firmado para un cliente WEB
-            // (los flujos ANDROID_VR / IOS devuelven HTTP 403 si reciben cookies de navegador o Referer web)
-            if (isYoutubeStream && isTrustedYoutubeOrGoogleVideoHost(cleanUrl) && isWebSignedGoogleVideoStream(cleanUrl)) {
-                if (!customHeaders.keys.any { it.equals("Referer", ignoreCase = true) }) {
-                    reqBuilder.header("Referer", "https://www.youtube.com/")
-                }
-                if (!customHeaders.keys.any { it.equals("Origin", ignoreCase = true) }) {
-                    reqBuilder.header("Origin", "https://www.youtube.com")
+            if (isYoutubeStream && isTrustedYoutubeOrGoogleVideoHost(cleanUrl)) {
+                if (customHeaders.isEmpty()) {
+                    reqBuilder.header("Referer", "https://m.youtube.com/")
                 }
                 try {
                     val cookies = android.webkit.CookieManager.getInstance().getCookie("https://m.youtube.com")
-                    if (!cookies.isNullOrBlank() && !customHeaders.keys.any { it.equals("Cookie", ignoreCase = true) }) {
+                    if (!cookies.isNullOrBlank() && !customHeaders.containsKey("Cookie")) {
                         reqBuilder.header("Cookie", cookies)
                     }
                 } catch (_: Throwable) {}
@@ -265,7 +215,6 @@ object ChunkedStreamDownloader {
                     .url(cleanUrl)
                     .header("User-Agent", defaultUa)
                     .header("Accept", "*/*")
-                    .header("Accept-Encoding", "identity")
                     .build()
                 response = httpClient.newCall(fallbackReq).execute()
             }
@@ -356,13 +305,14 @@ object ChunkedStreamDownloader {
         onProgress: (DownloadProgress) -> Unit
     ): Boolean {
         return try {
-            val signedUa = resolveEffectiveUserAgent(url, customHeaders)
+            val signedUa = customHeaders["User-Agent"]
+                ?: customHeaders["user-agent"]
+                ?: "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
 
             val probeBuilder = Request.Builder()
                 .url(url)
                 .header("User-Agent", signedUa)
                 .header("Accept", "*/*")
-                .header("Accept-Encoding", "identity")
 
             for ((k, v) in customHeaders) {
                 if (!k.equals("Range", ignoreCase = true) && !k.equals("Accept-Encoding", ignoreCase = true)) {

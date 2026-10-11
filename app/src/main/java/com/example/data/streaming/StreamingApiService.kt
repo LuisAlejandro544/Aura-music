@@ -1,13 +1,9 @@
 package com.example.data.streaming
 
 import android.content.Context
-import com.example.data.importer.HeadlessWebViewExtractor
 import com.example.data.importer.InnerTubeClient
-import com.example.data.importer.InvidiousStreamResolver
 import com.example.data.importer.OnlineVideoAudioImporter
-import com.example.data.importer.PipedStreamResolver
 import com.example.data.importer.WebStreamExtractor
-import com.example.data.importer.WebViewCookieBridge
 import com.example.data.importer.YtDlpNativeEngine
 import com.example.debug.AuraDebugManager
 import com.example.model.StreamingSearchFilter
@@ -31,16 +27,15 @@ import java.net.URL
  * Rol Arquitectónico:
  * 1. Búsqueda Unificada por API (sin usar yt-dlp para buscar):
  *    Consulta simultáneamente la API de YouTube Music (`WEB_REMIX` en `music.youtube.com`)
- *    y la API de YouTube (`WEB` en `youtube.com`) con respaldo automático a **Piped API**
- *    (`music_songs` y `videos`) e **Invidious API v1**, etiquetando cada resultado con su
- *    insignia (`YT MUSIC` vs `YOUTUBE`).
+ *    y la API de YouTube (`WEB` / `ANDROID` en `youtube.com`), etiquetando cada resultado
+ *    con su insignia correspondiente (`YT MUSIC` vs `YOUTUBE`).
  * 2. Recomendación de Canción Similar (Radio / Autoplay antes de terminar la canción):
- *    Consulta el endpoint `/youtubei/v1/next` y `PipedStreamResolver.fetchRelatedStreams`
- *    para obtener la siguiente pista similar recomendada antes de que finalice la pista actual.
- * 3. Resolución de Reproducción Multicapa:
- *    Combina `YtDlpNativeEngine` (100% limpio sin cookies), el modo híbrido `InnerTube + yt-dlp`,
- *    `PipedStreamResolver` (proxy anti-403), `InnerTubeClient` (`ANDROID_VR`/`IOS`/`TV` + `visitorData`),
- *    `InvidiousStreamResolver` (`?local=true`) y `HeadlessWebViewExtractor`.
+ *    Consulta el endpoint `/youtubei/v1/next` (Automix / Watch Next) para obtener la siguiente
+ *    pista similar recomendada antes de que finalice la pista actual.
+ * 3. Resolución de Reproducción con `yt-dlp`:
+ *    Una vez elegida la canción o la recomendación similar, normaliza enlaces de `music.youtube.com`
+ *    y utiliza `YtDlpNativeEngine` (con respaldo `InnerTubeClient`) para obtener las URLs reales
+ *    de audio y Video Canvas para reproducir y pre-cargar en caché.
  */
 object StreamingApiService {
 
@@ -67,18 +62,14 @@ object StreamingApiService {
         coroutineScope {
             val ytMusicDeferred = async {
                 if (filter == StreamingSearchFilter.ALL || filter == StreamingSearchFilter.YT_MUSIC) {
-                    searchYouTubeMusicApi(cleanQuery).ifEmpty {
-                        PipedStreamResolver.search(cleanQuery, StreamingSearchFilter.YT_MUSIC)
-                    }
+                    searchYouTubeMusicApi(cleanQuery)
                 } else {
                     emptyList()
                 }
             }
             val ytStandardDeferred = async {
                 if (filter == StreamingSearchFilter.ALL || filter == StreamingSearchFilter.YOUTUBE) {
-                    searchYouTubeStandardApi(cleanQuery).ifEmpty {
-                        PipedStreamResolver.search(cleanQuery, StreamingSearchFilter.YOUTUBE)
-                    }
+                    searchYouTubeStandardApi(cleanQuery)
                 } else {
                     emptyList()
                 }
@@ -87,20 +78,12 @@ object StreamingApiService {
             val musicResults = ytMusicDeferred.await()
             val videoResults = ytStandardDeferred.await()
 
-            val combined = when (filter) {
+            when (filter) {
                 StreamingSearchFilter.YT_MUSIC -> musicResults.ifEmpty {
                     videoResults.map { it.copy(platform = StreamingSourcePlatform.YT_MUSIC) }
                 }
                 StreamingSearchFilter.YOUTUBE -> videoResults
                 StreamingSearchFilter.ALL -> interleaveResults(musicResults, videoResults)
-            }
-
-            if (combined.isNotEmpty()) {
-                combined
-            } else {
-                PipedStreamResolver.search(cleanQuery, filter).ifEmpty {
-                    InvidiousStreamResolver.search(cleanQuery, filter)
-                }
             }
         }
     }
@@ -136,17 +119,7 @@ object StreamingApiService {
             return@withContext relatedFromNext.first()
         }
 
-        // 2. Consultar streams relacionados desde Piped API (/streams/{videoId})
-        val relatedFromPiped = PipedStreamResolver.fetchRelatedStreams(
-            videoId = cleanVideoId,
-            preferredPlatform = preferredPlatform,
-            excludedVideoIds = excludedVideoIds
-        )
-        if (relatedFromPiped.isNotEmpty()) {
-            return@withContext relatedFromPiped.first()
-        }
-
-        // 3. Respaldo por búsqueda semántica de artista/canción similar en la API
+        // 2. Respaldo por búsqueda semántica de artista/canción similar en la API
         val fallbackQuery = if (currentArtist.isNotBlank() && !currentArtist.equals("Artista desconocido", ignoreCase = true)) {
             "$currentArtist mix canciones similares"
         } else {
@@ -166,13 +139,13 @@ object StreamingApiService {
 
     /**
      * Toma un elemento de búsqueda o canción similar de la API (`YT Music` o `YouTube`)
-     * y resuelve los flujos listos para reproducir en ExoPlayer, pre-cargar en caché o descargar
-     * usando el motor configurado por el usuario en Ajustes (por defecto `YoutubeExtractionEngine.YTDLP`).
-     *
-     * Si el motor seleccionado falla:
-     * - En compilaciones Debug (`BuildConfig.ENABLE_DEBUG_MONITOR == true`): registra el código crudo exacto
-     *   del fallo en `AuraDebugManager.logError` (Aura Monitor) y notifica indicando revisar Aura Monitor.
-     * - En compilaciones Beta (`BuildConfig.ENABLE_DEBUG_MONITOR == false`): retorna el aviso directo para el usuario.
+     * y resuelve los flujos listos para reproducir en ExoPlayer, pre-cargar en caché o descargar:
+     * - Si la plataforma es `YOUTUBE` (`StreamingSourcePlatform.YOUTUBE`):
+     *   1º Utiliza exclusivamente `yt-dlp` (`YtDlpNativeEngine`, CPython + QuickJS) en primer lugar.
+     *   2º Si el video presenta bloqueo o restricción, aplica respaldo automático con `InnerTubeClient` y `WebStreamExtractor`.
+     * - Si la plataforma es `YT_MUSIC` (`StreamingSourcePlatform.YT_MUSIC`):
+     *   1º Resuelve directamente con `InnerTubeClient` (`<300ms`) y respaldo `InvidiousStreamResolver`,
+     *      sin invocar `yt-dlp` (ya que `yt-dlp` se reserva exclusivamente para pistas de YouTube).
      */
     suspend fun resolvePlayableStreamWithYtDlp(
         context: Context,
@@ -180,7 +153,6 @@ object StreamingApiService {
         forceBypassYtDlp: Boolean = false
     ): Result<OnlineVideoAudioImporter.ResolvedMediaInfo> = withContext(Dispatchers.IO) {
         val watchUrl = item.canonicalWatchUrl
-        val selectedEngine = WebStreamExtractor.getSelectedEngine(context)
 
         fun enrichAndRegister(info: OnlineVideoAudioImporter.ResolvedMediaInfo): Result<OnlineVideoAudioImporter.ResolvedMediaInfo> {
             val enriched = info.copy(
@@ -198,148 +170,75 @@ object StreamingApiService {
             return Result.success(enriched)
         }
 
-        fun reportStrictEngineFailure(
-            engine: com.example.data.importer.YoutubeExtractionEngine,
-            rawDiagnostic: String,
-            cause: Throwable? = null
-        ): Result<OnlineVideoAudioImporter.ResolvedMediaInfo> {
-            val isDebugApk = com.example.BuildConfig.ENABLE_DEBUG_MONITOR
-            return if (isDebugApk) {
-                val rawReport = buildString {
-                    appendLine("=== FALLO DE MOTOR ONLINE SELECCIONADO ===")
-                    appendLine("Motor: ${engine.name} (${engine.label})")
-                    appendLine("Plataforma: ${item.platform.name} (${item.platform.badgeText})")
-                    appendLine("VideoID: ${item.videoId}")
-                    appendLine("Título: ${item.title} - ${item.artist}")
-                    appendLine("URL Canónica: $watchUrl")
-                    appendLine("Diagnóstico Crudo Exacto:")
-                    appendLine(rawDiagnostic.ifBlank { "Sin salida estándar adicional (null/empty stream response)" })
-                }
-                AuraDebugManager.logError(
-                    tag = "StreamingEngine[${engine.badgeText}]",
-                    message = rawReport,
-                    throwable = cause ?: IllegalStateException(rawReport)
-                )
-                Result.failure(
-                    IllegalStateException(
-                        "Fallo en motor ${engine.label} para \"${item.title}\". Código crudo exacto registrado en Aura Monitor: ${rawDiagnostic.take(160)}"
-                    )
-                )
-            } else {
-                Result.failure(
-                    IllegalStateException(
-                        "Aviso: El motor seleccionado (${engine.label}) no pudo reproducir \"${item.title}\". Verifica tu conexión o cambia el motor en Ajustes."
-                    )
-                )
-            }
-        }
-
-        when (selectedEngine) {
-            com.example.data.importer.YoutubeExtractionEngine.YTDLP -> {
-                if (YtDlpAutoUpdaterIsBlockedSafe()) {
-                    return@withContext reportStrictEngineFailure(
-                        engine = selectedEngine,
-                        rawDiagnostic = "yt-dlp se encuentra bloqueado temporalmente mientras finaliza su actualización OTA."
-                    )
-                }
+        if (item.platform == StreamingSourcePlatform.YOUTUBE) {
+            // === PLATAFORMA YOUTUBE: Usar yt-dlp en primer lugar ===
+            if (!forceBypassYtDlp && !YtDlpAutoUpdaterIsBlockedSafe()) {
                 val ytdlpResult = YtDlpNativeEngine.resolveStream(context, watchUrl)
                 val info = ytdlpResult.getOrNull()
                 if (info != null && (!info.audioUrl.isNullOrBlank() || info.videoUrl.isNotBlank())) {
                     return@withContext enrichAndRegister(info)
                 }
-                val err = ytdlpResult.exceptionOrNull()
-                return@withContext reportStrictEngineFailure(
-                    engine = selectedEngine,
-                    rawDiagnostic = err?.message ?: "yt-dlp devolvió flujos vacíos para $watchUrl",
-                    cause = err
-                )
             }
 
-            com.example.data.importer.YoutubeExtractionEngine.INNERTUBE_YTDLP -> {
-                // 1º InnerTube busca e intercepta la URL directa verificando HTTP 206 en <300ms
-                val innerTubeFast = InnerTubeClient.resolve(
-                    videoId = item.videoId,
-                    originalUrl = watchUrl
-                )
-                if (innerTubeFast != null && (!innerTubeFast.audioUrl.isNullOrBlank() || innerTubeFast.videoUrl.isNotBlank())) {
-                    return@withContext enrichAndRegister(innerTubeFast)
-                }
-                // 2º Si requiere descifrado n-sig, InnerTube le pasa la URL canónica a yt-dlp limpio
-                if (!YtDlpAutoUpdaterIsBlockedSafe()) {
-                    val ytdlpResult = YtDlpNativeEngine.resolveStream(context, watchUrl)
-                    val info = ytdlpResult.getOrNull()
-                    if (info != null && (!info.audioUrl.isNullOrBlank() || info.videoUrl.isNotBlank())) {
-                        return@withContext enrichAndRegister(info)
-                    }
-                    val err = ytdlpResult.exceptionOrNull()
-                    return@withContext reportStrictEngineFailure(
-                        engine = selectedEngine,
-                        rawDiagnostic = "InnerTube + yt-dlp no pudieron resolver ${item.videoId}: ${err?.message ?: "sin flujos alcanzables"}",
-                        cause = err
-                    )
-                }
-                return@withContext reportStrictEngineFailure(
-                    engine = selectedEngine,
-                    rawDiagnostic = "InnerTube no obtuvo stream directo y yt-dlp está actualizándose por OTA."
-                )
+            // Respaldo automático si el video de YouTube tiene bloqueo en yt-dlp o recibió HTTP 403
+            val innerTubeFallback = InnerTubeClient.resolve(
+                videoId = item.videoId,
+                originalUrl = watchUrl
+            )
+            if (innerTubeFallback != null && (!innerTubeFallback.audioUrl.isNullOrBlank() || innerTubeFallback.videoUrl.isNotBlank())) {
+                return@withContext enrichAndRegister(innerTubeFallback)
             }
 
-            com.example.data.importer.YoutubeExtractionEngine.PIPED -> {
-                val pipedInfo = PipedStreamResolver.resolve(
-                    videoId = item.videoId,
-                    originalUrl = watchUrl
-                )
-                if (pipedInfo != null && (!pipedInfo.audioUrl.isNullOrBlank() || pipedInfo.videoUrl.isNotBlank())) {
-                    return@withContext enrichAndRegister(pipedInfo)
-                }
-                return@withContext reportStrictEngineFailure(
-                    engine = selectedEngine,
-                    rawDiagnostic = "PipedStreamResolver (/streams/${item.videoId}) no devolvió audioStreams/videoStreams válidos en las instancias federadas activas."
-                )
+            val invidiousFallback = com.example.data.importer.InvidiousStreamResolver.resolve(
+                videoId = item.videoId,
+                originalUrl = watchUrl
+            )
+            if (invidiousFallback != null && (!invidiousFallback.audioUrl.isNullOrBlank() || invidiousFallback.videoUrl.isNotBlank())) {
+                return@withContext enrichAndRegister(invidiousFallback)
             }
 
-            com.example.data.importer.YoutubeExtractionEngine.INNERTUBE -> {
-                val innerTubeInfo = InnerTubeClient.resolve(
-                    videoId = item.videoId,
-                    originalUrl = watchUrl
-                )
-                if (innerTubeInfo != null && (!innerTubeInfo.audioUrl.isNullOrBlank() || innerTubeInfo.videoUrl.isNotBlank())) {
-                    return@withContext enrichAndRegister(innerTubeInfo)
-                }
-                return@withContext reportStrictEngineFailure(
-                    engine = selectedEngine,
-                    rawDiagnostic = "InnerTubeClient (/youtubei/v1/player videoId=${item.videoId}) rechazó los clientes ANDROID_VR, IOS, TVHTML5 y ANDROID_TESTSUITE (PLAYABILITY_ERROR / 403)."
-                )
+            val webFallback = com.example.data.importer.HeadlessWebViewExtractor.resolve(
+                context = context,
+                videoId = item.videoId,
+                originalUrl = watchUrl
+            )
+            if (webFallback != null) {
+                return@withContext enrichAndRegister(webFallback)
             }
 
-            com.example.data.importer.YoutubeExtractionEngine.INVIDIOUS -> {
-                val invidiousInfo = InvidiousStreamResolver.resolve(
-                    videoId = item.videoId,
-                    originalUrl = watchUrl
-                )
-                if (invidiousInfo != null && (!invidiousInfo.audioUrl.isNullOrBlank() || invidiousInfo.videoUrl.isNotBlank())) {
-                    return@withContext enrichAndRegister(invidiousInfo)
-                }
-                return@withContext reportStrictEngineFailure(
-                    engine = selectedEngine,
-                    rawDiagnostic = "InvidiousStreamResolver (/api/v1/videos/${item.videoId}?local=true) no encontró adaptiveFormats ni formatStreams activos."
-                )
+            return@withContext Result.failure(
+                IllegalStateException("No se pudo resolver la pista de YouTube \"${item.title}\".")
+            )
+        } else {
+            // === PLATAFORMA YT MUSIC: Resolución directa sin usar yt-dlp ===
+            val innerTubeInfo = InnerTubeClient.resolve(
+                videoId = item.videoId,
+                originalUrl = watchUrl
+            )
+            if (innerTubeInfo != null && (!innerTubeInfo.audioUrl.isNullOrBlank() || innerTubeInfo.videoUrl.isNotBlank())) {
+                return@withContext enrichAndRegister(innerTubeInfo)
             }
 
-            com.example.data.importer.YoutubeExtractionEngine.WEBVIEW -> {
-                val webInfo = HeadlessWebViewExtractor.resolve(
-                    context = context,
-                    videoId = item.videoId,
-                    originalUrl = watchUrl
-                )
-                if (webInfo != null && (!webInfo.audioUrl.isNullOrBlank() || webInfo.videoUrl.isNotBlank())) {
-                    return@withContext enrichAndRegister(webInfo)
-                }
-                return@withContext reportStrictEngineFailure(
-                    engine = selectedEngine,
-                    rawDiagnostic = "HeadlessWebViewExtractor (https://m.youtube.com/watch?v=${item.videoId}) agotó el tiempo o no interceptó URLs googlevideo.com/videoplayback."
-                )
+            val invidiousInfo = com.example.data.importer.InvidiousStreamResolver.resolve(
+                videoId = item.videoId,
+                originalUrl = watchUrl
+            )
+            if (invidiousInfo != null && (!invidiousInfo.audioUrl.isNullOrBlank() || invidiousInfo.videoUrl.isNotBlank())) {
+                return@withContext enrichAndRegister(invidiousInfo)
             }
+
+            val webFallback = com.example.data.importer.HeadlessWebViewExtractor.resolve(
+                context = context,
+                videoId = item.videoId,
+                originalUrl = watchUrl
+            )
+            if (webFallback != null) {
+                return@withContext enrichAndRegister(webFallback)
+            }
+
+            return@withContext Result.failure(
+                IllegalStateException("No se pudo resolver la pista de YT Music \"${item.title}\".")
+            )
         }
     }
 

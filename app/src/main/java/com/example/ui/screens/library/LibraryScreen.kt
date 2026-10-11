@@ -69,8 +69,6 @@ fun LibraryScreen(
     isCreatingMixtape: Boolean = false,
     mixtapeProgress: Float = 0f,
     mixtapeStatusMessage: String? = null,
-    customAlbumsMetadata: Map<String, com.example.model.CollectionCustomMetadata> = emptyMap(),
-    customArtistsMetadata: Map<String, com.example.model.CollectionCustomMetadata> = emptyMap(),
     modifier: Modifier = Modifier
 ) {
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
@@ -371,15 +369,12 @@ fun LibraryScreen(
                     item { EmptyLibraryView(onImportClick = { onNavigate(NavScreen.Import) }) }
                 } else {
                     items(albumsList, key = { it.key }) { (albumName, tracks) ->
-                        val customAlbumMeta = customAlbumsMetadata[albumName]
                         AlbumGroupCard(
                             albumName = albumName,
                             artist = tracks.firstOrNull()?.artist ?: "Varios artistas",
                             trackCount = tracks.size,
                             representativeTrack = tracks.firstOrNull(),
                             previewTracks = tracks.take(4),
-                            customArtPath = customAlbumMeta?.customArtPath,
-                            customDescription = customAlbumMeta?.description,
                             onClick = {
                                 onOpenAlbum(albumName)
                             }
@@ -393,14 +388,11 @@ fun LibraryScreen(
                     item { EmptyLibraryView(onImportClick = { onNavigate(NavScreen.Import) }) }
                 } else {
                     items(artistsList, key = { it.key }) { (artistName, tracks) ->
-                        val customArtistMeta = customArtistsMetadata[artistName]
                         ArtistGroupCard(
                             artistName = artistName,
                             trackCount = tracks.size,
                             representativeTrack = tracks.firstOrNull(),
                             previewTracks = tracks.take(4),
-                            customArtPath = customArtistMeta?.customArtPath,
-                            customDescription = customArtistMeta?.description,
                             onClick = {
                                 onOpenArtist(artistName)
                             }

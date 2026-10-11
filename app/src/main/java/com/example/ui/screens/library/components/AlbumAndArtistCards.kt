@@ -36,8 +36,6 @@ fun AlbumGroupCard(
     trackCount: Int,
     representativeTrack: Track?,
     previewTracks: List<Track> = listOfNotNull(representativeTrack),
-    customArtPath: String? = null,
-    customDescription: String? = null,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -57,11 +55,7 @@ fun AlbumGroupCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             com.example.ui.components.PlaylistCoverCollage(
-                playlist = com.example.model.Playlist(
-                    id = -2L,
-                    name = albumName,
-                    customArtPath = customArtPath
-                ),
+                playlist = com.example.model.Playlist(id = -2L, name = albumName),
                 tracksOverride = previewTracks.take(4),
                 modifier = Modifier.size(54.dp),
                 cornerRadius = 8.dp
@@ -83,14 +77,6 @@ fun AlbumGroupCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                if (!customDescription.isNullOrBlank()) {
-                    Text(
-                        text = customDescription,
-                        style = MaterialTheme.typography.labelSmall.copy(color = TextSecondary.copy(alpha = 0.85f)),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
             }
             Icon(
                 imageVector = Icons.Default.ChevronRight,
@@ -110,8 +96,6 @@ fun ArtistGroupCard(
     trackCount: Int,
     representativeTrack: Track?,
     previewTracks: List<Track> = listOfNotNull(representativeTrack),
-    customArtPath: String? = null,
-    customDescription: String? = null,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -135,11 +119,7 @@ fun ArtistGroupCard(
                 modifier = Modifier.size(50.dp)
             ) {
                 com.example.ui.components.PlaylistCoverCollage(
-                    playlist = com.example.model.Playlist(
-                        id = -3L,
-                        name = artistName,
-                        customArtPath = customArtPath
-                    ),
+                    playlist = com.example.model.Playlist(id = -3L, name = artistName),
                     tracksOverride = previewTracks.take(4),
                     modifier = Modifier.fillMaxSize(),
                     cornerRadius = 25.dp
@@ -161,14 +141,6 @@ fun ArtistGroupCard(
                     style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
                     maxLines = 1
                 )
-                if (!customDescription.isNullOrBlank()) {
-                    Text(
-                        text = customDescription,
-                        style = MaterialTheme.typography.labelSmall.copy(color = TextSecondary.copy(alpha = 0.85f)),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
             }
             Icon(
                 imageVector = Icons.Default.ChevronRight,
@@ -178,4 +150,3 @@ fun ArtistGroupCard(
         }
     }
 }
-

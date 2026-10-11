@@ -127,34 +127,8 @@ object OnlineVideoAudioImporter {
             var audioReady = false
             var durationMs = resolvedInfo.durationSeconds * 1000L
 
-            val isWebVideoSource = WebStreamExtractor.isWebVideoUrl(resolvedInfo.originalUrl)
-            val hasCachedLocalAudio = !resolvedInfo.audioUrl.isNullOrBlank() &&
-                resolvedInfo.audioUrl.startsWith("/") &&
-                File(resolvedInfo.audioUrl).let { it.exists() && it.length() > 0L }
-            val activeEngine = WebStreamExtractor.getSelectedEngine(context)
-
-            // 0. Descarga directa nativa con yt-dlp cuando el motor activo es YTDLP puro (y no viene ya de caché local ni de INNERTUBE_YTDLP con stream verificado):
-            // En modo INNERTUBE_YTDLP, primero se descarga a máxima velocidad (10-40 MB/s) el flujo interceptado por InnerTube en el paso 1,
-            // y si ese flujo requiere descifrado adicional de firmas, pasa automáticamente a yt-dlp directo en el paso 3.A.
-            if (isWebVideoSource &&
-                !hasCachedLocalAudio &&
-                activeEngine == YoutubeExtractionEngine.YTDLP &&
-                YtDlpNativeEngine.isAvailable(context)
-            ) {
-                val directYtDlpSuccess = YtDlpNativeEngine.downloadMediaDirectlyToFiles(
-                    context = context,
-                    url = resolvedInfo.originalUrl,
-                    targetAudioFile = audioFile,
-                    targetVideoFile = if (attachAsCanvas) tempVideoFile else null,
-                    onProgress = onProgressUpdate
-                )
-                if (directYtDlpSuccess && audioFile.exists() && audioFile.length() > 0L) {
-                    audioReady = true
-                }
-            }
-
             // 1. Descarga prioritaria del audio de alta fidelidad (o copia instantánea si ya estaba en caché de streaming)
-            if (!audioReady && !resolvedInfo.audioUrl.isNullOrBlank()) {
+            if (!resolvedInfo.audioUrl.isNullOrBlank()) {
                 val localCachedAudio = if (resolvedInfo.audioUrl.startsWith("/")) File(resolvedInfo.audioUrl) else null
                 if (localCachedAudio != null && localCachedAudio.exists() && localCachedAudio.length() > 0L) {
                     localCachedAudio.copyTo(audioFile, overwrite = true)
@@ -180,7 +154,7 @@ object OnlineVideoAudioImporter {
                 val downloadVideoSuccess = if (localCachedVideo != null && localCachedVideo.exists() && localCachedVideo.length() > 0L) {
                     localCachedVideo.copyTo(tempVideoFile, overwrite = true)
                     tempVideoFile.exists() && tempVideoFile.length() > 0L
-                } else if (resolvedInfo.videoUrl.isNotBlank()) {
+                } else {
                     ChunkedStreamDownloader.downloadUrlToFile(
                         url = resolvedInfo.videoUrl,
                         targetFile = tempVideoFile,
@@ -189,8 +163,6 @@ object OnlineVideoAudioImporter {
                         httpClient = httpClient,
                         onProgress = onProgressUpdate
                     )
-                } else {
-                    false
                 }
                 if (downloadVideoSuccess && tempVideoFile.exists() && tempVideoFile.length() > 0L) {
                     try {
@@ -238,33 +210,18 @@ object OnlineVideoAudioImporter {
             }
 
             // 3. Fallback inteligente de autoreparación: si el stream devolvió 403 (ej. pistas VEVO protegidas) o falló
-            if (!audioReady && isWebVideoSource) {
+            if (!audioReady && WebStreamExtractor.isWebVideoUrl(resolvedInfo.originalUrl)) {
                 val ytId = WebStreamExtractor.extractVideoId(resolvedInfo.originalUrl)
-                AuraDebugManager.logInfo(
-                    "OnlineImporter",
-                    "El stream inicial requirió autoreparación (posible bloqueo VEVO/403). Ejecutando rescate con yt-dlp directo / InnerTube limpio / Piped / Invidious..."
-                )
-
-                // 3.A: Intentar descarga directa por yt-dlp si aún no se había completado
-                if (!audioReady && YtDlpNativeEngine.isAvailable(context)) {
-                    val rescuedByYtDlp = YtDlpNativeEngine.downloadMediaDirectlyToFiles(
-                        context = context,
-                        url = resolvedInfo.originalUrl,
-                        targetAudioFile = audioFile,
-                        targetVideoFile = if (attachAsCanvas) tempVideoFile else null,
-                        onProgress = onProgressUpdate
+                if (ytId != null) {
+                    AuraDebugManager.logInfo(
+                        "OnlineImporter",
+                        "El stream inicial requirió autoreparación (posible bloqueo VEVO/403). Resolviendo stream firmado con yt-dlp / InnerTube / Invidious..."
                     )
-                    if (rescuedByYtDlp && audioFile.exists() && audioFile.length() > 0L) {
-                        audioReady = true
-                    }
-                }
-
-                // 3.B: Si yt-dlp directo no estuvo disponible o falló, probar InnerTube limpio -> Piped -> Invidious -> WebView
-                if (!audioReady && ytId != null) {
-                    val freshInfo = InnerTubeClient.resolve(ytId, resolvedInfo.originalUrl)
-                        ?: PipedStreamResolver.resolve(ytId, resolvedInfo.originalUrl)
+                    val freshInfo = (if (YtDlpNativeEngine.isAvailable(context)) {
+                        YtDlpNativeEngine.resolveStream(context, resolvedInfo.originalUrl).getOrNull()
+                    } else null)
+                        ?: InnerTubeClient.resolve(ytId, resolvedInfo.originalUrl)
                         ?: InvidiousStreamResolver.resolve(ytId, resolvedInfo.originalUrl)
-                        ?: HeadlessWebViewExtractor.resolve(context, ytId, resolvedInfo.originalUrl)
 
                     if (freshInfo != null) {
                         if (!freshInfo.audioUrl.isNullOrBlank()) {
