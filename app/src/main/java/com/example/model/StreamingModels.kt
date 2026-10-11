@@ -26,6 +26,11 @@ enum class StreamingSourcePlatform(
         id = "YOUTUBE",
         badgeText = "YOUTUBE",
         label = "YouTube"
+    ),
+    SOUNDCLOUD(
+        id = "SOUNDCLOUD",
+        badgeText = "SOUNDCLOUD",
+        label = "SoundCloud"
     );
 
     companion object {
@@ -39,10 +44,90 @@ enum class StreamingSourcePlatform(
  * Filtro de origen en el buscador de la pestaña Explorar / Streaming.
  */
 enum class StreamingSearchFilter(val label: String) {
-    ALL("Todo (YT Music & YouTube)"),
+    ALL("Todo (YT Music, YT & SoundCloud)"),
     YT_MUSIC("🎵 Solo YT Music"),
-    YOUTUBE("▶️ Solo YouTube")
+    YOUTUBE("▶️ Solo YouTube"),
+    SOUNDCLOUD("☁️ Solo SoundCloud")
 }
+
+/**
+ * Plataforma externa de origen al importar una Playlist pública (Spotify o YouTube Music / YouTube).
+ */
+enum class ExternalPlaylistSource(
+    val id: String,
+    val displayName: String,
+    val badgeLabel: String
+) {
+    SPOTIFY(
+        id = "SPOTIFY",
+        displayName = "Spotify",
+        badgeLabel = "SPOTIFY"
+    ),
+    YOUTUBE_MUSIC(
+        id = "YOUTUBE_MUSIC",
+        displayName = "YouTube Music / YouTube",
+        badgeLabel = "YT MUSIC"
+    );
+}
+
+/**
+ * Modo de guardado elegido por el usuario en el Importador de Playlists:
+ * - STREAMING_INSTANT: Crea la playlist al instante lista para reproducir en Modo Streaming.
+ * - OFFLINE_DOWNLOAD: Crea la playlist y descarga todas sus pistas al almacenamiento privado en segundo plano.
+ */
+enum class PlaylistImportSaveMode(
+    val title: String,
+    val subtitle: String
+) {
+    STREAMING_INSTANT(
+        title = "⚡ Modo Streaming Rápido (Instantáneo)",
+        subtitle = "Crea la Playlist en segundos con su portada WebP lista para escuchar bajo demanda sin ocupar almacenamiento."
+    ),
+    OFFLINE_DOWNLOAD(
+        title = "📥 Descargar Todo Offline (En 2do plano)",
+        subtitle = "Crea la Playlist y descarga todas las canciones en alta fidelidad (con carátula WebP y Video Canvas opcional)."
+    )
+}
+
+/**
+ * Pista individual detectada dentro de una Playlist externa (Spotify o YouTube Music / YouTube).
+ */
+data class ExternalPlaylistTrackItem(
+    val index: Int,
+    val title: String,
+    val artist: String,
+    val album: String = "",
+    val durationSeconds: Long = 0L,
+    val thumbnailUrl: String = "",
+    val videoIdOrUrl: String = "",
+    val sourcePlatform: ExternalPlaylistSource = ExternalPlaylistSource.YOUTUBE_MUSIC
+) {
+    fun formattedDuration(): String {
+        if (durationSeconds <= 0L) return "--:--"
+        val mins = (durationSeconds / 60) % 60
+        val secs = durationSeconds % 60
+        val hours = durationSeconds / 3600
+        return if (hours > 0) {
+            String.format("%d:%02d:%02d", hours, mins, secs)
+        } else {
+            String.format("%d:%02d", mins, secs)
+        }
+    }
+}
+
+/**
+ * Metadatos y listado completo de pistas extraídos de una Playlist pública de Spotify o YouTube Music.
+ */
+data class ExternalPlaylistPreview(
+    val sourceUrl: String,
+    val playlistId: String,
+    val title: String,
+    val author: String,
+    val description: String = "",
+    val coverUrl: String = "",
+    val source: ExternalPlaylistSource,
+    val tracks: List<ExternalPlaylistTrackItem>
+)
 
 /**
  * Política exclusiva de red para la reproducción y pre-descarga en caché de Video Canvas durante el Streaming.
@@ -87,8 +172,16 @@ data class StreamingSearchItem(
     val durationSeconds: Long = 0L,
     val thumbnailUrl: String = "",
     val platform: StreamingSourcePlatform = StreamingSourcePlatform.YT_MUSIC,
-    val canonicalWatchUrl: String = "https://www.youtube.com/watch?v=$videoId",
-    val musicWatchUrl: String = "https://music.youtube.com/watch?v=$videoId"
+    val canonicalWatchUrl: String = if (platform == StreamingSourcePlatform.SOUNDCLOUD && videoId.startsWith("http", ignoreCase = true)) {
+        videoId
+    } else {
+        "https://www.youtube.com/watch?v=$videoId"
+    },
+    val musicWatchUrl: String = if (platform == StreamingSourcePlatform.SOUNDCLOUD && videoId.startsWith("http", ignoreCase = true)) {
+        videoId
+    } else {
+        "https://music.youtube.com/watch?v=$videoId"
+    }
 ) {
     fun formattedDuration(): String {
         if (durationSeconds <= 0L) return "En vivo / Stream"

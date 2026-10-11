@@ -48,16 +48,18 @@ object StreamingApiService {
 
     /**
      * Busca canciones y videos musicales en tiempo real según el filtro elegido por el usuario:
-     * - `ALL`: Combina e intercala resultados de YouTube Music (`YT MUSIC`) y YouTube (`YOUTUBE`).
+     * - `ALL`: Combina e intercala resultados de YouTube Music (`YT MUSIC`), YouTube (`YOUTUBE`) y SoundCloud (`SOUNDCLOUD`).
      * - `YT_MUSIC`: Exclusivamente canciones de YouTube Music con insignia `YT MUSIC`.
      * - `YOUTUBE`: Exclusivamente videos musicales de YouTube con insignia `YOUTUBE`.
+     * - `SOUNDCLOUD`: Exclusivamente pistas, remixes y sets de SoundCloud con insignia `SOUNDCLOUD`.
      */
     suspend fun searchStreamingCatalog(
         query: String,
-        filter: StreamingSearchFilter = StreamingSearchFilter.ALL
+        filter: StreamingSearchFilter = StreamingSearchFilter.ALL,
+        context: Context? = null
     ): List<StreamingSearchItem> = withContext(Dispatchers.IO) {
         val cleanQuery = query.trim()
-        if (cleanQuery.isBlank()) return@withContext getDefaultTrendingCatalog(filter)
+        if (cleanQuery.isBlank()) return@withContext getDefaultTrendingCatalog(filter, context)
 
         coroutineScope {
             val ytMusicDeferred = async {
@@ -74,16 +76,29 @@ object StreamingApiService {
                     emptyList()
                 }
             }
+            val soundCloudDeferred = async {
+                if (filter == StreamingSearchFilter.ALL || filter == StreamingSearchFilter.SOUNDCLOUD) {
+                    SoundCloudApiClient.searchTracks(
+                        context = context,
+                        query = cleanQuery,
+                        limit = if (filter == StreamingSearchFilter.SOUNDCLOUD) 25 else 14
+                    )
+                } else {
+                    emptyList()
+                }
+            }
 
             val musicResults = ytMusicDeferred.await()
             val videoResults = ytStandardDeferred.await()
+            val soundCloudResults = soundCloudDeferred.await()
 
             when (filter) {
                 StreamingSearchFilter.YT_MUSIC -> musicResults.ifEmpty {
                     videoResults.map { it.copy(platform = StreamingSourcePlatform.YT_MUSIC) }
                 }
                 StreamingSearchFilter.YOUTUBE -> videoResults
-                StreamingSearchFilter.ALL -> interleaveResults(musicResults, videoResults)
+                StreamingSearchFilter.SOUNDCLOUD -> soundCloudResults
+                StreamingSearchFilter.ALL -> interleaveResults(musicResults, videoResults, soundCloudResults)
             }
         }
     }
@@ -92,9 +107,15 @@ object StreamingApiService {
      * Obtiene una lista inicial de descubrimiento/tendencias cuando el buscador está vacío.
      */
     suspend fun getDefaultTrendingCatalog(
-        filter: StreamingSearchFilter = StreamingSearchFilter.ALL
+        filter: StreamingSearchFilter = StreamingSearchFilter.ALL,
+        context: Context? = null
     ): List<StreamingSearchItem> = withContext(Dispatchers.IO) {
-        searchStreamingCatalog("Top Hits Music Global", filter)
+        val defaultQuery = if (filter == StreamingSearchFilter.SOUNDCLOUD) {
+            "Electronic Phonk Remix Hits"
+        } else {
+            "Top Hits Music Global"
+        }
+        searchStreamingCatalog(defaultQuery, filter, context)
     }
 
     /**
@@ -111,12 +132,25 @@ object StreamingApiService {
         val cleanVideoId = currentVideoId.trim()
         if (cleanVideoId.isBlank()) return@withContext null
 
-        // 1. Consultar endpoint Watch Next / Automix de YouTube Music o YouTube
-        val relatedFromNext = fetchRelatedFromNextEndpoint(cleanVideoId, preferredPlatform)
-            .filter { it.videoId != cleanVideoId && !excludedVideoIds.contains(it.videoId) }
+        if (preferredPlatform == StreamingSourcePlatform.SOUNDCLOUD) {
+            val scSimilar = SoundCloudApiClient.fetchSimilarTracks(
+                currentTitle = currentTitle,
+                currentArtist = currentArtist,
+                excludedIds = excludedVideoIds + cleanVideoId
+            )
+            if (scSimilar.isNotEmpty()) {
+                return@withContext scSimilar.first()
+            }
+        }
 
-        if (relatedFromNext.isNotEmpty()) {
-            return@withContext relatedFromNext.first()
+        // 1. Consultar endpoint Watch Next / Automix de YouTube Music o YouTube
+        if (cleanVideoId.length == 11) {
+            val relatedFromNext = fetchRelatedFromNextEndpoint(cleanVideoId, preferredPlatform)
+                .filter { it.videoId != cleanVideoId && !excludedVideoIds.contains(it.videoId) }
+
+            if (relatedFromNext.isNotEmpty()) {
+                return@withContext relatedFromNext.first()
+            }
         }
 
         // 2. Respaldo por búsqueda semántica de artista/canción similar en la API
@@ -127,10 +161,10 @@ object StreamingApiService {
         }
         val searchCandidates = searchStreamingCatalog(
             query = fallbackQuery,
-            filter = if (preferredPlatform == StreamingSourcePlatform.YT_MUSIC) {
-                StreamingSearchFilter.YT_MUSIC
-            } else {
-                StreamingSearchFilter.ALL
+            filter = when (preferredPlatform) {
+                StreamingSourcePlatform.YT_MUSIC -> StreamingSearchFilter.YT_MUSIC
+                StreamingSourcePlatform.SOUNDCLOUD -> StreamingSearchFilter.SOUNDCLOUD
+                StreamingSourcePlatform.YOUTUBE -> StreamingSearchFilter.ALL
             }
         ).filter { it.videoId != cleanVideoId && !excludedVideoIds.contains(it.videoId) }
 
@@ -138,14 +172,16 @@ object StreamingApiService {
     }
 
     /**
-     * Toma un elemento de búsqueda o canción similar de la API (`YT Music` o `YouTube`)
+     * Toma un elemento de búsqueda o canción similar de la API (`YT Music`, `YouTube` o `SoundCloud`)
      * y resuelve los flujos listos para reproducir en ExoPlayer, pre-cargar en caché o descargar:
+     * - Si la plataforma es `SOUNDCLOUD`:
+     *   Resuelve mediante `SoundCloudApiClient.resolvePlayableStream` (API v2 progresiva + respaldo `yt-dlp`).
      * - Si la plataforma es `YOUTUBE` (`StreamingSourcePlatform.YOUTUBE`):
      *   1º Utiliza exclusivamente `yt-dlp` (`YtDlpNativeEngine`, CPython + QuickJS) en primer lugar.
      *   2º Si el video presenta bloqueo o restricción, aplica respaldo automático con `InnerTubeClient` y `WebStreamExtractor`.
      * - Si la plataforma es `YT_MUSIC` (`StreamingSourcePlatform.YT_MUSIC`):
      *   1º Resuelve directamente con `InnerTubeClient` (`<300ms`) y respaldo `InvidiousStreamResolver`,
-     *      sin invocar `yt-dlp` (ya que `yt-dlp` se reserva exclusivamente para pistas de YouTube).
+     *      sin invocar `yt-dlp` (ya que `yt-dlp` se reserva para pistas de YouTube/SoundCloud).
      */
     suspend fun resolvePlayableStreamWithYtDlp(
         context: Context,
@@ -168,6 +204,17 @@ object StreamingApiService {
                 headers = enriched.httpHeaders
             )
             return Result.success(enriched)
+        }
+
+        if (item.platform == StreamingSourcePlatform.SOUNDCLOUD) {
+            val scResult = SoundCloudApiClient.resolvePlayableStream(context, item)
+            val scInfo = scResult.getOrNull()
+            if (scInfo != null) {
+                return@withContext enrichAndRegister(scInfo)
+            }
+            return@withContext Result.failure(
+                scResult.exceptionOrNull() ?: IllegalStateException("No se pudo resolver la pista de SoundCloud \"${item.title}\".")
+            )
         }
 
         if (item.platform == StreamingSourcePlatform.YOUTUBE) {
@@ -509,16 +556,17 @@ object StreamingApiService {
     }
 
     /**
-     * Intercala resultados de YouTube Music y YouTube para mostrar ambas plataformas claramente diferenciadas
-     * con sus insignias (`YT MUSIC` y `YOUTUBE`) sin duplicar el mismo `videoId` del mismo origen.
+     * Intercala resultados de YouTube Music, YouTube y SoundCloud para mostrar las tres plataformas
+     * claramente diferenciadas con sus insignias (`YT MUSIC`, `YOUTUBE` y `SOUNDCLOUD`) sin duplicar IDs.
      */
     private fun interleaveResults(
         musicList: List<StreamingSearchItem>,
-        videoList: List<StreamingSearchItem>
+        videoList: List<StreamingSearchItem>,
+        soundCloudList: List<StreamingSearchItem> = emptyList()
     ): List<StreamingSearchItem> {
         val combined = mutableListOf<StreamingSearchItem>()
         val seenIds = mutableSetOf<String>()
-        val maxLen = maxOf(musicList.size, videoList.size)
+        val maxLen = maxOf(musicList.size, videoList.size, soundCloudList.size)
         for (i in 0 until maxLen) {
             if (i < musicList.size) {
                 val m = musicList[i]
@@ -527,6 +575,10 @@ object StreamingApiService {
             if (i < videoList.size) {
                 val v = videoList[i]
                 if (seenIds.add(v.videoId)) combined.add(v)
+            }
+            if (i < soundCloudList.size) {
+                val sc = soundCloudList[i]
+                if (seenIds.add(sc.videoId)) combined.add(sc)
             }
         }
         return combined

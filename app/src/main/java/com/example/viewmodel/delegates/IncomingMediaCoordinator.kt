@@ -29,7 +29,8 @@ class IncomingMediaCoordinator(
     private val onPlayTrack: (Track, List<Track>) -> Unit,
     private val onExpandNowPlaying: () -> Unit,
     private val onFetchOnlineLyrics: () -> Unit,
-    private val setImportingStatus: (isImporting: Boolean, message: String?) -> Unit
+    private val setImportingStatus: (isImporting: Boolean, message: String?) -> Unit,
+    private val onOpenPlaylistImportUrl: ((String) -> Unit)? = null
 ) {
 
     // Gestión de medios externos entrantes ("Abrir con...", "Compartir con...", SnapTube, etc.)
@@ -44,7 +45,7 @@ class IncomingMediaCoordinator(
 
     /**
      * Procesa un [Intent] externo entrante de tipo "Abrir con..." o "Compartir con...".
-     * Detecta inteligentemente si se trata de un archivo de audio, un video o un enlace web.
+     * Detecta inteligentemente si se trata de un archivo de audio, un video, una Playlist de Spotify/YT Music o un enlace web.
      */
     fun onIncomingIntent(intent: Intent?) {
         if (intent == null) return
@@ -60,7 +61,11 @@ class IncomingMediaCoordinator(
                 _pendingIncomingVideoUri.value = incoming.uri
             }
             is IncomingMedia.WebLink -> {
-                _pendingIncomingWebLink.value = incoming.url
+                if (com.example.data.importer.playlist.ExternalPlaylistImporter.isPlaylistUrl(incoming.url) && onOpenPlaylistImportUrl != null) {
+                    onOpenPlaylistImportUrl.invoke(incoming.url)
+                } else {
+                    _pendingIncomingWebLink.value = incoming.url
+                }
             }
         }
     }

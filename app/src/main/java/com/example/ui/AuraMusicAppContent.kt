@@ -469,7 +469,8 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
                                 },
                                 isCreatingMixtape = isCreatingMixtape,
                                 mixtapeProgress = mixtapeProgress,
-                                mixtapeStatusMessage = mixtapeStatusMessage
+                                mixtapeStatusMessage = mixtapeStatusMessage,
+                                onOpenPlaylistImportDialog = { viewModel.openPlaylistImportDialog() }
                             )
 
                             is NavScreen.Import -> ImportMusicScreen(
@@ -505,7 +506,8 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
                                         viewModel.playTrack(createdTrack)
                                         viewModel.setNowPlayingExpanded(true)
                                     }
-                                }
+                                },
+                                onOpenPlaylistImportDialog = { viewModel.openPlaylistImportDialog() }
                             )
 
                             is NavScreen.PlaylistDetail -> PlaylistDetailScreen(

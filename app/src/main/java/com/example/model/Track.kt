@@ -59,6 +59,7 @@ data class Track(
             lowerMime.contains("m4a") || lowerUri.endsWith(".m4a") -> "M4A"
             folderName.startsWith("STREAM:YT_MUSIC") -> "YT MUSIC"
             folderName.startsWith("STREAM:YOUTUBE") -> "YOUTUBE"
+            folderName.startsWith("STREAM:SOUNDCLOUD") -> "SOUNDCLOUD"
             else -> "MP3"
         }
     }
@@ -70,12 +71,12 @@ data class Track(
         get() = id < 0L || folderName.startsWith("STREAM:")
 
     /**
-     * Extrae el ID de video original (YouTube / YT Music) si la pista es de Streaming.
+     * Extrae el ID de video original (YouTube / YT Music) o URL canónica (SoundCloud) si la pista es de Streaming.
      */
     val streamingVideoId: String?
         get() {
             if (!isStreamingTrack) return null
-            val parts = folderName.split(":")
+            val parts = folderName.split(":", limit = 3)
             return if (parts.size >= 3) parts[2].takeIf { it.isNotBlank() } else null
         }
 
@@ -85,7 +86,7 @@ data class Track(
     val streamingPlatform: StreamingSourcePlatform?
         get() {
             if (!isStreamingTrack) return null
-            val parts = folderName.split(":")
+            val parts = folderName.split(":", limit = 3)
             return if (parts.size >= 2) StreamingSourcePlatform.fromId(parts[1]) else StreamingSourcePlatform.YT_MUSIC
         }
 }

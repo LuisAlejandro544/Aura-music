@@ -138,7 +138,7 @@ class StreamingModeCoordinator(
             _isSearching.value = true
             try {
                 cacheManager.evictExpiredAndOverLimit()
-                val items = StreamingApiService.searchStreamingCatalog(query, filter)
+                val items = StreamingApiService.searchStreamingCatalog(query, filter, context)
                 items.forEach { itemRegistry[it.videoId] = it }
                 _searchResults.value = items
             } catch (_: Exception) {

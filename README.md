@@ -126,10 +126,15 @@ Todo el panel de efectos se despliega al instante en una hoja modal desde el **M
   - Pega enlaces de **YouTube, TikTok o la web** para descargar la canción con su portada oficial en WebP y su **Video Canvas en 480p** vinculado automáticamente.
   - **Arquitectura Resiliente Multi-Motor**: Combina el motor oficial **`yt-dlp + FFmpeg`** (con actualizador OTA en caliente) + **`InnerTube Nativo`** (resolución en `<300ms`) + **`Bypass Invidious`** + **`WebView Móvil`** con cascada garantizada de portadas.
   - **Acelerador HTTP Range Multi-Bloque**: Rompe el límite de velocidad de red descargando entre **10 MB/s y 40 MB/s**, continuando en segundo plano con notificación en vivo aunque salgas de la aplicación.
+- **Importador Universal de Playlists de Spotify y YouTube Music / YouTube (`ExternalPlaylistImporter`)**:
+  - Importa cualquier Playlist pública de **Spotify** o **YouTube Music / YouTube** pegando su enlace (desde **Tu Biblioteca > Playlists**, **Importar Música** o usando **Compartir con...** directamente desde la app de Spotify o YouTube Music), **sin necesidad de iniciar sesión ni usar claves API**.
+  - Extrae título, autor, portada oficial (convertida automáticamente a **WebP sin pérdida** en `images/`) y la lista completa de canciones, permitiéndote elegir cómo guardarla:
+    1. ⚡ **Modo Streaming Rápido (Instantáneo)**: Crea la Playlist en segundos en tu biblioteca lista para escuchar bajo demanda sin ocupar almacenamiento.
+    2. 📥 **Descargar Todo Offline (En 2do plano)**: Crea la Playlist y descarga automáticamente todas sus canciones en alta fidelidad (con portada WebP y Video Canvas opcional) mediante `AuraDownloadService`.
 - **Conversor "Video a Música" 3 en 1 (En 1 Segundo)**:
   - Selecciona cualquier video de tu galería y extrae el audio directo a `.m4a` sin perder calidad (*Direct Stream Copy*), generando su portada WebP y vinculando el video de fondo al instante.
 - **Puente Inteligente "Abrir con..." y "Compartir con..."**:
-  - Comparte archivos de audio, videos o enlaces directamente desde **SnapTube, navegadores, Telegram, WhatsApp o gestores de archivos** hacia Aura Music: la app detecta qué es, lo guarda en tu biblioteca permanente y lo reproduce de inmediato.
+  - Comparte archivos de audio, videos, enlaces de canciones o **Playlists completas de Spotify / YouTube Music** directamente desde **Spotify, YouTube Music, SnapTube, navegadores, Telegram, WhatsApp o gestores de archivos** hacia Aura Music: la app detecta qué es, despliega el importador o guarda el medio en tu biblioteca permanente y lo reproduce de inmediato.
 - **Creador de Mixtapes (Fusión Continua con Capítulos Reactivos)**:
   - Une varias canciones de una Playlist en un solo archivo continuo `.m4a` con transiciones suaves de 3s, 5s, 8s o 10s. Mientras suena el Mixtape, Aura Music cambia automáticamente el título, la portada, el Video Canvas y la letra sincronizada en cada capítulo.
 - **Recorte Automático de Silencios (`AudioSilenceTrimmer`)**:
@@ -157,21 +162,22 @@ Todo el panel de efectos se despliega al instante en una hoja modal desde el **M
 </details>
 
 <details>
-<summary><b>🌐 6. Modo Streaming Híbrido Estilo Spotify (`Explorar`), Caché No Lineal (50–500 MB • 30 min) y Radio Similar</b></summary>
+<summary><b>🌐 6. Modo Streaming Híbrido Tri-Plataforma (`YT Music`, `YouTube` & `SoundCloud`), Importador de Playlists, Caché No Lineal (50–500 MB • 30 min) y Radio Similar</b></summary>
 <br/>
 
-- **Buscador API Dual (`YT MUSIC` + `YOUTUBE`) + Reproducción con `yt-dlp`**:
-  - Nueva pestaña **Explorar** en la barra inferior: busca canciones al instante mediante nuestra **API de consulta dual** (sin usar `yt-dlp` para buscar), mostrando indicadores visuales claros para distinguir pistas de **`YT MUSIC`** (YouTube Music) y **`YOUTUBE`** (con soporte nativo en `yt-dlp` para extraer y reproducir temas de YouTube Music).
-  - Cuando eliges una canción (o antes de pasar a la canción anterior o siguiente), la app consulta la API y **`yt-dlp`** resuelve el flujo de reproducción con letras sincronizadas automáticas desde **LRCLIB**.
+- **Buscador Tri-Plataforma (`YT MUSIC` + `YOUTUBE` + `SOUNDCLOUD`) + Reproducción Híbrida**:
+  - Nueva pestaña **Explorar** en la barra inferior: busca canciones, remixes, electrónica, phonk y sets de DJ al instante combinando resultados de **YouTube Music (`🎵 YT MUSIC`)**, **YouTube (`▶️ YOUTUBE`)** y **SoundCloud (`☁️ SOUNDCLOUD`)**, tanto de forma unificada en el filtro **Todo** como mediante el filtro dedicado **☁️ Solo SoundCloud**.
+  - **Motor SoundCloud Integrado (`SoundCloudApiClient`)**: Hidrata dinámicamente el `client_id` público de SoundCloud (`api-v2.soundcloud.com`) sin requerir claves ni cuentas, resolviendo flujos progresivos directos en alta fidelidad (MP3 / Opus) con carátulas HD (`500x500`) y respaldo automático en `yt-dlp`.
+  - Cuando eliges una canción (o antes de pasar a la canción anterior o siguiente), la app consulta la API y resuelve el flujo de reproducción con letras sincronizadas automáticas desde **LRCLIB**.
 - **Pre-Descarga No Lineal Adelantada (Read-Ahead Buffer) & Caché Inteligente de 30 Minutos (`StreamingCacheManager`)**:
   - Mientras escuchas una canción en streaming, Aura Music **pre-descarga por adelantado los siguientes minutos** de la canción (igual que hace YouTube) en segundo plano mediante bloques `HTTP Range`.
   - **Caché para Música y Videos de Fondo (50 MB por defecto hasta 500 MB)**: Configurable por el usuario en **Ajustes > Aura Dinámica, Streaming & Modo Juego**. Permite volver a la canción anterior o repetirla en bucle de forma instantánea sin gastar datos. Los archivos en caché se eliminan automáticamente tras **30 minutos sin usarse**, o eliminando primero las canciones más antiguas (*LRU*) si se llena el límite de hasta 500 MB.
 - **Política de Red Exclusiva para Video Canvas en Streaming**:
   - Nueva opción en Ajustes para elegir cómo se comportan los videos de fondo en streaming: **Solo con Wi-Fi**, **Siempre (incluso con datos móviles)** o **Desactivado** (afecta únicamente al streaming sin alterar jamás tus videos locales).
 - **Radio Automática de Canciones Similares y Descarga Permanente en 1 Toque**:
-  - Antes de que finalice la pista en reproducción, la API busca automáticamente una canción similar y la prepara para ofrecer reproducción continua infinita. Además, puedes pulsar el botón **Descargar** en cualquier resultado o dentro del reproductor para guardarla permanentemente en tu biblioteca offline (durante la reproducción en streaming, los efectos DSP C++20 permanecen en bypass directo).
+  - Antes de que finalice la pista en reproducción (ya sea de YouTube Music, YouTube o SoundCloud), la API busca automáticamente una canción similar y la prepara para ofrecer reproducción continua infinita. Además, puedes pulsar el botón **Descargar** en cualquier resultado o dentro del reproductor para guardarla permanentemente en tu biblioteca offline (durante la reproducción en streaming, los efectos DSP C++20 permanecen en bypass directo, mientras las 28 bandas del visualizador reaccionan en tiempo real).
 - **Color Reactivo Cada 1 Segundo, Indicadores de Red y Enfriamiento Inteligente en Streaming**:
-  - El reproductor online adapta sus colores dinámicamente cada **1 segundo (1000 ms)** tanto desde las portadas de **YouTube / YT Music** como desde el video en reproducción.
+  - El reproductor online adapta sus colores dinámicamente cada **1 segundo (1000 ms)** tanto desde las portadas de **YouTube / YT Music / SoundCloud** como desde el video en reproducción.
   - Muestra indicadores claros de carga o espera de internet directamente en el **botón Play/Pausa y en la miniatura** (tanto en el reproductor grande como en el Mini Reproductor), y optimiza el uso de CPU/GPU para mantener el teléfono fresco y ahorrar batería mientras escuchas música online con video.
 
 </details>

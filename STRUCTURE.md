@@ -23,8 +23,10 @@ El proyecto sigue una arquitectura reactiva y desacoplada organizada en capas:
      - `TrackLibraryCoordinator`: CRUD de pistas y playlists, importación SAF de archivos/carpetas, Video a Música y descargas en segundo plano con `AuraDownloadService`.
      - `LyricsCoordinator`: Gestión de letras locales y remotas LRCLIB.
      - `IncomingMediaCoordinator`: Recepción "Abrir con..." y "Compartir con...".
-     - `HeadphoneSettingsCoordinator`: Detección acústica de auriculares, modo Bit-Perfect/AAudio, guardado y balance estéreo.
-     - `MixtapeCoordinator`: Fusión continua de canciones en FFmpeg y capítulos reactivos en tiempo real.
+      - `HeadphoneSettingsCoordinator`: Detección acústica de auriculares, modo Bit-Perfect/AAudio, guardado y balance estéreo.
+      - `MixtapeCoordinator`: Fusión continua de canciones en FFmpeg y capítulos reactivos en tiempo real.
+      - `StreamingModeCoordinator`: Orquestador del Modo Streaming tri-plataforma (YT Music, YouTube & SoundCloud), caché inteligente y Radio Similar.
+      - `PlaylistImportCoordinator`: Orquestador del Importador Universal de Playlists de Spotify y YouTube Music / YouTube (Modo Streaming Instantáneo o Descarga Offline en 2do plano).
 5. **Capa de Presentación (UI con Jetpack Compose & Material 3)**:
    - Pantallas modulares (`HomeScreen`, `LibraryScreen`, `NowPlayingScreen`, `SettingsScreen`, `ImportMusicScreen`, `OnboardingScreen`, `PlaylistDetailScreen`).
    - Host global modularizado (`AuraMusicAppContent`, `GlobalDialogsHost`).
@@ -104,13 +106,16 @@ app/
 │   │       │       ├── mixtape/                # Motor de Fusión Continua y Auto-Remix / Mashup de 2 Canciones Locales
 │   │       │       │   ├── MixtapeEngine.kt         # Fusión FFmpeg acrossfade, collage WebP y capítulos
 │   │       │       │   └── SmartAutoRemixEngine.kt  # Auto-Remix de 2 canciones locales (Mashup Voz A + Base B / Remix Alternado DJ) y Auto-Match
+│   │       │       ├── playlist/               # Importador Universal de Playlists Públicas
+│   │       │       │   └── ExternalPlaylistImporter.kt # Extracción de Playlists de Spotify y YouTube Music / YouTube sin login ni API keys
 │   │       │       ├── download/               # Acelerador de Descargas HTTP Range
 │   │       │       │   └── ChunkedStreamDownloader.kt # Descarga acelerada HTTP Range multi-bloque
 │   │       │       └── tiktok/                 # Resolución Directa de TikTok
 │   │       │           └── TikTokMediaResolver.kt # Extracción libre de audio/video TikTok
 │   │       │   │
-│   │       │   └── streaming/                  # Modo Streaming Híbrido (API Dual + yt-dlp + Caché 30 min)
-│   │       │       ├── StreamingApiService.kt  # Búsqueda API dual (YT Music + YouTube), Radio Similar y resolución yt-dlp
+│   │       │   └── streaming/                  # Modo Streaming Híbrido Tri-Plataforma (API + yt-dlp + Caché 30 min)
+│   │       │       ├── StreamingApiService.kt  # Búsqueda tri-plataforma (YT Music + YouTube + SoundCloud), Radio Similar y resolución
+│   │       │       ├── SoundCloudApiClient.kt  # Cliente modular de SoundCloud (hidratación client_id v2, búsqueda y streams progresivos)
 │   │       │       └── StreamingCacheManager.kt # Caché inteligente (50-500 MB, 30 min TTL, LRU) y Pre-descarga No Lineal
 │   │       │
 │   │       ├── widget/                         # Sistema de 2 Widgets Interactivos de Escritorio
@@ -141,15 +146,16 @@ app/
 │   │       │       ├── NavigationCoordinator.kt         # Coordinador de navegación, temas y modos visuales
 │   │       │       ├── TrackLibraryCoordinator.kt       # Operaciones de pistas, playlists y descargas
 │   │       │       ├── LyricsCoordinator.kt             # Coordinación de letras sincronizadas
-│   │       │       ├── IncomingMediaCoordinator.kt      # Recepción de Intents externos
+│   │       │       ├── IncomingMediaCoordinator.kt      # Recepción de Intents externos y enlaces de Playlists
 │   │       │       ├── HeadphoneSettingsCoordinator.kt  # Ajustes de acústica, Bit-Perfect y auriculares
 │   │       │       ├── MixtapeCoordinator.kt            # Coordinador reactivo de Mixtapes y capítulos
-│   │       │       └── StreamingModeCoordinator.kt      # Orquestador del Modo Streaming (API Dual, yt-dlp, Caché y Radio)
+│   │       │       ├── StreamingModeCoordinator.kt      # Orquestador del Modo Streaming (YT Music, YouTube, SoundCloud, Caché y Radio)
+│   │       │       └── PlaylistImportCoordinator.kt     # Orquestador del Importador de Playlists de Spotify y YouTube Music
 │   │       │
 │   │       ├── model/                          # Modelos de Dominio y Datos
 │   │       │   ├── Track.kt
 │   │       │   ├── Playlist.kt
-│   │       │   ├── StreamingModels.kt               # Modelos de búsqueda streaming, plataformas (YT Music/YouTube) y caché
+│   │       │   ├── StreamingModels.kt               # Modelos de búsqueda streaming (YT Music/YouTube/SoundCloud), importador de playlists y caché
 │   │       │   ├── WidgetModels.kt                  # Modelos de configuración y estado persistido de Widgets
 │   │       │   ├── AppUpdateModels.kt               # Modelos de estado y metadatos de actualización APK
 │   │       │   ├── MixtapeModels.kt                 # Modelos de capítulos y metadatos de Mixtape
@@ -177,7 +183,7 @@ app/
 │   │       │   │   ├── home/
 │   │       │   │   │   └── HomeScreen.kt
 │   │       │   │   ├── streaming/
-│   │       │   │   │   └── StreamingExploreScreen.kt # Pestaña Explorar / Streaming con API Dual y Descarga en 1 toque
+│   │       │   │   │   └── StreamingExploreScreen.kt # Pestaña Explorar / Streaming Tri-Plataforma (YT Music, YouTube & SoundCloud)
 │   │       │   │   ├── library/
 │   │       │   │   │   ├── LibraryScreen.kt
 │   │       │   │   │   └── components/
@@ -254,6 +260,7 @@ app/
 │   │       │       │   ├── CreateMixtapeDialog.kt      # Diálogo unificado de Mixtape continuo y Auto-Remix de 2 canciones locales
 │   │       │       │   ├── AutoRemixConfigSection.kt   # Configurador modular del Auto-Remix / Mashup (Manual o Auto-Match)
 │   │       │       │   ├── DownloadFromLinkDialog.kt   # Diálogo de descarga web (YouTube/TikTok) modularizado
+│   │       │       │   ├── ImportExternalPlaylistDialog.kt # Diálogo de importación de Playlists de Spotify y YouTube Music
 │   │       │       │   ├── EditTrackDialog.kt          # Editor de metadatos, carátula WebP y Video Canvas
 │   │       │       │   ├── SearchLyricsDialog.kt       # Buscador interactivo de letras LRCLIB con versión oficial #1
 │   │       │       │   └── VideoToMusicDialog.kt       # Conversor 3 en 1 de Video a Música (.m4a + WebP + Canvas)

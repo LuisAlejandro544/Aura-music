@@ -69,6 +69,7 @@ fun LibraryScreen(
     isCreatingMixtape: Boolean = false,
     mixtapeProgress: Float = 0f,
     mixtapeStatusMessage: String? = null,
+    onOpenPlaylistImportDialog: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
@@ -100,7 +101,7 @@ fun LibraryScreen(
             .padding(horizontal = 16.dp),
         contentPadding = PaddingValues(bottom = 120.dp)
     ) {
-        // Título de la pantalla y botón de Añadir Lista
+        // Título de la pantalla y botones de Nueva Lista / Importar Playlist
         item {
             Spacer(modifier = Modifier.height(16.dp))
             Row(
@@ -116,18 +117,45 @@ fun LibraryScreen(
                     )
                 )
 
-                FilledTonalButton(
-                    onClick = { showCreatePlaylistDialog = true },
-                    shape = RoundedCornerShape(20.dp),
-                    colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.primary
-                    ),
-                    modifier = Modifier.testTag("create_playlist_btn")
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Nueva Lista", fontWeight = FontWeight.SemiBold)
+                    OutlinedButton(
+                        onClick = onOpenPlaylistImportDialog,
+                        shape = RoundedCornerShape(20.dp),
+                        border = BorderStroke(1.dp, Color(0xFF1DB954).copy(alpha = 0.65f)),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                        modifier = Modifier.testTag("import_external_playlist_header_btn")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CloudDownload,
+                            contentDescription = "Importar Playlist de Spotify o YT Music",
+                            tint = Color(0xFF1DB954),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text(
+                            text = "Importar",
+                            color = TextPrimary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
+                    FilledTonalButton(
+                        onClick = { showCreatePlaylistDialog = true },
+                        shape = RoundedCornerShape(20.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.primary
+                        ),
+                        modifier = Modifier.testTag("create_playlist_btn")
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Nueva Lista", fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -343,7 +371,37 @@ fun LibraryScreen(
                     Spacer(modifier = Modifier.height(10.dp))
                 }
 
-                // 2. Playlists del usuario
+                // 2. Acceso directo a Importador Universal de Playlists (Spotify y YouTube Music)
+                item {
+                    OutlinedButton(
+                        onClick = onOpenPlaylistImportDialog,
+                        shape = RoundedCornerShape(16.dp),
+                        border = BorderStroke(1.dp, Color(0xFF1DB954).copy(alpha = 0.55f)),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = SurfaceCard,
+                            contentColor = TextPrimary
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp)
+                            .testTag("library_playlists_tab_import_btn")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PlaylistAdd,
+                            contentDescription = null,
+                            tint = Color(0xFF1DB954),
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Importar Playlist de Spotify o YouTube Music",
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+
+                // 3. Playlists del usuario
                 if (playlists.isEmpty()) {
                     item {
                         EmptyPlaceholder(

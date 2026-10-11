@@ -1,0 +1,6 @@
+{
+  "summary":  "Plan técnico y de experiencia de usuario para integrar el Importador Universal de Playlists (Spotify y YouTube Music con opción de Modo Streaming rápido o Descarga Offline completa), el buscador y reproductor de SoundCloud en la pestaña Explorar (integrado en Todo y con filtro propio Solo SoundCloud), y la sincronización de toda la documentación (.md y chanelog-beta.md).",
+  "updatedAt":  "2026-10-11T19:36:57.041179072Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}

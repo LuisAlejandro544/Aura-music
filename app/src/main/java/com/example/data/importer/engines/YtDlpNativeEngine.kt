@@ -5,6 +5,7 @@ import android.util.Base64
 import com.example.debug.AuraDebugManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.File
@@ -752,5 +753,184 @@ object YtDlpNativeEngine {
             return "https://www.youtube.com/watch?v=$videoId"
         }
         return trimmed.replace(Regex("https?://(www\\.)?music\\.youtube\\.com", RegexOption.IGNORE_CASE), "https://www.youtube.com")
+    }
+
+    data class FlatPlaylistEntry(
+        val id: String,
+        val title: String,
+        val uploader: String,
+        val durationSeconds: Long,
+        val thumbnailUrl: String,
+        val url: String
+    )
+
+    data class FlatPlaylistDump(
+        val title: String,
+        val uploader: String,
+        val thumbnailUrl: String,
+        val entries: List<FlatPlaylistEntry>
+    )
+
+    /**
+     * Extrae de forma ultrarrápida los elementos de una Playlist de YouTube, YouTube Music o SoundCloud
+     * o una búsqueda (`scsearch15:...`) invocando `yt-dlp --flat-playlist --dump-single-json`.
+     */
+    suspend fun resolveFlatPlaylist(
+        context: Context,
+        targetUrlOrSearch: String
+    ): Result<FlatPlaylistDump> = withContext(Dispatchers.IO) {
+        try {
+            val trimmedInput = targetUrlOrSearch.trim()
+            if (trimmedInput.isBlank() || trimmedInput.startsWith("-")) {
+                return@withContext Result.failure(SecurityException("Entrada no válida para yt-dlp."))
+            }
+
+            init(context)
+            FFmpegNativeEngine.init(context)
+
+            val ytdlpBin = YtDlpAutoUpdater.getYtDlpFile(context)
+            val pythonBin = getPythonExecutable(context)
+            if (!ytdlpBin.exists() || pythonBin == null) {
+                YtDlpAutoUpdater.checkAndUpdate(context, forceDownload = false)
+            }
+
+            val activePython = getPythonExecutable(context)
+            if (!ytdlpBin.exists() || activePython == null) {
+                return@withContext Result.failure(IllegalStateException("Entorno nativo de yt-dlp no inicializado."))
+            }
+
+            val nativeDir = context.applicationInfo.nativeLibraryDir
+            val directPythonZipSo = File(nativeDir, "libpython.zip.so")
+            val quickJsExec = getQuickJsExecutable(context)
+            val pythonEnvDir = File(context.filesDir, "env/python")
+            val stdlibZip = File(pythonEnvDir, "stdlib.zip")
+            val stdlibDir = File(pythonEnvDir, "stdlib")
+            val modulesDir = File(pythonEnvDir, "modules")
+            val ffmpegEnvDir = File(context.filesDir, "env/ffmpeg")
+
+            ensureTlsCertificates(pythonEnvDir, forceRebuild = false)
+            val certPemFile = File(pythonEnvDir, "usr/etc/tls/cert.pem")
+            val tmpDir = File(context.cacheDir, "ytdlp_tmp").apply { mkdirs() }
+            val jsRuntimeSpec = if (quickJsExec != null && quickJsExec.exists()) "quickjs:${quickJsExec.absolutePath}" else "quickjs"
+
+            val normalizedInput = if (trimmedInput.startsWith("http", ignoreCase = true)) {
+                normalizeYouTubeMusicUrlForYtDlp(trimmedInput)
+            } else {
+                trimmedInput
+            }
+
+            val command = listOf(
+                activePython.absolutePath,
+                "-I",
+                ytdlpBin.absolutePath,
+                "--no-config",
+                "--dump-single-json",
+                "--flat-playlist",
+                "--no-warnings",
+                "--no-progress",
+                "--socket-timeout", "14",
+                "--js-runtimes", jsRuntimeSpec,
+                "--",
+                normalizedInput
+            )
+
+            val processBuilder = ProcessBuilder(command)
+                .directory(File(nativeDir))
+                .redirectErrorStream(false)
+
+            val env = processBuilder.environment()
+            env["PYTHONHOME"] = pythonEnvDir.absolutePath
+            env["PYTHONPATH"] = "${directPythonZipSo.absolutePath}:${stdlibZip.absolutePath}:${stdlibDir.absolutePath}:${modulesDir.absolutePath}:${pythonEnvDir.absolutePath}:${pythonEnvDir.absolutePath}/usr/lib/python3.11:${context.filesDir.absolutePath}/bin"
+            env["PYTHONNOUSERSITE"] = "1"
+            env["PYTHONDONTWRITEBYTECODE"] = "1"
+            env["PYTHONIOENCODING"] = "utf-8"
+            env["TMPDIR"] = tmpDir.absolutePath
+            env["HOME"] = pythonEnvDir.absolutePath
+            env["LD_LIBRARY_PATH"] = "$nativeDir:${modulesDir.absolutePath}:${pythonEnvDir.absolutePath}/usr/lib:${ffmpegEnvDir.absolutePath}/usr/lib"
+            env["PATH"] = "$nativeDir:${context.filesDir.absolutePath}/bin:${System.getenv("PATH") ?: "/system/bin"}"
+            if (certPemFile.exists() && certPemFile.length() > 0) {
+                env["SSL_CERT_FILE"] = certPemFile.absolutePath
+                env["REQUESTS_CA_BUNDLE"] = certPemFile.absolutePath
+                env["CURL_CA_BUNDLE"] = certPemFile.absolutePath
+            }
+            val apexCacerts = File("/apex/com.android.conscrypt/cacerts")
+            val systemCacerts = File("/system/etc/security/cacerts")
+            val certDir = when {
+                apexCacerts.exists() && apexCacerts.isDirectory && (apexCacerts.list()?.isNotEmpty() == true) -> apexCacerts
+                systemCacerts.exists() && systemCacerts.isDirectory && (systemCacerts.list()?.isNotEmpty() == true) -> systemCacerts
+                else -> null
+            }
+            if (certDir != null) {
+                env["SSL_CERT_DIR"] = certDir.absolutePath
+            }
+
+            val process = processBuilder.start()
+            val stdout = process.inputStream.bufferedReader().use { it.readText() }
+            val stderr = process.errorStream.bufferedReader().use { it.readText() }
+            val exitCode = process.waitFor()
+
+            if (exitCode != 0 || stdout.isBlank()) {
+                return@withContext Result.failure(IllegalStateException("yt-dlp flat-playlist error ($exitCode): ${stderr.take(200)}"))
+            }
+
+            val jsonLine = stdout.lineSequence().lastOrNull { it.trim().startsWith("{") } ?: stdout.trim()
+            val root = JSONObject(jsonLine)
+            val playlistTitle = root.optString("title", "Playlist Importada").trim()
+            val playlistUploader = root.optString("uploader", "").ifBlank { root.optString("channel", "Creador") }.trim()
+            val playlistThumb = extractBestThumbFromObject(root)
+
+            val entriesArr = root.optJSONArray("entries") ?: JSONArray()
+            val entries = mutableListOf<FlatPlaylistEntry>()
+            for (i in 0 until entriesArr.length()) {
+                val item = entriesArr.optJSONObject(i) ?: continue
+                val id = item.optString("id", "").trim()
+                val title = item.optString("title", "").trim()
+                if (title.isBlank() || title.equals("[Deleted video]", ignoreCase = true) || title.equals("[Private video]", ignoreCase = true)) {
+                    continue
+                }
+                val uploader = item.optString("uploader", "")
+                    .ifBlank { item.optString("channel", "") }
+                    .ifBlank { playlistUploader }
+                    .replace(" - Topic", "")
+                    .trim()
+                val duration = item.optDouble("duration", 0.0).toLong().coerceAtLeast(0L)
+                val entryUrl = item.optString("url", "").ifBlank { item.optString("webpage_url", "") }.trim()
+                val thumb = extractBestThumbFromObject(item)
+                    .ifBlank { if (id.length == 11) "https://i.ytimg.com/vi/$id/hqdefault.jpg" else playlistThumb }
+
+                entries.add(
+                    FlatPlaylistEntry(
+                        id = id.ifBlank { entryUrl },
+                        title = title,
+                        uploader = uploader.ifBlank { "Artista" },
+                        durationSeconds = duration,
+                        thumbnailUrl = thumb,
+                        url = entryUrl
+                    )
+                )
+            }
+
+            Result.success(
+                FlatPlaylistDump(
+                    title = playlistTitle,
+                    uploader = playlistUploader,
+                    thumbnailUrl = playlistThumb,
+                    entries = entries
+                )
+            )
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    private fun extractBestThumbFromObject(obj: JSONObject): String {
+        val direct = obj.optString("thumbnail", "")
+        if (direct.startsWith("http", ignoreCase = true)) return direct
+        val thumbs = obj.optJSONArray("thumbnails") ?: return ""
+        for (i in thumbs.length() - 1 downTo 0) {
+            val u = thumbs.optJSONObject(i)?.optString("url", "") ?: ""
+            if (u.startsWith("http", ignoreCase = true)) return u
+        }
+        return ""
     }
 }

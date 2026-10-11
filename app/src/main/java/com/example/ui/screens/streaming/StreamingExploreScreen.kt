@@ -139,7 +139,7 @@ fun StreamingExploreScreen(
                     fontWeight = FontWeight.ExtraBold
                 )
                 Text(
-                    text = "Búsqueda API dual (YT Music & YouTube) + Radio + Caché 30 min",
+                    text = "Búsqueda en YT Music, YouTube & SoundCloud + Radio + Caché 30 min",
                     style = MaterialTheme.typography.bodySmall,
                     color = TextSecondary
                 )
@@ -183,7 +183,7 @@ fun StreamingExploreScreen(
             onValueChange = onSearchQueryChange,
             placeholder = {
                 Text(
-                    text = "Buscar canciones, artistas o videos en YT Music y YouTube...",
+                    text = "Buscar canciones o remixes en YT Music, YouTube y SoundCloud...",
                     color = TextMuted,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -568,17 +568,29 @@ private fun StreamingResultCard(
 }
 
 /**
- * Insignia distintiva para diferenciar visualmente entre YouTube Music (`🎵 YT MUSIC`) y YouTube (`▶️ YOUTUBE`).
+ * Insignia distintiva para diferenciar visualmente entre YouTube Music (`🎵 YT MUSIC`),
+ * YouTube (`▶️ YOUTUBE`) y SoundCloud (`☁️ SOUNDCLOUD`).
  */
 @Composable
 fun StreamingPlatformBadge(
     platform: StreamingSourcePlatform,
     modifier: Modifier = Modifier
 ) {
-    val isYtMusic = platform == StreamingSourcePlatform.YT_MUSIC
-    val bgColor = if (isYtMusic) Color(0xFF9C27B0).copy(alpha = 0.24f) else Color(0xFFE53935).copy(alpha = 0.24f)
-    val accentColor = if (isYtMusic) Color(0xFFEA80FC) else Color(0xFFFF8A80)
-    val icon = if (isYtMusic) Icons.Filled.MusicNote else Icons.Filled.SmartDisplay
+    val bgColor = when (platform) {
+        StreamingSourcePlatform.YT_MUSIC -> Color(0xFF9C27B0).copy(alpha = 0.24f)
+        StreamingSourcePlatform.YOUTUBE -> Color(0xFFE53935).copy(alpha = 0.24f)
+        StreamingSourcePlatform.SOUNDCLOUD -> Color(0xFFFF5500).copy(alpha = 0.24f)
+    }
+    val accentColor = when (platform) {
+        StreamingSourcePlatform.YT_MUSIC -> Color(0xFFEA80FC)
+        StreamingSourcePlatform.YOUTUBE -> Color(0xFFFF8A80)
+        StreamingSourcePlatform.SOUNDCLOUD -> Color(0xFFFF7A33)
+    }
+    val icon = when (platform) {
+        StreamingSourcePlatform.YT_MUSIC -> Icons.Filled.MusicNote
+        StreamingSourcePlatform.YOUTUBE -> Icons.Filled.SmartDisplay
+        StreamingSourcePlatform.SOUNDCLOUD -> Icons.Filled.CloudDownload
+    }
 
     Surface(
         color = bgColor,

@@ -370,6 +370,13 @@ class AuraAudioPlayer(
     }
 
     fun playTrack(track: Track, isAutoCrossfadeOverlap: Boolean = false) {
+        if (track.isStreamingTrack && isUnresolvedStreamingPageUrl(track.uriString)) {
+            val handled = onStreamingTrackRequestedCallback?.invoke(track, isAutoCrossfadeOverlap) ?: false
+            if (handled) {
+                return
+            }
+        }
+
         val player = exoPlayer ?: return
         val outDeck = outgoingExoPlayer
         val previousTrack = _currentTrack.value
@@ -975,5 +982,25 @@ class AuraAudioPlayer(
         outgoingExoPlayer = null
         exoPlayer?.release()
         exoPlayer = null
+    }
+
+    /**
+     * Determina si la URI de una pista de Streaming aún es una URL de página web (YouTube watch,
+     * YouTube Music, SoundCloud permalink o marcador `aura_stream://`) que requiere resolución
+     * previa mediante `StreamingModeCoordinator` antes de entregarse a ExoPlayer.
+     */
+    private fun isUnresolvedStreamingPageUrl(uri: String): Boolean {
+        val clean = uri.trim().lowercase()
+        if (clean.isBlank() || clean.startsWith("aura_stream://")) return true
+        if (clean.contains("youtube.com/watch") ||
+            clean.contains("music.youtube.com/watch") ||
+            clean.contains("youtu.be/")
+        ) {
+            return true
+        }
+        if (clean.contains("soundcloud.com/") && !clean.contains("cf-media.sndcdn.com") && !clean.contains("akmedia.sndcdn.com")) {
+            return true
+        }
+        return false
     }
 }

@@ -409,4 +409,39 @@ fun GlobalDialogsHost(
             }
         }
     }
+
+    // 7. Modal del Importador Universal de Playlists (Spotify y YouTube Music / YouTube)
+    val showPlaylistImportDialog by viewModel.playlistImportCoordinator.showDialog.collectAsState()
+    if (showPlaylistImportDialog) {
+        val inputUrl by viewModel.playlistImportCoordinator.inputUrl.collectAsState()
+        val isAnalyzing by viewModel.playlistImportCoordinator.isAnalyzing.collectAsState()
+        val playlistPreview by viewModel.playlistImportCoordinator.playlistPreview.collectAsState()
+        val customPlaylistName by viewModel.playlistImportCoordinator.customPlaylistName.collectAsState()
+        val selectedSaveMode by viewModel.playlistImportCoordinator.selectedSaveMode.collectAsState()
+        val includeVideoCanvasOffline by viewModel.playlistImportCoordinator.includeVideoCanvasOffline.collectAsState()
+        val isImportingPlaylist by viewModel.playlistImportCoordinator.isImporting.collectAsState()
+        val importProgressText by viewModel.playlistImportCoordinator.importProgressText.collectAsState()
+        val importProgressFraction by viewModel.playlistImportCoordinator.importProgressFraction.collectAsState()
+        val errorMessage by viewModel.playlistImportCoordinator.errorMessage.collectAsState()
+
+        com.example.ui.components.dialogs.ImportExternalPlaylistDialog(
+            inputUrl = inputUrl,
+            isAnalyzing = isAnalyzing,
+            playlistPreview = playlistPreview,
+            customPlaylistName = customPlaylistName,
+            selectedSaveMode = selectedSaveMode,
+            includeVideoCanvasOffline = includeVideoCanvasOffline,
+            isImporting = isImportingPlaylist,
+            importProgressText = importProgressText,
+            importProgressFraction = importProgressFraction,
+            errorMessage = errorMessage,
+            onUrlChange = { viewModel.playlistImportCoordinator.updateInputUrl(it) },
+            onCustomNameChange = { viewModel.playlistImportCoordinator.updateCustomPlaylistName(it) },
+            onAnalyzeClick = { viewModel.playlistImportCoordinator.analyzePlaylistUrl() },
+            onSaveModeChange = { viewModel.playlistImportCoordinator.setSaveMode(it) },
+            onIncludeVideoCanvasChange = { viewModel.playlistImportCoordinator.setIncludeVideoCanvasOffline(it) },
+            onConfirmImportClick = { viewModel.playlistImportCoordinator.confirmImportPlaylist() },
+            onDismiss = { viewModel.playlistImportCoordinator.dismissDialog() }
+        )
+    }
 }

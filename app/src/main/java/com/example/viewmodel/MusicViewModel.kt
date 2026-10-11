@@ -204,6 +204,27 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val lyricsSearchResults: StateFlow<List<LyricSearchResult>> = lyricsCoordinator.lyricsSearchResults
     val searchLyricsError: StateFlow<String?> = lyricsCoordinator.searchLyricsError
 
+    // Coordinador Universal de Importación de Playlists (Spotify y YouTube Music / YouTube)
+    val playlistImportCoordinator = com.example.viewmodel.delegates.PlaylistImportCoordinator(
+        context = application,
+        trackDao = database.trackDao(),
+        playlistDao = database.playlistDao(),
+        storageManager = AppStorageManager(application),
+        scope = viewModelScope,
+        onStatusMessage = { msg -> trackLibraryCoordinator.setStatusMessage(msg) },
+        onOpenCreatedPlaylist = { createdPlaylistId ->
+            viewModelScope.launch {
+                val created = playlists.value.find { it.id == createdPlaylistId }
+                if (created != null) {
+                    openPlaylist(created)
+                } else {
+                    navigateTo(NavScreen.Library)
+                    setLibraryTab(LibraryTab.PLAYLISTS)
+                }
+            }
+        }
+    )
+
     // Coordinador de Medios Entrantes
     val incomingMediaCoordinator = IncomingMediaCoordinator(
         context = application,
@@ -214,13 +235,16 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         onFetchOnlineLyrics = { lyricsCoordinator.fetchOnlineLyrics() },
         setImportingStatus = { isImp, msg ->
             trackLibraryCoordinator.setImporting(isImp, msg)
+        },
+        onOpenPlaylistImportUrl = { playlistUrl ->
+            playlistImportCoordinator.openDialog(playlistUrl)
         }
     )
     val pendingIncomingAudioUris: StateFlow<List<Uri>> = incomingMediaCoordinator.pendingIncomingAudioUris
     val pendingIncomingVideoUri: StateFlow<Uri?> = incomingMediaCoordinator.pendingIncomingVideoUri
     val pendingIncomingWebLink: StateFlow<String?> = incomingMediaCoordinator.pendingIncomingWebLink
 
-    // Coordinador del Modo Streaming Híbrido (Búsqueda API dual, yt-dlp para YouTube, Caché 30 min y Radio)
+    // Coordinador del Modo Streaming Híbrido (Búsqueda API tri-plataforma, yt-dlp para YouTube/SoundCloud, Caché 30 min y Radio)
     val streamingCoordinator = StreamingModeCoordinator(
         context = application,
         audioPlayer = audioPlayer,
@@ -238,6 +262,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val streamingCacheConfig: StateFlow<StreamingCacheConfig> = streamingCoordinator.cacheConfig
     val downloadingStreamingIds: StateFlow<Set<String>> = streamingCoordinator.downloadingVideoIds
     val downloadedStreamingIds: StateFlow<Set<String>> = streamingCoordinator.downloadedVideoIds
+
+    fun openPlaylistImportDialog(prefilledUrl: String = "") {
+        playlistImportCoordinator.openDialog(prefilledUrl)
+    }
 
     init {
         // Hilo de renderizado de espectro FFT C++20 optimizado:

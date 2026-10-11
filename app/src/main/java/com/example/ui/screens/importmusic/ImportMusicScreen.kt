@@ -54,6 +54,7 @@ fun ImportMusicScreen(
     onDownloadFromLinkWithLoopStyle: (resolvedInfo: com.example.data.importer.OnlineVideoAudioImporter.ResolvedMediaInfo, customTitle: String, customArtist: String, attachAsCanvas: Boolean, trimSilence: Boolean, loopStyle: com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle) -> Unit = { info, title, artist, attach, trim, _ ->
         onDownloadFromLink(info, title, artist, attach, trim)
     },
+    onOpenPlaylistImportDialog: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showClearConfirmation by remember { mutableStateOf(false) }
@@ -280,6 +281,22 @@ fun ImportMusicScreen(
                     showDownloadFromLinkDialog = true
                 },
                 testTag = "import_youtube_link_btn"
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+
+        // Opción 3: Importador Universal de Playlists (Spotify y YouTube Music / YouTube)
+        item {
+            ImportActionCard(
+                title = "Importar Playlist (Spotify / YT Music)",
+                description = "Pega el enlace de cualquier Playlist pública de Spotify o YouTube Music: impórtala en segundos en Modo Streaming o descarga todas sus canciones offline.",
+                buttonText = "Importar Playlist",
+                icon = Icons.Default.PlaylistAdd,
+                accentGradient = Brush.horizontalGradient(
+                    listOf(Color(0xFF1DB954), Color(0xFF10B981), Color(0xFFFF0033))
+                ),
+                onClick = onOpenPlaylistImportDialog,
+                testTag = "import_external_playlist_card_btn"
             )
             Spacer(modifier = Modifier.height(12.dp))
         }
