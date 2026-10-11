@@ -40,11 +40,13 @@ object InnerTubeClient {
 
     /**
      * Obtiene un `visitorData` real desde YouTube (o desde el puente WebView como respaldo) para autenticar sesiones
-     * de invitado ante InnerTube y `yt-dlp` (`android_vr` + `player_skip=webpage,configs`) evitando bloqueos de bot.
+     * de invitado ante InnerTube y `yt-dlp` evitando bloqueos de bot.
      */
-    fun getOrFetchVisitorData(context: android.content.Context? = null): String? {
+    fun getOrFetchVisitorData(context: android.content.Context? = null, forceRefresh: Boolean = false): String? {
         val now = System.currentTimeMillis()
-        cachedVisitorData?.let { if (it.isNotBlank() && now - lastVisitorFetchMs < 30 * 60 * 1000L) return it }
+        if (!forceRefresh) {
+            cachedVisitorData?.let { if (it.isNotBlank() && now - lastVisitorFetchMs < 30 * 60 * 1000L) return it }
+        }
 
         return try {
             val reqBuilder = Request.Builder()
@@ -72,7 +74,39 @@ object InnerTubeClient {
     }
 
     /**
-     * Resuelve los flujos multimedia probando clientes InnerTube modernos en cascada.
+     * Comprueba con una petición rápida `Range: bytes=0-1` si la URL firmada de `googlevideo.com`
+     * es realmente descargable (HTTP 200 o 206) y no está bloqueada con HTTP 403 Forbidden.
+     */
+    fun isStreamUrlReachable(
+        streamUrl: String?,
+        userAgent: String,
+        extraHeaders: Map<String, String> = emptyMap()
+    ): Boolean {
+        if (streamUrl.isNullOrBlank()) return false
+        return try {
+            val reqBuilder = Request.Builder()
+                .url(streamUrl)
+                .header("User-Agent", userAgent)
+                .header("Accept", "*/*")
+                .header("Range", "bytes=0-1")
+
+            for ((k, v) in extraHeaders) {
+                if (!k.equals("Range", ignoreCase = true) && !k.equals("User-Agent", ignoreCase = true)) {
+                    reqBuilder.header(k, v)
+                }
+            }
+
+            httpClient.newCall(reqBuilder.build()).execute().use { resp ->
+                resp.code == 206 || resp.code == 200
+            }
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
+    /**
+     * Resuelve los flujos multimedia probando clientes InnerTube modernos en cascada y verificando
+     * que el stream responda HTTP 206 real (cero HTTP 403 Forbidden) antes de entregarlo.
      */
     suspend fun resolve(
         videoId: String,
@@ -82,11 +116,9 @@ object InnerTubeClient {
         val hasAuthSession = WebViewCookieBridge.hasAuthenticatedSessionCookies()
         val authCookieHeader = if (hasAuthSession) WebViewCookieBridge.getConsolidatedCookieHeader() else null
 
-        // IMPORTANTE: Los clientes de aplicación nativa (ANDROID_VR, IOS, ANDROID_TESTSUITE)
-        // NO deben enviar cookies de invitado de navegador móvil (m.youtube.com como VISITOR_INFO1_LIVE / YSC)
-        // ni cabeceras Origin: https://www.youtube.com, porque GoogleVideo ata el firma/token al contexto
-        // de sesión web y devuelve HTTP 403 Forbidden al descargar con el User-Agent nativo de Oculus/iOS.
-        // Estrategia 1: ANDROID_VR (Oculus Quest 3 nativo). Entrega URLs directas sin signatureCipher ni PO Token.
+        // Estrategia 1: ANDROID_VR (Oculus Quest 3 nativo).
+        // Nota: probamos primero sin visitorData externo (para que YouTube genere el suyo propio en responseContext)
+        // y si no, con visitorData, verificando siempre que la URL responda HTTP 206 real.
         val vrResult = queryInnerTube(
             videoId = videoId,
             originalUrl = originalUrl,
@@ -95,7 +127,7 @@ object InnerTubeClient {
             clientVersion = "1.62.27",
             clientIdHeader = "28",
             userAgent = "com.google.android.apps.youtube.vr.oculus/1.62.27 (Linux; U; Android 12; en_US; Quest 3; Build/SQ3A.220605.009.A1; Cronet/132.0.6808.3)",
-            visitorData = visitorData,
+            visitorData = null,
             cookieHeader = null,
             sendWebOriginHeader = false,
             extraClientProps = mapOf(
@@ -105,7 +137,27 @@ object InnerTubeClient {
                 "osName" to "Android",
                 "osVersion" to "12"
             )
-        )
+        ) ?: if (!visitorData.isNullOrBlank()) {
+            queryInnerTube(
+                videoId = videoId,
+                originalUrl = originalUrl,
+                endpointUrl = "https://www.youtube.com/youtubei/v1/player?prettyPrint=false",
+                clientName = "ANDROID_VR",
+                clientVersion = "1.62.27",
+                clientIdHeader = "28",
+                userAgent = "com.google.android.apps.youtube.vr.oculus/1.62.27 (Linux; U; Android 12; en_US; Quest 3; Build/SQ3A.220605.009.A1; Cronet/132.0.6808.3)",
+                visitorData = visitorData,
+                cookieHeader = null,
+                sendWebOriginHeader = false,
+                extraClientProps = mapOf(
+                    "deviceMake" to "Oculus",
+                    "deviceModel" to "Quest 3",
+                    "androidSdkVersion" to 32,
+                    "osName" to "Android",
+                    "osVersion" to "12"
+                )
+            )
+        } else null
         if (vrResult != null) return@withContext vrResult
 
         // Estrategia 2: IOS (YouTube iOS nativo). Excelente para música oficial y flujos MP4/M4A directos.
@@ -117,7 +169,7 @@ object InnerTubeClient {
             clientVersion = "20.10.4",
             clientIdHeader = "5",
             userAgent = "com.google.ios.youtube/20.10.4 (iPhone16,2; U; CPU iOS 18_3_2 like Mac OS X;)",
-            visitorData = visitorData,
+            visitorData = null,
             cookieHeader = null,
             sendWebOriginHeader = false,
             extraClientProps = mapOf(
@@ -155,7 +207,7 @@ object InnerTubeClient {
             clientVersion = "1.9",
             clientIdHeader = "30",
             userAgent = "com.google.android.youtube/1.9 (Linux; U; Android 14; en_US) gzip",
-            visitorData = visitorData,
+            visitorData = null,
             cookieHeader = null,
             sendWebOriginHeader = false,
             extraClientProps = mapOf("androidSdkVersion" to 34)
@@ -323,15 +375,30 @@ object InnerTubeClient {
                 }
 
                 if (!bestAudioUrl.isNullOrBlank()) {
+                    val headers = mutableMapOf("User-Agent" to userAgent)
+                    if (sendWebOriginHeader) {
+                        headers["Origin"] = "https://www.youtube.com"
+                        headers["Referer"] = "https://www.youtube.com/"
+                    }
+                    // Verificar que el stream realmente responda HTTP 200/206 antes de darlo por bueno
+                    if (!isStreamUrlReachable(bestAudioUrl, userAgent, headers)) {
+                        AuraDebugManager.logWarning(TAG, "Stream de $clientName rechazado con HTTP 403 en sonda real; probando siguiente cliente...")
+                        return null
+                    }
+                    val verifiedVideoUrl = if (!bestVideoUrl.isNullOrBlank() && bestVideoUrl != bestAudioUrl) {
+                        if (isStreamUrlReachable(bestVideoUrl, userAgent, headers)) bestVideoUrl else bestAudioUrl
+                    } else {
+                        bestAudioUrl
+                    }
                     OnlineVideoAudioImporter.ResolvedMediaInfo(
                         originalUrl = originalUrl,
                         suggestedTitle = title,
                         suggestedArtist = author,
-                        videoUrl = bestVideoUrl ?: bestAudioUrl,
+                        videoUrl = verifiedVideoUrl,
                         audioUrl = bestAudioUrl,
                         coverUrl = thumbnail,
                         durationSeconds = durationSeconds,
-                        httpHeaders = mapOf("User-Agent" to userAgent)
+                        httpHeaders = headers
                     )
                 } else {
                     null

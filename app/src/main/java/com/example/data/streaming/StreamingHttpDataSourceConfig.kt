@@ -93,6 +93,10 @@ object StreamingHttpDataSourceConfig {
                 clientParam.contains("VISIONOS") -> VISION_CLIENT_UA
                 clientParam.contains("ANDROID_MUSIC") -> ANDROID_MUSIC_UA
                 clientParam.contains("IOS") -> IOS_CLIENT_UA
+                clientParam.contains("TVHTML5") ->
+                    "Mozilla/5.0 (PlayStation; PlayStation 4/12.00) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.4 Safari/605.1.15"
+                clientParam.contains("ANDROID_TESTSUITE") ->
+                    "com.google.android.youtube/1.9 (Linux; U; Android 14; en_US) gzip"
                 else -> null
             }
 
@@ -101,8 +105,8 @@ object StreamingHttpDataSourceConfig {
                 result["User-Agent"] = inferredUa ?: DEFAULT_CHROME_MOBILE_UA
             }
 
-            // Si el cliente es WEB o WEB_REMIX y no hay Origin/Referer, agregarlos evita 403 en nodos CDN estrictos
-            if (clientParam.startsWith("WEB") || clientParam.isEmpty()) {
+            // Si el cliente es WEB, WEB_REMIX o TVHTML5_SIMPLY_EMBEDDED_PLAYER y no hay Origin/Referer, agregarlos
+            if (clientParam.startsWith("WEB") || clientParam.contains("TVHTML5") || clientParam.isEmpty()) {
                 if (!result.keys.any { it.equals("Origin", ignoreCase = true) }) {
                     result["Origin"] = "https://www.youtube.com"
                 }
@@ -111,11 +115,11 @@ object StreamingHttpDataSourceConfig {
                 }
             }
 
-            // Adjuntar cookies de WebView solo si fue extraído por cliente web y no tiene Cookie propia
+            // Adjuntar cookies de WebView solo si fue extraído por cliente web con sesión y no tiene Cookie propia
             if (clientParam.startsWith("WEB") && !result.keys.any { it.equals("Cookie", ignoreCase = true) }) {
                 try {
                     val cookies = CookieManager.getInstance().getCookie("https://m.youtube.com")
-                    if (!cookies.isNullOrBlank()) {
+                    if (!cookies.isNullOrBlank() && (cookies.contains("SAPISID=") || cookies.contains("__Secure-3PAPISID="))) {
                         result["Cookie"] = cookies
                     }
                 } catch (_: Throwable) {}
@@ -129,17 +133,17 @@ object StreamingHttpDataSourceConfig {
     }
 
     /**
-     * Limpia parámetros conflictivos en URLs de `googlevideo.com` (`&range=...`, `&rn=...`, `&rbuf=...`)
-     * para que `ExoPlayer` pueda abrir sus propias peticiones `Range: bytes=0-` sin recibir `403 Forbidden`.
+     * Limpia únicamente el parámetro `&range=...` si NO forma parte de `sparams` (parámetros firmados criptográficamente),
+     * evitando invalidar la firma `sig`/`lsig` de `googlevideo.com` cuando `ExoPlayer` envía su cabecera `Range`.
      */
     fun sanitizeStreamUri(uri: Uri): Uri {
         val raw = uri.toString()
         if (!isGoogleVideoOrYoutubeUrl(raw)) return uri
+        val sparams = extractQueryParam(raw, "sparams")?.split(",")?.map { it.trim().lowercase() } ?: emptyList()
+        if ("range" in sparams) return uri
         val cleaned = raw
             .replace(Regex("""&range=[^&]+"""), "")
             .replace(Regex("""\?range=[^&]+&"""), "?")
-            .replace(Regex("""&rn=[^&]+"""), "")
-            .replace(Regex("""&rbuf=[^&]+"""), "")
         return if (cleaned != raw) Uri.parse(cleaned) else uri
     }
 

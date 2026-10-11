@@ -402,11 +402,24 @@ class StreamingModeCoordinator(
                     thumbnailUrl = failedTrack.albumArtPath ?: "https://i.ytimg.com/vi/$videoId/hqdefault.jpg",
                     platform = platform
                 )
-                val resolvedResult = StreamingApiService.resolvePlayableStreamWithYtDlp(
-                    context = context,
-                    item = baseItem,
-                    forceBypassYtDlp = true
-                )
+                // Si el stream activo recibió HTTP 403, primero probamos rescate directo verificado con HTTP 206 (InnerTubeClient -> Piped -> motor seleccionado)
+                val directVerified = com.example.data.importer.InnerTubeClient.resolve(videoId, baseItem.canonicalWatchUrl)
+                    ?: com.example.data.importer.PipedStreamResolver.resolve(videoId, baseItem.canonicalWatchUrl)
+                val resolvedResult = if (directVerified != null) {
+                    com.example.data.streaming.StreamingHttpDataSourceConfig.registerStreamHeaders(
+                        videoId = videoId,
+                        audioUrl = directVerified.audioUrl,
+                        videoUrl = directVerified.videoUrl,
+                        headers = directVerified.httpHeaders
+                    )
+                    Result.success(directVerified)
+                } else {
+                    StreamingApiService.resolvePlayableStreamWithYtDlp(
+                        context = context,
+                        item = baseItem,
+                        forceBypassYtDlp = true
+                    )
+                }
                 val resolved = resolvedResult.getOrNull()
                 if (resolved != null) {
                     val freshAudioUrl = resolved.audioUrl?.takeIf { it.isNotBlank() } ?: resolved.videoUrl

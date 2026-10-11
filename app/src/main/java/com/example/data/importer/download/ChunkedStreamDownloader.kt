@@ -125,11 +125,14 @@ object ChunkedStreamDownloader {
 
         val isYoutubeStream = isTrustedYoutubeOrGoogleVideoHost(url)
 
-        // 1. Si la URL contiene rangos parciales (&range=0-...), probar primero sin rango para descargar el archivo completo
-        val cleanUrl = if (isYoutubeStream && url.contains("&range=")) {
+        // 1. Si la URL contiene rangos parciales (&range=0-...) y no está protegida en sparams, probar primero sin rango
+        val sparams = try {
+            Uri.parse(url).getQueryParameter("sparams")?.lowercase() ?: ""
+        } catch (_: Exception) {
+            ""
+        }
+        val cleanUrl = if (isYoutubeStream && url.contains("&range=") && !sparams.contains("range")) {
             url.replace(Regex("&range=[^&]+"), "")
-                .replace(Regex("&rn=[^&]+"), "")
-                .replace(Regex("&rbuf=[^&]+"), "")
         } else {
             url
         }
