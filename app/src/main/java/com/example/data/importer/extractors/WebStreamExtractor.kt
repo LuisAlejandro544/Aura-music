@@ -31,7 +31,7 @@ enum class YoutubeExtractionEngine(val label: String, val description: String) {
 object WebStreamExtractor {
 
     private val YOUTUBE_ID_PATTERN = Pattern.compile(
-        "(?:youtu\\.be/|youtube\\.com/(?:embed/|v/|shorts/|watch\\?v=|watch\\?.+&v=))([a-zA-Z0-9_-]{11})"
+        "(?:youtu\\.be/|(?:[a-zA-Z0-9-]+\\.)?youtube\\.com/(?:embed/|v/|shorts/|watch\\?v=|watch\\?.+&v=))([a-zA-Z0-9_-]{11})"
     )
 
     fun isWebVideoUrl(url: String): Boolean {
@@ -41,8 +41,11 @@ object WebStreamExtractor {
     }
 
     fun extractVideoId(url: String): String? {
-        val matcher = YOUTUBE_ID_PATTERN.matcher(url.trim())
-        return if (matcher.find()) matcher.group(1) else null
+        val clean = url.trim()
+        val matcher = YOUTUBE_ID_PATTERN.matcher(clean)
+        if (matcher.find()) return matcher.group(1)
+        val queryMatch = Regex("[?&]v=([a-zA-Z0-9_-]{11})").find(clean)
+        return queryMatch?.groupValues?.getOrNull(1)
     }
 
     /**

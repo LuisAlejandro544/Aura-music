@@ -72,6 +72,18 @@ object InnerTubeClient {
         )
         if (musicResult != null) return@withContext musicResult
 
+        // Estrategia 4: IOS (Cliente nativo iPhone para pistas con restricción móvil en Android)
+        val iosResult = queryInnerTube(
+            videoId = videoId,
+            originalUrl = originalUrl,
+            endpointUrl = "https://www.youtube.com/youtubei/v1/player?prettyPrint=false",
+            clientName = "IOS",
+            clientVersion = "19.29.1",
+            userAgent = "com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)",
+            extraClientProps = mapOf("deviceModel" to "iPhone16,2", "osVersion" to "17.5.1.21F90")
+        )
+        if (iosResult != null) return@withContext iosResult
+
         null
     }
 
@@ -199,6 +211,7 @@ object InnerTubeClient {
             }
 
             if (!bestAudioUrl.isNullOrBlank()) {
+                val clientHeaders = mapOf("User-Agent" to userAgent)
                 OnlineVideoAudioImporter.ResolvedMediaInfo(
                     originalUrl = originalUrl,
                     suggestedTitle = title,
@@ -207,7 +220,9 @@ object InnerTubeClient {
                     audioUrl = bestAudioUrl,
                     coverUrl = thumbnail,
                     durationSeconds = durationSeconds,
-                    httpHeaders = mapOf("User-Agent" to userAgent)
+                    httpHeaders = clientHeaders,
+                    audioHeaders = clientHeaders,
+                    videoHeaders = clientHeaders
                 )
             } else {
                 null

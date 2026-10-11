@@ -358,4 +358,15 @@ Este documento traza las fases de evolución técnica y funcional para convertir
     - Hidratación dinámica y en caché del `client_id` público de SoundCloud (`api-v2.soundcloud.com`) desde sus bundles web oficiales, con respaldo por hidratación HTML y `yt-dlp` (`scsearch:`).
     - Integrado simultáneamente en el filtro **Todo (YT Music, YT & SoundCloud)** (intercalando resultados de las 3 plataformas) y en su propio chip dedicado **☁️ Solo SoundCloud**, identificado con la insignia naranja vibrante **`☁️ SOUNDCLOUD` (`#FF5500`)**.
     - Resolución de streams progresivos HTTP (MP3 / Opus) compatibles con la caché inteligente de 30 minutos (`StreamingCacheManager`), extracción cromática de portadas remotas en `ArtworkColorExtractor`, Radio de canciones similares y descarga permanente en 1 toque.
+- [x] **Blindaje Definitivo Anti-HTTP 403 en `googlevideo.com` y Cascada Automática de 5 Niveles (`YtDlpNativeEngine`, `ChunkedStreamDownloader`, `StreamingHttpDataSourceConfig`, `OnlineVideoAudioImporter` & `MediaAssetProcessor`)**:
+  - **Separación Estricta de Cabeceras por Flujo (`audioHeaders` vs `videoHeaders`)**: Aislamiento de las cabeceras HTTP de cada formato en `YtDlpNativeEngine`, `InnerTubeClient` y `ResolvedMediaInfo` para impedir que el formato de video 480p sobrescriba el `User-Agent` firmado del formato de audio `.m4a`.
+  - **Alineación Inteligente por Parámetro `c=` en `StreamingHttpDataSourceConfig` y `ChunkedStreamDownloader`**: Inspección automática del parámetro `c=` (`ANDROID_VR`, `IOS`, `ANDROID_MUSIC`, `ANDROID`, `VISIONOS`, `TVHTML5`, `MWEB`, `WEB`) en cada URL de `googlevideo.com`, asignando el `User-Agent` y `Origin` canónicos de ese cliente y bloqueando la inyección de cookies de `m.youtube.com` en clientes nativos (`ANDROID_VR`/`IOS`).
+  - **Reconocimiento Universal de Subdominios de YouTube (`music.youtube.com`, `m.youtube.com`, `www.youtube.com`, `youtu.be`)**: Expresión regular mejorada en `WebStreamExtractor.extractVideoId` para activar siempre la autoreparación en pistas de YouTube Music y YouTube.
+  - **Cascada Automática de 5 Niveles de Fallback (Audio, Video Canvas 480p y Pre-Carga de Caché)**:
+    1. **Nivel 1**: Normalización y reintento por perfil `c=` en `ChunkedStreamDownloader`.
+    2. **Nivel 2**: Resolución alternativa inmediata vía **`InnerTubeClient`** (`ANDROID_VR` -> `VISIONOS` -> `ANDROID_MUSIC` -> `IOS`).
+    3. **Nivel 3**: Bypass vía **`InvidiousStreamResolver`**.
+    4. **Nivel 4**: Extracción vía **`HeadlessWebViewExtractor`** (`m.youtube.com`).
+    5. **Nivel 5**: Descarga directa nativa a archivo mediante **`YtDlpNativeEngine.downloadStreamDirectToFile`** usando el propio transporte TLS/HTTP de Python.
+
 

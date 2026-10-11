@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan técnico y de experiencia de usuario para integrar el Importador Universal de Playlists (Spotify y YouTube Music con opción de Modo Streaming rápido o Descarga Offline completa), el buscador y reproductor de SoundCloud en la pestaña Explorar (integrado en Todo y con filtro propio Solo SoundCloud), y la sincronización de toda la documentación (.md y chanelog-beta.md).",
-  "updatedAt":  "2026-10-11T19:36:57.041179072Z",
+  "summary":  "Plan de ingeniería y diagnóstico forense para eliminar de raíz el error HTTP 403 en las descargas de googlevideo.com resueltas por yt-dlp, separando las cabeceras HTTP por flujo (audio vs. video), infiriendo el perfil exacto del cliente c= de la URL firmada, e integrando la cascada completa de 5 niveles de fallback tanto para el audio como para el Video Canvas 480p.",
+  "updatedAt":  "2026-10-11T22:11:41.341747150Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

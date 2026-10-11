@@ -210,6 +210,8 @@ object MediaAssetProcessor {
         onProgressUpdate: (DownloadProgress) -> Unit,
         downloadFunction: (url: String, target: File, phase: String, headers: Map<String, String>) -> Boolean
     ): String? {
+        val effectiveVideoHeaders = resolvedInfo.videoHeaders.ifEmpty { resolvedInfo.httpHeaders }
+
         // 1. Si aún no tenemos tempVideoFile y videoUrl es distinto de audioUrl, descargarlo o copiarlo si ya estaba en caché local
         if (!isValidVideoFile(tempVideoFile) &&
             !resolvedInfo.videoUrl.isNullOrBlank() &&
@@ -225,7 +227,7 @@ object MediaAssetProcessor {
                     resolvedInfo.videoUrl,
                     tempVideoFile,
                     "Descargando Video Canvas de fondo (480p)...",
-                    resolvedInfo.httpHeaders
+                    effectiveVideoHeaders
                 )
             }
         }
@@ -239,55 +241,78 @@ object MediaAssetProcessor {
             }
         }
 
-        // 3. Si aún no es válido, resolver activamente un flujo de video MP4 480p dedicado
+        // 3. Si aún no es válido (ej. el stream 480p inicial devolvió HTTP 403), ejecutar cascada de respaldos para Video Canvas 480p
         if (!isValidVideoFile(tempVideoFile) && WebStreamExtractor.isWebVideoUrl(resolvedInfo.originalUrl)) {
             val ytId = WebStreamExtractor.extractVideoId(resolvedInfo.originalUrl)
+            AuraDebugManager.logInfo(
+                "OnlineImporter",
+                "Activando cascada de respaldos para Video Canvas 480p (${ytId ?: resolvedInfo.originalUrl})..."
+            )
+            val videoCandidates = mutableListOf<Pair<String, Map<String, String>>>()
+
             if (ytId != null) {
-                AuraDebugManager.logInfo(
-                    "OnlineImporter",
-                    "Resolviendo flujo de Video Canvas 480p dedicado para $ytId..."
-                )
-                val videoCandidates = mutableListOf<Pair<String, Map<String, String>>>()
-                val isStandardYoutube = !resolvedInfo.originalUrl.contains("music.youtube.com", ignoreCase = true)
-
-                if (isStandardYoutube && YtDlpNativeEngine.isAvailable(context)) {
-                    val ytdlpFallback = YtDlpNativeEngine.resolveStream(context, resolvedInfo.originalUrl).getOrNull()
-                    if (ytdlpFallback != null &&
-                        ytdlpFallback.videoUrl.isNotBlank() &&
-                        ytdlpFallback.videoUrl != ytdlpFallback.audioUrl
-                    ) {
-                        videoCandidates.add(ytdlpFallback.videoUrl to ytdlpFallback.httpHeaders)
-                    }
-                }
-
                 val innerTubeFallback = InnerTubeClient.resolve(ytId, resolvedInfo.originalUrl)
                 if (innerTubeFallback != null &&
                     innerTubeFallback.videoUrl.isNotBlank() &&
-                    innerTubeFallback.videoUrl != innerTubeFallback.audioUrl
+                    innerTubeFallback.videoUrl != resolvedInfo.videoUrl
                 ) {
-                    videoCandidates.add(innerTubeFallback.videoUrl to innerTubeFallback.httpHeaders)
+                    videoCandidates.add(
+                        innerTubeFallback.videoUrl to innerTubeFallback.videoHeaders.ifEmpty { innerTubeFallback.httpHeaders }
+                    )
                 }
 
                 val invidiousFallback = InvidiousStreamResolver.resolve(ytId, resolvedInfo.originalUrl)
                 if (invidiousFallback != null &&
                     invidiousFallback.videoUrl.isNotBlank() &&
-                    invidiousFallback.videoUrl != invidiousFallback.audioUrl
+                    invidiousFallback.videoUrl != resolvedInfo.videoUrl
                 ) {
-                    videoCandidates.add(invidiousFallback.videoUrl to invidiousFallback.httpHeaders)
+                    videoCandidates.add(
+                        invidiousFallback.videoUrl to invidiousFallback.videoHeaders.ifEmpty { invidiousFallback.httpHeaders }
+                    )
                 }
 
-                for ((candidateVideoUrl, candidateHeaders) in videoCandidates) {
-                    if (tempVideoFile.exists()) tempVideoFile.delete()
-                    val downloaded = downloadFunction(
-                        candidateVideoUrl,
-                        tempVideoFile,
-                        "Descargando Video Canvas de fondo (480p)...",
-                        candidateHeaders
+                val webViewFallback = HeadlessWebViewExtractor.resolve(context, ytId, resolvedInfo.originalUrl)
+                if (webViewFallback != null &&
+                    webViewFallback.videoUrl.isNotBlank() &&
+                    webViewFallback.videoUrl != resolvedInfo.videoUrl
+                ) {
+                    videoCandidates.add(
+                        webViewFallback.videoUrl to webViewFallback.videoHeaders.ifEmpty { webViewFallback.httpHeaders }
                     )
-                    if (downloaded && isValidVideoFile(tempVideoFile)) {
-                        break
-                    }
                 }
+            }
+
+            for ((candidateVideoUrl, candidateHeaders) in videoCandidates) {
+                if (tempVideoFile.exists()) tempVideoFile.delete()
+                val downloaded = downloadFunction(
+                    candidateVideoUrl,
+                    tempVideoFile,
+                    "Descargando Video Canvas de fondo (480p)...",
+                    candidateHeaders
+                )
+                if (downloaded && isValidVideoFile(tempVideoFile)) {
+                    break
+                }
+            }
+
+            // Último nivel de la cascada: Descarga directa de video 480p con el propio binario yt-dlp CLI
+            if (!isValidVideoFile(tempVideoFile) && YtDlpNativeEngine.isAvailable(context)) {
+                if (tempVideoFile.exists()) tempVideoFile.delete()
+                onProgressUpdate(
+                    DownloadProgress(
+                        isDownloading = true,
+                        phase = "Descargando Video Canvas (480p) con motor nativo yt-dlp...",
+                        bytesDownloaded = 0L,
+                        totalBytes = 0L,
+                        progressFraction = 0.91f
+                    )
+                )
+                YtDlpNativeEngine.downloadStreamDirectToFile(
+                    context = context,
+                    url = resolvedInfo.originalUrl,
+                    targetFile = tempVideoFile,
+                    isAudioOnly = false
+                )
             }
         }
 

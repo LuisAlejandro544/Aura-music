@@ -201,7 +201,9 @@ object StreamingApiService {
                 videoId = item.videoId,
                 audioUrl = enriched.audioUrl,
                 videoUrl = enriched.videoUrl,
-                headers = enriched.httpHeaders
+                headers = enriched.httpHeaders,
+                audioHeaders = enriched.audioHeaders,
+                videoHeaders = enriched.videoHeaders
             )
             return Result.success(enriched)
         }

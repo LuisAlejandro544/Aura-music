@@ -102,7 +102,7 @@
 - **Importador Universal de Playlists de Spotify y YouTube Music / YouTube (`ExternalPlaylistImporter`)**:
   - Pega o comparte el enlace de cualquier Playlist pública de **Spotify** o **YouTube Music / YouTube** para importarla con su portada oficial en **WebP sin pérdida** y todas sus canciones, eligiendo entre **⚡ Modo Streaming Rápido (Instantáneo)** o **📥 Descargar Todo Offline en 2do plano**.
 - **Descarga Directa desde YouTube, TikTok, SoundCloud y Enlaces Web en Segundo Plano (`AuraDownloadService`)**:
-  - Motor predeterminado **`yt-dlp` (98% de efectividad)** con entorno **CPython 3.11 / QuickJS** + arquitectura resiliente de 3 niveles (**InnerTube Nativo `<300ms`** + **Bypass Invidious** + **WebView Móvil con cascada de carátulas**).
+  - Motor predeterminado **`yt-dlp` (98% de efectividad)** con entorno **CPython 3.11 / QuickJS**, separación independiente de cabeceras por flujo (`audioHeaders` vs `videoHeaders` alineadas al perfil `c=` de `googlevideo.com`) y **cascada automática anti-HTTP 403 de 5 niveles** (**Cabeceras por perfil `c=`** → **InnerTube Multi-Cliente (`ANDROID_VR`/`VISIONOS`/`ANDROID_MUSIC`/`IOS`) `<300ms`** → **Bypass Invidious** → **WebView Móvil** → **Descarga directa nativa con `yt-dlp` CLI**).
   - **Acelerador HTTP Range Multi-Bloque**: Descarga pistas y videos a máxima velocidad (10–40 MB/s) eliminando el estrangulamiento de red, con vinculación automática de **Video Canvas en 480p** y carátula **WebP Lossless**.
   - Continúa descargando en segundo plano con notificación nativa interactiva aunque salgas de la aplicación.
 - **Actualizador Automático de Versiones APK (`AppReleaseUpdater`)**:

@@ -443,20 +443,30 @@ object YtDlpNativeEngine {
 
             var directAudioUrl: String? = null
             var directVideoUrl: String? = null
-            val resolvedHeaders = mutableMapOf<String, String>()
+            var audioHeaders = mapOf<String, String>()
+            var videoHeaders = mapOf<String, String>()
 
-            fun extractHeadersFromJson(fmtObj: JSONObject) {
-                val headersObj = fmtObj.optJSONObject("http_headers") ?: rootJson.optJSONObject("http_headers")
-                if (headersObj != null) {
-                    val keys = headersObj.keys()
+            fun extractHeadersMapFromJson(fmtObj: JSONObject): Map<String, String> {
+                val map = LinkedHashMap<String, String>()
+                val rootHeadersObj = rootJson.optJSONObject("http_headers")
+                if (rootHeadersObj != null) {
+                    val keys = rootHeadersObj.keys()
                     while (keys.hasNext()) {
                         val k = keys.next()
-                        val v = headersObj.optString(k, "")
-                        if (v.isNotBlank()) {
-                            resolvedHeaders[k] = v
-                        }
+                        val v = rootHeadersObj.optString(k, "")
+                        if (v.isNotBlank()) map[k] = v
                     }
                 }
+                val fmtHeadersObj = fmtObj.optJSONObject("http_headers")
+                if (fmtHeadersObj != null) {
+                    val keys = fmtHeadersObj.keys()
+                    while (keys.hasNext()) {
+                        val k = keys.next()
+                        val v = fmtHeadersObj.optString(k, "")
+                        if (v.isNotBlank()) map[k] = v
+                    }
+                }
+                return map
             }
 
             fun isDirectHttpStream(fmtUrl: String, protocol: String, ext: String): Boolean {
@@ -473,6 +483,17 @@ object YtDlpNativeEngine {
                 return true
             }
 
+            fun clientDirectDownloadBonus(fmtUrl: String): Double {
+                val lower = fmtUrl.lowercase()
+                return when {
+                    lower.contains("c=android_vr") -> 1500.0
+                    lower.contains("c=ios") -> 1200.0
+                    lower.contains("c=android_music") -> 1000.0
+                    lower.contains("c=visionos") -> 900.0
+                    else -> 0.0
+                }
+            }
+
             // 1. Revisar formatos seleccionados explícitamente por yt-dlp (requested_formats)
             val requestedFormats = rootJson.optJSONArray("requested_formats")
             if (requestedFormats != null) {
@@ -484,12 +505,14 @@ object YtDlpNativeEngine {
                     val ext = fmt.optString("ext", "")
                     val fmtUrl = fmt.optString("url", "")
                     if (isDirectHttpStream(fmtUrl, protocol, ext)) {
-                        extractHeadersFromJson(fmt)
+                        val fmtHeaders = extractHeadersMapFromJson(fmt)
                         if (vcodec != "none" && directVideoUrl == null) {
                             directVideoUrl = fmtUrl
+                            videoHeaders = fmtHeaders
                         }
                         if (acodec != "none" && directAudioUrl == null) {
                             directAudioUrl = fmtUrl
+                            audioHeaders = fmtHeaders
                         }
                     }
                 }
@@ -500,6 +523,7 @@ object YtDlpNativeEngine {
             if (formats != null) {
                 var bestAudioScore = -1.0
                 var selectedVideoUrl: String? = null
+                var selectedVideoHeaders: Map<String, String> = emptyMap()
                 var bestVideoScore = -999999
 
                 for (i in 0 until formats.length()) {
@@ -514,14 +538,15 @@ object YtDlpNativeEngine {
                     val height = fmt.optInt("height", 0)
                     val abr = fmt.optDouble("abr", 0.0).takeIf { it > 0 } ?: fmt.optDouble("tbr", 0.0)
 
-                    // Audio directo de alta fidelidad (priorizar m4a / mp4a para compatibilidad nativa en Android)
+                    // Audio directo de alta fidelidad (priorizar m4a / mp4a y clientes ANDROID_VR / IOS que no dan 403 en OkHttp)
                     if (acodec != "none" && vcodec == "none") {
                         val codecBonus = if (ext == "m4a" || acodec.contains("mp4a")) 500.0 else 0.0
-                        val audioScore = abr + codecBonus
+                        val clientBonus = clientDirectDownloadBonus(fmtUrl)
+                        val audioScore = abr + codecBonus + clientBonus
                         if (audioScore > bestAudioScore || directAudioUrl == null) {
                             bestAudioScore = audioScore
                             directAudioUrl = fmtUrl
-                            extractHeadersFromJson(fmt)
+                            audioHeaders = extractHeadersMapFromJson(fmt)
                         }
                     }
 
@@ -536,22 +561,23 @@ object YtDlpNativeEngine {
                         if (vcodec.startsWith("avc1") || vcodec.contains("h264")) {
                             score += 4000
                         } else if (vcodec.startsWith("av01") || vcodec.contains("av1")) {
-                            // Penalizar AV1 ya que muchos decodificadores móviles y extractores fallan con él
                             score -= 6000
                         } else if (vcodec.contains("vp9")) {
                             score -= 2000
                         }
+                        score += clientDirectDownloadBonus(fmtUrl).toInt()
 
                         if (score > bestVideoScore) {
                             bestVideoScore = score
                             selectedVideoUrl = fmtUrl
-                            extractHeadersFromJson(fmt)
+                            selectedVideoHeaders = extractHeadersMapFromJson(fmt)
                         }
                     }
                 }
 
                 if (selectedVideoUrl != null) {
                     directVideoUrl = selectedVideoUrl
+                    videoHeaders = selectedVideoHeaders
                 }
             }
 
@@ -561,7 +587,7 @@ object YtDlpNativeEngine {
                 val rootExt = rootJson.optString("ext", "")
                 if (isDirectHttpStream(rootUrl, rootProto, rootExt)) {
                     directAudioUrl = rootUrl
-                    extractHeadersFromJson(rootJson)
+                    audioHeaders = extractHeadersMapFromJson(rootJson)
                 }
             }
 
@@ -575,15 +601,39 @@ object YtDlpNativeEngine {
                     val vcodec = fmt.optString("vcodec", "none").lowercase()
                     val acodec = fmt.optString("acodec", "none").lowercase()
                     if (isDirectHttpStream(fmtUrl, protocol, ext) && vcodec != "none" && acodec != "none") {
+                        val fmtHeaders = extractHeadersMapFromJson(fmt)
                         directVideoUrl = fmtUrl
-                        extractHeadersFromJson(fmt)
-                        if (directAudioUrl == null) directAudioUrl = fmtUrl
+                        videoHeaders = fmtHeaders
+                        if (directAudioUrl == null) {
+                            directAudioUrl = fmtUrl
+                            audioHeaders = fmtHeaders
+                        }
                         break
                     }
                 }
             }
 
             val finalVideoUrl = directVideoUrl ?: directAudioUrl ?: url
+            val finalAudioHeaders = com.example.data.streaming.StreamingHttpDataSourceConfig.resolveHeadersForStream(
+                videoId = null,
+                rawUrl = directAudioUrl ?: finalVideoUrl,
+                explicitHeaders = audioHeaders
+            )
+            val finalVideoHeaders = com.example.data.streaming.StreamingHttpDataSourceConfig.resolveHeadersForStream(
+                videoId = null,
+                rawUrl = finalVideoUrl,
+                explicitHeaders = videoHeaders.ifEmpty { audioHeaders }
+            )
+
+            com.example.data.streaming.StreamingHttpDataSourceConfig.registerStreamHeaders(
+                videoId = WebStreamExtractor.extractVideoId(url),
+                audioUrl = directAudioUrl,
+                videoUrl = finalVideoUrl,
+                headers = finalAudioHeaders,
+                audioHeaders = finalAudioHeaders,
+                videoHeaders = finalVideoHeaders
+            )
+
             val mediaInfo = OnlineVideoAudioImporter.ResolvedMediaInfo(
                 originalUrl = url,
                 suggestedTitle = title,
@@ -592,7 +642,9 @@ object YtDlpNativeEngine {
                 audioUrl = directAudioUrl,
                 coverUrl = thumbnail.ifBlank { null },
                 durationSeconds = duration,
-                httpHeaders = resolvedHeaders
+                httpHeaders = finalAudioHeaders,
+                audioHeaders = finalAudioHeaders,
+                videoHeaders = finalVideoHeaders
             )
 
             AuraDebugManager.logInfo(TAG, "¡yt-dlp resolvió exitosamente: '$title' de $uploader ($duration s) con video 480p!")
@@ -600,6 +652,120 @@ object YtDlpNativeEngine {
         } catch (e: Exception) {
             AuraDebugManager.logWarning(TAG, "Fallo al ejecutar proceso yt-dlp: ${e.message}")
             Result.failure(e)
+        }
+    }
+
+    /**
+     * Descarga directamente el flujo de audio o video 480p hacia [targetFile] usando el motor HTTP/TLS
+     * interno de `yt-dlp` (CPython + OpenSSL + QuickJS).
+     * Se utiliza como 5º nivel infalible de la cascada cuando un nodo de `googlevideo.com` exige la misma
+     * sesión TLS (huella JA3) que generó el token del video.
+     */
+    suspend fun downloadStreamDirectToFile(
+        context: Context,
+        url: String,
+        targetFile: File,
+        isAudioOnly: Boolean
+    ): Boolean = withContext(Dispatchers.IO) {
+        try {
+            if (YtDlpAutoUpdater.isYtDlpTemporarilyBlocked()) return@withContext false
+            init(context)
+            FFmpegNativeEngine.init(context)
+
+            val ytdlpFile = YtDlpAutoUpdater.getYtDlpFile(context)
+            val activePython = getPythonExecutable(context) ?: return@withContext false
+            if (!ytdlpFile.exists()) return@withContext false
+
+            val rawTrimmedUrl = url.trim()
+            if (!rawTrimmedUrl.startsWith("http://", ignoreCase = true) && !rawTrimmedUrl.startsWith("https://", ignoreCase = true)) {
+                return@withContext false
+            }
+            val cleanUrl = normalizeYouTubeMusicUrlForYtDlp(rawTrimmedUrl)
+
+            val pythonEnvDir = File(context.filesDir, "env/python")
+            ensureTlsCertificates(pythonEnvDir)
+            val localCert = File(pythonEnvDir, "usr/etc/tls/cert.pem")
+            val qjsBin = getQuickJsExecutable(context)
+            val ffmpegBin = FFmpegNativeEngine.getBinaryFile(context)
+
+            if (targetFile.exists()) {
+                targetFile.delete()
+            }
+            targetFile.parentFile?.mkdirs()
+
+            val formatSelector = if (isAudioOnly) {
+                "bestaudio[ext=m4a][protocol^=http]/bestaudio[protocol^=http]/best[ext=mp4][protocol^=http]/best"
+            } else {
+                "bestvideo[height<=480][ext=mp4][vcodec^=avc1][protocol^=http]/best[height<=480][ext=mp4][protocol^=http]/best[height<=480]"
+            }
+
+            val cmdList = mutableListOf<String>().apply {
+                add(activePython.absolutePath)
+                add("-I")
+                add(ytdlpFile.absolutePath)
+                add("--no-config")
+                add("--no-warnings")
+                add("--no-part")
+                add("--no-playlist")
+                add("--extractor-args")
+                add("youtube:player_client=android_vr,ios,web")
+                add("--format")
+                add(formatSelector)
+                if (qjsBin != null && qjsBin.exists()) {
+                    add("--js-runtimes")
+                    add("quickjs:${qjsBin.absolutePath}")
+                }
+                if (ffmpegBin != null && ffmpegBin.exists()) {
+                    add("--ffmpeg-location")
+                    add(ffmpegBin.absolutePath)
+                }
+                add("-o")
+                add(targetFile.absolutePath)
+                add("--")
+                add(cleanUrl)
+            }
+
+            val nativeDir = context.applicationInfo.nativeLibraryDir
+            val directPythonZipSo = File(nativeDir, "libpython.zip.so")
+            val stdlibZip = File(pythonEnvDir, "stdlib.zip")
+            val stdlibDir = File(pythonEnvDir, "stdlib")
+            val modulesDir = File(pythonEnvDir, "modules")
+            val ffmpegEnvDir = File(context.filesDir, "env/ffmpeg")
+
+            val pb = ProcessBuilder(cmdList)
+                .directory(File(nativeDir))
+                .redirectErrorStream(true)
+
+            pb.environment().apply {
+                this["PYTHONHOME"] = pythonEnvDir.absolutePath
+                this["PYTHONPATH"] = "${directPythonZipSo.absolutePath}:${stdlibZip.absolutePath}:${stdlibDir.absolutePath}:${modulesDir.absolutePath}:${pythonEnvDir.absolutePath}:${pythonEnvDir.absolutePath}/usr/lib/python3.11:${context.filesDir.absolutePath}/bin"
+                this["PYTHONNOUSERSITE"] = "1"
+                this["HOME"] = pythonEnvDir.absolutePath
+                this["LD_LIBRARY_PATH"] = "$nativeDir:${modulesDir.absolutePath}:${pythonEnvDir.absolutePath}/usr/lib:${ffmpegEnvDir.absolutePath}/usr/lib"
+                if (localCert.exists() && localCert.length() > 0) {
+                    this["SSL_CERT_FILE"] = localCert.absolutePath
+                    this["CURL_CA_BUNDLE"] = localCert.absolutePath
+                    this["REQUESTS_CA_BUNDLE"] = localCert.absolutePath
+                }
+                this["PATH"] = "$nativeDir:${context.filesDir.absolutePath}/bin:${System.getenv("PATH") ?: ""}"
+                this["TMPDIR"] = context.cacheDir.absolutePath
+            }
+
+            AuraDebugManager.logInfo(TAG, "Ejecutando descarga directa nativa con yt-dlp (${if (isAudioOnly) "Audio" else "Video 480p"}) para: $cleanUrl")
+            val process = pb.start()
+            process.inputStream.bufferedReader().use { it.readText() }
+            val exitCode = process.waitFor()
+
+            val ok = exitCode == 0 && targetFile.exists() && targetFile.length() > 1024L
+            if (ok) {
+                AuraDebugManager.logInfo(TAG, "¡Descarga directa nativa con yt-dlp completada (${targetFile.length()} bytes)!")
+            } else {
+                AuraDebugManager.logWarning(TAG, "Descarga directa con yt-dlp terminó con código $exitCode.")
+            }
+            ok
+        } catch (e: Exception) {
+            AuraDebugManager.logWarning(TAG, "Excepción en descarga directa con yt-dlp: ${e.message}")
+            false
         }
     }
 

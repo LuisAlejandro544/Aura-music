@@ -35,7 +35,9 @@ object OnlineVideoAudioImporter {
         val audioUrl: String?,
         val coverUrl: String?,
         val durationSeconds: Long,
-        val httpHeaders: Map<String, String> = emptyMap()
+        val httpHeaders: Map<String, String> = emptyMap(),
+        val audioHeaders: Map<String, String> = emptyMap(),
+        val videoHeaders: Map<String, String> = emptyMap()
     )
 
     /**
@@ -127,6 +129,55 @@ object OnlineVideoAudioImporter {
             var audioReady = false
             var durationMs = resolvedInfo.durationSeconds * 1000L
 
+            val effectiveAudioHeaders = resolvedInfo.audioHeaders.ifEmpty { resolvedInfo.httpHeaders }
+            val effectiveVideoHeaders = resolvedInfo.videoHeaders.ifEmpty { resolvedInfo.httpHeaders }
+
+            suspend fun extractAudioFromDownloadedVideo(sourceVidFile: File): Boolean {
+                if (!sourceVidFile.exists() || sourceVidFile.length() <= 0L) return false
+                try {
+                    val videoUri = Uri.fromFile(sourceVidFile)
+                    val isYoutube = resolvedInfo.originalUrl.contains("youtu", ignoreCase = true)
+                    val dummyTrack = VideoAudioExtractor.convertVideoToTrack(
+                        context = context,
+                        storageManager = storageManager,
+                        videoUri = videoUri,
+                        title = finalTitle,
+                        artist = finalArtist,
+                        album = if (isYoutube) "YouTube Music" else "TikTok Music",
+                        attachAsCanvas = false,
+                        forceLoop = forceLoop,
+                        trimSilence = false
+                    )
+                    if (dummyTrack != null) {
+                        val extractedFile = File(Uri.parse(dummyTrack.uriString).path ?: "")
+                        if (extractedFile.exists() && extractedFile.length() > 0L) {
+                            extractedFile.copyTo(audioFile, overwrite = true)
+                            if (extractedFile.absolutePath != audioFile.absolutePath) {
+                                extractedFile.delete()
+                            }
+                            return audioFile.exists() && audioFile.length() > 0L
+                        }
+                    }
+                } catch (_: Throwable) {}
+
+                if (FFmpegNativeEngine.isAvailable(context)) {
+                    val ffmpegResult = FFmpegNativeEngine.extractAudio(
+                        context = context,
+                        inputFile = sourceVidFile,
+                        outputFile = audioFile,
+                        audioBitrate = "256k",
+                        targetFormat = "m4a",
+                        totalDurationMs = durationMs
+                    )
+                    if (ffmpegResult.success && audioFile.exists() && audioFile.length() > 0L) {
+                        return true
+                    }
+                }
+
+                sourceVidFile.copyTo(audioFile, overwrite = true)
+                return audioFile.exists() && audioFile.length() > 0L
+            }
+
             // 1. Descarga prioritaria del audio de alta fidelidad (o copia instantánea si ya estaba en caché de streaming)
             if (!resolvedInfo.audioUrl.isNullOrBlank()) {
                 val localCachedAudio = if (resolvedInfo.audioUrl.startsWith("/")) File(resolvedInfo.audioUrl) else null
@@ -138,7 +189,7 @@ object OnlineVideoAudioImporter {
                         url = resolvedInfo.audioUrl,
                         targetFile = audioFile,
                         phase = "Descargando audio de alta fidelidad...",
-                        customHeaders = resolvedInfo.httpHeaders,
+                        customHeaders = effectiveAudioHeaders,
                         httpClient = httpClient,
                         onProgress = onProgressUpdate
                     )
@@ -148,134 +199,115 @@ object OnlineVideoAudioImporter {
                 }
             }
 
-            // 2. Si no había audio directo o falló, descargar flujo de video (o usar caché local) y demuxear
+            // 2. Si no había audio directo o falló, descargar flujo de video (con sus videoHeaders propios) y demuxear
             if (!audioReady) {
                 val localCachedVideo = if (resolvedInfo.videoUrl.startsWith("/")) File(resolvedInfo.videoUrl) else null
                 val downloadVideoSuccess = if (localCachedVideo != null && localCachedVideo.exists() && localCachedVideo.length() > 0L) {
                     localCachedVideo.copyTo(tempVideoFile, overwrite = true)
                     tempVideoFile.exists() && tempVideoFile.length() > 0L
-                } else {
+                } else if (resolvedInfo.videoUrl.isNotBlank() && resolvedInfo.videoUrl != resolvedInfo.audioUrl) {
                     ChunkedStreamDownloader.downloadUrlToFile(
                         url = resolvedInfo.videoUrl,
                         targetFile = tempVideoFile,
                         phase = "Descargando flujo multimedia...",
-                        customHeaders = resolvedInfo.httpHeaders,
+                        customHeaders = effectiveVideoHeaders,
                         httpClient = httpClient,
                         onProgress = onProgressUpdate
                     )
+                } else {
+                    false
                 }
                 if (downloadVideoSuccess && tempVideoFile.exists() && tempVideoFile.length() > 0L) {
-                    try {
-                        val videoUri = Uri.fromFile(tempVideoFile)
-                        val isYoutube = resolvedInfo.originalUrl.contains("youtu", ignoreCase = true)
-                        val dummyTrack = VideoAudioExtractor.convertVideoToTrack(
-                            context = context,
-                            storageManager = storageManager,
-                            videoUri = videoUri,
-                            title = finalTitle,
-                            artist = finalArtist,
-                            album = if (isYoutube) "YouTube Music" else "TikTok Music",
-                            attachAsCanvas = false,
-                            forceLoop = forceLoop,
-                            trimSilence = false
-                        )
-                        if (dummyTrack != null) {
-                            val extractedFile = File(Uri.parse(dummyTrack.uriString).path ?: "")
-                            if (extractedFile.exists() && extractedFile.length() > 0L) {
-                                audioReady = true
-                                extractedFile.copyTo(audioFile, overwrite = true)
-                            }
-                        }
-                    } catch (_: Throwable) {}
-
-                    if (!audioReady && FFmpegNativeEngine.isAvailable(context)) {
-                        val ffmpegResult = FFmpegNativeEngine.extractAudio(
-                            context = context,
-                            inputFile = tempVideoFile,
-                            outputFile = audioFile,
-                            audioBitrate = "256k",
-                            targetFormat = "m4a",
-                            totalDurationMs = durationMs
-                        )
-                        if (ffmpegResult.success && audioFile.exists() && audioFile.length() > 0L) {
-                            audioReady = true
-                        }
-                    }
-
-                    if (!audioReady) {
-                        tempVideoFile.copyTo(audioFile, overwrite = true)
-                        audioReady = true
-                    }
+                    audioReady = extractAudioFromDownloadedVideo(tempVideoFile)
                 }
             }
 
-            // 3. Fallback inteligente de autoreparación: si el stream devolvió 403 (ej. pistas VEVO protegidas) o falló
+            // 3. Cascada completa de autoreparación en 5 niveles si googlevideo.com devolvió HTTP 403 (VEVO / CDN / colisión de sesión)
             if (!audioReady && WebStreamExtractor.isWebVideoUrl(resolvedInfo.originalUrl)) {
                 val ytId = WebStreamExtractor.extractVideoId(resolvedInfo.originalUrl)
-                if (ytId != null) {
-                    AuraDebugManager.logInfo(
-                        "OnlineImporter",
-                        "El stream inicial requirió autoreparación (posible bloqueo VEVO/403). Resolviendo stream firmado con yt-dlp / InnerTube / Invidious..."
+                AuraDebugManager.logInfo(
+                    "OnlineImporter",
+                    "Activando cascada de autoreparación anti-403 para '${resolvedInfo.originalUrl}' (ID: ${ytId ?: "N/A"})..."
+                )
+
+                suspend fun tryDownloadFromCandidate(candidateName: String, candidate: ResolvedMediaInfo?): Boolean {
+                    if (candidate == null) return false
+                    // Evitar reintentar exactamente la misma URL que ya falló con 403
+                    val candAudioUrl = candidate.audioUrl
+                    if (!candAudioUrl.isNullOrBlank() && candAudioUrl != resolvedInfo.audioUrl) {
+                        val candAudioHeaders = candidate.audioHeaders.ifEmpty { candidate.httpHeaders }
+                        val okAudio = ChunkedStreamDownloader.downloadUrlToFile(
+                            url = candAudioUrl,
+                            targetFile = audioFile,
+                            phase = "Descargando audio ($candidateName)...",
+                            customHeaders = candAudioHeaders,
+                            httpClient = httpClient,
+                            onProgress = onProgressUpdate
+                        )
+                        if (okAudio && audioFile.exists() && audioFile.length() > 0L) {
+                            AuraDebugManager.logInfo("OnlineImporter", "¡Audio recuperado con éxito mediante $candidateName!")
+                            return true
+                        }
+                    }
+
+                    val candVideoUrl = candidate.videoUrl
+                    if (candVideoUrl.isNotBlank() && candVideoUrl != resolvedInfo.videoUrl && candVideoUrl != resolvedInfo.audioUrl) {
+                        val candVideoHeaders = candidate.videoHeaders.ifEmpty { candidate.httpHeaders }
+                        val okVid = ChunkedStreamDownloader.downloadUrlToFile(
+                            url = candVideoUrl,
+                            targetFile = tempVideoFile,
+                            phase = "Descargando flujo multimedia ($candidateName)...",
+                            customHeaders = candVideoHeaders,
+                            httpClient = httpClient,
+                            onProgress = onProgressUpdate
+                        )
+                        if (okVid && tempVideoFile.exists() && tempVideoFile.length() > 0L) {
+                            if (extractAudioFromDownloadedVideo(tempVideoFile)) {
+                                AuraDebugManager.logInfo("OnlineImporter", "¡Audio extraído con éxito mediante video de $candidateName!")
+                                return true
+                            }
+                        }
+                    }
+                    return false
+                }
+
+                // Nivel Fallback 1: InnerTube Multi-Cliente (ANDROID_VR -> VISIONOS -> ANDROID_MUSIC -> IOS)
+                if (!audioReady && ytId != null) {
+                    val innerTubeCandidate = InnerTubeClient.resolve(ytId, resolvedInfo.originalUrl)
+                    audioReady = tryDownloadFromCandidate("InnerTube", innerTubeCandidate)
+                }
+
+                // Nivel Fallback 2: Bypass Invidious API
+                if (!audioReady && ytId != null) {
+                    val invidiousCandidate = InvidiousStreamResolver.resolve(ytId, resolvedInfo.originalUrl)
+                    audioReady = tryDownloadFromCandidate("Invidious", invidiousCandidate)
+                }
+
+                // Nivel Fallback 3: Headless WebView (m.youtube.com)
+                if (!audioReady && ytId != null) {
+                    val webViewCandidate = HeadlessWebViewExtractor.resolve(context, ytId, resolvedInfo.originalUrl)
+                    audioReady = tryDownloadFromCandidate("WebView", webViewCandidate)
+                }
+
+                // Nivel Fallback 4: Descarga nativa directa con el binario yt-dlp CLI (misma sesión TLS/OpenSSL que resolvió el token)
+                if (!audioReady && YtDlpNativeEngine.isAvailable(context)) {
+                    onProgressUpdate(
+                        DownloadProgress(
+                            isDownloading = true,
+                            phase = "Descargando directamente con motor nativo yt-dlp...",
+                            bytesDownloaded = 0L,
+                            totalBytes = 0L,
+                            progressFraction = 0.35f
+                        )
                     )
-                    val freshInfo = (if (YtDlpNativeEngine.isAvailable(context)) {
-                        YtDlpNativeEngine.resolveStream(context, resolvedInfo.originalUrl).getOrNull()
-                    } else null)
-                        ?: InnerTubeClient.resolve(ytId, resolvedInfo.originalUrl)
-                        ?: InvidiousStreamResolver.resolve(ytId, resolvedInfo.originalUrl)
-
-                    if (freshInfo != null) {
-                        if (!freshInfo.audioUrl.isNullOrBlank()) {
-                            val backupAudioSuccess = ChunkedStreamDownloader.downloadUrlToFile(
-                                url = freshInfo.audioUrl,
-                                targetFile = audioFile,
-                                phase = "Descargando audio de alta fidelidad...",
-                                customHeaders = freshInfo.httpHeaders,
-                                httpClient = httpClient,
-                                onProgress = onProgressUpdate
-                            )
-                            if (backupAudioSuccess && audioFile.exists() && audioFile.length() > 0L) {
-                                audioReady = true
-                            }
-                        }
-
-                        if (!audioReady && !freshInfo.videoUrl.isNullOrBlank()) {
-                            val backupVideoSuccess = ChunkedStreamDownloader.downloadUrlToFile(
-                                url = freshInfo.videoUrl,
-                                targetFile = tempVideoFile,
-                                phase = "Descargando flujo multimedia...",
-                                customHeaders = freshInfo.httpHeaders,
-                                httpClient = httpClient,
-                                onProgress = onProgressUpdate
-                            )
-                            if (backupVideoSuccess && tempVideoFile.exists() && tempVideoFile.length() > 0L) {
-                                try {
-                                    val videoUri = Uri.fromFile(tempVideoFile)
-                                    val dummyTrack = VideoAudioExtractor.convertVideoToTrack(
-                                        context = context,
-                                        storageManager = storageManager,
-                                        videoUri = videoUri,
-                                        title = finalTitle,
-                                        artist = finalArtist,
-                                        album = "YouTube Music",
-                                        attachAsCanvas = false,
-                                        forceLoop = forceLoop,
-                                        trimSilence = false
-                                    )
-                                    if (dummyTrack != null) {
-                                        val extractedFile = File(Uri.parse(dummyTrack.uriString).path ?: "")
-                                        if (extractedFile.exists() && extractedFile.length() > 0L) {
-                                            audioReady = true
-                                            extractedFile.copyTo(audioFile, overwrite = true)
-                                        }
-                                    }
-                                } catch (_: Throwable) {}
-
-                                if (!audioReady) {
-                                    tempVideoFile.copyTo(audioFile, overwrite = true)
-                                    audioReady = true
-                                }
-                            }
-                        }
+                    val directOk = YtDlpNativeEngine.downloadStreamDirectToFile(
+                        context = context,
+                        url = resolvedInfo.originalUrl,
+                        targetFile = audioFile,
+                        isAudioOnly = true
+                    )
+                    if (directOk && audioFile.exists() && audioFile.length() > 0L) {
+                        audioReady = true
                     }
                 }
             }

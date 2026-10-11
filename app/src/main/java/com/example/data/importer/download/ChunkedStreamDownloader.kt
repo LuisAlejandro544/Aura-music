@@ -166,62 +166,64 @@ object ChunkedStreamDownloader {
         }
 
         val cleanUrl = if (isGoogleVideoHost) {
-            url.replace(Regex("""&range=\d+-\d+"""), "")
-                .replace(Regex("""\?range=\d+-\d+&"""), "?")
+            url.replace(Regex("""&range=[^&]+"""), "")
+                .replace(Regex("""\?range=[^&]+&"""), "?")
+                .replace(Regex("""&rn=[^&]+"""), "")
+                .replace(Regex("""&rbuf=[^&]+"""), "")
         } else url
+
+        val alignedHeaders = com.example.data.streaming.StreamingHttpDataSourceConfig.resolveHeadersForStream(
+            videoId = null,
+            rawUrl = cleanUrl,
+            explicitHeaders = customHeaders
+        )
 
         // 1. Acelerador de descarga por bloques HTTP Range (evita el estrangulamiento de 63 KB/s de YouTube)
         if (isGoogleVideoHost) {
-            val chunkedSuccess = executeChunkedDownload(cleanUrl, targetFile, phase, customHeaders, httpClient, onProgress)
+            val chunkedSuccess = executeChunkedDownload(cleanUrl, targetFile, phase, alignedHeaders, httpClient, onProgress)
             if (chunkedSuccess && targetFile.exists() && targetFile.length() > 0L) {
                 return true
             }
         }
 
-        // 2. Descarga lineal estándar de respaldo
+        // 2. Descarga lineal estándar de respaldo con cabeceras alineadas al cliente c=
         return try {
-            val defaultUa = customHeaders["User-Agent"]
-                ?: customHeaders["user-agent"]
-                ?: "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
-
             val reqBuilder = Request.Builder().url(cleanUrl)
-                .header("User-Agent", defaultUa)
-                .header("Accept", "*/*")
-                .header("Accept-Encoding", "identity")
-
-            for ((k, v) in customHeaders) {
-                if (!k.equals("Range", ignoreCase = true) && !k.equals("Accept-Encoding", ignoreCase = true)) {
+            for ((k, v) in alignedHeaders) {
+                if (!k.equals("Range", ignoreCase = true)) {
                     reqBuilder.header(k, v)
                 }
             }
 
-            if (isYoutubeStream && isTrustedYoutubeOrGoogleVideoHost(cleanUrl)) {
-                if (customHeaders.isEmpty()) {
-                    reqBuilder.header("Referer", "https://m.youtube.com/")
-                }
-                try {
-                    val cookies = android.webkit.CookieManager.getInstance().getCookie("https://m.youtube.com")
-                    if (!cookies.isNullOrBlank() && !customHeaders.containsKey("Cookie")) {
-                        reqBuilder.header("Cookie", cookies)
-                    }
-                } catch (_: Throwable) {}
-            }
-
             var response = httpClient.newCall(reqBuilder.build()).execute()
 
-            if (response.code == 403 && (isYoutubeStream || cleanUrl.contains("googlevideo.com"))) {
+            // Si devuelve 403, reintentar exclusivamente con el User-Agent canónico puro del cliente `c=` sin cabeceras extra
+            if (response.code == 403 && (isYoutubeStream || isGoogleVideoHost)) {
                 response.close()
-                val fallbackReq = Request.Builder()
+                val clientParam = try { Uri.parse(cleanUrl).getQueryParameter("c") } catch (_: Exception) { null }
+                val canonicalUa = com.example.data.streaming.StreamingHttpDataSourceConfig.inferCanonicalUserAgentForClient(clientParam)
+                    ?: alignedHeaders["User-Agent"]
+                    ?: "Mozilla/5.0 (Android; VR; Meta Quest 3) AppleWebKit/537.36"
+
+                val fallbackReqBuilder = Request.Builder()
                     .url(cleanUrl)
-                    .header("User-Agent", defaultUa)
+                    .header("User-Agent", canonicalUa)
                     .header("Accept", "*/*")
-                    .build()
-                response = httpClient.newCall(fallbackReq).execute()
+                    .header("Accept-Encoding", "identity")
+
+                if (clientParam == null || clientParam.startsWith("WEB", ignoreCase = true) || clientParam.startsWith("MWEB", ignoreCase = true)) {
+                    fallbackReqBuilder
+                        .header("Origin", "https://www.youtube.com")
+                        .header("Referer", "https://www.youtube.com/")
+                }
+
+                response = httpClient.newCall(fallbackReqBuilder.build()).execute()
             }
 
             response.use { res ->
                 if (!res.isSuccessful) {
-                    AuraDebugManager.logWarning("Downloader", "HTTP ${res.code} al descargar: ${cleanUrl.take(50)}...")
+                    val clientTag = try { Uri.parse(cleanUrl).getQueryParameter("c") ?: "N/A" } catch (_: Exception) { "N/A" }
+                    AuraDebugManager.logWarning("Downloader", "HTTP ${res.code} (c=$clientTag) al descargar: ${cleanUrl.take(55)}...")
                     return false
                 }
                 val body = res.body ?: return false
@@ -300,22 +302,14 @@ object ChunkedStreamDownloader {
         url: String,
         targetFile: File,
         phase: String,
-        customHeaders: Map<String, String>,
+        alignedHeaders: Map<String, String>,
         httpClient: OkHttpClient,
         onProgress: (DownloadProgress) -> Unit
     ): Boolean {
         return try {
-            val signedUa = customHeaders["User-Agent"]
-                ?: customHeaders["user-agent"]
-                ?: "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
-
-            val probeBuilder = Request.Builder()
-                .url(url)
-                .header("User-Agent", signedUa)
-                .header("Accept", "*/*")
-
-            for ((k, v) in customHeaders) {
-                if (!k.equals("Range", ignoreCase = true) && !k.equals("Accept-Encoding", ignoreCase = true)) {
+            val probeBuilder = Request.Builder().url(url)
+            for ((k, v) in alignedHeaders) {
+                if (!k.equals("Range", ignoreCase = true)) {
                     probeBuilder.header(k, v)
                 }
             }
@@ -332,7 +326,13 @@ object ChunkedStreamDownloader {
             }
 
             if (totalBytes <= 0L) {
-                return false
+                // Algunos formatos progresivos aceptan &range=start-end por query param en lugar de cabecera Range
+                val clenParam = try { Uri.parse(url).getQueryParameter("clen")?.toLongOrNull() } catch (_: Exception) { null }
+                if (clenParam != null && clenParam > 0L) {
+                    totalBytes = clenParam
+                } else {
+                    return false
+                }
             }
 
             val chunkSize = 2_621_440L // 2.5 MB por fragmento
@@ -349,23 +349,34 @@ object ChunkedStreamDownloader {
             FileOutputStream(targetFile, true).use { fileOut ->
                 while (currentByte < totalBytes) {
                     val endByte = minOf(currentByte + chunkSize - 1, totalBytes - 1)
-                    val chunkBuilder = Request.Builder()
-                        .url(url)
-                        .header("User-Agent", signedUa)
-                        .header("Accept", "*/*")
+                    val chunkBuilder = Request.Builder().url(url)
 
-                    for ((k, v) in customHeaders) {
-                        if (!k.equals("Range", ignoreCase = true) && !k.equals("Accept-Encoding", ignoreCase = true)) {
+                    for ((k, v) in alignedHeaders) {
+                        if (!k.equals("Range", ignoreCase = true)) {
                             chunkBuilder.header(k, v)
                         }
                     }
                     chunkBuilder.header("Range", "bytes=$currentByte-$endByte")
 
-                    val chunkRes = httpClient.newCall(chunkBuilder.build()).execute()
+                    var chunkRes = httpClient.newCall(chunkBuilder.build()).execute()
                     if (!chunkRes.isSuccessful && chunkRes.code != 206) {
                         chunkRes.close()
-                        AuraDebugManager.logWarning("Downloader", "Bloque rechazado con código ${chunkRes.code}. Recurriendo a descarga lineal.")
-                        return false
+                        // Si el servidor CDN prefiere parámetro query &range=start-end en lugar de cabecera HTTP Range
+                        val separator = if (url.contains("?")) "&" else "?"
+                        val queryRangeUrl = "${url}${separator}range=$currentByte-$endByte"
+                        val queryRangeBuilder = Request.Builder().url(queryRangeUrl)
+                        for ((k, v) in alignedHeaders) {
+                            if (!k.equals("Range", ignoreCase = true)) {
+                                queryRangeBuilder.header(k, v)
+                            }
+                        }
+                        chunkRes = httpClient.newCall(queryRangeBuilder.build()).execute()
+                        if (!chunkRes.isSuccessful && chunkRes.code != 206) {
+                            val code = chunkRes.code
+                            chunkRes.close()
+                            AuraDebugManager.logWarning("Downloader", "Bloque rechazado con código $code. Recurriendo a descarga lineal.")
+                            return false
+                        }
                     }
 
                     chunkRes.body?.byteStream()?.use { chunkStream ->
