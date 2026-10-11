@@ -82,19 +82,25 @@ object InnerTubeClient {
         originalUrl: String
     ): OnlineVideoAudioImporter.ResolvedMediaInfo? = withContext(Dispatchers.IO) {
         val visitorData = getOrFetchVisitorData()
-        val cookieHeader = WebViewCookieBridge.getConsolidatedCookieHeader()
+        val hasAuthSession = WebViewCookieBridge.hasAuthenticatedSessionCookies()
+        val authCookieHeader = if (hasAuthSession) WebViewCookieBridge.getConsolidatedCookieHeader() else null
 
+        // IMPORTANTE: Los clientes de aplicación nativa (ANDROID_VR, IOS, ANDROID_TESTSUITE)
+        // NO deben enviar cookies de invitado de navegador móvil (m.youtube.com como VISITOR_INFO1_LIVE / YSC)
+        // ni cabeceras Origin: https://www.youtube.com, porque GoogleVideo ata el firma/token al contexto
+        // de sesión web y devuelve HTTP 403 Forbidden al descargar con el User-Agent nativo de Oculus/iOS.
         // Estrategia 1: ANDROID_VR (Oculus Quest 3 nativo). Entrega URLs directas sin signatureCipher ni PO Token.
         val vrResult = queryInnerTube(
             videoId = videoId,
             originalUrl = originalUrl,
             endpointUrl = "https://www.youtube.com/youtubei/v1/player?prettyPrint=false",
             clientName = "ANDROID_VR",
-            clientVersion = "1.61.48",
+            clientVersion = "1.62.27",
             clientIdHeader = "28",
-            userAgent = "com.google.android.apps.youtube.vr.oculus/1.61.48 (Linux; U; Android 12; en_US; Quest 3; Build/SQ3A.220605.009.A1; Cronet/132.0.6808.3)",
+            userAgent = "com.google.android.apps.youtube.vr.oculus/1.62.27 (Linux; U; Android 12; en_US; Quest 3; Build/SQ3A.220605.009.A1; Cronet/132.0.6808.3)",
             visitorData = visitorData,
-            cookieHeader = cookieHeader,
+            cookieHeader = null,
+            sendWebOriginHeader = false,
             extraClientProps = mapOf(
                 "deviceMake" to "Oculus",
                 "deviceModel" to "Quest 3",
@@ -115,7 +121,8 @@ object InnerTubeClient {
             clientIdHeader = "5",
             userAgent = "com.google.ios.youtube/20.10.4 (iPhone16,2; U; CPU iOS 18_3_2 like Mac OS X;)",
             visitorData = visitorData,
-            cookieHeader = cookieHeader,
+            cookieHeader = null,
+            sendWebOriginHeader = false,
             extraClientProps = mapOf(
                 "deviceMake" to "Apple",
                 "deviceModel" to "iPhone16,2",
@@ -135,7 +142,8 @@ object InnerTubeClient {
             clientIdHeader = "85",
             userAgent = "Mozilla/5.0 (PlayStation; PlayStation 4/12.00) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.4 Safari/605.1.15",
             visitorData = visitorData,
-            cookieHeader = cookieHeader,
+            cookieHeader = authCookieHeader,
+            sendWebOriginHeader = true,
             extraClientProps = emptyMap(),
             embedThirdParty = true
         )
@@ -151,7 +159,8 @@ object InnerTubeClient {
             clientIdHeader = "30",
             userAgent = "com.google.android.youtube/1.9 (Linux; U; Android 14; en_US) gzip",
             visitorData = visitorData,
-            cookieHeader = cookieHeader,
+            cookieHeader = null,
+            sendWebOriginHeader = false,
             extraClientProps = mapOf("androidSdkVersion" to 34)
         )
         if (testSuiteResult != null) return@withContext testSuiteResult
@@ -169,6 +178,7 @@ object InnerTubeClient {
         userAgent: String,
         visitorData: String?,
         cookieHeader: String?,
+        sendWebOriginHeader: Boolean = false,
         extraClientProps: Map<String, Any>,
         embedThirdParty: Boolean = false
     ): OnlineVideoAudioImporter.ResolvedMediaInfo? {
@@ -209,8 +219,12 @@ object InnerTubeClient {
                 .header("User-Agent", userAgent)
                 .header("X-YouTube-Client-Name", clientIdHeader)
                 .header("X-YouTube-Client-Version", clientVersion)
-                .header("Origin", "https://www.youtube.com")
                 .post(body)
+
+            if (sendWebOriginHeader) {
+                requestBuilder.header("Origin", "https://www.youtube.com")
+                requestBuilder.header("Referer", "https://www.youtube.com/")
+            }
 
             if (!visitorData.isNullOrBlank()) {
                 requestBuilder.header("X-Goog-Visitor-Id", visitorData)

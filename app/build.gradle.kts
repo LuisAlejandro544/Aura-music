@@ -570,17 +570,17 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
     val pythonLauncherC = File(cppDir, "native_python_launcher.c")
 
     // Paquetes y directorios de escritorio/test/servidores legados en stdlib que yt-dlp jamás utiliza en Android
+    // (Se preservan intactos xmlrpc/, wsgiref/, difflib.pyc y _pydecimal.pyc requeridos por yt-dlp oficial)
     val prunedStdlibPrefixes = listOf(
       "test/", "tests/", "unittest/", "tkinter/", "idlelib/", "turtledemo/",
       "pydoc_data/", "distutils/", "lib2to3/", "ensurepip/", "venv/", "curses/", "dbm/", "msilib/",
-      "multiprocessing/popen_", "multiprocessing/resource_", "multiprocessing/forkserver", "multiprocessing/shared_memory",
-      "wsgiref/", "xmlrpc/"
+      "multiprocessing/popen_", "multiprocessing/resource_", "multiprocessing/forkserver", "multiprocessing/shared_memory"
     )
     val prunedStdlibExact = setOf(
       "turtle.pyc", "turtle.py", "doctest.pyc", "doctest.py", "pdb.pyc",
-      "_pydecimal.pyc", "_pydecimal.py", "pydoc.pyc", "pydoc.py",
+      "pydoc.pyc", "pydoc.py",
       "mailbox.pyc", "mailbox.py", "pickletools.pyc", "pickletools.py",
-      "difflib.pyc", "difflib.py", "smtpd.pyc", "smtplib.pyc", "imaplib.pyc",
+      "smtpd.pyc", "smtplib.pyc", "imaplib.pyc",
       "poplib.pyc", "nntplib.pyc", "ftplib.pyc", "telnetlib.pyc",
       "antigravity.pyc", "this.pyc", " tabnanny.pyc", "tabnanny.pyc",
       "cProfile.pyc", "profile.pyc", "pstats.pyc", "timeit.pyc", "trace.pyc",
@@ -597,6 +597,7 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
     }
 
     // Módulos C nativos (.so) y librerías compartidas que yt-dlp nunca usa (bases de datos, tests, GUI, audioop, codecs CJK pesados, profilers)
+    // (Se preservan intactos mmap, cmath, _statistics, _zoneinfo y _decimal requeridos por yt-dlp)
     val prunedNativeSharedLibs = setOf(
       "libsqlite3_chaquopy.so", "libsqlite3.so"
     )
@@ -604,8 +605,8 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
       "_sqlite3", "_tkinter", "_test", "_ctypes_test", "_xxtestfuzz", "xxlimited",
       "_curses", "_dbm", "_gdbm", "nis", "ossaudiodev", "spwd", "syslog",
       "audioop", "_codecs_cn", "_codecs_hk", "_codecs_iso2022", "_codecs_jp", "_codecs_kr", "_codecs_tw",
-      "_decimal", "_lsprof", "_xxsubinterpreters", "_statistics", "_zoneinfo", "termios", "resource",
-      "cmath", "mmap", "_multiprocessing", "_posixshmem", "grp", "crypt"
+      "_lsprof", "_xxsubinterpreters", "termios", "resource",
+      "_multiprocessing", "_posixshmem", "grp", "crypt"
     )
 
     fun shouldPrunePythonCModule(fileName: String): Boolean {
@@ -877,7 +878,7 @@ val ensureDebugKeystore = tasks.register<EnsureDebugKeystoreTask>("ensureDebugKe
 
 val provisionNativeDeps = tasks.register<ProvisionNativeDepsTask>("provisionNativeDeps") {
   dependsOn(ensureDebugKeystore)
-  provisionVersion.set("v2.5-pure-ffmpeg-cli-no-abidetect")
+  provisionVersion.set("v2.6-ytdlp-stdlib-restored")
   val mobileOnlyMode = gradle.startParameter.taskNames.any { it.contains("Beta", ignoreCase = true) } ||
     System.getenv("AURA_BETA_MOBILE_ONLY") == "true" ||
     System.getenv("AURA_SPLIT_APKS") == "true"

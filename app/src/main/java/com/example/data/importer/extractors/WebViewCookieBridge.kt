@@ -98,6 +98,37 @@ object WebViewCookieBridge {
     }
 
     /**
+     * Comprueba si existen cookies reales de sesión autenticada de Google/YouTube
+     * (`SAPISID`, `__Secure-3PAPISID`, `SID`, `LOGIN_INFO`), evitando pasar cookies vacías de invitado (`SOCS`)
+     * que en `yt-dlp` o `InnerTubeClient` desactivan clientes nativos (`android_vr` / `ios`).
+     */
+    fun hasAuthenticatedSessionCookies(context: Context? = null): Boolean {
+        return try {
+            val authCookieNames = setOf("SAPISID", "__Secure-3PAPISID", "__Secure-1PAPISID", "SID", "HSID", "SSID", "LOGIN_INFO")
+            if (context != null) {
+                val file = getCookiesFile(context)
+                if (file.exists() && file.length() >= 120L) {
+                    val foundInFile = file.readLines().any { line ->
+                        val trimmed = line.trim()
+                        if (trimmed.isEmpty() || trimmed.startsWith("#")) return@any false
+                        val cols = trimmed.split("\t")
+                        cols.size >= 7 && cols[5].trim() in authCookieNames && cols[6].trim().isNotEmpty()
+                    }
+                    if (foundInFile) return true
+                }
+            }
+            val rawHeader = getConsolidatedCookieHeader() ?: return false
+            rawHeader.split(";").any { pair ->
+                val name = pair.substringBefore("=", "").trim()
+                val value = pair.substringAfter("=", "").trim()
+                name in authCookieNames && value.isNotEmpty()
+            }
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
+    /**
      * Cuenta cuántas entradas de cookies activas existen actualmente en `cookies.txt`.
      */
     fun getCookieEntriesCount(context: Context): Int {

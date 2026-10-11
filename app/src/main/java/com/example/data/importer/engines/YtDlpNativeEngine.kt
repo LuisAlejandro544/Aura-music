@@ -55,7 +55,7 @@ object YtDlpNativeEngine {
             }.orEmpty()
 
             val currentSignature = buildString {
-                append("direct_symlink_v4_")
+                append("direct_symlink_v5_")
                 if (pythonZip.exists()) append("${pythonZip.length()}_${pythonZip.lastModified()}_")
                 append("mods:${pymodFiles.size}")
             }
@@ -233,33 +233,41 @@ object YtDlpNativeEngine {
         ensureTlsCertificates(pythonEnvDir)
         val localCert = File(pythonEnvDir, "usr/etc/tls/cert.pem")
 
-        // Exportar automáticamente las cookies reales del WebView a cookies.txt (equivalente Android a --cookies-from-browser)
+        // Exportar cookies reales del WebView a cookies.txt (solo se adjuntan si contienen sesión autenticada o en reintento explícito)
         val cookiesFile = WebViewCookieBridge.syncWebViewCookiesToNetscapeFile(context)
-        val capturedUserAgent = WebViewCookieBridge.getCapturedUserAgent(context)
+        val hasAuthCookies = WebViewCookieBridge.hasAuthenticatedSessionCookies(context)
 
-        fun buildYtDlpCommand(activeCookiesFile: File?): MutableList<String> {
+        fun buildYtDlpCommand(
+            activeCookiesFile: File?,
+            useCookies: Boolean,
+            useCustomExtractorArgs: Boolean = true
+        ): MutableList<String> {
             return mutableListOf<String>().apply {
                 add(activePython.absolutePath)
                 add(ytdlpFile.absolutePath)
                 add("--dump-single-json")
                 add("--no-warnings")
+                add("--no-playlist")
                 add("--no-check-formats")
-                add("--user-agent")
-                add(capturedUserAgent)
-                if (activeCookiesFile != null && activeCookiesFile.exists() && activeCookiesFile.length() > 60L) {
+                // IMPORTANTE: No pasar --user-agent global para no contaminar el User-Agent nativo de Oculus Quest (android_vr) e iOS (ios)
+                if (useCookies && activeCookiesFile != null && activeCookiesFile.exists() && activeCookiesFile.length() > 60L) {
                     add("--cookies")
                     add(activeCookiesFile.absolutePath)
                 }
-                val capturedVisitorData = WebViewCookieBridge.getCapturedVisitorData(context)
-                val extractorArgValue = if (!capturedVisitorData.isNullOrBlank()) {
-                    "youtube:player_client=android_vr,tv,ios,mweb,web;visitor_data=$capturedVisitorData"
-                } else {
-                    "youtube:player_client=android_vr,tv,ios,mweb,web"
+                if (useCustomExtractorArgs) {
+                    val capturedVisitorData = WebViewCookieBridge.getCapturedVisitorData(context)
+                    val extractorArgValue = if (!capturedVisitorData.isNullOrBlank() && !useCookies) {
+                        "youtube:player_client=android_vr,ios,tv,mweb,web;visitor_data=$capturedVisitorData"
+                    } else if (useCookies) {
+                        "youtube:player_client=tv,mweb,web,android_vr,ios"
+                    } else {
+                        "youtube:player_client=android_vr,ios,tv,mweb,web"
+                    }
+                    add("--extractor-args")
+                    add(extractorArgValue)
                 }
-                add("--extractor-args")
-                add(extractorArgValue)
                 add("--format")
-                add("bestvideo[height<=480][ext=mp4][vcodec^=avc1][protocol^=http]+bestaudio[ext=m4a][protocol^=http]/bestvideo[height<=480][ext=mp4][protocol^=http]+bestaudio[protocol^=http]/best[height<=480][ext=mp4][protocol^=http]/best[height<=480]")
+                add("bestvideo[height<=480][ext=mp4][vcodec^=avc1][protocol^=http]+bestaudio[ext=m4a][protocol^=http]/bestvideo[height<=480][ext=mp4][protocol^=http]+bestaudio[protocol^=http]/best[height<=480][ext=mp4][protocol^=http]/best[height<=480]/best")
                 if (qjsBin != null && qjsBin.exists()) {
                     add("--js-runtimes")
                     add("quickjs:${qjsBin.absolutePath}")
@@ -278,9 +286,9 @@ object YtDlpNativeEngine {
             }
         }
 
-        var cmdList = buildYtDlpCommand(cookiesFile)
+        var cmdList = buildYtDlpCommand(cookiesFile, useCookies = hasAuthCookies, useCustomExtractorArgs = true)
 
-        AuraDebugManager.logInfo(TAG, "Ejecutando yt-dlp con Python nativo + cookies.txt para resolver URL: $url")
+        AuraDebugManager.logInfo(TAG, "Ejecutando yt-dlp con Python nativo (clientes nativos limpios sin --user-agent forzado) para resolver URL: $url")
         val jsonOutput = StringBuilder()
         val errorLog = StringBuilder()
 
@@ -405,14 +413,18 @@ object YtDlpNativeEngine {
                 retryErrThread.join()
             }
 
-            // Reintento automático inmediato refrescando las cookies del navegador WebView (cookies.txt + visitorData)
+            // Reintento automático inmediato con configuración por defecto de yt-dlp y/o cookies refrescadas
             if (exitCode != 0 || jsonOutput.isBlank()) {
-                AuraDebugManager.logWarning(TAG, "Primer intento de yt-dlp finalizó con código $exitCode. Refrescando cookies del WebView a cookies.txt y reintentando...")
+                AuraDebugManager.logWarning(TAG, "Primer intento de yt-dlp finalizó con código $exitCode (${errorLog.takeLast(180).trim()}). Reintentando con clientes por defecto + cookies del WebView...")
                 val refreshedCookies = WebViewCookieBridge.warmUpAndExportCookies(
                     context = context,
                     targetVideoId = WebStreamExtractor.extractVideoId(cleanUrl)
                 )
-                cmdList = buildYtDlpCommand(refreshedCookies)
+                cmdList = buildYtDlpCommand(
+                    activeCookiesFile = refreshedCookies,
+                    useCookies = WebViewCookieBridge.hasAuthenticatedSessionCookies(context),
+                    useCustomExtractorArgs = false
+                )
                 jsonOutput.clear()
                 errorLog.clear()
 
@@ -626,6 +638,227 @@ object YtDlpNativeEngine {
             AuraDebugManager.logWarning(TAG, "Fallo al ejecutar proceso yt-dlp: ${e.message}")
             Result.failure(e)
         }
+    }
+
+    /**
+     * Descarga directamente el archivo de audio (y opcionalmente el Video Canvas en 480p) a disco
+     * ejecutando `yt-dlp` como descargador nativo (con soporte de fragmentos concurrentes `-N 4`,
+     * manejo interno de firmas `n-sig`, rangos dinámicos y cabeceras exactas por cliente para evitar HTTP 403).
+     */
+    suspend fun downloadMediaDirectlyToFiles(
+        context: Context,
+        url: String,
+        targetAudioFile: File,
+        targetVideoFile: File?,
+        onProgress: (com.example.model.DownloadProgress) -> Unit
+    ): Boolean = withContext(Dispatchers.IO) {
+        if (YtDlpAutoUpdater.isYtDlpTemporarilyBlocked()) return@withContext false
+
+        init(context)
+        FFmpegNativeEngine.init(context)
+
+        val ytdlpFile = YtDlpAutoUpdater.getYtDlpFile(context)
+        val activePython = getPythonExecutable(context) ?: return@withContext false
+        if (!ytdlpFile.exists() || ytdlpFile.length() < 10_000L) return@withContext false
+
+        val cleanUrl = normalizeYouTubeMusicUrlForYtDlp(url.trim())
+        if (!cleanUrl.startsWith("http://", ignoreCase = true) && !cleanUrl.startsWith("https://", ignoreCase = true)) {
+            return@withContext false
+        }
+
+        val pythonEnvDir = File(context.filesDir, "env/python")
+        ensureTlsCertificates(pythonEnvDir)
+        val localCert = File(pythonEnvDir, "usr/etc/tls/cert.pem")
+        val ffmpegBin = FFmpegNativeEngine.getBinaryFile(context)
+        val qjsBin = getQuickJsExecutable(context)
+        val cookiesFile = WebViewCookieBridge.syncWebViewCookiesToNetscapeFile(context)
+        val hasAuthCookies = WebViewCookieBridge.hasAuthenticatedSessionCookies(context)
+
+        fun configurePythonEnv(pb: ProcessBuilder) {
+            val nativeDir = context.applicationInfo.nativeLibraryDir
+            val directPythonZipSo = File(nativeDir, "libpython.zip.so")
+            val stdlibZip = File(pythonEnvDir, "stdlib.zip")
+            val stdlibDir = File(pythonEnvDir, "stdlib")
+            val modulesDir = File(pythonEnvDir, "modules")
+            val ffmpegEnvDir = File(context.filesDir, "env/ffmpeg")
+
+            pb.environment().apply {
+                this["PYTHONHOME"] = pythonEnvDir.absolutePath
+                this["PYTHONPATH"] = "${directPythonZipSo.absolutePath}:${stdlibZip.absolutePath}:${stdlibDir.absolutePath}:${modulesDir.absolutePath}:${pythonEnvDir.absolutePath}:${pythonEnvDir.absolutePath}/usr/lib/python3.11:${context.filesDir.absolutePath}/bin"
+                this["PYTHONNOUSERSITE"] = "1"
+                this["HOME"] = pythonEnvDir.absolutePath
+                this["LD_LIBRARY_PATH"] = "$nativeDir:${modulesDir.absolutePath}:${pythonEnvDir.absolutePath}/usr/lib:${ffmpegEnvDir.absolutePath}/usr/lib"
+                if (localCert.exists() && localCert.length() > 0) {
+                    this["SSL_CERT_FILE"] = localCert.absolutePath
+                    this["CURL_CA_BUNDLE"] = localCert.absolutePath
+                    this["REQUESTS_CA_BUNDLE"] = localCert.absolutePath
+                }
+                val apexCacerts = File("/apex/com.android.conscrypt/cacerts")
+                val systemCacerts = File("/system/etc/security/cacerts")
+                val certDir = when {
+                    apexCacerts.exists() && apexCacerts.isDirectory && (apexCacerts.list()?.isNotEmpty() == true) -> apexCacerts
+                    systemCacerts.exists() && systemCacerts.isDirectory && (systemCacerts.list()?.isNotEmpty() == true) -> systemCacerts
+                    else -> null
+                }
+                if (certDir != null) {
+                    this["SSL_CERT_DIR"] = certDir.absolutePath
+                }
+                this["PATH"] = "$nativeDir:${context.filesDir.absolutePath}/bin:${System.getenv("PATH") ?: ""}"
+                this["TMPDIR"] = context.cacheDir.absolutePath
+            }
+        }
+
+        val progressRegex = Regex("""\[download\]\s+(\d+(?:\.\d+)?)%(?:\s+of\s+~?\s*([\d.]+)([KMG]i?B))?(?:\s+at\s+([\d.]+)([KMG]i?B)/s)?""", RegexOption.IGNORE_CASE)
+
+        fun parseUnitToBytes(amount: Double, unit: String): Long {
+            val u = unit.uppercase()
+            val mult = when {
+                u.startsWith("G") -> 1024L * 1024L * 1024L
+                u.startsWith("M") -> 1024L * 1024L
+                u.startsWith("K") -> 1024L
+                else -> 1L
+            }
+            return (amount * mult).toLong()
+        }
+
+        fun runDirectYtDlpDownload(
+            formatSelector: String,
+            outputFile: File,
+            phaseLabel: String,
+            useCookies: Boolean
+        ): Boolean {
+            return try {
+                outputFile.parentFile?.mkdirs()
+                if (outputFile.exists()) outputFile.delete()
+                File("${outputFile.absolutePath}.part").takeIf { it.exists() }?.delete()
+
+                val cmd = mutableListOf<String>().apply {
+                    add(activePython.absolutePath)
+                    add(ytdlpFile.absolutePath)
+                    add("--no-playlist")
+                    add("--no-warnings")
+                    add("--no-part")
+                    add("--newline")
+                    add("--concurrent-fragments")
+                    add("4")
+                    add("--retries")
+                    add("3")
+                    if (useCookies && cookiesFile != null && cookiesFile.exists() && cookiesFile.length() > 60L) {
+                        add("--cookies")
+                        add(cookiesFile.absolutePath)
+                    }
+                    val capturedVisitorData = WebViewCookieBridge.getCapturedVisitorData(context)
+                    val extractorArgValue = if (!capturedVisitorData.isNullOrBlank() && !useCookies) {
+                        "youtube:player_client=android_vr,ios,tv,mweb,web;visitor_data=$capturedVisitorData"
+                    } else {
+                        "youtube:player_client=android_vr,ios,tv,mweb,web"
+                    }
+                    add("--extractor-args")
+                    add(extractorArgValue)
+                    add("-f")
+                    add(formatSelector)
+                    if (qjsBin != null && qjsBin.exists()) {
+                        add("--js-runtimes")
+                        add("quickjs:${qjsBin.absolutePath}")
+                    }
+                    if (ffmpegBin != null && ffmpegBin.exists()) {
+                        add("--ffmpeg-location")
+                        add(ffmpegBin.absolutePath)
+                    }
+                    add("-o")
+                    add(outputFile.absolutePath)
+                    add("--")
+                    add(cleanUrl)
+                }
+
+                val pb = ProcessBuilder(cmd)
+                    .directory(File(context.applicationInfo.nativeLibraryDir))
+                    .redirectErrorStream(true)
+                configurePythonEnv(pb)
+
+                val proc = pb.start()
+                val errTail = StringBuilder()
+
+                BufferedReader(InputStreamReader(proc.inputStream)).use { reader ->
+                    var line: String?
+                    while (reader.readLine().also { line = it } != null) {
+                        val ln = line ?: continue
+                        val match = progressRegex.find(ln)
+                        if (match != null) {
+                            val pct = (match.groupValues[1].toFloatOrNull() ?: 0f) / 100f
+                            val totalVal = match.groupValues[2].toDoubleOrNull() ?: 0.0
+                            val totalUnit = match.groupValues[3]
+                            val speedVal = match.groupValues[4].toDoubleOrNull() ?: 0.0
+                            val speedUnit = match.groupValues[5]
+                            val totalBytes = if (totalVal > 0.0) parseUnitToBytes(totalVal, totalUnit) else 0L
+                            val speedBytes = if (speedVal > 0.0) parseUnitToBytes(speedVal, speedUnit) else 0L
+                            val downloadedBytes = if (totalBytes > 0L) (totalBytes * pct).toLong() else outputFile.length()
+
+                            onProgress(
+                                com.example.model.DownloadProgress(
+                                    isDownloading = true,
+                                    phase = phaseLabel,
+                                    bytesDownloaded = downloadedBytes,
+                                    totalBytes = totalBytes,
+                                    bytesPerSecond = speedBytes,
+                                    progressFraction = pct.coerceIn(0f, 1f)
+                                )
+                            )
+                        } else if (ln.contains("ERROR:", ignoreCase = true)) {
+                            errTail.append(ln).append("\n")
+                        }
+                    }
+                }
+
+                val code = proc.waitFor()
+                val ok = code == 0 && outputFile.exists() && outputFile.length() > 1024L
+                if (!ok && errTail.isNotEmpty()) {
+                    AuraDebugManager.logWarning(TAG, "yt-dlp descarga directa ($phaseLabel) código $code: ${errTail.takeLast(200).trim()}")
+                }
+                ok
+            } catch (e: Exception) {
+                AuraDebugManager.logWarning(TAG, "Excepción en descarga directa yt-dlp ($phaseLabel): ${e.message}")
+                false
+            }
+        }
+
+        // 1. Descargar audio directamente con yt-dlp
+        val audioSelector = "bestaudio[ext=m4a][protocol^=http]/bestaudio[protocol^=http]/best[height<=480][ext=mp4]/best"
+        var audioDownloaded = runDirectYtDlpDownload(
+            formatSelector = audioSelector,
+            outputFile = targetAudioFile,
+            phaseLabel = "Descargando audio de alta fidelidad (yt-dlp)...",
+            useCookies = hasAuthCookies
+        )
+        if (!audioDownloaded) {
+            audioDownloaded = runDirectYtDlpDownload(
+                formatSelector = "bestaudio/best",
+                outputFile = targetAudioFile,
+                phaseLabel = "Descargando audio de alta fidelidad (yt-dlp)...",
+                useCookies = !hasAuthCookies
+            )
+        }
+
+        if (!audioDownloaded || !targetAudioFile.exists() || targetAudioFile.length() <= 1024L) {
+            return@withContext false
+        }
+
+        // 2. Si el usuario solicitó Video Canvas (targetVideoFile != null), descargar el video en 480p directamente con yt-dlp
+        if (targetVideoFile != null) {
+            val videoSelector = "bestvideo[height<=480][ext=mp4][vcodec^=avc1][protocol^=http]/bestvideo[height<=480][ext=mp4][protocol^=http]/best[height<=480][ext=mp4]/best[height<=480]"
+            val videoOk = runDirectYtDlpDownload(
+                formatSelector = videoSelector,
+                outputFile = targetVideoFile,
+                phaseLabel = "Descargando Video Canvas 480p (yt-dlp)...",
+                useCookies = hasAuthCookies
+            )
+            if (!videoOk) {
+                AuraDebugManager.logInfo(TAG, "Video Canvas 480p opcional no se descargó en pase directo; se continuará con audio + carátula.")
+            }
+        }
+
+        AuraDebugManager.logInfo(TAG, "¡Descarga directa nativa por yt-dlp completada con éxito (${targetAudioFile.length() / 1024} KB)!")
+        true
     }
 
     /**

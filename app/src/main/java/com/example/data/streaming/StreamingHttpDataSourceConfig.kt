@@ -28,7 +28,7 @@ object StreamingHttpDataSourceConfig {
         "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
 
     private const val VR_CLIENT_UA =
-        "Mozilla/5.0 (Android; VR; Meta Quest 3) AppleWebKit/537.36"
+        "com.google.android.apps.youtube.vr.oculus/1.62.27 (Linux; U; Android 12; en_US; Quest 3; Build/SQ3A.220605.009.A1; Cronet/132.0.6808.3)"
 
     private const val VISION_CLIENT_UA =
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15"
@@ -37,7 +37,7 @@ object StreamingHttpDataSourceConfig {
         "com.google.android.apps.youtube.music/6.42.52 (Linux; U; Android 14; es_ES) gzip"
 
     private const val IOS_CLIENT_UA =
-        "com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)"
+        "com.google.ios.youtube/20.10.4 (iPhone16,2; U; CPU iOS 18_3_2 like Mac OS X;)"
 
     private val headersByVideoId = ConcurrentHashMap<String, Map<String, String>>()
     private val headersByUrlKey = ConcurrentHashMap<String, Map<String, String>>()
