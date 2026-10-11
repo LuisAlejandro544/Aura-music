@@ -39,10 +39,10 @@ object InnerTubeClient {
     private var lastVisitorFetchMs: Long = 0L
 
     /**
-     * Obtiene un `visitorData` real desde YouTube (o desde el puente WebView) para autenticar sesiones
-     * de invitado ante InnerTube y evitar bloqueos de bot.
+     * Obtiene un `visitorData` real desde YouTube (o desde el puente WebView como respaldo) para autenticar sesiones
+     * de invitado ante InnerTube y `yt-dlp` (`android_vr` + `player_skip=webpage,configs`) evitando bloqueos de bot.
      */
-    private fun getOrFetchVisitorData(): String? {
+    fun getOrFetchVisitorData(context: android.content.Context? = null): String? {
         val now = System.currentTimeMillis()
         cachedVisitorData?.let { if (it.isNotBlank() && now - lastVisitorFetchMs < 30 * 60 * 1000L) return it }
 
@@ -51,9 +51,6 @@ object InnerTubeClient {
                 .url("https://www.youtube.com/sw.js_data")
                 .header("User-Agent", WebViewCookieBridge.DEFAULT_MOBILE_USER_AGENT)
                 .get()
-            WebViewCookieBridge.getConsolidatedCookieHeader()?.let { cookie ->
-                reqBuilder.header("Cookie", cookie)
-            }
 
             httpClient.newCall(reqBuilder.build()).execute().use { resp ->
                 if (resp.isSuccessful) {
@@ -68,9 +65,9 @@ object InnerTubeClient {
                     }
                 }
             }
-            cachedVisitorData
+            cachedVisitorData ?: context?.let { WebViewCookieBridge.getCapturedVisitorData(it) }
         } catch (_: Throwable) {
-            cachedVisitorData
+            cachedVisitorData ?: context?.let { WebViewCookieBridge.getCapturedVisitorData(it) }
         }
     }
 
