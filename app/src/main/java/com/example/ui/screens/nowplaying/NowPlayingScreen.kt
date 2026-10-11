@@ -180,6 +180,8 @@ fun NowPlayingScreen(
     onSetNowPlayingDesignMode: (NowPlayingDesignMode) -> Unit = {},
     collectionContextTitle: String = "Tu Biblioteca",
     onDownloadStreamingTrack: ((Track) -> Unit)? = null,
+    isStreamingTrackDownloading: Boolean = false,
+    isStreamingTrackDownloaded: Boolean = false,
     isLoadingOrBuffering: Boolean = false,
     isWaitingForNetwork: Boolean = false,
     modifier: Modifier = Modifier
@@ -388,6 +390,8 @@ fun NowPlayingScreen(
                 onDownloadStreamingTrack = if (currentTrack.isStreamingTrack && onDownloadStreamingTrack != null) {
                     { onDownloadStreamingTrack(currentTrack) }
                 } else null,
+                isStreamingTrackDownloading = isStreamingTrackDownloading,
+                isStreamingTrackDownloaded = isStreamingTrackDownloaded,
                 isLoadingOrBuffering = isLoadingOrBuffering,
                 isVideoLoading = effectiveVideoLoading,
                 isWaitingForNetwork = effectiveWaitingNetwork
@@ -422,7 +426,9 @@ fun NowPlayingScreen(
                     onOpenDesignSelector = { showDesignSelectorDialog = true },
                     onDownloadStreamingTrack = if (currentTrack.isStreamingTrack && onDownloadStreamingTrack != null) {
                         { onDownloadStreamingTrack(currentTrack) }
-                    } else null
+                    } else null,
+                    isStreamingTrackDownloading = isStreamingTrackDownloading,
+                    isStreamingTrackDownloaded = isStreamingTrackDownloaded
                 )
 
             Spacer(modifier = Modifier.weight(0.5f))

@@ -111,6 +111,8 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
     val pendingIncomingVideoUri by viewModel.pendingIncomingVideoUri.collectAsStateWithLifecycle()
     val pendingIncomingWebLink by viewModel.pendingIncomingWebLink.collectAsStateWithLifecycle()
     val downloadProgress by viewModel.downloadProgress.collectAsStateWithLifecycle()
+    val downloadingStreamingIds by viewModel.downloadingStreamingIds.collectAsStateWithLifecycle()
+    val downloadedStreamingIds by viewModel.downloadedStreamingIds.collectAsStateWithLifecycle()
 
     // Estados de Mixtape Continuo con Capítulos Reactivos
     val isCreatingMixtape by viewModel.isCreatingMixtape.collectAsStateWithLifecycle()
@@ -409,7 +411,6 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
                                 val resolvingVideoId by viewModel.resolvingVideoId.collectAsStateWithLifecycle()
                                 val nextSimilarPreview by viewModel.nextSimilarTrackPreview.collectAsStateWithLifecycle()
                                 val streamingCacheCfg by viewModel.streamingCacheConfig.collectAsStateWithLifecycle()
-                                val downloadingIds by viewModel.downloadingStreamingIds.collectAsStateWithLifecycle()
 
                                 com.example.ui.screens.streaming.StreamingExploreScreen(
                                     searchQuery = streamingQuery,
@@ -421,7 +422,9 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
                                     currentTrack = effectiveTrack,
                                     nextSimilarTrackPreview = nextSimilarPreview,
                                     cacheConfig = streamingCacheCfg,
-                                    downloadingVideoIds = downloadingIds,
+                                    downloadingVideoIds = downloadingStreamingIds,
+                                    downloadedVideoIds = downloadedStreamingIds,
+                                    localLibraryTracks = allTracks,
                                     onSearchQueryChange = { viewModel.updateStreamingSearchQuery(it) },
                                     onSearchSubmit = { viewModel.performStreamingSearch(it) },
                                     onFilterChange = { viewModel.setStreamingSearchFilter(it) },
@@ -655,6 +658,16 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
                 onSetNowPlayingDesignMode = { viewModel.setNowPlayingDesignMode(it) },
                 collectionContextTitle = selectedPlaylist?.name ?: currentTrack?.album ?: "Tu Biblioteca",
                 onDownloadStreamingTrack = { track -> viewModel.downloadCurrentStreamingTrackPermanently(track) },
+                isStreamingTrackDownloading = effectiveTrack?.streamingVideoId?.let { vid -> downloadingStreamingIds.contains(vid) } == true,
+                isStreamingTrackDownloaded = effectiveTrack?.let { trk ->
+                    val vid = trk.streamingVideoId
+                    (!vid.isNullOrBlank() && downloadedStreamingIds.contains(vid)) ||
+                        allTracks.any { local ->
+                            (!vid.isNullOrBlank() && local.streamingVideoId == vid) ||
+                                (local.title.equals(trk.title, ignoreCase = true) &&
+                                    local.artist.equals(trk.artist, ignoreCase = true))
+                        }
+                } == true,
                 isLoadingOrBuffering = effectiveTrack?.isStreamingTrack == true && (isAudioBuffering || isResolvingStreamGlobal),
                 isWaitingForNetwork = effectiveTrack?.isStreamingTrack == true && isNetworkStalled,
                 isDynamicArtworkColorEnabled = isDynamicArtworkColorEnabled,

@@ -437,6 +437,54 @@ public:
         }
     }
 
+    /**
+     * Analiza las muestras PCM de 16-bit en modo de SOLO LECTURA (sin alterar ni un solo bit del buffer de salida).
+     * Diseñado para el Modo Streaming Híbrido: mantiene el bypass C++20 sobre los efectos de audio mientras
+     * alimenta en tiempo real las 28 bandas espectrales del visualizador (AudioVisualizer) y la intensidad acústica.
+     */
+    void analyzeReadOnlyPcm16(std::span<const int16_t> samples) {
+        if (samples.empty() || mChannels <= 0) return;
+
+        const size_t totalSamples = samples.size();
+        const size_t frames = totalSamples / static_cast<size_t>(mChannels);
+        if (frames == 0) return;
+
+        constexpr size_t NUM_BANDS = 28;
+        std::array<double, NUM_BANDS> bandEnergy{};
+        const size_t samplesPerBand = std::max<size_t>(1, frames / NUM_BANDS);
+        double sumSquares = 0.0;
+        size_t frameIdx = 0;
+
+        for (size_t i = 0; i < totalSamples; i += static_cast<size_t>(mChannels)) {
+            double sampleL = static_cast<double>(samples[i]) / 32768.0;
+            double sampleR = (mChannels > 1 && (i + 1) < totalSamples)
+                             ? static_cast<double>(samples[i + 1]) / 32768.0
+                             : sampleL;
+
+            double monoAbs = (std::abs(sampleL) + std::abs(sampleR)) * 0.5;
+            sumSquares += monoAbs * monoAbs;
+
+            size_t bandIdx = std::min<size_t>(NUM_BANDS - 1, frameIdx / samplesPerBand);
+            bandEnergy[bandIdx] += monoAbs;
+            frameIdx++;
+        }
+
+        double rms = std::sqrt(sumSquares / static_cast<double>(frames));
+        float targetIntensity = std::clamp(static_cast<float>(rms * 3.4), 0.06f, 1.0f);
+        mCurrentIntensity = (mCurrentIntensity * 0.60f) + (targetIntensity * 0.40f);
+
+        const double invSamplesPerBand = 1.0 / static_cast<double>(samplesPerBand);
+        for (size_t b = 0; b < NUM_BANDS; ++b) {
+            float avgBand = static_cast<float>(bandEnergy[b] * invSamplesPerBand);
+            float targetH = std::clamp(avgBand * 3.8f * kVisualizerBandWeights[b], 0.08f, 1.0f);
+            if (targetH > mVisualizerBands[b]) {
+                mVisualizerBands[b] = (mVisualizerBands[b] * 0.35f) + (targetH * 0.65f);
+            } else {
+                mVisualizerBands[b] = (mVisualizerBands[b] * 0.82f) + (targetH * 0.18f);
+            }
+        }
+    }
+
     [[nodiscard]] std::string getEngineInfo() const {
         return "Aura Music C++20 10-Band Biquad, Vocal Clarity, 8D/16D Spatial, Reverb & Crossfeed DSP Core [Modular Active]";
     }
@@ -505,6 +553,9 @@ Java_com_example_playback_NativeAudioEngine_nativeSetDspEnabled(JNIEnv* env, job
 
 JNIEXPORT void JNICALL
 Java_com_example_playback_NativeAudioEngine_nativeProcessPcmBuffer(JNIEnv* env, jobject thiz, jobject byteBuffer, jint offset, jint length);
+
+JNIEXPORT void JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeAnalyzePcmBufferReadOnly(JNIEnv* env, jobject thiz, jobject byteBuffer, jint offset, jint length);
 
 JNIEXPORT void JNICALL
 Java_com_example_playback_NativeAudioEngine_nativeSetEightDEnabled(JNIEnv* env, jobject thiz, jboolean enabled);

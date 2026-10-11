@@ -71,6 +71,9 @@ class StreamingModeCoordinator(
     private val _downloadingVideoIds = MutableStateFlow<Set<String>>(emptySet())
     val downloadingVideoIds: StateFlow<Set<String>> = _downloadingVideoIds.asStateFlow()
 
+    private val _downloadedVideoIds = MutableStateFlow<Set<String>>(emptySet())
+    val downloadedVideoIds: StateFlow<Set<String>> = _downloadedVideoIds.asStateFlow()
+
     private var searchJob: Job? = null
     private var playResolutionJob: Job? = null
     private var similarPrefetchJob: Job? = null
@@ -95,11 +98,15 @@ class StreamingModeCoordinator(
         loadInitialTrendingIfNeeded()
 
         // Limpiar estado de descarga del botón cuando AuraDownloadService termina (éxito o error)
+        // y activar el signo de verificación (✓) únicamente cuando la descarga haya culminado con éxito
         scope.launch {
             AuraDownloadService.taskFinishedEvents.collect { event ->
                 val vid = event.sourceVideoId
                 if (!vid.isNullOrBlank()) {
                     _downloadingVideoIds.value = _downloadingVideoIds.value - vid
+                    if (event.success) {
+                        _downloadedVideoIds.value = _downloadedVideoIds.value + vid
+                    }
                 } else {
                     _downloadingVideoIds.value = emptySet()
                 }

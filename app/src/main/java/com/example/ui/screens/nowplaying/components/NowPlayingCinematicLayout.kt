@@ -84,6 +84,8 @@ fun NowPlayingCinematicLayout(
     onOpenDetails: () -> Unit,
     collectionContextTitle: String = "Tu Biblioteca",
     onDownloadStreamingTrack: (() -> Unit)? = null,
+    isStreamingTrackDownloading: Boolean = false,
+    isStreamingTrackDownloaded: Boolean = false,
     isLoadingOrBuffering: Boolean = false,
     isVideoLoading: Boolean = false,
     isWaitingForNetwork: Boolean = false,
@@ -180,17 +182,39 @@ fun NowPlayingCinematicLayout(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (currentTrack.isStreamingTrack && onDownloadStreamingTrack != null) {
                         IconButton(
-                            onClick = onDownloadStreamingTrack,
+                            onClick = {
+                                if (!isStreamingTrackDownloading && !isStreamingTrackDownloaded) {
+                                    onDownloadStreamingTrack()
+                                }
+                            },
                             modifier = Modifier
                                 .size(42.dp)
                                 .testTag("cinematic_download_streaming_btn")
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.CloudDownload,
-                                contentDescription = "Descargar pista en biblioteca local",
-                                tint = animatedPrimary,
-                                modifier = Modifier.size(22.dp)
-                            )
+                            when {
+                                isStreamingTrackDownloading -> {
+                                    com.example.ui.components.AnimatedDownloadingArrowIcon(
+                                        tint = animatedPrimary,
+                                        size = 22.dp
+                                    )
+                                }
+                                isStreamingTrackDownloaded -> {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = "Descargado en biblioteca local",
+                                        tint = Color(0xFF10B981),
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+                                else -> {
+                                    Icon(
+                                        imageVector = Icons.Default.CloudDownload,
+                                        contentDescription = "Descargar pista en biblioteca local",
+                                        tint = animatedPrimary,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+                            }
                         }
                     }
                     IconButton(

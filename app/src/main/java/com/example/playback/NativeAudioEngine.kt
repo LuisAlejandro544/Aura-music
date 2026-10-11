@@ -213,6 +213,18 @@ object NativeAudioEngine {
     }
 
     /**
+     * Analiza en tiempo real las muestras PCM en modo de solo lectura (sin alterar el audio)
+     * para impulsar las 28 bandas del visualizador y la intensidad acústica en canciones de Streaming.
+     */
+    fun analyzePcmBufferReadOnly(byteBuffer: ByteBuffer, offset: Int, length: Int) {
+        if (isLoaded) {
+            try {
+                nativeAnalyzePcmBufferReadOnly(byteBuffer, offset, length)
+            } catch (ignored: Throwable) {}
+        }
+    }
+
+    /**
      * Limpieza de Buffer (Buffer Flushing):
      * Pone a cero los acumuladores de muestras previas en el ecualizador, filtros de bajos,
      * clarificador vocal, procesadores 8D/16D, líneas de retardo del filtro Crossfeed y colas de Reverb en C++20.
@@ -372,6 +384,7 @@ object NativeAudioEngine {
     private external fun nativeSetBassBoost(strength: Float)
     private external fun nativeSetDspEnabled(enabled: Boolean)
     private external fun nativeProcessPcmBuffer(byteBuffer: ByteBuffer, offset: Int, length: Int)
+    private external fun nativeAnalyzePcmBufferReadOnly(byteBuffer: ByteBuffer, offset: Int, length: Int)
     private external fun nativeSetEightDEnabled(enabled: Boolean)
     private external fun nativeSetEightD16DMode(is16DMode: Boolean)
     private external fun nativeSetEightDOrbitSpeed(speedSeconds: Float)

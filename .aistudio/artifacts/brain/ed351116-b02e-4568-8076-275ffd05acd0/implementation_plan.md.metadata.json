@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan técnico y de experiencia de usuario para reparar de raíz tanto el generador de Auto-Remix y Mashup de 2 canciones (FFmpeg) como el Smart AutoMix DJ de transiciones en vivo (Dual-Deck), además de actualizar el workflow de compilación de APK Debug en GitHub Actions para generar y publicar los 3 APKs móviles separados (arm64-v8a, armeabi-v7a y universal) junto con SHA256SUMS.txt en Artifacts.",
-  "updatedAt":  "2026-10-11T01:28:06.148295118Z",
+  "summary":  "Plan técnico de actualización a v0.2.0-beta-1a (NEBULA-00200A), corrección del desbordamiento de textos en filas y botones de Ajustes, animación continua de flecha descendente durante la descarga de pistas en Streaming con confirmación (✓) solo al completarse en la biblioteca, y reactividad garantizada de las 28 bandas del visualizador en canciones de Streaming.",
+  "updatedAt":  "2026-10-11T02:22:29.624643418Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

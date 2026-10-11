@@ -5,7 +5,7 @@
 ### **Tu estudio audiófilo, centro de descargas y experiencia Video Canvas en tu bolsillo.**
 **100% libre de anuncios y sin suscripciones.**
 
-[![Versión Beta](https://img.shields.io/badge/Versi%C3%B3n-v0.1.1--beta--1a%20(Nebula)-8B5CF6?style=for-the-badge&logo=android&logoColor=white)](../../releases)
+[![Versión Beta](https://img.shields.io/badge/Versi%C3%B3n-v0.2.0--beta--1a%20(Nebula)-8B5CF6?style=for-the-badge&logo=android&logoColor=white)](../../releases)
 [![Lenguaje Principal](https://img.shields.io/badge/Lenguaje-Kotlin%20%2B%20Jetpack%20Compose-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white)](./READMEAI.md)
 [![Motor de Audio](https://img.shields.io/badge/Audio%20DSP-ISO%20C%2B%2B20%20(64--bit)%20%2B%20AAudio-00D2FF?style=for-the-badge&logo=cplusplus&logoColor=white)](./READMEAI.md)
 [![Android API](https://img.shields.io/badge/Android-8.0%2B%20(API%2026--36)-3DDC84?style=for-the-badge&logo=android&logoColor=white)](../../releases)

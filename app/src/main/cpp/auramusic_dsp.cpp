@@ -77,6 +77,31 @@ Java_com_example_playback_NativeAudioEngine_nativeProcessPcmBuffer(JNIEnv* env, 
 }
 
 JNIEXPORT void JNICALL
+Java_com_example_playback_NativeAudioEngine_nativeAnalyzePcmBufferReadOnly(JNIEnv* env, jobject /* thiz */, jobject byteBuffer, jint offset, jint length) {
+    if (!byteBuffer || offset < 0 || length <= 0) return;
+
+    void* directBuffer = env->GetDirectBufferAddress(byteBuffer);
+    if (!directBuffer) return;
+
+    jlong capacity = env->GetDirectBufferCapacity(byteBuffer);
+    if (capacity <= 0) return;
+
+    jlong endOffset = static_cast<jlong>(offset) + static_cast<jlong>(length);
+    if (static_cast<jlong>(offset) >= capacity || endOffset > capacity || endOffset < static_cast<jlong>(offset)) {
+        return;
+    }
+
+    const auto* pcm16Ptr = reinterpret_cast<const int16_t*>(static_cast<const uint8_t*>(directBuffer) + offset);
+    size_t sampleCount = static_cast<size_t>(length) / sizeof(int16_t);
+
+    if (sampleCount > 0) {
+        std::lock_guard<std::mutex> lock(sDspMutex);
+        std::span<const int16_t> sampleSpan(pcm16Ptr, sampleCount);
+        sDspEngine.analyzeReadOnlyPcm16(sampleSpan);
+    }
+}
+
+JNIEXPORT void JNICALL
 Java_com_example_playback_NativeAudioEngine_nativeSetEightDEnabled(JNIEnv* /* env */, jobject /* thiz */, jboolean enabled) {
     LOGI("Aura Music Audio 8D/16D: %s", enabled ? "ACTIVADO" : "DESACTIVADO");
     std::lock_guard<std::mutex> lock(sDspMutex);

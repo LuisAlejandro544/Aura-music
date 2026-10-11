@@ -48,6 +48,8 @@ fun NowPlayingTopBar(
     isVocalClarityActive: Boolean = false,
     onOpenDesignSelector: (() -> Unit)? = null,
     onDownloadStreamingTrack: (() -> Unit)? = null,
+    isStreamingTrackDownloading: Boolean = false,
+    isStreamingTrackDownloaded: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val hasVideo = !currentTrack.videoUri.isNullOrEmpty()
@@ -87,20 +89,44 @@ fun NowPlayingTopBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            // Botón directo para descargar canción en streaming permanentemente a la biblioteca local
+            // Botón directo para descargar canción en streaming permanentemente a la biblioteca local:
+            // - Mientras descarga: muestra la animación de la flecha bajando sucesivamente.
+            // - Cuando termina de descargarse: muestra el signo de verificación (✓).
             if (currentTrack.isStreamingTrack && onDownloadStreamingTrack != null) {
                 IconButton(
-                    onClick = onDownloadStreamingTrack,
+                    onClick = {
+                        if (!isStreamingTrackDownloading && !isStreamingTrackDownloaded) {
+                            onDownloadStreamingTrack()
+                        }
+                    },
                     modifier = Modifier
                         .size(42.dp)
                         .testTag("now_playing_download_streaming_btn")
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.CloudDownload,
-                        contentDescription = "Descargar pista en biblioteca local",
-                        tint = animatedPrimary,
-                        modifier = Modifier.size(22.dp)
-                    )
+                    when {
+                        isStreamingTrackDownloading -> {
+                            com.example.ui.components.AnimatedDownloadingArrowIcon(
+                                tint = animatedPrimary,
+                                size = 22.dp
+                            )
+                        }
+                        isStreamingTrackDownloaded -> {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "Descargado en biblioteca local",
+                                tint = Color(0xFF10B981),
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        else -> {
+                            Icon(
+                                imageVector = Icons.Default.CloudDownload,
+                                contentDescription = "Descargar pista en biblioteca local",
+                                tint = animatedPrimary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
                 }
             }
 

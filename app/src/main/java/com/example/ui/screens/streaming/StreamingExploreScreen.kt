@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.CloudDownload
@@ -103,6 +104,8 @@ fun StreamingExploreScreen(
     nextSimilarTrackPreview: StreamingSearchItem?,
     cacheConfig: StreamingCacheConfig,
     downloadingVideoIds: Set<String>,
+    downloadedVideoIds: Set<String> = emptySet(),
+    localLibraryTracks: List<Track> = emptyList(),
     onSearchQueryChange: (String) -> Unit,
     onSearchSubmit: (String) -> Unit,
     onFilterChange: (StreamingSearchFilter) -> Unit,
@@ -310,12 +313,19 @@ fun StreamingExploreScreen(
                     val isCurrentlyPlaying = currentTrack?.streamingVideoId == item.videoId
                     val isBeingResolved = isResolvingStream && resolvingVideoId == item.videoId
                     val isDownloading = downloadingVideoIds.contains(item.videoId)
+                    val isAlreadyDownloaded = downloadedVideoIds.contains(item.videoId) ||
+                        localLibraryTracks.any { local ->
+                            local.streamingVideoId == item.videoId ||
+                                (local.title.equals(item.title, ignoreCase = true) &&
+                                    local.artist.equals(item.artist, ignoreCase = true))
+                        }
 
                     StreamingResultCard(
                         item = item,
                         isCurrentlyPlaying = isCurrentlyPlaying,
                         isBeingResolved = isBeingResolved,
                         isDownloading = isDownloading,
+                        isDownloaded = isAlreadyDownloaded,
                         onPlayClick = {
                             if (isCurrentlyPlaying) {
                                 onOpenNowPlaying()
@@ -402,6 +412,7 @@ private fun StreamingResultCard(
     isCurrentlyPlaying: Boolean,
     isBeingResolved: Boolean,
     isDownloading: Boolean,
+    isDownloaded: Boolean = false,
     onPlayClick: () -> Unit,
     onDownloadClick: () -> Unit
 ) {
@@ -510,31 +521,46 @@ private fun StreamingResultCard(
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            // Botón de Descarga Permanente en Biblioteca Local (mínimo 48dp de área táctil)
+            // Botón de Descarga Permanente en Biblioteca Local (mínimo 48dp de área táctil):
+            // - Mientras se está descargando: muestra la animación de la flecha bajando sucesivamente.
+            // - Cuando termina de descargarse: muestra el signo de verificación (✓) en verde.
             IconButton(
-                onClick = { if (!isDownloading) onDownloadClick() },
+                onClick = { if (!isDownloading && !isDownloaded) onDownloadClick() },
                 modifier = Modifier
                     .size(48.dp)
                     .clip(CircleShape)
                     .background(
-                        if (isDownloading) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                        else SurfaceVariantDark
+                        when {
+                            isDownloading -> MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
+                            isDownloaded -> Color(0xFF10B981).copy(alpha = 0.18f)
+                            else -> SurfaceVariantDark
+                        }
                     )
                     .testTag("download_streaming_${item.videoId}")
             ) {
-                if (isDownloading) {
-                    CircularProgressIndicator(
-                        color = MaterialTheme.colorScheme.primary,
-                        strokeWidth = 2.2.dp,
-                        modifier = Modifier.size(20.dp)
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Filled.CloudDownload,
-                        contentDescription = "Descargar canción para siempre",
-                        tint = TextPrimary,
-                        modifier = Modifier.size(22.dp)
-                    )
+                when {
+                    isDownloading -> {
+                        com.example.ui.components.AnimatedDownloadingArrowIcon(
+                            tint = MaterialTheme.colorScheme.primary,
+                            size = 22.dp
+                        )
+                    }
+                    isDownloaded -> {
+                        Icon(
+                            imageVector = Icons.Filled.Check,
+                            contentDescription = "Canción descargada en tu biblioteca",
+                            tint = Color(0xFF10B981),
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                    else -> {
+                        Icon(
+                            imageVector = Icons.Filled.CloudDownload,
+                            contentDescription = "Descargar canción para siempre",
+                            tint = TextPrimary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
                 }
             }
         }

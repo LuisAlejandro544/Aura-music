@@ -237,6 +237,7 @@ app/
 │   │       │       ├── MiniPlayer.kt           # Mini reproductor flotante persistente con Video Canvas
 │   │       │       ├── BottomNavBar.kt         # Barra de navegación inferior con insignia de descubrimiento
 │   │       │       ├── TrackListItem.kt        # Elemento modular de canción con marquesina
+│   │       │       ├── AnimatedDownloadingArrowIcon.kt # Icono animado de flecha descendente continua durante descargas
 │   │       │       ├── AudioEffectsBottomSheet.kt # Hoja modal unificada del estudio acústico C++20
 │   │       │       ├── artwork/                # Portadas, Collages, Fondo de Galería, Arte Procedural y Video Canvas
 │   │       │       │   ├── ArtworkImage.kt         # Renderizador WebP con recorte de franjas negras 4:3

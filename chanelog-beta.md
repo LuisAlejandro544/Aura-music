@@ -1,6 +1,6 @@
-# 🌌 Aura Beta — Changelog Oficial (`v0.1.1-beta-1a` • Codename: **Nebula**)
+# 🌌 Aura Beta — Changelog Oficial (`v0.2.0-beta-1a` • Codename: **Nebula**)
 
-> **Versión:** `v0.1.1-beta-1a` (`NEBULA-00111A` • Build `#100111`)  
+> **Versión:** `v0.2.0-beta-1a` (`NEBULA-00200A` • Build `#100200`)  
 > **Nombre en Launcher:** `Aura Beta`  
 > **Identificador de Paquete (`Android/data/`):** `com.auramusic.beta`  
 > **Codename de la Serie Beta:** **Nebula**  
@@ -10,7 +10,7 @@
 
 ---
 
-## 🔥 Novedades Destacadas en `v0.1.1-beta-1a`
+## 🔥 Novedades Destacadas en `v0.2.0-beta-1a`
 
 1. 🖼️ **Fondo de Pantalla Personalizado de Galería (Imagen WebP o Video Corto)**:
    - Ahora puedes elegir una **foto o un video corto de la galería de tu teléfono** para ponerlo como fondo de pantalla mientras navegas por **Tu Biblioteca**, **Inicio** o **toda la aplicación** (configurable desde **Ajustes > Aura Dinámica, Video & Modo Juego**).
@@ -46,7 +46,7 @@
 
 ---
 
-## 🚀 Todo lo que ofrecemos en Aura Beta (`v0.1.1-beta-1a`)
+## 🚀 Todo lo que ofrecemos en Aura Beta (`v0.2.0-beta-1a`)
 
 **Aura Beta** es un reproductor musical audiófilo y centro multimedia todo-en-uno para Android, diseñado desde cero para que puedas disfrutar, personalizar, descargar y masterizar tu música directamente desde tu teléfono móvil sin necesidad de una PC.
 
@@ -124,6 +124,6 @@ En cada lanzamiento de **Aura Beta (`Nebula`)** generamos **3 archivos APK exclu
 
 | Archivo APK | Arquitectura | ¿Para qué sirve y qué teléfonos deben instalarlo? |
 | :--- | :--- | :--- |
-| 📱 **`AuraBeta-v0.1.1-beta-1a-Nebula-arm64-v8a.apk`** | **ARM 64-bits (`arm64-v8a`)** | **Recomendado para la mayoría de teléfonos modernos (2018 en adelante).** Incluye exclusivamente los motores nativos en C++20, FFmpeg y Python de 64 bits. Es más ligero en espacio de almacenamiento y ofrece el máximo rendimiento acústico y energético. |
-| 📱 **`AuraBeta-v0.1.1-beta-1a-Nebula-armeabi-v7a.apk`** | **ARM 32-bits (`armeabi-v7a`)** | **Diseñado para teléfonos antiguos, básicos o con sistemas Android de 32 bits.** Contiene exclusivamente los binarios nativos optimizados con instrucciones ARMv7 NEON de 32 bits sin cargar librerías de 64 bits que tu procesador no utilice. |
-| 🌐 **`AuraBeta-v0.1.1-beta-1a-Nebula-universal.apk`** | **Universal Móvil (`arm64-v8a` + `armeabi-v7a`)** | **Funciona en absolutamente cualquier teléfono Android (32 y 64 bits).** Es el APK todo-terreno ideal si no sabes qué procesador tiene tu celular, para compartir el archivo con amigos por mensajería o para subir directamente a tiendas como **Uptodown**. |
+| 📱 **`AuraBeta-v0.2.0-beta-1a-Nebula-arm64-v8a.apk`** | **ARM 64-bits (`arm64-v8a`)** | **Recomendado para la mayoría de teléfonos modernos (2018 en adelante).** Incluye exclusivamente los motores nativos en C++20, FFmpeg y Python de 64 bits. Es más ligero en espacio de almacenamiento y ofrece el máximo rendimiento acústico y energético. |
+| 📱 **`AuraBeta-v0.2.0-beta-1a-Nebula-armeabi-v7a.apk`** | **ARM 32-bits (`armeabi-v7a`)** | **Diseñado para teléfonos antiguos, básicos o con sistemas Android de 32 bits.** Contiene exclusivamente los binarios nativos optimizados con instrucciones ARMv7 NEON de 32 bits sin cargar librerías de 64 bits que tu procesador no utilice. |
+| 🌐 **`AuraBeta-v0.2.0-beta-1a-Nebula-universal.apk`** | **Universal Móvil (`arm64-v8a` + `armeabi-v7a`)** | **Funciona en absolutamente cualquier teléfono Android (32 y 64 bits).** Es el APK todo-terreno ideal si no sabes qué procesador tiene tu celular, para compartir el archivo con amigos por mensajería o para subir directamente a tiendas como **Uptodown**. |

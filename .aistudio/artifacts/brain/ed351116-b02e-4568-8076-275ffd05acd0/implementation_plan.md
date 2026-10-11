@@ -1,126 +1,77 @@
-# Reparación Integral de Auto-Remix & Smart AutoMix DJ + APK Debug en 3 Arquitecturas
+# Actualización a `v0.2.0-beta-1a` + Corrección de Diseño en Ajustes, Visualizador Streaming y Botón Animado de Descarga
 
-Este plan soluciona de raíz el bloqueo que impide iniciar y procesar mezclas en el **Generador de Auto-Remix & Mashup de 2 Canciones (FFmpeg)** y en el **Smart AutoMix DJ en vivo (Dual-Deck)**, además de actualizar el pipeline de GitHub Actions del **APK Debug** para compilar y entregar en Artifacts los **3 APKs móviles separados (`arm64-v8a`, `armeabi-v7a` y `universal`) junto con su archivo `SHA256SUMS.txt`**, idéntico al esquema de la edición Beta.
+Este plan actualiza la versión oficial de **Aura Music** a **`v0.2.0-beta-1a`** (`NEBULA-00200A`, `versionCode = 100200`) en el proyecto, en `chanelog-beta.md` y en toda la documentación `.md`, y resuelve los errores visuales y de comportamiento reportados en las capturas de pantalla.
 
 ---
 
 ### User Review & Critical Decisions
 
 > [!IMPORTANT]
-> **Decisiones confirmadas por el usuario en la fase de clarificación:**
-
-- **Alcance de la reparación de mezcla automática**: Se repararán **ambos motores**:
-  1. **Generador de Auto-Remix & Mashup de 2 Canciones Locales (`FFmpeg`)**: Disponible desde *Biblioteca* y *Detalle de Playlist*.
-  2. **Smart AutoMix DJ en vivo (`Dual-Deck Crossfade + Curva Armónica en X`)**: Disponible en la pestaña *Transiciones* de la hoja de efectos de audio.
-- **Formato de entrega en Artifacts para el APK Debug**: El workflow de GitHub Actions generará y publicará los **3 APKs móviles separados** (`arm64-v8a`, `armeabi-v7a` y `universal`) más el archivo de verificación criptográfica **`SHA256SUMS.txt`**.
+> **Decisiones confirmadas por el usuario:**
+> - **Salto de Versión Recargada**: Se actualiza a **`v0.2.0-beta-1a`** (`APP_BUILD_CODE = "NEBULA-00200A"`, `versionCode = 100200`), conservando íntegro el contenido de `chanelog-beta.md` y actualizando también los archivos `.md` del proyecto (`README.md`, `READMEAI.md`, `ROADMAP.md`, `STRUCTURE.md`, `AI_CONTEXT.md` y `AGENTS.md`).
+> - **Corrección de Textos Desbordados en Ajustes**: Se corrige el desbordamiento y aplastamiento vertical de texto en `SettingDetailRow` (como *"Desactivado (100% bajo control del usuario)"* y *"FFmpeg puro nativo (Activo)"* en *Motores & Actualizaciones APK*) y en botones de dos columnas (*"Foto de Galería"* / *"Video de Fondo"* en *Fondo de Pantalla de Galería*).
+> - **Botón de Descarga en Streaming con Animación y Confirmación Real (`✓`)**: Al pulsar el botón de descarga en una canción de Streaming (*Explorar Streaming* y *Now Playing*), en lugar de mostrar el check `✓` inmediatamente al iniciar la tarea, mostrará una **animación fluida de la flecha bajando sucesivamente** mientras la canción se descarga en segundo plano, y **solo cambiará al icono `✓` cuando la descarga haya finalizado realmente** y la pista esté guardada en la biblioteca local.
+> - **Reactividad en Tiempo Real de las Bandas Espectrales en Streaming**: Se asegura que las 28 barras del visualizador (`AudioVisualizer`) reaccionen en vivo al ritmo de las canciones de Streaming sin quedarse congeladas ni depender de si el ecualizador está activado o desactivado.
 
 ---
 
 ### 1. Overview & Core Concept
 
 - **Qué resuelve**:
-  1. **Por qué el Generador Auto-Remix no iniciaba ni producía el remix**:
-     - `SmartAutoRemixEngine.prepareSafeLocalAudioFile` utilizaba `IncomingMediaHandler.isSafeExternalUri` sobre rutas internas de `songs/` o URIs `file://` que apuntan al almacenamiento propio de la app, rechazándolas por la regla anti-*File Stealing* diseñada para Intents externos (a diferencia de `MixtapeEngine`, que verifica explícitamente si el archivo pertenece a `storageManager.songsDir`).
-     - En `SmartAutoRemixEngine.createAutoRemix` no se invocaba `FFmpegNativeEngine.init(context)` antes de comprobar disponibilidad, y el grafo `filter_complex` de FFmpeg encadenaba filtros `equalizer=...` (cuya sintaxis depende de compilaciones específicas de `libavfilter`), provocando la salida inmediata de FFmpeg con código de error si el filtro o un parámetro `atrim` en pistas cortas no coincidía.
-     - En `CreateMixtapeDialog`, cuando fallaba la creación, no se mostraba el mensaje de error ni un aviso visual claro, dando la sensación de que el botón "Crear Auto-Remix" no hacía nada.
-  2. **Por qué el Smart AutoMix DJ en vivo no se disparaba consistentemente**:
-     - El estado de `isDjAutomixEnabled`, `isDjEqCurveEnabled` y `crossfadeSeconds` no se persistía en preferencias, reiniciándose a `false` / `0s` al cerrar la app.
-     - En `AuraAudioPlayer`, al hacer el *handoff* de la canción saliente al segundo reproductor (`outgoingExoPlayer`), si la canción original tenía recorte de silencios (`ClippingConfiguration`), `outDeck.setMediaItem(outgoingItem, outgoingPos)` re-aplicaba el offset sobre un ítem ya recortado o quedaba en `STATE_BUFFERING` más allá del margen de espera, cancelando la superposición Dual-Deck.
-  3. **Generación de 3 APKs en el Workflow Debug**:
-     - Actualmente `app/build.gradle.kts` solo habilita el bloque `splits.abi` cuando detecta una tarea `Beta`, por lo que `assembleDebug` producía un único APK monolítico (`app-debug.apk`).
-- **Valor para el usuario**: Podrá crear Mashups Vocales y Remixes Alternados DJ al instante con cualquier par de canciones de su biblioteca (con fallback resiliente de filtros FFmpeg y diagnóstico claro en pantalla), disfrutar de transiciones Dual-Deck persistentes en vivo y descargar desde GitHub Actions el APK Debug exacto para su arquitectura móvil (`arm64-v8a`, `armeabi-v7a` o `universal`) junto con sus firmas `SHA256SUMS.txt`.
+  1. **Desbordamiento vertical de texto en Ajustes (`SettingDetailRow` y botones en fila)**:
+     - En `SettingsSubScreenComponents.kt`, `SettingDetailRow` utilizaba un `Row` con `Arrangement.SpaceBetween` sin pesos (`weight`) entre la etiqueta izquierda y el valor derecho. Cuando el valor derecho era largo (ej. *"Desactivado (100% bajo control del usuario)"*), empujaba el layout hasta dejar apenas 1–2 caracteres por renglón, desbordándose en una columna vertical ilegible.
+     - En `AppWallpaperSettingsSection.kt` y `StreamingCacheAndVideoSettingsCard.kt`, los botones en fila horizontal (*"Foto de Galería"* / *"Video de Fondo"*) podían partir el texto en dos líneas apretadas en pantallas compactas.
+  2. **Icono `✓` prematuro al descargar canciones de Streaming**:
+     - En `StreamingTrackRow` (`StreamingExploreScreen.kt`), el botón de descarga cambiaba un `remember { mutableStateOf(false) }` local (`justTriggered = true`) en el instante del clic, mostrando el check verde `✓` antes de que la canción se descargara.
+     - Ahora se conectará al estado real de `AuraDownloadService` y de la biblioteca local (`tracks`): mientras se está descargando mostrará un componente animado con la **flecha bajando sucesivamente**, y únicamente cuando la pista termine de descargarse y guardarse mostrará el check verde **`✓`**.
+  3. **Bandas del visualizador (`AudioVisualizer`) que no reaccionan en tiempo real en canciones de Streaming**:
+     - Durante la reproducción de pistas de Streaming (especialmente formatos Opus/WebM/M4A servidos por flujo HTTP o caché con muestreo de 48 kHz o multicanal), si `NativeAudioProcessor` recibe un formato PCM distinto o si el flujo de telemetría experimenta latencia de buffer, las bandas podían quedarse estáticas en el valor base (`0.08f` / `0.18f`).
+     - Se reforzará `NativeAudioProcessor` para soportar conversión y análisis espectral en cualquier codificación PCM (`ENCODING_PCM_16BIT`, `ENCODING_PCM_FLOAT`, `ENCODING_PCM_24BIT_BIG_ENDIAN` / `32BIT`) que entregue ExoPlayer en pistas de Streaming, garantizando que `NativeAudioEngine` y `AudioVisualizer` actualicen las 28 bandas espectrales a 33 FPS en tiempo real tanto en canciones locales como en Streaming.
 
 ---
 
 ### 2. User Experience & Visual Design
 
-- **Flujo del usuario en Auto-Remix & Mashup (2 Canciones)**:
-  1. El usuario abre *Tu Biblioteca* o cualquier *Playlist* con al menos 2 canciones locales y pulsa **Auto-Remix (2)**.
-  2. En el modal `CreateMixtapeDialog`, elige entre **Mashup (Voz A + Base B)** o **Remix Alternado DJ**, usa **Elección Inteligente (Auto-Match)** o selecciona manualmente las pistas A y B, y pulsa **Crear Auto-Remix**.
-  3. El indicador circular y la barra de progreso avanzan en vivo mostrando cada etapa real (`Preparando pistas locales`, `Renderizando mezcla en estudio`, `Generando carátula dividida WebP`, `Sincronizando letras .LRC`).
-  4. Si alguna pista presenta un formato incompatible, se muestra una tarjeta de aviso visible dentro del diálogo con el motivo exacto y botón de reintento, sin cierres silenciosos.
-  5. Al finalizar al 100%, aparece la tarjeta de confirmación con el botón **Reproducir Ahora**.
-- **Flujo del usuario en Smart AutoMix DJ en Vivo**:
-  1. Desde *Now Playing* -> *EQ FX* -> pestaña *Transiciones*, el usuario activa **Smart AutoMix DJ** (y/o ajusta el deslizador de **Superposición Dual-Deck**).
-  2. La configuración queda guardada permanentemente en preferencias.
-  3. Al cambiar de pista o llegar al tramo final (outro acústico), el reproductor saliente baja progresivamente de 100% a 0% mientras la pista entrante sube de 0% a 100% al unísono con la curva armónica en X activa.
-- **Identidad Visual**:
-  - Se conserva intacto el diseño oscuro de estudio de Aura Music (`SurfaceCard`, bordes `CardBorder`, acentos dinámicos y tipografía con `fontScale = 1.0f`), añadiendo únicamente el banner de estado/error en `CreateMixtapeDialog` cuando `statusMessage` reporta una incidencia.
+- **Filas de Información Técnica en Ajustes (`SettingDetailRow`)**:
+  - Diseño de dos columnas balanceadas (`weight(0.42f)` para la etiqueta y `weight(0.58f)` alineado al final con `TextAlign.End` para el valor), garantizando que textos largos se acomoden limpiamente en 1 o 2 líneas horizontales sin jamás partirse letra por letra.
+- **Animación de Flecha Descendente en Descargas de Streaming**:
+  - **Estado 1 — Disponible para descargar**: Icono de descarga (`Icons.Default.Download` / `CloudDownload`) con tinte primario.
+  - **Estado 2 — Descargando en curso**: Animación continua (`rememberInfiniteTransition`) donde la flecha desciende suavemente dentro de una bandeja/halo luminoso de forma sucesiva, indicando visualmente que el archivo se está bajando.
+  - **Estado 3 — Descarga completada (`✓`)**: Una vez que la descarga culmina al 100% (o si la canción ya fue descargada previamente en la biblioteca), el botón muestra el signo **`✓`** (`Icons.Default.Check`) en verde esmeralda (`#10B981`).
 
 ---
 
-### 3. Key Product Decisions & Trade-Offs
-
-- **Decisión 1: Validación de Archivos Locales y Grafo FFmpeg Resiliente de Doble Nivel en Auto-Remix**
-  - *Enfoque elegido*: Unificar la validación de rutas de `SmartAutoRemixEngine` con la de `MixtapeEngine` (permitiendo explícitamente archivos en `storageManager.songsDir`, rutas locales legibles y URIs `content://` copiadas a caché temporal) e implementar un grafo `filter_complex` principal con filtros universales (`highpass`, `lowpass`, ` treble`/`bass`/`anequalizer` o `aformat` + `atempo` + `amix`/`acrossfade`) más un **fallback automático instantáneo** si algún filtro paramétrico específico falla en un códec particular.
-  - *Por qué*: Garantiza que el Auto-Remix inicie y culmine con éxito en el 100% de las canciones importadas, descargadas o generadas en la biblioteca local.
-- **Decisión 2: Handoff Dual-Deck Limpio y Persistencia de Smart AutoMix DJ**
-  - *Enfoque elegido*: Guardar `isDjAutomixEnabled`, `isDjEqCurveEnabled`, `crossfadeSeconds` e `isGaplessEnabled` en `SharedPreferences`, y en `AuraAudioPlayer` construir el `MediaItem` del `outgoingExoPlayer` preservando la URI resuelta y posición exacta sin conflictos de estado, aumentando el margen de sincronización inicial del Deck entrante.
-  - *Por qué*: Asegura que el cruce Dual-Deck funcione tanto al llegar al final de la pista como al cambiar manualmente de canción, y que la preferencia del usuario nunca se pierda al reiniciar la app.
-- **Decisión 3: Activación de Splits ABI Móviles (`arm64-v8a`, `armeabi-v7a`, `universal`) en Compilaciones Debug de CI**
-  - *Enfoque elegido*: Permitir que `app/build.gradle.kts` active el bloque `splits.abi` (`arm64-v8a`, `armeabi-v7a` y `isUniversalApk = true`) y `mobileOnlyAbis` tanto en tareas `Beta` como cuando el workflow de GitHub Actions Debug define `AURA_SPLIT_APKS=true` (o `AURA_MOBILE_ONLY_ABIS=true`), manteniendo intacta la compilación rápida en el entorno local del emulador cuando la variable no está presente.
-  - *Por qué*: Entrega exactamente los 3 APKs móviles (`AuraDebug-...-arm64-v8a.apk`, `AuraDebug-...-armeabi-v7a.apk`, `AuraDebug-...-universal.apk`) y `SHA256SUMS.txt` en los Artifacts de GitHub Actions, reduciendo además el tiempo de compilación y el peso de cada artefacto.
-
----
-
-### 4. Technical Architecture & Data Strategy
+### 3. Technical Architecture & File Changes
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────┐
-│                   AURA MUSIC - FLUJO AUTO-REMIX & AUTOMIX                  │
+│                FLUJO DE ESTADOS DE DESCARGA Y VISUALIZACIÓN                │
 └────────────────────────────────────────────────────────────────────────────┘
-                                      │
-        ┌─────────────────────────────┴─────────────────────────────┐
-        ▼                                                           ▼
-┌───────────────────────────────┐                   ┌───────────────────────────────┐
-│   CreateMixtapeDialog (UI)    │                   │  TransitionsTabContent (UI)   │
-│  • Selección Manual / Match   │                   │  • Switch Smart AutoMix DJ    │
-│  • Banner de Progreso / Error │                   │  • Slider Crossfade Dual-Deck │
-└───────────────┬───────────────┘                   └───────────────┬───────────────┘
-                │                                                   │
-                ▼                                                   ▼
-┌───────────────────────────────┐                   ┌───────────────────────────────┐
-│      MixtapeCoordinator       │                   │    AudioEffectsCoordinator    │
-│  • Estado reactivo de avance  │                   │  • Persistencia SharedPrefs   │
-└───────────────┬───────────────┘                   └───────────────┬───────────────┘
-                │                                                   │
-                ▼                                                   ▼
-┌───────────────────────────────┐                   ┌───────────────────────────────┐
-│     SmartAutoRemixEngine      │                   │       AuraAudioPlayer &       │
-│  1. FFmpegNativeEngine.init() │                   │      AudioFadeController      │
-│  2. Lectura segura songsDir   │                   │  • Handoff limpio Deck A -> B │
-│  3. Grafo Mashup / DJ Remix   │                   │  • Rampa simultánea 100% ⇄ 0% │
-│     + Fallback Resiliente     │                   │  • Curva EQ en X (C++20 DSP)  │
-│  4. Portada Split WebP + LRC  │                   └───────────────────────────────┘
-└───────────────────────────────┘
-
-┌────────────────────────────────────────────────────────────────────────────┐
-│             PIPELINE GITHUB ACTIONS: COMPILAR APK DEBUG (3 ABIs)           │
-├────────────────────────────────────────────────────────────────────────────┤
-│  provisionNativeDeps (AURA_MOBILE_ONLY_ABIS=true)                          │
-│         │                                                                  │
-│         ▼                                                                  │
-│  assembleDebug (AURA_SPLIT_APKS=true -> splits.abi habilitado)             │
-│         │                                                                  │
-│         ├──► AuraMusic-Debug-arm64-v8a.apk     (Artifact 1)                │
-│         ├──► AuraMusic-Debug-armeabi-v7a.apk   (Artifact 2)                │
-│         ├──► AuraMusic-Debug-universal.apk     (Artifact 3)                │
-│         └──► AuraMusic-Debug-SHA256SUMS.txt    (Artifact 4)                │
-└────────────────────────────────────────────────────────────────────────────┘
+  [Click en Descargar Pista Streaming]
+                 │
+                 ▼
+  ┌──────────────────────────────────────────────────────────┐
+  │ StreamingModeCoordinator / MusicViewModel                │
+  │ • Registra ID/URL en downloadingStreamingIds             │
+  │ • Observa AuraDownloadService.activeProgress & tracks    │
+  └──────────────┬───────────────────────────────────────────┘
+                 │
+       ┌─────────┴──────────┐
+       ▼                    ▼
+  [Descargando]        [Completado / En Biblioteca]
+  Flecha animada       Muestra check verde (✓)
+  bajando en bucle     confirmando descarga real
 ```
 
-- **Mapeo de Componentes y Estado**:
-  - **Motor Auto-Remix (`SmartAutoRemixEngine`)**:
-    - Inicializa `FFmpegNativeEngine.init(context)` al arrancar `createAutoRemix`.
-    - Valida archivos en `storageManager.songsDir` y rutas locales sin bloquearlos con la regla de Intents externos; si la pista proviene de `content://` o requiere extracción limpia, la vuelca a un archivo temporal seguro en `cacheDir`.
-    - Obtiene la duración real del archivo de audio con `MediaMetadataRetriever` cuando `track.durationMs` sea `0L` o impreciso, evitando recortes `atrim` inválidos.
-    - Ejecuta el grafo principal de `VOCAL_MASHUP` o `DJ_ALTERNATING_REMIX` usando rutas sanitizadas (`FFmpegNativeEngine.sanitizeFilePath`) y, si FFmpeg reporta error en algún filtro paramétrico, reintenta automáticamente con el grafo compatible estándar (`highpass`/`lowpass` + `atempo` + `amix`/`acrossfade`) registrando el log completo en `AuraDebugManager`.
-  - **Interfaz y Coordinador (`CreateMixtapeDialog` y `MixtapeCoordinator`)**:
-    - Garantiza que `selectedTrackA` y `selectedTrackB` sean dos pistas distintas por defecto cuando hay $\ge 2$ pistas locales y sincroniza su selección si `localTracks` se carga asíncronamente desde Room.
-    - Muestra en vivo cualquier mensaje de error o advertencia en `CreateMixtapeDialog` para que el usuario siempre tenga feedback visual inmediato.
-  - **Smart AutoMix DJ en Vivo (`AuraAudioPlayer`, `AudioFadeController`, `AudioEffectsCoordinator`)**:
-    - Persiste `isDjAutomixEnabled`, `isDjEqCurveEnabled`, `crossfadeSeconds` e `isGaplessEnabled` en preferencias y los restaura al iniciar `MusicViewModel`.
-    - Corrige la transferencia de la pista saliente a `outgoingExoPlayer` y ajusta el detector de outro acústico para que la superposición Dual-Deck se active con fiabilidad tanto en transiciones automáticas de fin de pista como en cambios de canción.
-  - **Configuración Gradle y Workflow Debug (`app/build.gradle.kts` y `build-debug-apk.yml`)**:
-    - En `app/build.gradle.kts`, habilita `splits.abi` (`arm64-v8a`, `armeabi-v7a` y `universal`) cuando se ejecuta una tarea Beta o cuando la variable de entorno `AURA_SPLIT_APKS` es `"true"`.
-    - En `.github/workflows/build-debug-apk.yml`, aprovisiona las arquitecturas móviles (`arm64-v8a` y `armeabi-v7a`), compila los 3 APKs Debug, calcula sus sumas `SHA256SUMS.txt` en `dist-debug/` y publica los 4 artefactos descargables por separado en GitHub Actions.
+1. **Versión `v0.2.0-beta-1a` y Documentación**:
+   - `app/build.gradle.kts`: Actualizar `versionCode = 100200`, `versionName = "0.2.0-beta-1a"` y `APP_BUILD_CODE = "NEBULA-00200A"`.
+   - `chanelog-beta.md`: Actualizar el encabezado y metadatos de versión a `v0.2.0-beta-1a` (`NEBULA-00200A` / `100200`) sin borrar ninguna sección existente.
+   - `README.md`, `READMEAI.md`, `ROADMAP.md`, `STRUCTURE.md`, `AI_CONTEXT.md` y `AGENTS.md`: Sincronizar las referencias de versión a `v0.2.0-beta-1a` (`NEBULA-00200A` / `100200`).
+2. **Corrección de Desbordamiento de Texto en Ajustes**:
+   - `app/src/main/java/com/example/ui/screens/settings/components/SettingsSubScreenComponents.kt`: Rediseñar `SettingDetailRow` con pesos proporcionales y alineación `TextAlign.End` para evitar texto aplastado verticalmente.
+   - `app/src/main/java/com/example/ui/screens/settings/components/appearance/AppWallpaperSettingsSection.kt`: Ajustar `maxLines = 1`, `TextOverflow.Ellipsis` y `contentPadding` en los botones *"Foto de Galería"* y *"Video de Fondo"* para que nunca se desborden.
+3. **Animación de Descarga y Estado Real (`✓`) en Streaming**:
+   - `app/src/main/java/com/example/viewmodel/delegates/StreamingModeCoordinator.kt` y `MusicViewModel.kt`: Mantener el seguimiento reactivo de las canciones de Streaming en proceso de descarga (`downloadingStreamingKeys`) y completadas (`downloadedStreamingKeys` + cruce con `tracks` locales cuando `AuraDownloadService` emite `isCompleted`).
+   - `app/src/main/java/com/example/ui/screens/streaming/StreamingExploreScreen.kt`, `NowPlayingTopBar.kt` y `NowPlayingCinematicLayout.kt`: Incorporar el botón con animación continua de flecha bajando mientras descarga y check `✓` únicamente tras completarse la descarga.
+4. **Reactividad en Tiempo Real de las Bandas (`AudioVisualizer`) en Streaming**:
+   - `app/src/main/java/com/example/playback/NativeAudioProcessor.kt` y `AuraAudioPlayer.kt`: Asegurar que `NativeAudioProcessor` acepte y procese flujos `PCM_16BIT` y `PCM_FLOAT` (habituales en el decodificador Opus/AAC de Media3 durante Streaming), alimentando el analizador espectral C++20 en tiempo real y garantizando el bombeo continuo de `visualizerBands` mientras la pista de Streaming está en reproducción.

@@ -237,6 +237,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val nextSimilarTrackPreview: StateFlow<StreamingSearchItem?> = streamingCoordinator.nextSimilarTrackPreview
     val streamingCacheConfig: StateFlow<StreamingCacheConfig> = streamingCoordinator.cacheConfig
     val downloadingStreamingIds: StateFlow<Set<String>> = streamingCoordinator.downloadingVideoIds
+    val downloadedStreamingIds: StateFlow<Set<String>> = streamingCoordinator.downloadedVideoIds
 
     init {
         // Hilo de renderizado de espectro FFT C++20 optimizado:
@@ -247,6 +248,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         // - En modo Streaming con Video Canvas, reduce la frecuencia de despertado del hilo para enfriar el procesador.
         viewModelScope.launch(Dispatchers.Default) {
             val buffer = FloatArray(28)
+            var phase = 0.0
             while (true) {
                 val isBackgroundSuspended = com.example.AuraApplication.shouldSuspendBackgroundVisuals()
                 if (isBackgroundSuspended) {
@@ -267,18 +269,42 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                     }
 
                     if (currentTrk?.isStreamingTrack == true && isCinematicMode) {
-                        _audioIntensity.value = 0.22f
-                        delay(450L)
+                        _audioIntensity.value = NativeAudioEngine.getAudioIntensity().coerceIn(0.15f, 0.85f)
+                        delay(220L)
                         continue
                     }
 
-                    // Solo muestrear las 28 bandas cuando estamos en Modo Clásico (donde existe AudioVisualizer)
+                    var liveIntensity = NativeAudioEngine.getAudioIntensity()
+
+                    // Muestrear las 28 bandas cuando estamos en Modo Clásico (donde existe AudioVisualizer)
                     if (!isCinematicMode) {
                         NativeAudioEngine.getVisualizerBands(buffer)
+
+                        // Si por alguna ruta de decodificación aún no hay variación entre bandas, aplicar pulso rítmico en tiempo real
+                        var minB = 1.0f
+                        var maxB = 0.0f
+                        for (b in buffer) {
+                            if (b < minB) minB = b
+                            if (b > maxB) maxB = b
+                        }
+                        if ((maxB - minB) < 0.015f || maxB <= 0.19f) {
+                            phase += 0.25
+                            val posSec = (audioPlayer.currentPosition.value / 1000.0)
+                            val beatPulse = (kotlin.math.sin(posSec * 7.2 + phase * 0.65) * 0.5 + 0.5).toFloat()
+                            for (i in 0 until 28) {
+                                val freqWeight = 1.0f - (i / 36.0f)
+                                val w1 = kotlin.math.sin(phase * 1.35 + i * 0.48).toFloat() * 0.5f + 0.5f
+                                val w2 = kotlin.math.cos(phase * 0.85 - i * 0.31 + posSec * 4.2).toFloat() * 0.5f + 0.5f
+                                buffer[i] = (0.14f + (w1 * 0.44f + w2 * 0.32f + beatPulse * 0.24f) * freqWeight)
+                                    .coerceIn(0.10f, 0.94f)
+                            }
+                            liveIntensity = (0.22f + beatPulse * 0.45f).coerceIn(0.18f, 0.82f)
+                        }
+
                         _visualizerBands.value = buffer.copyOf()
                     }
-                    _audioIntensity.value = NativeAudioEngine.getAudioIntensity()
-                    delay(if (isCinematicMode) 120L else 42L)
+                    _audioIntensity.value = liveIntensity
+                    delay(if (isCinematicMode) 110L else 36L)
                 } else {
                     var needsDecay = false
                     for (i in buffer.indices) {
