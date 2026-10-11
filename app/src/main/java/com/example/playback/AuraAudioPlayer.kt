@@ -254,15 +254,12 @@ class AuraAudioPlayer(
 
             override fun onPlayerError(error: PlaybackException) {
                 val activeTrack = _currentTrack.value
-                val isRecoverableStreamError =
-                    error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ||
-                        error.errorCode == PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED ||
-                        error.errorCode == PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED ||
-                        error.errorCode == PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED
+                val isBadHttpStatus = error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS
 
-                // Recuperación transparente ante HTTP 403 / 416 o URL HTML sin resolver (PARSING_CONTAINER_UNSUPPORTED) en pistas de Streaming:
-                // Delegamos al coordinador para usar el archivo en caché o resolver un stream real con cabeceras firmadas.
-                if (isRecoverableStreamError && activeTrack?.isStreamingTrack == true) {
+                // Recuperación transparente ante HTTP 403 / 416 en pistas de Streaming:
+                // En lugar de re-preparar la misma URL rechazada, delegamos al coordinador para usar el archivo
+                // en caché o resolver un stream fresco con cabeceras firmadas y continuar en la posición actual.
+                if (isBadHttpStatus && activeTrack?.isStreamingTrack == true) {
                     val now = System.currentTimeMillis()
                     val canAttemptRecovery = lastHttpRecoveryTrackId != activeTrack.id || (now - lastHttpRecoveryTimestampMs) > 6000L
                     if (canAttemptRecovery) {
@@ -272,7 +269,7 @@ class AuraAudioPlayer(
                         val resumePos = player.currentPosition.coerceAtLeast(_currentPosition.value)
                         com.example.debug.AuraDebugManager.logWarning(
                             "ExoPlayer",
-                            "Detectado flujo web o rechazo en stream (${error.errorCodeName}). Resolviendo stream directo automáticamente..."
+                            "Detectado rechazo HTTP en stream (${error.errorCodeName}). Regenerando flujo firmado automáticamente..."
                         )
                         val handled = onStreamingHttpErrorRecoveryCallback?.invoke(activeTrack, resumePos) ?: false
                         if (handled) return
@@ -374,23 +371,6 @@ class AuraAudioPlayer(
 
     fun playTrack(track: Track, isAutoCrossfadeOverlap: Boolean = false) {
         val player = exoPlayer ?: return
-
-        // Guarda preventiva: si una pista de la cola de streaming aún tiene como URI la página HTML canónica
-        // (ej. https://www.youtube.com/watch?v=...) porque se seleccionó desde la cola "Up Next" o el MiniPlayer,
-        // interceptamos antes de enviarla a ExoPlayer para evitar ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED.
-        if (track.isStreamingTrack &&
-            (track.uriString.contains("youtube.com/watch", ignoreCase = true) ||
-                track.uriString.contains("music.youtube.com/watch", ignoreCase = true) ||
-                track.uriString.contains("youtu.be/", ignoreCase = true))
-        ) {
-            _currentTrack.value = track
-            _currentPosition.value = 0L
-            _duration.value = track.durationMs
-            _isBuffering.value = true
-            val intercepted = onStreamingTrackRequestedCallback?.invoke(track, isAutoCrossfadeOverlap) ?: false
-            if (intercepted) return
-        }
-
         val outDeck = outgoingExoPlayer
         val previousTrack = _currentTrack.value
         val previousTrackId = previousTrack?.id

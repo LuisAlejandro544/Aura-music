@@ -82,7 +82,7 @@ fun DownloadFromLinkDialog(
             if (initialUrl.contains("youtu", ignoreCase = true)) DownloadSourceMode.YOUTUBE_WEB else initialMode
         )
     }
-    var selectedEngine by remember { mutableStateOf(com.example.data.importer.WebStreamExtractor.getSelectedEngine(context)) }
+    var selectedEngine by remember { mutableStateOf(YoutubeExtractionEngine.YTDLP) }
     var linkUrl by remember { mutableStateOf(initialUrl) }
     var isResolving by remember { mutableStateOf(false) }
     var resolveError by remember { mutableStateOf<String?>(null) }
@@ -211,7 +211,6 @@ fun DownloadFromLinkDialog(
                         selectedEngine = selectedEngine,
                         onEngineSelected = {
                             selectedEngine = it
-                            com.example.data.importer.WebStreamExtractor.setSelectedEngine(context, it)
                             resolveError = null
                         },
                         packageUpdateState = packageUpdateState,

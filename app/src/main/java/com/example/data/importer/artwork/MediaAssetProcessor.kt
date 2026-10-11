@@ -225,7 +225,7 @@ object MediaAssetProcessor {
                     resolvedInfo.videoUrl,
                     tempVideoFile,
                     "Descargando Video Canvas de fondo (480p)...",
-                    resolvedInfo.videoHttpHeaders.ifEmpty { resolvedInfo.httpHeaders }
+                    resolvedInfo.httpHeaders
                 )
             }
         }
@@ -248,15 +248,24 @@ object MediaAssetProcessor {
                     "Resolviendo flujo de Video Canvas 480p dedicado para $ytId..."
                 )
                 val videoCandidates = mutableListOf<Pair<String, Map<String, String>>>()
+                val isStandardYoutube = !resolvedInfo.originalUrl.contains("music.youtube.com", ignoreCase = true)
+
+                if (isStandardYoutube && YtDlpNativeEngine.isAvailable(context)) {
+                    val ytdlpFallback = YtDlpNativeEngine.resolveStream(context, resolvedInfo.originalUrl).getOrNull()
+                    if (ytdlpFallback != null &&
+                        ytdlpFallback.videoUrl.isNotBlank() &&
+                        ytdlpFallback.videoUrl != ytdlpFallback.audioUrl
+                    ) {
+                        videoCandidates.add(ytdlpFallback.videoUrl to ytdlpFallback.httpHeaders)
+                    }
+                }
 
                 val innerTubeFallback = InnerTubeClient.resolve(ytId, resolvedInfo.originalUrl)
                 if (innerTubeFallback != null &&
                     innerTubeFallback.videoUrl.isNotBlank() &&
                     innerTubeFallback.videoUrl != innerTubeFallback.audioUrl
                 ) {
-                    videoCandidates.add(
-                        innerTubeFallback.videoUrl to innerTubeFallback.videoHttpHeaders.ifEmpty { innerTubeFallback.httpHeaders }
-                    )
+                    videoCandidates.add(innerTubeFallback.videoUrl to innerTubeFallback.httpHeaders)
                 }
 
                 val invidiousFallback = InvidiousStreamResolver.resolve(ytId, resolvedInfo.originalUrl)
@@ -264,9 +273,7 @@ object MediaAssetProcessor {
                     invidiousFallback.videoUrl.isNotBlank() &&
                     invidiousFallback.videoUrl != invidiousFallback.audioUrl
                 ) {
-                    videoCandidates.add(
-                        invidiousFallback.videoUrl to invidiousFallback.videoHttpHeaders.ifEmpty { invidiousFallback.httpHeaders }
-                    )
+                    videoCandidates.add(invidiousFallback.videoUrl to invidiousFallback.httpHeaders)
                 }
 
                 for ((candidateVideoUrl, candidateHeaders) in videoCandidates) {
@@ -280,18 +287,6 @@ object MediaAssetProcessor {
                     if (downloaded && isValidVideoFile(tempVideoFile)) {
                         break
                     }
-                }
-
-                // 4. Si los candidatos en OkHttp devolvieron HTTP 403 (ej. video oficial de disquera), descargar el flujo 480p directo con yt-dlp
-                if (!isValidVideoFile(tempVideoFile) && YtDlpNativeEngine.isAvailable(context)) {
-                    if (tempVideoFile.exists()) tempVideoFile.delete()
-                    YtDlpNativeEngine.downloadStreamDirectWithYtDlp(
-                        context = context,
-                        url = resolvedInfo.originalUrl,
-                        targetFile = tempVideoFile,
-                        videoOnly480p = true,
-                        onProgress = onProgressUpdate
-                    )
                 }
             }
         }

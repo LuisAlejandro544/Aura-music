@@ -239,7 +239,7 @@ object YtDlpNativeEngine {
             add("--dump-single-json")
             add("--no-warnings")
             add("--extractor-args")
-            add("youtube:player_client=android_vr,ios,tv_embedded,web")
+            add("youtube:player_client=android_vr,ios,web")
             add("--format")
             add("bestvideo[height<=480][ext=mp4][vcodec^=avc1][protocol^=http]+bestaudio[ext=m4a][protocol^=http]/bestvideo[height<=480][ext=mp4][protocol^=http]+bestaudio[protocol^=http]/best[height<=480][ext=mp4][protocol^=http]/best[height<=480]")
             if (qjsBin != null && qjsBin.exists()) {
@@ -433,9 +433,6 @@ object YtDlpNativeEngine {
             }
 
             val rootJson = JSONObject(jsonOutput.toString())
-            val videoId = rootJson.optString("id", "").ifBlank {
-                WebStreamExtractor.extractVideoId(cleanUrl) ?: ""
-            }
             val title = rootJson.optString("title", "Audio de YouTube").trim()
             val uploader = rootJson.optString("uploader", "").ifBlank {
                 rootJson.optString("channel", "YouTube")
@@ -445,11 +442,9 @@ object YtDlpNativeEngine {
 
             var directAudioUrl: String? = null
             var directVideoUrl: String? = null
-            val audioHeaders = LinkedHashMap<String, String>()
-            val videoHeaders = LinkedHashMap<String, String>()
+            val resolvedHeaders = mutableMapOf<String, String>()
 
-            fun parseFormatHeaders(fmtObj: JSONObject): Map<String, String> {
-                val map = LinkedHashMap<String, String>()
+            fun extractHeadersFromJson(fmtObj: JSONObject) {
                 val headersObj = fmtObj.optJSONObject("http_headers") ?: rootJson.optJSONObject("http_headers")
                 if (headersObj != null) {
                     val keys = headersObj.keys()
@@ -457,15 +452,10 @@ object YtDlpNativeEngine {
                         val k = keys.next()
                         val v = headersObj.optString(k, "")
                         if (v.isNotBlank()) {
-                            map[k] = v
+                            resolvedHeaders[k] = v
                         }
                     }
                 }
-                val cookiesStr = fmtObj.optString("cookies", "").ifBlank { rootJson.optString("cookies", "") }
-                if (cookiesStr.isNotBlank() && !map.keys.any { it.equals("Cookie", ignoreCase = true) }) {
-                    map["Cookie"] = cookiesStr
-                }
-                return map
             }
 
             fun isDirectHttpStream(fmtUrl: String, protocol: String, ext: String): Boolean {
@@ -493,16 +483,12 @@ object YtDlpNativeEngine {
                     val ext = fmt.optString("ext", "")
                     val fmtUrl = fmt.optString("url", "")
                     if (isDirectHttpStream(fmtUrl, protocol, ext)) {
-                        val fmtHeaders = parseFormatHeaders(fmt)
+                        extractHeadersFromJson(fmt)
                         if (vcodec != "none" && directVideoUrl == null) {
                             directVideoUrl = fmtUrl
-                            videoHeaders.clear()
-                            videoHeaders.putAll(fmtHeaders)
                         }
                         if (acodec != "none" && directAudioUrl == null) {
                             directAudioUrl = fmtUrl
-                            audioHeaders.clear()
-                            audioHeaders.putAll(fmtHeaders)
                         }
                     }
                 }
@@ -513,7 +499,6 @@ object YtDlpNativeEngine {
             if (formats != null) {
                 var bestAudioScore = -1.0
                 var selectedVideoUrl: String? = null
-                var selectedVideoFmtHeaders: Map<String, String> = emptyMap()
                 var bestVideoScore = -999999
 
                 for (i in 0 until formats.length()) {
@@ -528,24 +513,14 @@ object YtDlpNativeEngine {
                     val height = fmt.optInt("height", 0)
                     val abr = fmt.optDouble("abr", 0.0).takeIf { it > 0 } ?: fmt.optDouble("tbr", 0.0)
 
-                    // Priorizar clientes móviles/VR nativos que no sufren bloqueo 403 por IP/cookies en disqueras VEVO
-                    val clientBonus = when {
-                        fmtUrl.contains("c=ANDROID_VR", ignoreCase = true) -> 350.0
-                        fmtUrl.contains("c=IOS", ignoreCase = true) -> 300.0
-                        fmtUrl.contains("c=ANDROID_MUSIC", ignoreCase = true) -> 280.0
-                        fmtUrl.contains("c=TVHTML5", ignoreCase = true) -> 200.0
-                        else -> 0.0
-                    }
-
                     // Audio directo de alta fidelidad (priorizar m4a / mp4a para compatibilidad nativa en Android)
                     if (acodec != "none" && vcodec == "none") {
                         val codecBonus = if (ext == "m4a" || acodec.contains("mp4a")) 500.0 else 0.0
-                        val audioScore = abr + codecBonus + clientBonus
+                        val audioScore = abr + codecBonus
                         if (audioScore > bestAudioScore || directAudioUrl == null) {
                             bestAudioScore = audioScore
                             directAudioUrl = fmtUrl
-                            audioHeaders.clear()
-                            audioHeaders.putAll(parseFormatHeaders(fmt))
+                            extractHeadersFromJson(fmt)
                         }
                     }
 
@@ -553,13 +528,14 @@ object YtDlpNativeEngine {
                     if (vcodec != "none" && height > 0) {
                         val targetHeight = 480
                         val diff = kotlin.math.abs(height - targetHeight)
-                        var score = 10000 - (diff * 15) + clientBonus.toInt()
+                        var score = 10000 - (diff * 15)
 
                         if (height == 480) score += 5000
                         if (ext == "mp4") score += 3000
                         if (vcodec.startsWith("avc1") || vcodec.contains("h264")) {
                             score += 4000
                         } else if (vcodec.startsWith("av01") || vcodec.contains("av1")) {
+                            // Penalizar AV1 ya que muchos decodificadores móviles y extractores fallan con él
                             score -= 6000
                         } else if (vcodec.contains("vp9")) {
                             score -= 2000
@@ -568,15 +544,13 @@ object YtDlpNativeEngine {
                         if (score > bestVideoScore) {
                             bestVideoScore = score
                             selectedVideoUrl = fmtUrl
-                            selectedVideoFmtHeaders = parseFormatHeaders(fmt)
+                            extractHeadersFromJson(fmt)
                         }
                     }
                 }
 
                 if (selectedVideoUrl != null) {
                     directVideoUrl = selectedVideoUrl
-                    videoHeaders.clear()
-                    videoHeaders.putAll(selectedVideoFmtHeaders)
                 }
             }
 
@@ -586,8 +560,7 @@ object YtDlpNativeEngine {
                 val rootExt = rootJson.optString("ext", "")
                 if (isDirectHttpStream(rootUrl, rootProto, rootExt)) {
                     directAudioUrl = rootUrl
-                    audioHeaders.clear()
-                    audioHeaders.putAll(parseFormatHeaders(rootJson))
+                    extractHeadersFromJson(rootJson)
                 }
             }
 
@@ -602,40 +575,14 @@ object YtDlpNativeEngine {
                     val acodec = fmt.optString("acodec", "none").lowercase()
                     if (isDirectHttpStream(fmtUrl, protocol, ext) && vcodec != "none" && acodec != "none") {
                         directVideoUrl = fmtUrl
-                        videoHeaders.clear()
-                        videoHeaders.putAll(parseFormatHeaders(fmt))
-                        if (directAudioUrl == null) {
-                            directAudioUrl = fmtUrl
-                            audioHeaders.clear()
-                            audioHeaders.putAll(videoHeaders)
-                        }
+                        extractHeadersFromJson(fmt)
+                        if (directAudioUrl == null) directAudioUrl = fmtUrl
                         break
                     }
                 }
             }
 
             val finalVideoUrl = directVideoUrl ?: directAudioUrl ?: url
-            val primaryHeaders = if (audioHeaders.isNotEmpty()) audioHeaders else videoHeaders
-            val finalVideoHeaders = if (videoHeaders.isNotEmpty()) videoHeaders else primaryHeaders
-
-            // Registrar cada flujo con sus cabeceras exactas (sin contaminar audio con cabeceras de video ni viceversa)
-            if (!directAudioUrl.isNullOrBlank() && primaryHeaders.isNotEmpty()) {
-                com.example.data.streaming.StreamingHttpDataSourceConfig.registerStreamHeaders(
-                    videoId = videoId.ifBlank { null },
-                    audioUrl = directAudioUrl,
-                    videoUrl = null,
-                    headers = primaryHeaders
-                )
-            }
-            if (finalVideoUrl.isNotBlank() && finalVideoHeaders.isNotEmpty()) {
-                com.example.data.streaming.StreamingHttpDataSourceConfig.registerStreamHeaders(
-                    videoId = if (directAudioUrl.isNullOrBlank()) videoId.ifBlank { null } else null,
-                    audioUrl = null,
-                    videoUrl = finalVideoUrl,
-                    headers = finalVideoHeaders
-                )
-            }
-
             val mediaInfo = OnlineVideoAudioImporter.ResolvedMediaInfo(
                 originalUrl = url,
                 suggestedTitle = title,
@@ -644,8 +591,7 @@ object YtDlpNativeEngine {
                 audioUrl = directAudioUrl,
                 coverUrl = thumbnail.ifBlank { null },
                 durationSeconds = duration,
-                httpHeaders = primaryHeaders,
-                videoHttpHeaders = finalVideoHeaders
+                httpHeaders = resolvedHeaders
             )
 
             AuraDebugManager.logInfo(TAG, "¡yt-dlp resolvió exitosamente: '$title' de $uploader ($duration s) con video 480p!")
@@ -653,159 +599,6 @@ object YtDlpNativeEngine {
         } catch (e: Exception) {
             AuraDebugManager.logWarning(TAG, "Fallo al ejecutar proceso yt-dlp: ${e.message}")
             Result.failure(e)
-        }
-    }
-
-    /**
-     * Descarga directamente el archivo de audio o video ejecutando el binario nativo de yt-dlp + Python + QuickJS.
-     *
-     * Rol Arquitectónico:
-     * Cuando un video oficial de disquera (VEVO / Sony / Universal / Warner) bloquea descargas externas de OkHttp
-     * con HTTP 403 por firmas PO Token / sesión TLS o cookies efímeras, `yt-dlp` realiza la descarga directa
-     * dentro de la misma sesión en que negoció el reproductor y el descifrado JS con QuickJS.
-     */
-    suspend fun downloadStreamDirectWithYtDlp(
-        context: Context,
-        url: String,
-        targetFile: File,
-        videoOnly480p: Boolean = false,
-        onProgress: (com.example.model.DownloadProgress) -> Unit = {}
-    ): Boolean = withContext(Dispatchers.IO) {
-        if (YtDlpAutoUpdater.isYtDlpTemporarilyBlocked()) return@withContext false
-        init(context)
-        FFmpegNativeEngine.init(context)
-
-        val ytdlpFile = YtDlpAutoUpdater.getYtDlpFile(context)
-        val activePython = getPythonExecutable(context) ?: return@withContext false
-        if (!ytdlpFile.exists()) return@withContext false
-
-        val cleanUrl = normalizeYouTubeMusicUrlForYtDlp(url.trim())
-        if (!cleanUrl.startsWith("http://", ignoreCase = true) && !cleanUrl.startsWith("https://", ignoreCase = true)) {
-            return@withContext false
-        }
-
-        val ffmpegBin = FFmpegNativeEngine.getBinaryFile(context)
-        val qjsBin = getQuickJsExecutable(context)
-        val pythonEnvDir = File(context.filesDir, "env/python")
-        ensureTlsCertificates(pythonEnvDir)
-        val localCert = File(pythonEnvDir, "usr/etc/tls/cert.pem")
-
-        if (targetFile.exists()) targetFile.delete()
-        targetFile.parentFile?.mkdirs()
-
-        val formatSelector = if (videoOnly480p) {
-            "bestvideo[height<=480][ext=mp4][vcodec^=avc1]/bestvideo[height<=480][ext=mp4]/best[height<=480][ext=mp4]/best[height<=480]"
-        } else {
-            "bestaudio[ext=m4a]/bestaudio/best[height<=480]"
-        }
-
-        val cmdList = mutableListOf<String>().apply {
-            add(activePython.absolutePath)
-            add(ytdlpFile.absolutePath)
-            add("--no-playlist")
-            add("--no-part")
-            add("--no-warnings")
-            add("--newline")
-            add("--extractor-args")
-            add("youtube:player_client=android_vr,ios,tv_embedded,web")
-            add("-f")
-            add(formatSelector)
-            if (qjsBin != null && qjsBin.exists()) {
-                add("--js-runtimes")
-                add("quickjs:${qjsBin.absolutePath}")
-            }
-            if (ffmpegBin != null && ffmpegBin.exists()) {
-                add("--ffmpeg-location")
-                add(ffmpegBin.absolutePath)
-            }
-            add("-o")
-            add(targetFile.absolutePath)
-            add("--")
-            add(cleanUrl)
-        }
-
-        try {
-            val nativeDir = context.applicationInfo.nativeLibraryDir
-            val directPythonZipSo = File(nativeDir, "libpython.zip.so")
-            val stdlibZip = File(pythonEnvDir, "stdlib.zip")
-            val stdlibDir = File(pythonEnvDir, "stdlib")
-            val modulesDir = File(pythonEnvDir, "modules")
-            val ffmpegEnvDir = File(context.filesDir, "env/ffmpeg")
-
-            val pb = ProcessBuilder(cmdList)
-                .directory(File(nativeDir))
-                .redirectErrorStream(true)
-
-            pb.environment().apply {
-                this["PYTHONHOME"] = pythonEnvDir.absolutePath
-                this["PYTHONPATH"] = "${directPythonZipSo.absolutePath}:${stdlibZip.absolutePath}:${stdlibDir.absolutePath}:${modulesDir.absolutePath}:${pythonEnvDir.absolutePath}:${pythonEnvDir.absolutePath}/usr/lib/python3.11:${context.filesDir.absolutePath}/bin"
-                this["PYTHONNOUSERSITE"] = "1"
-                this["HOME"] = pythonEnvDir.absolutePath
-                this["LD_LIBRARY_PATH"] = "$nativeDir:${modulesDir.absolutePath}:${pythonEnvDir.absolutePath}/usr/lib:${ffmpegEnvDir.absolutePath}/usr/lib"
-                if (localCert.exists() && localCert.length() > 0) {
-                    this["SSL_CERT_FILE"] = localCert.absolutePath
-                    this["CURL_CA_BUNDLE"] = localCert.absolutePath
-                    this["REQUESTS_CA_BUNDLE"] = localCert.absolutePath
-                }
-                this["PATH"] = "$nativeDir:${context.filesDir.absolutePath}/bin:${System.getenv("PATH") ?: ""}"
-                this["TMPDIR"] = context.cacheDir.absolutePath
-            }
-
-            val phaseLabel = if (videoOnly480p) {
-                "Descargando Video Canvas 480p directo con yt-dlp..."
-            } else {
-                "Descargando audio directo con yt-dlp..."
-            }
-            onProgress(
-                com.example.model.DownloadProgress(
-                    isDownloading = true,
-                    phase = phaseLabel,
-                    progressFraction = 0.05f
-                )
-            )
-
-            val process = pb.start()
-            val percentRegex = Regex("""(\d+(?:\.\d+)?)%""")
-            val readerThread = Thread {
-                try {
-                    BufferedReader(InputStreamReader(process.inputStream)).use { reader ->
-                        var line: String?
-                        while (reader.readLine().also { line = it } != null) {
-                            val currentLine = line ?: continue
-                            if (currentLine.contains("[download]")) {
-                                val match = percentRegex.find(currentLine)
-                                val pct = match?.groupValues?.getOrNull(1)?.toFloatOrNull()
-                                if (pct != null) {
-                                    val currentBytes = if (targetFile.exists()) targetFile.length() else 0L
-                                    onProgress(
-                                        com.example.model.DownloadProgress(
-                                            isDownloading = true,
-                                            phase = phaseLabel,
-                                            bytesDownloaded = currentBytes,
-                                            totalBytes = if (pct > 0f) (currentBytes * 100f / pct).toLong() else 0L,
-                                            progressFraction = (pct / 100f).coerceIn(0f, 1f)
-                                        )
-                                    )
-                                }
-                            }
-                        }
-                    }
-                } catch (_: Exception) {}
-            }
-            readerThread.start()
-            val exitCode = process.waitFor()
-            readerThread.join()
-
-            val ok = exitCode == 0 && targetFile.exists() && targetFile.length() > 4096L
-            if (ok) {
-                AuraDebugManager.logInfo(TAG, "Descarga directa con yt-dlp completada con éxito (${targetFile.length()} bytes)")
-            } else {
-                AuraDebugManager.logWarning(TAG, "Descarga directa con yt-dlp finalizó con código $exitCode")
-            }
-            ok
-        } catch (e: Exception) {
-            AuraDebugManager.logWarning(TAG, "Excepción en descarga directa con yt-dlp: ${e.message}")
-            false
         }
     }
 

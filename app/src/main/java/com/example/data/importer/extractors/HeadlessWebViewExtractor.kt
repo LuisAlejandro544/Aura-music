@@ -59,25 +59,14 @@ object HeadlessWebViewExtractor {
         withTimeoutOrNull(22000L) {
             suspendCancellableCoroutine { continuation ->
                 var webView: WebView? = null
-                var cleanedUp = false
 
                 fun cleanup() {
-                    if (cleanedUp) return
-                    cleanedUp = true
-                    val targetView = webView
-                    webView = null
-                    val destroyTask = Runnable {
-                        try {
-                            targetView?.stopLoading()
-                            targetView?.webViewClient = WebViewClient()
-                            targetView?.destroy()
-                        } catch (_: Throwable) {}
-                    }
-                    if (Looper.myLooper() == Looper.getMainLooper()) {
-                        destroyTask.run()
-                    } else {
-                        Handler(Looper.getMainLooper()).post(destroyTask)
-                    }
+                    try {
+                        webView?.stopLoading()
+                        webView?.pauseTimers()
+                        webView?.destroy()
+                        webView = null
+                    } catch (ignored: Throwable) {}
                 }
 
                 continuation.invokeOnCancellation {
@@ -101,10 +90,9 @@ object HeadlessWebViewExtractor {
                         mediaPlaybackRequiresUserGesture = false
                         loadsImagesAutomatically = true
                         blockNetworkImage = false
-                        cacheMode = WebSettings.LOAD_DEFAULT
-                        userAgentString = WebViewCookieBridge.getCapturedUserAgent(context)
+                        cacheMode = WebSettings.LOAD_NO_CACHE
+                        userAgentString = "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
                     }
-                    WebViewCookieBridge.saveCapturedUserAgent(context, view.settings.userAgentString)
 
                     var streamExtracted = false
                     var capturedAudioUrl: String? = null

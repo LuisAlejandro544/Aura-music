@@ -2,9 +2,7 @@ package com.example.ui.components.download
 
 import android.content.Context
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MusicNote
@@ -97,40 +95,20 @@ fun DownloadSourceAndEngineSelector(
             }
             Spacer(modifier = Modifier.height(4.dp))
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(androidx.compose.foundation.rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 FilterChip(
                     selected = selectedEngine == YoutubeExtractionEngine.YTDLP,
                     onClick = { onEngineSelected(YoutubeExtractionEngine.YTDLP) },
-                    label = { Text("⭐ yt-dlp", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                    label = { Text("⭐ yt-dlp (98%)", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
                     modifier = Modifier.testTag("engine_chip_ytdlp")
-                )
-                FilterChip(
-                    selected = selectedEngine == YoutubeExtractionEngine.INNERTUBE_YTDLP,
-                    onClick = { onEngineSelected(YoutubeExtractionEngine.INNERTUBE_YTDLP) },
-                    label = { Text("⚡ InnerTube + yt-dlp", fontSize = 11.sp, fontWeight = FontWeight.SemiBold) },
-                    modifier = Modifier.testTag("engine_chip_innertube_ytdlp")
-                )
-                FilterChip(
-                    selected = selectedEngine == YoutubeExtractionEngine.PIPED,
-                    onClick = { onEngineSelected(YoutubeExtractionEngine.PIPED) },
-                    label = { Text("Piped API", fontSize = 11.sp) },
-                    modifier = Modifier.testTag("engine_chip_piped")
                 )
                 FilterChip(
                     selected = selectedEngine == YoutubeExtractionEngine.INNERTUBE,
                     onClick = { onEngineSelected(YoutubeExtractionEngine.INNERTUBE) },
                     label = { Text("InnerTube", fontSize = 11.sp) },
                     modifier = Modifier.testTag("engine_chip_innertube")
-                )
-                FilterChip(
-                    selected = selectedEngine == YoutubeExtractionEngine.INVIDIOUS,
-                    onClick = { onEngineSelected(YoutubeExtractionEngine.INVIDIOUS) },
-                    label = { Text("Invidious", fontSize = 11.sp) },
-                    modifier = Modifier.testTag("engine_chip_invidious")
                 )
                 FilterChip(
                     selected = selectedEngine == YoutubeExtractionEngine.WEBVIEW,
@@ -141,24 +119,13 @@ fun DownloadSourceAndEngineSelector(
             }
             Text(
                 text = when (selectedEngine) {
-                    YoutubeExtractionEngine.YTDLP -> "✅ Motor nativo limpio (Python 3.11 + QuickJS sin cookies) con respaldo automático InnerTube / Piped / Invidious."
-                    YoutubeExtractionEngine.INNERTUBE_YTDLP -> "⚡ Híbrido: InnerTube intercepta la URL en <300ms y se la pasa a yt-dlp si requiere descifrado o descarga directa."
-                    YoutubeExtractionEngine.PIPED -> "🌐 Red abierta de servidores Piped API sin anuncios con proxy anti-403 para YouTube y YouTube Music."
-                    YoutubeExtractionEngine.INNERTUBE -> "⚡ API directa de YouTube Music (ANDROID_VR / IOS / TV) con respaldo Invidious Proxy."
-                    YoutubeExtractionEngine.INVIDIOUS -> "🛡️ Nodos abiertos Invidious API v1 con túnel proxy ?local=true para eludir bloqueos de IP."
-                    YoutubeExtractionEngine.WEBVIEW -> "🌍 Navegador móvil en segundo plano que extrae el flujo en vivo sobre m.youtube.com."
+                    YoutubeExtractionEngine.YTDLP -> "✅ El más recomendable (por defecto): tiene un 98% de probabilidad de funcionar. Si alguna vez falla, sal y vuelve a entrar para pegar la URL de nuevo."
+                    YoutubeExtractionEngine.INNERTUBE -> "API nativa directa de YouTube Music. Rápida, gratis y sin consumo de batería."
+                    YoutubeExtractionEngine.WEBVIEW -> "Navegador efímero en segundo plano que ejecuta el reproductor en memoria."
                 },
                 style = MaterialTheme.typography.labelSmall.copy(
-                    color = if (selectedEngine == YoutubeExtractionEngine.YTDLP || selectedEngine == YoutubeExtractionEngine.INNERTUBE_YTDLP) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        TextSecondary
-                    },
-                    fontWeight = if (selectedEngine == YoutubeExtractionEngine.YTDLP || selectedEngine == YoutubeExtractionEngine.INNERTUBE_YTDLP) {
-                        FontWeight.SemiBold
-                    } else {
-                        FontWeight.Normal
-                    }
+                    color = if (selectedEngine == YoutubeExtractionEngine.YTDLP) MaterialTheme.colorScheme.primary else TextSecondary,
+                    fontWeight = if (selectedEngine == YoutubeExtractionEngine.YTDLP) FontWeight.SemiBold else FontWeight.Normal
                 ),
                 modifier = Modifier
                     .padding(top = 4.dp, start = 2.dp)

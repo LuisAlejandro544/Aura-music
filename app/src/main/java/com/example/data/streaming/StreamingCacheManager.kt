@@ -376,25 +376,7 @@ class StreamingCacheManager(private val context: Context) {
                             }
                         }
                     }
-                    if (outputFile.exists() && outputFile.length() > MIN_VALID_AUDIO_BYTES) {
-                        return@withContext true
-                    }
-
-                    // Respaldo final con descarga directa nativa desde yt-dlp si el CDN bloqueó con HTTP 403
-                    if (safeId.length == 11 && com.example.data.importer.YtDlpNativeEngine.isAvailable(context)) {
-                        val isVideoTarget = outputFile.name.contains("video", ignoreCase = true)
-                        val watchUrl = "https://www.youtube.com/watch?v=$safeId"
-                        val directOk = com.example.data.importer.YtDlpNativeEngine.downloadStreamDirectWithYtDlp(
-                            context = context,
-                            url = watchUrl,
-                            targetFile = outputFile,
-                            videoOnly480p = isVideoTarget
-                        )
-                        if (directOk && outputFile.exists() && outputFile.length() > MIN_VALID_AUDIO_BYTES) {
-                            return@withContext true
-                        }
-                    }
-                    false
+                    outputFile.exists() && outputFile.length() > MIN_VALID_AUDIO_BYTES
                 } catch (_: Exception) {
                     false
                 }

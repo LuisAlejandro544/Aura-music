@@ -48,22 +48,14 @@ class AuraApplication : Application() {
         }
 
         /**
-         * Mitiga de raíz la fuga de memoria reportada en Android 14 (ROMs TECNO HiOS, Xiaomi/MIUI/HyperOS, vivo, ColorOS):
-         * - `ResourcesImpl.mAppContext -> ContextImpl.mOuterContext -> Service`
-         * - `ResourcesImpl.mAppContext -> ContextImpl.mServiceCache[] -> VirtualDeviceManager.mContext -> AuraDownloadService`
+         * Mitiga de raíz la fuga de memoria reportada en ROMs OEM (Xiaomi/MIUI/HyperOS, vivo, ColorOS):
+         * `ResourcesImpl.mAppContext -> ContextImpl.mOuterContext -> Service`.
          *
-         * En Android 14 (API 34), cuando un Service invoca `startForeground()` o consulta servicios del sistema,
-         * `SystemServiceRegistry` instancia `android.companion.virtual.VirtualDeviceManager` dentro del arreglo
-         * `ContextImpl.mServiceCache` del `ContextImpl` asociado al `Service`, guardando una referencia fuerte
-         * `VirtualDeviceManager.mContext = AuraDownloadService`. Si `ResourcesImpl.mAppContext` retiene ese
-         * `ContextImpl`, el `Service` queda atrapado en memoria tras `onDestroy()`.
-         *
-         * Esta función:
-         * 1. Redirige `ContextImpl.mOuterContext` hacia `applicationContext`.
-         * 2. Recorre `ContextImpl.mServiceCache` (`Object[]`), busca cualquier servicio cacheado (como `VirtualDeviceManager`)
-         *    cuyo campo `mContext` / `mOuterContext` apunte al `Service` destruido, lo reasigna a `applicationContext`
-         *    y vacía por completo el arreglo `mServiceCache` del `ContextImpl` saliente.
-         * 3. Limpia `ResourcesImpl.mAppContext` si la ROM permite el acceso reflexivo.
+         * En Android 9+, `ResourcesImpl.mAppContext` suele estar en la lista restringida de APIs ocultas,
+         * pero `ContextImpl` expone `setOuterContext(Context)` / `mOuterContext` dentro de la jerarquía
+         * del `baseContext` del servicio. Al reasignar `mOuterContext` hacia `applicationContext` al
+         * destruirse el servicio, aunque `ResourcesImpl.mAppContext` conserve el `ContextImpl` en memoria
+         * estática, la instancia del `Service` queda 100% desvinculada y libre para el Garbage Collector.
          */
         fun detachServiceFromContextImplAndOemResources(service: android.app.Service) {
             val appCtx = service.applicationContext ?: return
@@ -72,36 +64,14 @@ class AuraApplication : Application() {
                 appCtx.resources
             } catch (_: Throwable) {}
 
-            // Función auxiliar para limpiar referencias a `service` dentro de cualquier wrapper del sistema (ej. VirtualDeviceManager)
-            fun scrubCachedSystemServiceObject(cachedObj: Any?) {
-                if (cachedObj == null) return
-                var clazz: Class<*>? = cachedObj.javaClass
-                var depth = 0
-                while (clazz != null && clazz != Any::class.java && depth < 4) {
-                    for (f in clazz.declaredFields) {
-                        if (f.name == "mContext" || f.name == "mOuterContext" || f.type == android.content.Context::class.java) {
-                            try {
-                                f.isAccessible = true
-                                val currentRef = f.get(cachedObj)
-                                if (currentRef === service || currentRef === service.baseContext) {
-                                    f.set(cachedObj, appCtx)
-                                }
-                            } catch (_: Throwable) {}
-                        }
-                    }
-                    clazz = clazz.superclass
-                    depth++
-                }
-            }
-
             // 2. Desenvolver cualquier ContextWrapper hasta alcanzar android.app.ContextImpl
-            //    redirigir mOuterContext -> applicationContext y vaciar mServiceCache[]
+            //    y redirigir mOuterContext -> applicationContext
             try {
                 var currentCtx: android.content.Context? = service.baseContext
                 var depth = 0
                 while (currentCtx != null && depth < 10) {
                     if (currentCtx.javaClass.name == "android.app.ContextImpl") {
-                        // A. Intentar primero el método interno setOuterContext(Context)
+                        // Intentar primero el método interno setOuterContext(Context)
                         var updated = false
                         try {
                             val setOuterMethod = currentCtx.javaClass.getDeclaredMethod(
@@ -124,24 +94,6 @@ class AuraApplication : Application() {
                                 }
                             } catch (_: Throwable) {}
                         }
-
-                        // B. Limpiar ContextImpl.mServiceCache (incluyendo VirtualDeviceManager.mContext -> AuraDownloadService)
-                        try {
-                            val cacheField = currentCtx.javaClass.getDeclaredField("mServiceCache")
-                            cacheField.isAccessible = true
-                            val serviceCache = cacheField.get(currentCtx) as? Array<*>
-                            if (serviceCache != null) {
-                                @Suppress("UNCHECKED_CAST")
-                                val mutableCache = serviceCache as? Array<Any?>
-                                for (i in serviceCache.indices) {
-                                    val cachedService = serviceCache[i]
-                                    if (cachedService != null) {
-                                        scrubCachedSystemServiceObject(cachedService)
-                                        mutableCache?.set(i, null)
-                                    }
-                                }
-                            }
-                        } catch (_: Throwable) {}
                         break
                     }
                     currentCtx = if (currentCtx is android.content.ContextWrapper) {
@@ -161,8 +113,7 @@ class AuraApplication : Application() {
                         field.isAccessible = true
                         val currentVal = field.get(null)
                         if (currentVal === service.baseContext || currentVal === service) {
-                            val appBase = (appCtx as? android.content.ContextWrapper)?.baseContext ?: appCtx
-                            field.set(null, appBase)
+                            field.set(null, appCtx)
                         }
                         break
                     }

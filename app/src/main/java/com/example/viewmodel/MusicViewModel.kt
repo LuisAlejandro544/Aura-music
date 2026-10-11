@@ -166,8 +166,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val currentScreen = navigationCoordinator.currentScreen
     val selectedPlaylist = navigationCoordinator.selectedPlaylist
     val selectedPlaylistTracks = navigationCoordinator.selectedPlaylistTracks
-    val customAlbumsMetadata = navigationCoordinator.customAlbumsMetadata
-    val customArtistsMetadata = navigationCoordinator.customArtistsMetadata
     val isNowPlayingExpanded = navigationCoordinator.isNowPlayingExpanded
     val searchQuery = navigationCoordinator.searchQuery
     val selectedLibraryTab = navigationCoordinator.selectedLibraryTab
@@ -180,7 +178,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val isVideoCanvasActive: StateFlow<Boolean> = videoDisplayMode.map { it != VideoDisplayMode.OFF }
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
     val nowPlayingDesignMode = navigationCoordinator.nowPlayingDesignMode
-    val onlineExtractionEngine = navigationCoordinator.onlineExtractionEngine
 
     // Estados de importación y progreso de descargas
     val isImporting = trackLibraryCoordinator.isImporting
@@ -243,12 +240,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val downloadedStreamingIds: StateFlow<Set<String>> = streamingCoordinator.downloadedVideoIds
 
     init {
-        // Cargar metadatos personalizados (foto WebP y descripción) de Álbumes y Artistas en segundo plano
-        viewModelScope.launch(Dispatchers.IO) {
-            val (albumsMeta, artistsMeta) = AppStorageManager(application).loadCollectionsCustomMetadataSync()
-            navigationCoordinator.setInitialCollectionsCustomMetadata(albumsMeta, artistsMeta)
-        }
-
         // Hilo de renderizado de espectro FFT C++20 optimizado:
         // - Pausa por completo el muestreo JNI y entra en suspensión profunda cuando la app está en segundo plano
         //   (por ejemplo, mientras el usuario está jugando) para ahorrar CPU y batería.
@@ -537,8 +528,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun setNowPlayingDesignMode(mode: NowPlayingDesignMode) = navigationCoordinator.setNowPlayingDesignMode(mode)
     fun cycleNowPlayingDesignMode() = setNowPlayingDesignMode(nowPlayingDesignMode.value.next())
-    fun setOnlineExtractionEngine(engine: com.example.data.importer.YoutubeExtractionEngine) =
-        navigationCoordinator.setOnlineExtractionEngine(engine)
 
     // --- Reproducción ---
     fun playTrack(track: Track, fromList: List<Track>? = null) {
@@ -600,83 +589,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun createPlaylist(name: String, description: String = "", customArtUri: Uri? = null) =
         trackLibraryCoordinator.createPlaylist(name, description, customArtUri)
-
-    fun updatePlaylist(
-        playlistId: Long,
-        newName: String,
-        newDescription: String = "",
-        customArtUri: Uri? = null,
-        removeArtwork: Boolean = false
-    ) {
-        when (playlistId) {
-            -2L -> updateAlbumDetails(newName, newDescription, customArtUri, removeArtwork)
-            -3L -> updateArtistDetails(newName, newDescription, customArtUri, removeArtwork)
-            else -> trackLibraryCoordinator.updatePlaylist(playlistId, newName, newDescription, customArtUri, removeArtwork)
-        }
-    }
-
-    fun updateAlbumDetails(
-        albumName: String,
-        description: String,
-        customArtUri: Uri? = null,
-        removeArtwork: Boolean = false
-    ) {
-        if (albumName.isBlank()) return
-        viewModelScope.launch(Dispatchers.IO) {
-            val storageManager = AppStorageManager(getApplication())
-            val existing = customAlbumsMetadata.value[albumName]
-            val finalArtPath = when {
-                customArtUri != null -> storageManager.saveCollectionArtworkFromUri(
-                    collectionTypePrefix = "album",
-                    collectionName = albumName,
-                    sourceUri = customArtUri,
-                    oldArtworkPath = existing?.customArtPath
-                )
-                removeArtwork -> {
-                    storageManager.deleteArtworkFile(existing?.customArtPath)
-                    null
-                }
-                else -> existing?.customArtPath
-            }
-            navigationCoordinator.updateAlbumCustomMetadata(albumName, description, finalArtPath)
-            storageManager.saveCollectionsCustomMetadata(
-                albums = navigationCoordinator.customAlbumsMetadata.value,
-                artists = navigationCoordinator.customArtistsMetadata.value
-            )
-        }
-    }
-
-    fun updateArtistDetails(
-        artistName: String,
-        description: String,
-        customArtUri: Uri? = null,
-        removeArtwork: Boolean = false
-    ) {
-        if (artistName.isBlank()) return
-        viewModelScope.launch(Dispatchers.IO) {
-            val storageManager = AppStorageManager(getApplication())
-            val existing = customArtistsMetadata.value[artistName]
-            val finalArtPath = when {
-                customArtUri != null -> storageManager.saveCollectionArtworkFromUri(
-                    collectionTypePrefix = "artist",
-                    collectionName = artistName,
-                    sourceUri = customArtUri,
-                    oldArtworkPath = existing?.customArtPath
-                )
-                removeArtwork -> {
-                    storageManager.deleteArtworkFile(existing?.customArtPath)
-                    null
-                }
-                else -> existing?.customArtPath
-            }
-            navigationCoordinator.updateArtistCustomMetadata(artistName, description, finalArtPath)
-            storageManager.saveCollectionsCustomMetadata(
-                albums = navigationCoordinator.customAlbumsMetadata.value,
-                artists = navigationCoordinator.customArtistsMetadata.value
-            )
-        }
-    }
-
+    fun updatePlaylist(playlistId: Long, newName: String, newDescription: String = "", customArtUri: Uri? = null, removeArtwork: Boolean = false) =
+        trackLibraryCoordinator.updatePlaylist(playlistId, newName, newDescription, customArtUri, removeArtwork)
     fun deletePlaylist(playlistId: Long) = trackLibraryCoordinator.deletePlaylist(playlistId)
     fun addTrackToPlaylist(playlistId: Long, trackId: Long) = trackLibraryCoordinator.addTrackToPlaylist(playlistId, trackId)
     fun removeTrackFromPlaylist(playlistId: Long, trackId: Long) = trackLibraryCoordinator.removeTrackFromPlaylist(playlistId, trackId)

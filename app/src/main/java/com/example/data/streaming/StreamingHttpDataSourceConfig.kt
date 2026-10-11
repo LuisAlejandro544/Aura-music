@@ -28,19 +28,16 @@ object StreamingHttpDataSourceConfig {
         "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
 
     private const val VR_CLIENT_UA =
-        "com.google.android.apps.youtube.vr.oculus/1.60.19 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip"
+        "Mozilla/5.0 (Android; VR; Meta Quest 3) AppleWebKit/537.36"
 
     private const val VISION_CLIENT_UA =
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15"
 
     private const val ANDROID_MUSIC_UA =
-        "com.google.android.apps.youtube.music/7.27.52 (Linux; U; Android 14; es_US) gzip"
+        "com.google.android.apps.youtube.music/6.42.52 (Linux; U; Android 14; es_ES) gzip"
 
     private const val IOS_CLIENT_UA =
-        "com.google.ios.youtube/19.45.4 (iPhone16,2; U; CPU iOS 18_1_0 like Mac OS X;)"
-
-    private const val TV_CLIENT_UA =
-        "Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version"
+        "com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)"
 
     private val headersByVideoId = ConcurrentHashMap<String, Map<String, String>>()
     private val headersByUrlKey = ConcurrentHashMap<String, Map<String, String>>()
@@ -53,39 +50,35 @@ object StreamingHttpDataSourceConfig {
         videoId: String?,
         audioUrl: String?,
         videoUrl: String?,
-        headers: Map<String, String>,
-        videoHeaders: Map<String, String>? = null
+        headers: Map<String, String>
     ) {
-        fun cleanMap(raw: Map<String, String>): Map<String, String> {
-            return raw.filter { (k, v) ->
-                k.isNotBlank() && v.isNotBlank() &&
-                    !k.equals("Range", ignoreCase = true) &&
-                    !k.equals("Accept-Encoding", ignoreCase = true)
-            }
+        if (headers.isEmpty()) return
+        val cleanHeaders = headers.filter { (k, v) ->
+            k.isNotBlank() && v.isNotBlank() &&
+                !k.equals("Range", ignoreCase = true) &&
+                !k.equals("Accept-Encoding", ignoreCase = true)
         }
+        if (cleanHeaders.isEmpty()) return
 
-        val cleanAudioHeaders = cleanMap(headers)
-        val cleanVideoHeaders = cleanMap(videoHeaders ?: headers)
-
-        if (!videoId.isNullOrBlank() && cleanAudioHeaders.isNotEmpty()) {
-            headersByVideoId[videoId.trim()] = cleanAudioHeaders
+        if (!videoId.isNullOrBlank()) {
+            headersByVideoId[videoId.trim()] = cleanHeaders
         }
-        if (!audioUrl.isNullOrBlank() && cleanAudioHeaders.isNotEmpty()) {
-            headersByUrlKey[extractUrlSignatureKey(audioUrl)] = cleanAudioHeaders
+        if (!audioUrl.isNullOrBlank()) {
+            headersByUrlKey[extractUrlSignatureKey(audioUrl)] = cleanHeaders
         }
-        if (!videoUrl.isNullOrBlank() && cleanVideoHeaders.isNotEmpty()) {
-            headersByUrlKey[extractUrlSignatureKey(videoUrl)] = cleanVideoHeaders
+        if (!videoUrl.isNullOrBlank()) {
+            headersByUrlKey[extractUrlSignatureKey(videoUrl)] = cleanHeaders
         }
     }
 
     /**
-     * Obtiene las cabeceras óptimas para una URL o `videoId`, alineando estrictamente el `User-Agent`,
-     * `Origin` y `Referer` requeridos por el parámetro `c=` de `googlevideo.com` para prevenir HTTP 403.
+     * Obtiene las cabeceras óptimas para una URL o `videoId`, infiriendo automáticamente el `User-Agent`
+     * requerido por el parámetro `c=` de `googlevideo.com` si no hubiera cabeceras explícitas registradas.
      */
     fun resolveHeadersForStream(videoId: String?, rawUrl: String): Map<String, String> {
         val result = LinkedHashMap<String, String>()
 
-        // 1. Cabeceras registradas explícitamente por yt-dlp o InnerTube para esta URL específica (prioridad por clave de URL + itag)
+        // 1. Cabeceras registradas explícitamente por yt-dlp o InnerTube para esta URL o videoId
         val byUrl = headersByUrlKey[extractUrlSignatureKey(rawUrl)]
         val byId = if (!videoId.isNullOrBlank()) headersByVideoId[videoId.trim()] else null
         val baseHeaders = byUrl ?: byId ?: emptyMap()
@@ -100,33 +93,21 @@ object StreamingHttpDataSourceConfig {
                 clientParam.contains("VISIONOS") -> VISION_CLIENT_UA
                 clientParam.contains("ANDROID_MUSIC") -> ANDROID_MUSIC_UA
                 clientParam.contains("IOS") -> IOS_CLIENT_UA
-                clientParam.contains("TVHTML5") -> TV_CLIENT_UA
                 else -> null
             }
 
             val currentUa = result["User-Agent"] ?: result["user-agent"]
-            // Si la URL pertenece a un cliente nativo (ANDROID_VR, IOS, ANDROID_MUSIC) pero las cabeceras tenían un User-Agent de navegador Web (o viceversa), corregir para evitar HTTP 403
-            val hasMismatchedWebUaOnNativeClient = inferredUa != null &&
-                !clientParam.startsWith("WEB") &&
-                !clientParam.contains("VISIONOS") &&
-                (currentUa == null || currentUa.contains("Mozilla/5.0 (Windows", ignoreCase = true) || currentUa.contains("Chrome/", ignoreCase = true))
-
-            if (currentUa.isNullOrBlank() || hasMismatchedWebUaOnNativeClient) {
-                result.remove("user-agent")
+            if (currentUa.isNullOrBlank()) {
                 result["User-Agent"] = inferredUa ?: DEFAULT_CHROME_MOBILE_UA
             }
 
+            // Si el cliente es WEB o WEB_REMIX y no hay Origin/Referer, agregarlos evita 403 en nodos CDN estrictos
             if (clientParam.startsWith("WEB") || clientParam.isEmpty()) {
                 if (!result.keys.any { it.equals("Origin", ignoreCase = true) }) {
                     result["Origin"] = "https://www.youtube.com"
                 }
                 if (!result.keys.any { it.equals("Referer", ignoreCase = true) }) {
                     result["Referer"] = "https://www.youtube.com/"
-                }
-            } else if (clientParam.contains("IOS") || clientParam.contains("ANDROID")) {
-                // Los clientes nativos (IOS / ANDROID_VR / ANDROID_MUSIC) no deben enviar Origin/Referer de navegador web
-                result.keys.removeAll {
-                    it.equals("Origin", ignoreCase = true) || it.equals("Referer", ignoreCase = true)
                 }
             }
 

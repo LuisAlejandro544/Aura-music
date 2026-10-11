@@ -60,13 +60,11 @@ fun LazyListScope.mainSettingsMenuContent(
     isBackgroundGameModeEnabled: Boolean = true,
     appWallpaperConfig: AppWallpaperConfig = AppWallpaperConfig(),
     nowPlayingDesignMode: NowPlayingDesignMode,
-    onlineExtractionEngine: com.example.data.importer.YoutubeExtractionEngine = com.example.data.importer.YoutubeExtractionEngine.YTDLP,
     isHeadphoneConnected: Boolean,
     connectedDeviceName: String,
     mediaCount: Int,
     widgetConfig: WidgetConfig = WidgetConfig(),
     onOpenPlayerDesign: () -> Unit,
-    onOpenOnlineEngine: () -> Unit = {},
     onOpenVisualBehavior: () -> Unit,
     onOpenThemePalettes: () -> Unit,
     onOpenWidgets: () -> Unit = {},
@@ -89,27 +87,7 @@ fun LazyListScope.mainSettingsMenuContent(
         Spacer(modifier = Modifier.height(12.dp))
     }
 
-    // 2. Motor de Reproducción & Descarga Online (yt-dlp por defecto)
-    item {
-        val diagnosticLabel = if (com.example.BuildConfig.ENABLE_DEBUG_MONITOR) {
-            "Diagnóstico crudo en Aura Monitor"
-        } else {
-            "Avisos directos en pantalla"
-        }
-        SettingsNavigationCard(
-            icon = Icons.Default.Build,
-            title = "Motor de Reproducción & Descarga Online",
-            subtitle = "Activo: ${onlineExtractionEngine.label} • $diagnosticLabel",
-            iconTint = MaterialTheme.colorScheme.primary,
-            badgeText = onlineExtractionEngine.badgeText,
-            badgeColor = MaterialTheme.colorScheme.primary,
-            onClick = onOpenOnlineEngine,
-            testTag = "settings_nav_online_extraction_engine"
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-    }
-
-    // 3. Aura Dinámica, Streaming & Modo Juego (Menú de 4 Sub-Apartados)
+    // 2. Aura Dinámica, Streaming & Modo Juego (Menú de 4 Sub-Apartados)
     item {
         val auraStatus = if (isDynamicArtworkColorEnabled) "Aura Dinámica (1s)" else "Aura Dinámica OFF"
         val wallpaperStatus = if (appWallpaperConfig.hasValidMedia) "Fondo Galería activo" else "Fondo OLED"

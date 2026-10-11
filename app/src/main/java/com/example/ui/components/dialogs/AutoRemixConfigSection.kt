@@ -36,8 +36,6 @@ fun AutoRemixConfigSection(
     localTracks: List<Track>,
     selectedTrackA: Track?,
     selectedTrackB: Track?,
-    acousticProfileA: com.example.model.TrackAcousticProfile? = null,
-    acousticProfileB: com.example.model.TrackAcousticProfile? = null,
     autoMatchReason: String,
     selectedRemixStyle: AutoRemixStyle,
     remixTitle: String,
@@ -86,7 +84,6 @@ fun AutoRemixConfigSection(
         TrackSlotSelectorCard(
             badge = if (selectedRemixStyle == AutoRemixStyle.VOCAL_MASHUP) "CANCIÓN A • VOZ PRINCIPAL" else "CANCIÓN A • BLOQUE 1 & 3",
             track = selectedTrackA,
-            acousticProfile = acousticProfileA,
             onClick = onPickTrackA,
             testTag = "pick_track_a_card"
         )
@@ -117,7 +114,6 @@ fun AutoRemixConfigSection(
         TrackSlotSelectorCard(
             badge = if (selectedRemixStyle == AutoRemixStyle.VOCAL_MASHUP) "CANCIÓN B • BASE RÍTMICA" else "CANCIÓN B • DROP 2 & CIERRE",
             track = selectedTrackB,
-            acousticProfile = acousticProfileB,
             onClick = onPickTrackB,
             testTag = "pick_track_b_card"
         )
@@ -221,7 +217,6 @@ fun AutoRemixConfigSection(
 private fun TrackSlotSelectorCard(
     badge: String,
     track: Track?,
-    acousticProfile: com.example.model.TrackAcousticProfile? = null,
     onClick: () -> Unit,
     testTag: String
 ) {
@@ -239,35 +234,13 @@ private fun TrackSlotSelectorCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = badge,
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
+                Text(
+                    text = badge,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
                     )
-                    if (acousticProfile != null) {
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
-                            border = BorderStroke(0.6.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.45f))
-                        ) {
-                            Text(
-                                text = acousticProfile.badgeText,
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.primary
-                                ),
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
-                }
+                )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = track?.title ?: "Toca para elegir canción local",
@@ -295,4 +268,3 @@ private fun TrackSlotSelectorCard(
         }
     }
 }
-
