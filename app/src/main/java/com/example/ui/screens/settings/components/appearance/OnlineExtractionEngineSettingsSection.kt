@@ -37,12 +37,13 @@ import com.example.ui.theme.TextSecondary
  * Apartado independiente de Ajustes para seleccionar el Motor de Descarga y Reproducción Online (Streaming).
  *
  * Responsabilidad arquitectónica (MVVM):
- * - Presenta en una pantalla dedicada las opciones de motores de extracción para escuchar videos y canciones online:
- *   1. `yt-dlp + Cookies` (Por defecto, el más estable y libre de errores).
- *   2. `Piped API` (Open Source Proxy sin anuncios).
- *   3. `InnerTube + Invidious` (Clientes directos Android VR / iOS / TV).
- *   4. `Invidious Proxy` (Instancias con túnel local=true).
- *   5. `WebView Real` (Navegador móvil en segundo plano).
+ * - Presenta en una pantalla dedicada las opciones de motores de extracción para escuchar en streaming y descargar videos/canciones locales:
+ *   1. `yt-dlp Nativo` (Por defecto, limpio sin cookies).
+ *   2. `InnerTube + yt-dlp` (Modo Híbrido: InnerTube busca e intercepta la URL en <300ms y se apoya en yt-dlp).
+ *   3. `Piped API` (Open Source Proxy sin anuncios).
+ *   4. `InnerTube + Invidious` (Clientes directos Android VR / iOS / TV).
+ *   5. `Invidious Proxy` (Instancias con túnel local=true).
+ *   6. `WebView Real` (Navegador móvil en segundo plano).
  * - Informa el protocolo de diagnóstico activo según la compilación:
  *   - APK Debug: registra el código crudo exacto en Aura Monitor cuando falla el motor elegido.
  *   - APK Beta: muestra un aviso directo en pantalla al usuario.
@@ -92,9 +93,9 @@ fun LazyListScope.onlineExtractionEngineSettingsSection(
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     text = if (isDebugApk) {
-                        "Al escuchar o descargar videos online se utilizará el motor que elijas aquí (yt-dlp por defecto). Si el motor seleccionado llega a fallar, se enviará el código crudo exacto a Aura Monitor y se te avisará de inmediato."
+                        "Al escuchar en streaming o descargar videos locales se utilizará el motor que elijas aquí (yt-dlp Nativo o el híbrido InnerTube + yt-dlp). Si el motor seleccionado llega a fallar, se enviará el código crudo exacto a Aura Monitor."
                     } else {
-                        "Al escuchar o descargar videos online se utilizará el motor que elijas aquí (yt-dlp por defecto). Si ocurre algún fallo con el motor seleccionado, aparecerá un aviso directo en pantalla."
+                        "Al escuchar en streaming o descargar videos locales se utilizará el motor que elijas aquí (yt-dlp Nativo o el híbrido InnerTube + yt-dlp). Si ocurre algún fallo con el motor seleccionado, aparecerá un aviso directo en pantalla."
                     },
                     style = MaterialTheme.typography.bodySmall.copy(
                         color = TextSecondary,
@@ -132,6 +133,7 @@ private fun OnlineEngineOptionCard(
     val accentColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
     val icon: ImageVector = when (engine) {
         YoutubeExtractionEngine.YTDLP -> Icons.Default.Terminal
+        YoutubeExtractionEngine.INNERTUBE_YTDLP -> Icons.Default.Speed
         YoutubeExtractionEngine.PIPED -> Icons.Default.Security
         YoutubeExtractionEngine.INNERTUBE -> Icons.Default.Speed
         YoutubeExtractionEngine.INVIDIOUS -> Icons.Default.CloudDownload
@@ -140,15 +142,17 @@ private fun OnlineEngineOptionCard(
 
     val detailedSubtitle = when (engine) {
         YoutubeExtractionEngine.YTDLP ->
-            "Predeterminado y más fiable. Ejecuta yt-dlp nativo con Python 3.11 + QuickJS y cookies reales (cookies.txt) para reproducir sin errores."
+            "Predeterminado y más fiable. Ejecuta yt-dlp nativo 100% limpio (sin cookies) con Python 3.11 + QuickJS para descargar y reproducir sin bloqueos."
+        YoutubeExtractionEngine.INNERTUBE_YTDLP ->
+            "Opcional Híbrido para Streaming y Descarga Local: InnerTube busca e intercepta la URL al instante (<300ms) y se la pasa a yt-dlp cuando requiere descifrado o descarga."
         YoutubeExtractionEngine.PIPED ->
             "Red abierta de código libre sin anuncios con proxy anti-403 (pipedproxy) para YouTube y YouTube Music."
         YoutubeExtractionEngine.INNERTUBE ->
-            "API interna multi-cliente (ANDROID_VR Quest 3, iOS y TVHTML5) con extracción de visitorData."
+            "API interna multi-cliente (ANDROID_VR Quest 3, iOS y TVHTML5) con verificación de flujos HTTP 206."
         YoutubeExtractionEngine.INVIDIOUS ->
             "Instancias públicas de Invidious con auto-descubrimiento y túnel proxy local=true (/latest_version)."
         YoutubeExtractionEngine.WEBVIEW ->
-            "Navegador móvil sobre m.youtube.com que intercepta flujos googlevideo y refresca cookies.txt."
+            "Navegador móvil sobre m.youtube.com que intercepta flujos directos googlevideo."
     }
 
     Card(

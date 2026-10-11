@@ -6,12 +6,17 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Motores de extracción seleccionables por el usuario para enlaces de YouTube y Web.
+ * Motores de extracción seleccionables por el usuario para enlaces de YouTube y Web
+ * tanto al descargar video/música local como al escuchar en Streaming.
  */
 enum class YoutubeExtractionEngine(val label: String, val description: String) {
     YTDLP(
-        "yt-dlp + Cookies",
-        "Motor nativo de escritorio (Python + QuickJS + cookies.txt del WebView)."
+        "yt-dlp Nativo",
+        "Motor nativo limpio (Python 3.11 + QuickJS sin cookies) con respaldo automático."
+    ),
+    INNERTUBE_YTDLP(
+        "InnerTube + yt-dlp",
+        "Modo Híbrido: InnerTube intercepta y resuelve al instante (<300ms) y delega en yt-dlp si requiere descifrado o descarga directa."
     ),
     PIPED(
         "Piped API",
@@ -27,12 +32,13 @@ enum class YoutubeExtractionEngine(val label: String, val description: String) {
     ),
     WEBVIEW(
         "WebView Real",
-        "Navegador móvil en segundo plano que captura flujos y refresca cookies.txt."
+        "Navegador móvil en segundo plano que intercepta flujos directos googlevideo."
     );
 
     val badgeText: String
         get() = when (this) {
             YTDLP -> "YT-DLP"
+            INNERTUBE_YTDLP -> "INNERTUBE + YT-DLP"
             PIPED -> "PIPED API"
             INNERTUBE -> "INNERTUBE"
             INVIDIOUS -> "INVIDIOUS"
@@ -50,12 +56,13 @@ enum class YoutubeExtractionEngine(val label: String, val description: String) {
 }
 
 /**
- * Orquestador de Extracción de Video/Audio Web con Arquitectura Resiliente de 5 Niveles:
- * - Nivel 0 (yt-dlp + cookies.txt): Motor nativo ejecutado localmente con Python + QuickJS y cookies reales del WebView.
- * - Nivel 1 (Piped API): Red de servidores abiertos con proxy anti-403 (`pipedproxy`) para YouTube y YT Music.
- * - Nivel 2 (InnerTube): Clientes directos (`ANDROID_VR` Oculus, `IOS`, `TVHTML5_SIMPLY_EMBEDDED_PLAYER`) con `visitorData`.
- * - Nivel 3 (Invidious API v1): Espejos públicos con auto-descubrimiento y proxy `local=true` (`/latest_version`).
- * - Nivel 4 (Headless WebView): Navegador real sobre `m.youtube.com` que intercepta flujos y exporta `cookies.txt`.
+ * Orquestador de Extracción de Video/Audio Web con Arquitectura Resiliente:
+ * - `YTDLP` (yt-dlp Nativo limpio): Motor nativo ejecutado localmente con Python 3.11 + QuickJS sin cookies.
+ * - `INNERTUBE_YTDLP` (InnerTube + yt-dlp Híbrido): InnerTube localiza e intercepta la URL al instante (<300ms) y se coordina con `yt-dlp` para descifrado/descarga cuando se requiere.
+ * - `PIPED` (Piped API): Red de servidores abiertos con proxy anti-403 (`pipedproxy`) para YouTube y YT Music.
+ * - `INNERTUBE` (InnerTube): Clientes directos (`ANDROID_VR` Oculus, `IOS`, `TVHTML5_SIMPLY_EMBEDDED_PLAYER`).
+ * - `INVIDIOUS` (Invidious API v1): Espejos públicos con auto-descubrimiento y proxy `local=true` (`/latest_version`).
+ * - `WEBVIEW` (Headless WebView): Navegador real sobre `m.youtube.com` que intercepta flujos directos.
  */
 object WebStreamExtractor {
 
@@ -110,7 +117,7 @@ object WebStreamExtractor {
 
     /**
      * Resuelve los flujos multimedia usando el motor preferido y aplicando fallback automático en cascada
-     * entre `yt-dlp + cookies.txt`, `Piped API`, `InnerTube`, `Invidious Proxy` y `Headless WebView`.
+     * entre `yt-dlp Nativo`, `InnerTube + yt-dlp`, `Piped API`, `InnerTube`, `Invidious Proxy` y `Headless WebView`.
      */
     suspend fun resolveStream(
         context: Context,
@@ -122,18 +129,42 @@ object WebStreamExtractor {
 
         when (preferredEngine) {
             YoutubeExtractionEngine.YTDLP -> {
-                // 1º Intentar con yt-dlp nativo + cookies.txt del WebView
+                // 1º Intentar con yt-dlp nativo limpio (sin cookies)
                 val ytdlpResult = YtDlpNativeEngine.resolveStream(context, cleanUrl)
                 if (ytdlpResult.isSuccess) return@withContext ytdlpResult
 
-                AuraDebugManager.logInfo("WebStreamExtractor", "yt-dlp no resolvió ($cleanUrl), activando cascada Piped -> InnerTube -> Invidious -> WebView...")
+                AuraDebugManager.logInfo("WebStreamExtractor", "yt-dlp no resolvió ($cleanUrl), activando cascada InnerTube -> Piped -> Invidious -> WebView...")
                 if (videoId != null) {
-                    PipedStreamResolver.resolve(videoId, cleanUrl)?.let { return@withContext Result.success(it) }
                     InnerTubeClient.resolve(videoId, cleanUrl)?.let { return@withContext Result.success(it) }
+                    PipedStreamResolver.resolve(videoId, cleanUrl)?.let { return@withContext Result.success(it) }
                     InvidiousStreamResolver.resolve(videoId, cleanUrl)?.let { return@withContext Result.success(it) }
                     HeadlessWebViewExtractor.resolve(context, videoId, cleanUrl)?.let { return@withContext Result.success(it) }
                 }
                 return@withContext ytdlpResult
+            }
+
+            YoutubeExtractionEngine.INNERTUBE_YTDLP -> {
+                // Modo Híbrido InnerTube + yt-dlp:
+                // 1º InnerTube intercepta el videoId, obtiene metadatos y verifica alcanzabilidad HTTP 206 en <300ms
+                if (videoId != null) {
+                    val innerTubeFast = InnerTubeClient.resolve(videoId, cleanUrl)
+                    if (innerTubeFast != null && (!innerTubeFast.audioUrl.isNullOrBlank() || innerTubeFast.videoUrl.isNotBlank())) {
+                        AuraDebugManager.logInfo("WebStreamExtractor", "Modo Híbrido [InnerTube + yt-dlp]: InnerTube interceptó el flujo verificando HTTP 206 en <300ms ($videoId).")
+                        return@withContext Result.success(innerTubeFast)
+                    }
+                }
+                // 2º Si el video requiere descifrado n-sig en JS o InnerTube no entregó stream directo, delega la URL canónica a yt-dlp limpio
+                val canonicalTarget = if (videoId != null) "https://www.youtube.com/watch?v=$videoId" else cleanUrl
+                AuraDebugManager.logInfo("WebStreamExtractor", "Modo Híbrido [InnerTube + yt-dlp]: Pasando URL interceptada ($canonicalTarget) a yt-dlp nativo...")
+                val ytdlpHybrid = YtDlpNativeEngine.resolveStream(context, canonicalTarget)
+                if (ytdlpHybrid.isSuccess) return@withContext ytdlpHybrid
+
+                if (videoId != null) {
+                    PipedStreamResolver.resolve(videoId, cleanUrl)?.let { return@withContext Result.success(it) }
+                    InvidiousStreamResolver.resolve(videoId, cleanUrl)?.let { return@withContext Result.success(it) }
+                    HeadlessWebViewExtractor.resolve(context, videoId, cleanUrl)?.let { return@withContext Result.success(it) }
+                }
+                return@withContext ytdlpHybrid
             }
 
             YoutubeExtractionEngine.PIPED -> {

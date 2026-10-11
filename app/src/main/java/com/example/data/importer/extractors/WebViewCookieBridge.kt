@@ -18,18 +18,12 @@ import java.io.File
 import kotlin.coroutines.resume
 
 /**
- * Extractor y Puente Automático de Cookies del WebView hacia formato Netscape (`cookies.txt`).
+ * Gestor de Cabeceras y Estado de Sesión para el Extractor WebView Móvil (`HeadlessWebViewExtractor`).
  *
  * Rol Arquitectónico:
- * 1. En Android, `--cookies-from-browser` está restringido por el sandbox de Linux entre aplicaciones.
- *    Este componente extrae en tiempo real todas las cookies reales del navegador WebView interno
- *    de la app (`CookieManager.getInstance()`) para los dominios de YouTube, YouTube Music y Google,
- *    y las exporta automáticamente a un archivo estándar Netscape HTTP Cookie File (`cookies.txt`).
- * 2. Permite que `yt-dlp` (`--cookies /ruta/a/cookies.txt --user-agent "..."`) e `InnerTubeClient`
- *    actúen exactamente como un navegador móvil de un usuario real, superando bloqueos de bot
- *    (`Sign in to confirm you're not a bot`) y restricciones de sesión.
- * 3. Incluye un calentador automático silencioso (`warmUpAndExportCookies`) y soporte para importar
- *    o refrescar cookies desde una sesión interactiva de navegador WebView o archivo `.txt`.
+ * - Gestiona el User-Agent móvil y el estado de sesión interno exclusivo del motor opcional WebView Móvil.
+ * - Nota de diseño: `yt-dlp` NUNCA utiliza cookies de WebView (`--cookies`), ya que opera 100% limpio
+ *   con sus clientes nativos (`tv_embedded`, `android_vr`, `tv`, `mweb`) y QuickJS.
  */
 object WebViewCookieBridge {
 
@@ -368,13 +362,29 @@ object WebViewCookieBridge {
         withTimeoutOrNull(10_000L) {
             suspendCancellableCoroutine { continuation ->
                 var webView: WebView? = null
+                var cleanedUp = false
+
+                fun destroyWebViewSafely() {
+                    if (cleanedUp) return
+                    cleanedUp = true
+                    val targetView = webView
+                    webView = null
+                    val task = Runnable {
+                        try {
+                            targetView?.stopLoading()
+                            targetView?.webViewClient = WebViewClient()
+                            targetView?.destroy()
+                        } catch (_: Throwable) {}
+                    }
+                    if (Looper.myLooper() == Looper.getMainLooper()) {
+                        task.run()
+                    } else {
+                        Handler(Looper.getMainLooper()).post(task)
+                    }
+                }
 
                 fun cleanupAndFinish() {
-                    try {
-                        webView?.stopLoading()
-                        webView?.destroy()
-                        webView = null
-                    } catch (_: Throwable) {}
+                    destroyWebViewSafely()
                     val exported = syncWebViewCookiesToNetscapeFile(context)
                     if (continuation.isActive) {
                         continuation.resume(exported)
@@ -382,11 +392,7 @@ object WebViewCookieBridge {
                 }
 
                 continuation.invokeOnCancellation {
-                    try {
-                        webView?.stopLoading()
-                        webView?.destroy()
-                        webView = null
-                    } catch (_: Throwable) {}
+                    destroyWebViewSafely()
                 }
 
                 try {

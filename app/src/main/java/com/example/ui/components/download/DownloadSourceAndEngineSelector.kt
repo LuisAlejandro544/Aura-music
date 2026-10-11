@@ -2,7 +2,9 @@ package com.example.ui.components.download
 
 import android.content.Context
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MusicNote
@@ -95,7 +97,9 @@ fun DownloadSourceAndEngineSelector(
             }
             Spacer(modifier = Modifier.height(4.dp))
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(androidx.compose.foundation.rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 FilterChip(
@@ -103,6 +107,12 @@ fun DownloadSourceAndEngineSelector(
                     onClick = { onEngineSelected(YoutubeExtractionEngine.YTDLP) },
                     label = { Text("⭐ yt-dlp", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
                     modifier = Modifier.testTag("engine_chip_ytdlp")
+                )
+                FilterChip(
+                    selected = selectedEngine == YoutubeExtractionEngine.INNERTUBE_YTDLP,
+                    onClick = { onEngineSelected(YoutubeExtractionEngine.INNERTUBE_YTDLP) },
+                    label = { Text("⚡ InnerTube + yt-dlp", fontSize = 11.sp, fontWeight = FontWeight.SemiBold) },
+                    modifier = Modifier.testTag("engine_chip_innertube_ytdlp")
                 )
                 FilterChip(
                     selected = selectedEngine == YoutubeExtractionEngine.PIPED,
@@ -131,15 +141,24 @@ fun DownloadSourceAndEngineSelector(
             }
             Text(
                 text = when (selectedEngine) {
-                    YoutubeExtractionEngine.YTDLP -> "✅ Motor nativo con cookies reales del WebView (--cookies cookies.txt) y respaldo automático Piped / InnerTube / Invidious."
+                    YoutubeExtractionEngine.YTDLP -> "✅ Motor nativo limpio (Python 3.11 + QuickJS sin cookies) con respaldo automático InnerTube / Piped / Invidious."
+                    YoutubeExtractionEngine.INNERTUBE_YTDLP -> "⚡ Híbrido: InnerTube intercepta la URL en <300ms y se la pasa a yt-dlp si requiere descifrado o descarga directa."
                     YoutubeExtractionEngine.PIPED -> "🌐 Red abierta de servidores Piped API sin anuncios con proxy anti-403 para YouTube y YouTube Music."
-                    YoutubeExtractionEngine.INNERTUBE -> "⚡ API directa de YouTube Music (ANDROID_VR / IOS / TV + visitorData) con respaldo Invidious Proxy."
+                    YoutubeExtractionEngine.INNERTUBE -> "⚡ API directa de YouTube Music (ANDROID_VR / IOS / TV) con respaldo Invidious Proxy."
                     YoutubeExtractionEngine.INVIDIOUS -> "🛡️ Nodos abiertos Invidious API v1 con túnel proxy ?local=true para eludir bloqueos de IP."
-                    YoutubeExtractionEngine.WEBVIEW -> "🌍 Navegador móvil en segundo plano que extrae el flujo en vivo y refresca automáticamente cookies.txt."
+                    YoutubeExtractionEngine.WEBVIEW -> "🌍 Navegador móvil en segundo plano que extrae el flujo en vivo sobre m.youtube.com."
                 },
                 style = MaterialTheme.typography.labelSmall.copy(
-                    color = if (selectedEngine == YoutubeExtractionEngine.YTDLP) MaterialTheme.colorScheme.primary else TextSecondary,
-                    fontWeight = if (selectedEngine == YoutubeExtractionEngine.YTDLP) FontWeight.SemiBold else FontWeight.Normal
+                    color = if (selectedEngine == YoutubeExtractionEngine.YTDLP || selectedEngine == YoutubeExtractionEngine.INNERTUBE_YTDLP) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        TextSecondary
+                    },
+                    fontWeight = if (selectedEngine == YoutubeExtractionEngine.YTDLP || selectedEngine == YoutubeExtractionEngine.INNERTUBE_YTDLP) {
+                        FontWeight.SemiBold
+                    } else {
+                        FontWeight.Normal
+                    }
                 ),
                 modifier = Modifier
                     .padding(top = 4.dp, start = 2.dp)

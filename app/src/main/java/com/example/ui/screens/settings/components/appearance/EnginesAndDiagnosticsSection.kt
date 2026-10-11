@@ -109,38 +109,15 @@ fun LazyListScope.enginesAndDiagnosticsSettingsContent(
                 var ytdlpVersion by remember { mutableStateOf(com.example.data.importer.YtDlpAutoUpdater.getInstalledVersion(context)) }
                 var isUpdating by remember { mutableStateOf(false) }
                 var updateMessage by remember { mutableStateOf<String?>(null) }
-                var cookieCount by remember {
-                    mutableIntStateOf(
-                        com.example.data.importer.WebViewCookieBridge.syncWebViewCookiesToNetscapeFile(context)
-                            ?.let { com.example.data.importer.WebViewCookieBridge.getCookieEntriesCount(context) } ?: 0
-                    )
-                }
-                var isRefreshingCookies by remember { mutableStateOf(false) }
                 val coroutineScope = rememberCoroutineScope()
-
-                val importCookiesLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-                    contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
-                ) { uri ->
-                    if (uri != null) {
-                        coroutineScope.launch {
-                            val res = com.example.data.importer.WebViewCookieBridge.importExternalCookiesTxt(context, uri)
-                            res.onSuccess { count ->
-                                cookieCount = count
-                                updateMessage = "cookies.txt importado con éxito ($count cookies activas para --cookies)."
-                            }.onFailure { err ->
-                                updateMessage = err.message ?: "Error al importar cookies.txt"
-                            }
-                        }
-                    }
-                }
 
                 SettingDetailRow(
                     "FFmpeg Puro",
                     if (com.example.data.importer.FFmpegNativeEngine.isAvailable(context)) "Listo en dispositivo" else "Habilitado (CLI / NDK)"
                 )
                 SettingDetailRow("Versión yt-dlp", ytdlpVersion)
+                SettingDetailRow("Modo Híbrido", "InnerTube + yt-dlp disponible")
                 SettingDetailRow("Piped API & Invidious", "Activos (Proxy Anti-403 + YT Music)")
-                SettingDetailRow("Cookies WebView (--cookies)", "$cookieCount activas en cookies.txt")
 
                 if (updateMessage != null) {
                     Spacer(modifier = Modifier.height(8.dp))
@@ -191,49 +168,6 @@ fun LazyListScope.enginesAndDiagnosticsSettingsContent(
                         Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Buscar Actualizaciones de yt-dlp (OTA)", fontWeight = FontWeight.Bold)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedButton(
-                        onClick = {
-                            if (!isRefreshingCookies) {
-                                isRefreshingCookies = true
-                                updateMessage = "Sincronizando sesión y cookies del navegador WebView a cookies.txt..."
-                                coroutineScope.launch {
-                                    com.example.data.importer.WebViewCookieBridge.warmUpAndExportCookies(context)
-                                    cookieCount = com.example.data.importer.WebViewCookieBridge.getCookieEntriesCount(context)
-                                    isRefreshingCookies = false
-                                    updateMessage = "Cookies del WebView exportadas a cookies.txt ($cookieCount activas)."
-                                }
-                            }
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("refresh_webview_cookies_btn")
-                    ) {
-                        Text(
-                            text = if (isRefreshingCookies) "Sincronizando..." else "Refrescar Cookies",
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-
-                    OutlinedButton(
-                        onClick = {
-                            importCookiesLauncher.launch("text/*")
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("import_cookies_txt_btn")
-                    ) {
-                        Text("Importar cookies.txt", fontWeight = FontWeight.SemiBold)
                     }
                 }
             }

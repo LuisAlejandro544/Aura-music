@@ -59,17 +59,25 @@ object HeadlessWebViewExtractor {
         withTimeoutOrNull(22000L) {
             suspendCancellableCoroutine { continuation ->
                 var webView: WebView? = null
+                var cleanedUp = false
 
                 fun cleanup() {
-                    try {
-                        WebViewCookieBridge.syncWebViewCookiesToNetscapeFile(context)
-                    } catch (_: Throwable) {}
-                    try {
-                        webView?.stopLoading()
-                        webView?.pauseTimers()
-                        webView?.destroy()
-                        webView = null
-                    } catch (ignored: Throwable) {}
+                    if (cleanedUp) return
+                    cleanedUp = true
+                    val targetView = webView
+                    webView = null
+                    val destroyTask = Runnable {
+                        try {
+                            targetView?.stopLoading()
+                            targetView?.webViewClient = WebViewClient()
+                            targetView?.destroy()
+                        } catch (_: Throwable) {}
+                    }
+                    if (Looper.myLooper() == Looper.getMainLooper()) {
+                        destroyTask.run()
+                    } else {
+                        Handler(Looper.getMainLooper()).post(destroyTask)
+                    }
                 }
 
                 continuation.invokeOnCancellation {

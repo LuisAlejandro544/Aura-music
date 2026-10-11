@@ -131,10 +131,16 @@ object OnlineVideoAudioImporter {
             val hasCachedLocalAudio = !resolvedInfo.audioUrl.isNullOrBlank() &&
                 resolvedInfo.audioUrl.startsWith("/") &&
                 File(resolvedInfo.audioUrl).let { it.exists() && it.length() > 0L }
+            val activeEngine = WebStreamExtractor.getSelectedEngine(context)
 
-            // 0. Descarga directa nativa con yt-dlp (cuando se descarga por URL web/YouTube y no viene ya de caché local):
-            // Permite que yt-dlp gestione sus propios fragmentos, firmas, cookies y cabeceras internamente sin recibir HTTP 403 en OkHttp.
-            if (isWebVideoSource && !hasCachedLocalAudio && YtDlpNativeEngine.isAvailable(context)) {
+            // 0. Descarga directa nativa con yt-dlp cuando el motor activo es YTDLP puro (y no viene ya de caché local ni de INNERTUBE_YTDLP con stream verificado):
+            // En modo INNERTUBE_YTDLP, primero se descarga a máxima velocidad (10-40 MB/s) el flujo interceptado por InnerTube en el paso 1,
+            // y si ese flujo requiere descifrado adicional de firmas, pasa automáticamente a yt-dlp directo en el paso 3.A.
+            if (isWebVideoSource &&
+                !hasCachedLocalAudio &&
+                activeEngine == YoutubeExtractionEngine.YTDLP &&
+                YtDlpNativeEngine.isAvailable(context)
+            ) {
                 val directYtDlpSuccess = YtDlpNativeEngine.downloadMediaDirectlyToFiles(
                     context = context,
                     url = resolvedInfo.originalUrl,

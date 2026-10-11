@@ -38,7 +38,7 @@ import java.net.URL
  *    Consulta el endpoint `/youtubei/v1/next` y `PipedStreamResolver.fetchRelatedStreams`
  *    para obtener la siguiente pista similar recomendada antes de que finalice la pista actual.
  * 3. Resolución de Reproducción Multicapa:
- *    Combina `YtDlpNativeEngine` (con `--cookies cookies.txt` del `WebViewCookieBridge`),
+ *    Combina `YtDlpNativeEngine` (100% limpio sin cookies), el modo híbrido `InnerTube + yt-dlp`,
  *    `PipedStreamResolver` (proxy anti-403), `InnerTubeClient` (`ANDROID_VR`/`IOS`/`TV` + `visitorData`),
  *    `InvidiousStreamResolver` (`?local=true`) y `HeadlessWebViewExtractor`.
  */
@@ -181,8 +181,6 @@ object StreamingApiService {
     ): Result<OnlineVideoAudioImporter.ResolvedMediaInfo> = withContext(Dispatchers.IO) {
         val watchUrl = item.canonicalWatchUrl
         val selectedEngine = WebStreamExtractor.getSelectedEngine(context)
-        // Sincronizar cookies actuales del WebView a cookies.txt antes de resolver
-        WebViewCookieBridge.syncWebViewCookiesToNetscapeFile(context)
 
         fun enrichAndRegister(info: OnlineVideoAudioImporter.ResolvedMediaInfo): Result<OnlineVideoAudioImporter.ResolvedMediaInfo> {
             val enriched = info.copy(
@@ -254,6 +252,35 @@ object StreamingApiService {
                     engine = selectedEngine,
                     rawDiagnostic = err?.message ?: "yt-dlp devolvió flujos vacíos para $watchUrl",
                     cause = err
+                )
+            }
+
+            com.example.data.importer.YoutubeExtractionEngine.INNERTUBE_YTDLP -> {
+                // 1º InnerTube busca e intercepta la URL directa verificando HTTP 206 en <300ms
+                val innerTubeFast = InnerTubeClient.resolve(
+                    videoId = item.videoId,
+                    originalUrl = watchUrl
+                )
+                if (innerTubeFast != null && (!innerTubeFast.audioUrl.isNullOrBlank() || innerTubeFast.videoUrl.isNotBlank())) {
+                    return@withContext enrichAndRegister(innerTubeFast)
+                }
+                // 2º Si requiere descifrado n-sig, InnerTube le pasa la URL canónica a yt-dlp limpio
+                if (!YtDlpAutoUpdaterIsBlockedSafe()) {
+                    val ytdlpResult = YtDlpNativeEngine.resolveStream(context, watchUrl)
+                    val info = ytdlpResult.getOrNull()
+                    if (info != null && (!info.audioUrl.isNullOrBlank() || info.videoUrl.isNotBlank())) {
+                        return@withContext enrichAndRegister(info)
+                    }
+                    val err = ytdlpResult.exceptionOrNull()
+                    return@withContext reportStrictEngineFailure(
+                        engine = selectedEngine,
+                        rawDiagnostic = "InnerTube + yt-dlp no pudieron resolver ${item.videoId}: ${err?.message ?: "sin flujos alcanzables"}",
+                        cause = err
+                    )
+                }
+                return@withContext reportStrictEngineFailure(
+                    engine = selectedEngine,
+                    rawDiagnostic = "InnerTube no obtuvo stream directo y yt-dlp está actualizándose por OTA."
                 )
             }
 

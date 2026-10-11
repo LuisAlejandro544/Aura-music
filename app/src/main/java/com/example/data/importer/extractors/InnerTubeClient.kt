@@ -97,7 +97,12 @@ object InnerTubeClient {
             }
 
             httpClient.newCall(reqBuilder.build()).execute().use { resp ->
-                resp.code == 206 || resp.code == 200
+                if (resp.code != 206 && resp.code != 200) return false
+                val contentType = resp.header("Content-Type")?.lowercase().orEmpty()
+                if (contentType.contains("text/html") || contentType.contains("text/plain")) {
+                    return false
+                }
+                true
             }
         } catch (_: Throwable) {
             false

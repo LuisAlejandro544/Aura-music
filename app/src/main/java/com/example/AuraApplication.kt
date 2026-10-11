@@ -193,7 +193,6 @@ class AuraApplication : Application() {
         applicationScope.launch {
             try {
                 com.example.data.storage.AppStorageManager.cleanupResidualFiles(applicationContext)
-                com.example.data.importer.WebViewCookieBridge.syncWebViewCookiesToNetscapeFile(applicationContext)
                 FFmpegNativeEngine.init(applicationContext)
                 YtDlpNativeEngine.init(applicationContext)
                 // Chequeo en caliente OTA de yt-dlp sin bloquear la interfaz

@@ -233,9 +233,8 @@ object YtDlpNativeEngine {
         ensureTlsCertificates(pythonEnvDir)
         val localCert = File(pythonEnvDir, "usr/etc/tls/cert.pem")
 
-        // Exportar cookies reales del WebView a cookies.txt (solo se adjuntan si contienen sesión autenticada real)
-        val cookiesFile = WebViewCookieBridge.syncWebViewCookiesToNetscapeFile(context)
-        val hasAuthCookies = WebViewCookieBridge.hasAuthenticatedSessionCookies(context)
+        // IMPORTANTE: yt-dlp se ejecuta 100% limpio sin cookies (--cookies), dejando que negocie sus
+        // propios clientes internos (tv_embedded, android_vr, tv, mweb) y descifre n-sig con QuickJS.
 
         fun extractCleanErrorSummary(rawErr: CharSequence): String {
             val lines = rawErr.toString().lines().map { it.trim() }.filter { it.isNotEmpty() }
@@ -246,8 +245,6 @@ object YtDlpNativeEngine {
         }
 
         fun buildYtDlpCommand(
-            activeCookiesFile: File?,
-            useCookies: Boolean,
             extractorClientProfile: String?,
             checkFormats: Boolean
         ): MutableList<String> {
@@ -261,23 +258,6 @@ object YtDlpNativeEngine {
                     add("--check-formats")
                 } else {
                     add("--no-check-formats")
-                }
-                // IMPORTANTE:
-                // 1. NUNCA inyectamos un `visitor_data` obtenido desde el User-Agent móvil de Chrome (sw.js_data / m.youtube.com)
-                //    dentro de `android_vr` o `tv_embedded`, porque YouTube vincula criptográficamente el visitorData al
-                //    clientId (2 = MWEB vs 28 = ANDROID_VR) y a la subred IP; mezclarlo hace que googlevideo.com devuelva
-                //    inmediatamente `HTTP Error 403: Forbidden` al intentar leer el stream.
-                // 2. Dejamos que yt-dlp negocie su propio visitorData limpio por cada cliente nativo (`tv_embedded,android_vr,tv`)
-                //    y resuelva los desafíos `n-sig` con nuestro motor C99 nativo `QuickJS` (`--js-runtimes quickjs:...`).
-                val attachCookies = useCookies &&
-                        hasAuthCookies &&
-                        activeCookiesFile != null &&
-                        activeCookiesFile.exists() &&
-                        activeCookiesFile.length() > 120L
-
-                if (attachCookies && activeCookiesFile != null) {
-                    add("--cookies")
-                    add(activeCookiesFile.absolutePath)
                 }
                 if (!extractorClientProfile.isNullOrBlank()) {
                     add("--extractor-args")
@@ -579,28 +559,19 @@ object YtDlpNativeEngine {
         val errorLog = StringBuilder()
 
         try {
-            // Cascada de perfiles de extracción sin inyectar visitor_data ajeno:
-            // 1. tv_embedded,android_vr,tv con player_skip=webpage (descarga configs/JS para descifrar n-sig con QuickJS sin bajar la página HTML watch que pide captcha)
+            // Cascada de perfiles de extracción limpios sin cookies ni visitor_data externo:
+            // 1. tv_embedded,android_vr,tv con player_skip=webpage (descarga configs/JS para descifrar n-sig con QuickJS)
             // 2. android_vr,tv puro con --check-formats
             // 3. mweb,tv_embedded completo con QuickJS
-            val candidateProfiles = if (hasAuthCookies) {
-                listOf(
-                    "youtube:player_client=tv_embedded,android_vr,tv,mweb",
-                    "youtube:player_client=android_vr,tv;player_skip=webpage"
-                )
-            } else {
-                listOf(
-                    "youtube:player_client=tv_embedded,android_vr,tv;player_skip=webpage",
-                    "youtube:player_client=android_vr,tv;player_skip=webpage,configs",
-                    "youtube:player_client=mweb,tv_embedded"
-                )
-            }
+            val candidateProfiles = listOf(
+                "youtube:player_client=tv_embedded,android_vr,tv;player_skip=webpage",
+                "youtube:player_client=android_vr,tv;player_skip=webpage,configs",
+                "youtube:player_client=mweb,tv_embedded"
+            )
 
             for ((idx, profile) in candidateProfiles.withIndex()) {
                 AuraDebugManager.logInfo(TAG, "Ejecutando yt-dlp intento #${idx + 1} (perfil: $profile) para resolver URL: $url")
                 val cmdList = buildYtDlpCommand(
-                    activeCookiesFile = cookiesFile,
-                    useCookies = hasAuthCookies,
                     extractorClientProfile = profile,
                     checkFormats = (idx > 0)
                 )
@@ -653,7 +624,7 @@ object YtDlpNativeEngine {
     /**
      * Descarga directamente el archivo de audio (y opcionalmente el Video Canvas en 480p) a disco
      * ejecutando `yt-dlp` como descargador nativo con `--check-formats`, resolución de `n-sig` mediante QuickJS
-     * y sin inyectar `visitor_data` ajeno para erradicar `HTTP Error 403: Forbidden`.
+     * y 100% libre de cookies para erradicar bloqueos de sesión y `HTTP Error 403: Forbidden`.
      */
     suspend fun downloadMediaDirectlyToFiles(
         context: Context,
@@ -681,8 +652,6 @@ object YtDlpNativeEngine {
         val localCert = File(pythonEnvDir, "usr/etc/tls/cert.pem")
         val ffmpegBin = FFmpegNativeEngine.getBinaryFile(context)
         val qjsBin = getQuickJsExecutable(context)
-        val cookiesFile = WebViewCookieBridge.syncWebViewCookiesToNetscapeFile(context)
-        val hasAuthCookies = WebViewCookieBridge.hasAuthenticatedSessionCookies(context)
 
         fun configurePythonEnv(pb: ProcessBuilder) {
             val nativeDir = context.applicationInfo.nativeLibraryDir
@@ -735,8 +704,7 @@ object YtDlpNativeEngine {
             formatSelector: String,
             outputFile: File,
             phaseLabel: String,
-            extractorClientProfile: String?,
-            attachCookies: Boolean
+            extractorClientProfile: String?
         ): Boolean {
             return try {
                 outputFile.parentFile?.mkdirs()
@@ -758,10 +726,6 @@ object YtDlpNativeEngine {
                     add("3")
                     add("--fragment-retries")
                     add("3")
-                    if (attachCookies && hasAuthCookies && cookiesFile != null && cookiesFile.exists() && cookiesFile.length() > 120L) {
-                        add("--cookies")
-                        add(cookiesFile.absolutePath)
-                    }
                     if (!extractorClientProfile.isNullOrBlank()) {
                         add("--extractor-args")
                         add(extractorClientProfile)
@@ -835,20 +799,13 @@ object YtDlpNativeEngine {
             }
         }
 
-        // Perfiles sin visitor_data contaminado para que yt-dlp negocie su propio token de sesión por cliente y descifre n-sig con QuickJS
+        // Perfiles limpios sin cookies ni visitor_data ajeno para que yt-dlp negocie su propio token de sesión y descifre n-sig con QuickJS
         val audioSelector = "bestaudio[ext=m4a][protocol^=http]/bestaudio[protocol^=http]/best[height<=480][ext=mp4]/best"
-        val downloadProfiles = if (hasAuthCookies) {
-            listOf(
-                "youtube:player_client=tv_embedded,android_vr,tv,mweb",
-                "youtube:player_client=android_vr,tv;player_skip=webpage"
-            )
-        } else {
-            listOf(
-                "youtube:player_client=tv_embedded,android_vr,tv;player_skip=webpage",
-                "youtube:player_client=mweb,tv_embedded",
-                "youtube:player_client=android_vr,tv;player_skip=webpage,configs"
-            )
-        }
+        val downloadProfiles = listOf(
+            "youtube:player_client=tv_embedded,android_vr,tv;player_skip=webpage",
+            "youtube:player_client=mweb,tv_embedded",
+            "youtube:player_client=android_vr,tv;player_skip=webpage,configs"
+        )
 
         var audioDownloaded = false
         var successfulProfile: String? = null
@@ -857,8 +814,7 @@ object YtDlpNativeEngine {
                 formatSelector = audioSelector,
                 outputFile = targetAudioFile,
                 phaseLabel = "Descargando audio de alta fidelidad (yt-dlp)...",
-                extractorClientProfile = profile,
-                attachCookies = hasAuthCookies
+                extractorClientProfile = profile
             )
             if (audioDownloaded && targetAudioFile.exists() && targetAudioFile.length() > 1024L) {
                 successfulProfile = profile
@@ -878,8 +834,7 @@ object YtDlpNativeEngine {
                 formatSelector = videoSelector,
                 outputFile = targetVideoFile,
                 phaseLabel = "Descargando Video Canvas 480p (yt-dlp)...",
-                extractorClientProfile = activeVideoProfile,
-                attachCookies = hasAuthCookies
+                extractorClientProfile = activeVideoProfile
             )
             if (!videoOk) {
                 for (altProfile in downloadProfiles.filter { it != activeVideoProfile }) {
@@ -887,8 +842,7 @@ object YtDlpNativeEngine {
                         formatSelector = videoSelector,
                         outputFile = targetVideoFile,
                         phaseLabel = "Descargando Video Canvas 480p (yt-dlp)...",
-                        extractorClientProfile = altProfile,
-                        attachCookies = hasAuthCookies
+                        extractorClientProfile = altProfile
                     )
                     if (videoOk) break
                 }
