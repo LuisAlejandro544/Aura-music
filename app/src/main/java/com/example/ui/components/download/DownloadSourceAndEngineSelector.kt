@@ -96,13 +96,19 @@ fun DownloadSourceAndEngineSelector(
             Spacer(modifier = Modifier.height(4.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 FilterChip(
                     selected = selectedEngine == YoutubeExtractionEngine.YTDLP,
                     onClick = { onEngineSelected(YoutubeExtractionEngine.YTDLP) },
-                    label = { Text("⭐ yt-dlp (98%)", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                    label = { Text("⭐ yt-dlp", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
                     modifier = Modifier.testTag("engine_chip_ytdlp")
+                )
+                FilterChip(
+                    selected = selectedEngine == YoutubeExtractionEngine.PIPED,
+                    onClick = { onEngineSelected(YoutubeExtractionEngine.PIPED) },
+                    label = { Text("Piped API", fontSize = 11.sp) },
+                    modifier = Modifier.testTag("engine_chip_piped")
                 )
                 FilterChip(
                     selected = selectedEngine == YoutubeExtractionEngine.INNERTUBE,
@@ -119,9 +125,10 @@ fun DownloadSourceAndEngineSelector(
             }
             Text(
                 text = when (selectedEngine) {
-                    YoutubeExtractionEngine.YTDLP -> "✅ El más recomendable (por defecto): tiene un 98% de probabilidad de funcionar. Si alguna vez falla, sal y vuelve a entrar para pegar la URL de nuevo."
-                    YoutubeExtractionEngine.INNERTUBE -> "API nativa directa de YouTube Music. Rápida, gratis y sin consumo de batería."
-                    YoutubeExtractionEngine.WEBVIEW -> "Navegador efímero en segundo plano que ejecuta el reproductor en memoria."
+                    YoutubeExtractionEngine.YTDLP -> "✅ Motor nativo con cookies reales del WebView (--cookies cookies.txt) y respaldo automático Piped / InnerTube / Invidious."
+                    YoutubeExtractionEngine.PIPED -> "🌐 Red abierta de servidores Piped API sin anuncios con proxy anti-403 para YouTube y YouTube Music."
+                    YoutubeExtractionEngine.INNERTUBE -> "⚡ API directa de YouTube Music (ANDROID_VR / IOS / TV + visitorData) con respaldo Invidious Proxy."
+                    YoutubeExtractionEngine.WEBVIEW -> "🌍 Navegador móvil en segundo plano que extrae el flujo en vivo y refresca automáticamente cookies.txt."
                 },
                 style = MaterialTheme.typography.labelSmall.copy(
                     color = if (selectedEngine == YoutubeExtractionEngine.YTDLP) MaterialTheme.colorScheme.primary else TextSecondary,

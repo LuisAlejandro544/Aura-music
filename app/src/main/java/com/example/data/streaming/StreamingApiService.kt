@@ -1,9 +1,13 @@
 package com.example.data.streaming
 
 import android.content.Context
+import com.example.data.importer.HeadlessWebViewExtractor
 import com.example.data.importer.InnerTubeClient
+import com.example.data.importer.InvidiousStreamResolver
 import com.example.data.importer.OnlineVideoAudioImporter
+import com.example.data.importer.PipedStreamResolver
 import com.example.data.importer.WebStreamExtractor
+import com.example.data.importer.WebViewCookieBridge
 import com.example.data.importer.YtDlpNativeEngine
 import com.example.debug.AuraDebugManager
 import com.example.model.StreamingSearchFilter
@@ -27,15 +31,16 @@ import java.net.URL
  * Rol Arquitectónico:
  * 1. Búsqueda Unificada por API (sin usar yt-dlp para buscar):
  *    Consulta simultáneamente la API de YouTube Music (`WEB_REMIX` en `music.youtube.com`)
- *    y la API de YouTube (`WEB` / `ANDROID` en `youtube.com`), etiquetando cada resultado
- *    con su insignia correspondiente (`YT MUSIC` vs `YOUTUBE`).
+ *    y la API de YouTube (`WEB` en `youtube.com`) con respaldo automático a **Piped API**
+ *    (`music_songs` y `videos`) e **Invidious API v1**, etiquetando cada resultado con su
+ *    insignia (`YT MUSIC` vs `YOUTUBE`).
  * 2. Recomendación de Canción Similar (Radio / Autoplay antes de terminar la canción):
- *    Consulta el endpoint `/youtubei/v1/next` (Automix / Watch Next) para obtener la siguiente
- *    pista similar recomendada antes de que finalice la pista actual.
- * 3. Resolución de Reproducción con `yt-dlp`:
- *    Una vez elegida la canción o la recomendación similar, normaliza enlaces de `music.youtube.com`
- *    y utiliza `YtDlpNativeEngine` (con respaldo `InnerTubeClient`) para obtener las URLs reales
- *    de audio y Video Canvas para reproducir y pre-cargar en caché.
+ *    Consulta el endpoint `/youtubei/v1/next` y `PipedStreamResolver.fetchRelatedStreams`
+ *    para obtener la siguiente pista similar recomendada antes de que finalice la pista actual.
+ * 3. Resolución de Reproducción Multicapa:
+ *    Combina `YtDlpNativeEngine` (con `--cookies cookies.txt` del `WebViewCookieBridge`),
+ *    `PipedStreamResolver` (proxy anti-403), `InnerTubeClient` (`ANDROID_VR`/`IOS`/`TV` + `visitorData`),
+ *    `InvidiousStreamResolver` (`?local=true`) y `HeadlessWebViewExtractor`.
  */
 object StreamingApiService {
 
@@ -62,14 +67,18 @@ object StreamingApiService {
         coroutineScope {
             val ytMusicDeferred = async {
                 if (filter == StreamingSearchFilter.ALL || filter == StreamingSearchFilter.YT_MUSIC) {
-                    searchYouTubeMusicApi(cleanQuery)
+                    searchYouTubeMusicApi(cleanQuery).ifEmpty {
+                        PipedStreamResolver.search(cleanQuery, StreamingSearchFilter.YT_MUSIC)
+                    }
                 } else {
                     emptyList()
                 }
             }
             val ytStandardDeferred = async {
                 if (filter == StreamingSearchFilter.ALL || filter == StreamingSearchFilter.YOUTUBE) {
-                    searchYouTubeStandardApi(cleanQuery)
+                    searchYouTubeStandardApi(cleanQuery).ifEmpty {
+                        PipedStreamResolver.search(cleanQuery, StreamingSearchFilter.YOUTUBE)
+                    }
                 } else {
                     emptyList()
                 }
@@ -78,12 +87,20 @@ object StreamingApiService {
             val musicResults = ytMusicDeferred.await()
             val videoResults = ytStandardDeferred.await()
 
-            when (filter) {
+            val combined = when (filter) {
                 StreamingSearchFilter.YT_MUSIC -> musicResults.ifEmpty {
                     videoResults.map { it.copy(platform = StreamingSourcePlatform.YT_MUSIC) }
                 }
                 StreamingSearchFilter.YOUTUBE -> videoResults
                 StreamingSearchFilter.ALL -> interleaveResults(musicResults, videoResults)
+            }
+
+            if (combined.isNotEmpty()) {
+                combined
+            } else {
+                PipedStreamResolver.search(cleanQuery, filter).ifEmpty {
+                    InvidiousStreamResolver.search(cleanQuery, filter)
+                }
             }
         }
     }
@@ -119,7 +136,17 @@ object StreamingApiService {
             return@withContext relatedFromNext.first()
         }
 
-        // 2. Respaldo por búsqueda semántica de artista/canción similar en la API
+        // 2. Consultar streams relacionados desde Piped API (/streams/{videoId})
+        val relatedFromPiped = PipedStreamResolver.fetchRelatedStreams(
+            videoId = cleanVideoId,
+            preferredPlatform = preferredPlatform,
+            excludedVideoIds = excludedVideoIds
+        )
+        if (relatedFromPiped.isNotEmpty()) {
+            return@withContext relatedFromPiped.first()
+        }
+
+        // 3. Respaldo por búsqueda semántica de artista/canción similar en la API
         val fallbackQuery = if (currentArtist.isNotBlank() && !currentArtist.equals("Artista desconocido", ignoreCase = true)) {
             "$currentArtist mix canciones similares"
         } else {
@@ -141,11 +168,11 @@ object StreamingApiService {
      * Toma un elemento de búsqueda o canción similar de la API (`YT Music` o `YouTube`)
      * y resuelve los flujos listos para reproducir en ExoPlayer, pre-cargar en caché o descargar:
      * - Si la plataforma es `YOUTUBE` (`StreamingSourcePlatform.YOUTUBE`):
-     *   1º Utiliza exclusivamente `yt-dlp` (`YtDlpNativeEngine`, CPython + QuickJS) en primer lugar.
-     *   2º Si el video presenta bloqueo o restricción, aplica respaldo automático con `InnerTubeClient` y `WebStreamExtractor`.
+     *   1º Utiliza `yt-dlp` (`YtDlpNativeEngine` con `--cookies cookies.txt` del WebView) si `forceBypassYtDlp == false`.
+     *   2º Si hay bloqueo o se pide bypass (`forceBypassYtDlp == true`), resuelve con `PipedStreamResolver` (proxy anti-403),
+     *      `InnerTubeClient` (`ANDROID_VR`/`IOS`/`TV` + `visitorData`), `InvidiousStreamResolver` (`?local=true`) y `HeadlessWebViewExtractor`.
      * - Si la plataforma es `YT_MUSIC` (`StreamingSourcePlatform.YT_MUSIC`):
-     *   1º Resuelve directamente con `InnerTubeClient` (`<300ms`) y respaldo `InvidiousStreamResolver`,
-     *      sin invocar `yt-dlp` (ya que `yt-dlp` se reserva exclusivamente para pistas de YouTube).
+     *   1º Resuelve con `InnerTubeClient` (`<300ms`), `PipedStreamResolver`, `InvidiousStreamResolver` y `YtDlpNativeEngine` + `cookies.txt`.
      */
     suspend fun resolvePlayableStreamWithYtDlp(
         context: Context,
@@ -153,6 +180,8 @@ object StreamingApiService {
         forceBypassYtDlp: Boolean = false
     ): Result<OnlineVideoAudioImporter.ResolvedMediaInfo> = withContext(Dispatchers.IO) {
         val watchUrl = item.canonicalWatchUrl
+        // Sincronizar cookies actuales del WebView a cookies.txt antes de resolver
+        WebViewCookieBridge.syncWebViewCookiesToNetscapeFile(context)
 
         fun enrichAndRegister(info: OnlineVideoAudioImporter.ResolvedMediaInfo): Result<OnlineVideoAudioImporter.ResolvedMediaInfo> {
             val enriched = info.copy(
@@ -171,7 +200,7 @@ object StreamingApiService {
         }
 
         if (item.platform == StreamingSourcePlatform.YOUTUBE) {
-            // === PLATAFORMA YOUTUBE: Usar yt-dlp en primer lugar ===
+            // === PLATAFORMA YOUTUBE: Usar yt-dlp + cookies.txt en primer lugar ===
             if (!forceBypassYtDlp && !YtDlpAutoUpdaterIsBlockedSafe()) {
                 val ytdlpResult = YtDlpNativeEngine.resolveStream(context, watchUrl)
                 val info = ytdlpResult.getOrNull()
@@ -180,7 +209,16 @@ object StreamingApiService {
                 }
             }
 
-            // Respaldo automático si el video de YouTube tiene bloqueo en yt-dlp o recibió HTTP 403
+            // Respaldo 1: Piped API (proxy anti-403 en pipedproxy)
+            val pipedFallback = PipedStreamResolver.resolve(
+                videoId = item.videoId,
+                originalUrl = watchUrl
+            )
+            if (pipedFallback != null && (!pipedFallback.audioUrl.isNullOrBlank() || pipedFallback.videoUrl.isNotBlank())) {
+                return@withContext enrichAndRegister(pipedFallback)
+            }
+
+            // Respaldo 2: InnerTube (ANDROID_VR Quest 3 / IOS / TVHTML5 + visitorData)
             val innerTubeFallback = InnerTubeClient.resolve(
                 videoId = item.videoId,
                 originalUrl = watchUrl
@@ -189,7 +227,8 @@ object StreamingApiService {
                 return@withContext enrichAndRegister(innerTubeFallback)
             }
 
-            val invidiousFallback = com.example.data.importer.InvidiousStreamResolver.resolve(
+            // Respaldo 3: Invidious API v1 (?local=true /latest_version)
+            val invidiousFallback = InvidiousStreamResolver.resolve(
                 videoId = item.videoId,
                 originalUrl = watchUrl
             )
@@ -197,7 +236,8 @@ object StreamingApiService {
                 return@withContext enrichAndRegister(invidiousFallback)
             }
 
-            val webFallback = com.example.data.importer.HeadlessWebViewExtractor.resolve(
+            // Respaldo 4: Headless WebView (m.youtube.com + refresco de cookies.txt)
+            val webFallback = HeadlessWebViewExtractor.resolve(
                 context = context,
                 videoId = item.videoId,
                 originalUrl = watchUrl
@@ -210,16 +250,26 @@ object StreamingApiService {
                 IllegalStateException("No se pudo resolver la pista de YouTube \"${item.title}\".")
             )
         } else {
-            // === PLATAFORMA YT MUSIC: Resolución directa sin usar yt-dlp ===
-            val innerTubeInfo = InnerTubeClient.resolve(
+            // === PLATAFORMA YT MUSIC: InnerTube + Piped API + Invidious Proxy + yt-dlp (cookies.txt) ===
+            if (!forceBypassYtDlp) {
+                val innerTubeInfo = InnerTubeClient.resolve(
+                    videoId = item.videoId,
+                    originalUrl = watchUrl
+                )
+                if (innerTubeInfo != null && (!innerTubeInfo.audioUrl.isNullOrBlank() || innerTubeInfo.videoUrl.isNotBlank())) {
+                    return@withContext enrichAndRegister(innerTubeInfo)
+                }
+            }
+
+            val pipedInfo = PipedStreamResolver.resolve(
                 videoId = item.videoId,
                 originalUrl = watchUrl
             )
-            if (innerTubeInfo != null && (!innerTubeInfo.audioUrl.isNullOrBlank() || innerTubeInfo.videoUrl.isNotBlank())) {
-                return@withContext enrichAndRegister(innerTubeInfo)
+            if (pipedInfo != null && (!pipedInfo.audioUrl.isNullOrBlank() || pipedInfo.videoUrl.isNotBlank())) {
+                return@withContext enrichAndRegister(pipedInfo)
             }
 
-            val invidiousInfo = com.example.data.importer.InvidiousStreamResolver.resolve(
+            val invidiousInfo = InvidiousStreamResolver.resolve(
                 videoId = item.videoId,
                 originalUrl = watchUrl
             )
@@ -227,7 +277,14 @@ object StreamingApiService {
                 return@withContext enrichAndRegister(invidiousInfo)
             }
 
-            val webFallback = com.example.data.importer.HeadlessWebViewExtractor.resolve(
+            if (!YtDlpAutoUpdaterIsBlockedSafe()) {
+                val ytdlpInfo = YtDlpNativeEngine.resolveStream(context, watchUrl).getOrNull()
+                if (ytdlpInfo != null && (!ytdlpInfo.audioUrl.isNullOrBlank() || ytdlpInfo.videoUrl.isNotBlank())) {
+                    return@withContext enrichAndRegister(ytdlpInfo)
+                }
+            }
+
+            val webFallback = HeadlessWebViewExtractor.resolve(
                 context = context,
                 videoId = item.videoId,
                 originalUrl = watchUrl

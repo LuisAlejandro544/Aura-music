@@ -233,33 +233,54 @@ object YtDlpNativeEngine {
         ensureTlsCertificates(pythonEnvDir)
         val localCert = File(pythonEnvDir, "usr/etc/tls/cert.pem")
 
-        val cmdList = mutableListOf<String>().apply {
-            add(activePython.absolutePath)
-            add(ytdlpFile.absolutePath)
-            add("--dump-single-json")
-            add("--no-warnings")
-            add("--extractor-args")
-            add("youtube:player_client=android_vr,ios,web")
-            add("--format")
-            add("bestvideo[height<=480][ext=mp4][vcodec^=avc1][protocol^=http]+bestaudio[ext=m4a][protocol^=http]/bestvideo[height<=480][ext=mp4][protocol^=http]+bestaudio[protocol^=http]/best[height<=480][ext=mp4][protocol^=http]/best[height<=480]")
-            if (qjsBin != null && qjsBin.exists()) {
-                add("--js-runtimes")
-                add("quickjs:${qjsBin.absolutePath}")
+        // Exportar automáticamente las cookies reales del WebView a cookies.txt (equivalente Android a --cookies-from-browser)
+        val cookiesFile = WebViewCookieBridge.syncWebViewCookiesToNetscapeFile(context)
+        val capturedUserAgent = WebViewCookieBridge.getCapturedUserAgent(context)
+
+        fun buildYtDlpCommand(activeCookiesFile: File?): MutableList<String> {
+            return mutableListOf<String>().apply {
+                add(activePython.absolutePath)
+                add(ytdlpFile.absolutePath)
+                add("--dump-single-json")
+                add("--no-warnings")
+                add("--no-check-formats")
+                add("--user-agent")
+                add(capturedUserAgent)
+                if (activeCookiesFile != null && activeCookiesFile.exists() && activeCookiesFile.length() > 60L) {
+                    add("--cookies")
+                    add(activeCookiesFile.absolutePath)
+                }
+                val capturedVisitorData = WebViewCookieBridge.getCapturedVisitorData(context)
+                val extractorArgValue = if (!capturedVisitorData.isNullOrBlank()) {
+                    "youtube:player_client=android_vr,tv,ios,mweb,web;visitor_data=$capturedVisitorData"
+                } else {
+                    "youtube:player_client=android_vr,tv,ios,mweb,web"
+                }
+                add("--extractor-args")
+                add(extractorArgValue)
+                add("--format")
+                add("bestvideo[height<=480][ext=mp4][vcodec^=avc1][protocol^=http]+bestaudio[ext=m4a][protocol^=http]/bestvideo[height<=480][ext=mp4][protocol^=http]+bestaudio[protocol^=http]/best[height<=480][ext=mp4][protocol^=http]/best[height<=480]")
+                if (qjsBin != null && qjsBin.exists()) {
+                    add("--js-runtimes")
+                    add("quickjs:${qjsBin.absolutePath}")
+                }
+                if (ffmpegBin != null && ffmpegBin.exists()) {
+                    add("--ffmpeg-location")
+                    add(ffmpegBin.absolutePath)
+                }
+                // Asegurar siempre el bundle de certificados CA consolidados en lugar de desactivar TLS
+                if (!localCert.exists() || localCert.length() < 1000L) {
+                    ensureTlsCertificates(pythonEnvDir, forceRebuild = true)
+                }
+                // Delimitador para garantizar que el argumento no sea interpretado como flag CLI
+                add("--")
+                add(cleanUrl)
             }
-            if (ffmpegBin != null && ffmpegBin.exists()) {
-                add("--ffmpeg-location")
-                add(ffmpegBin.absolutePath)
-            }
-            // Asegurar siempre el bundle de certificados CA consolidados en lugar de desactivar TLS
-            if (!localCert.exists() || localCert.length() < 1000L) {
-                ensureTlsCertificates(pythonEnvDir, forceRebuild = true)
-            }
-            // Delimitador para garantizar que el argumento no sea interpretado como flag CLI
-            add("--")
-            add(cleanUrl)
         }
 
-        AuraDebugManager.logInfo(TAG, "Ejecutando yt-dlp con Python nativo para resolver URL: $url")
+        var cmdList = buildYtDlpCommand(cookiesFile)
+
+        AuraDebugManager.logInfo(TAG, "Ejecutando yt-dlp con Python nativo + cookies.txt para resolver URL: $url")
         val jsonOutput = StringBuilder()
         val errorLog = StringBuilder()
 
@@ -384,9 +405,14 @@ object YtDlpNativeEngine {
                 retryErrThread.join()
             }
 
-            // Reintento automático inmediato ante fallos transitorios (ej. conexión efímera o firma temporal)
+            // Reintento automático inmediato refrescando las cookies del navegador WebView (cookies.txt + visitorData)
             if (exitCode != 0 || jsonOutput.isBlank()) {
-                AuraDebugManager.logWarning(TAG, "Primer intento de yt-dlp finalizó con código $exitCode. Ejecutando reintento automático inmediato...")
+                AuraDebugManager.logWarning(TAG, "Primer intento de yt-dlp finalizó con código $exitCode. Refrescando cookies del WebView a cookies.txt y reintentando...")
+                val refreshedCookies = WebViewCookieBridge.warmUpAndExportCookies(
+                    context = context,
+                    targetVideoId = WebStreamExtractor.extractVideoId(cleanUrl)
+                )
+                cmdList = buildYtDlpCommand(refreshedCookies)
                 jsonOutput.clear()
                 errorLog.clear()
 

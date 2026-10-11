@@ -215,11 +215,12 @@ object OnlineVideoAudioImporter {
                 if (ytId != null) {
                     AuraDebugManager.logInfo(
                         "OnlineImporter",
-                        "El stream inicial requirió autoreparación (posible bloqueo VEVO/403). Resolviendo stream firmado con yt-dlp / InnerTube / Invidious..."
+                        "El stream inicial requirió autoreparación (posible bloqueo VEVO/403). Resolviendo stream con Piped API / yt-dlp + cookies.txt / InnerTube / Invidious..."
                     )
-                    val freshInfo = (if (YtDlpNativeEngine.isAvailable(context)) {
-                        YtDlpNativeEngine.resolveStream(context, resolvedInfo.originalUrl).getOrNull()
-                    } else null)
+                    val freshInfo = PipedStreamResolver.resolve(ytId, resolvedInfo.originalUrl)
+                        ?: (if (YtDlpNativeEngine.isAvailable(context)) {
+                            YtDlpNativeEngine.resolveStream(context, resolvedInfo.originalUrl).getOrNull()
+                        } else null)
                         ?: InnerTubeClient.resolve(ytId, resolvedInfo.originalUrl)
                         ?: InvidiousStreamResolver.resolve(ytId, resolvedInfo.originalUrl)
 

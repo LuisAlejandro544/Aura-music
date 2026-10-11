@@ -84,12 +84,14 @@ app/
 │   │       │       │   ├── FFmpegNativeEngine.kt   # Extracción y Canvas con prevención de Flag Injection
 │   │       │       │   ├── YtDlpNativeEngine.kt    # Entorno nativo de ejecución con TLS/SSL y Android 14+ APEX CA
 │   │       │       │   └── YtDlpAutoUpdater.kt     # Actualizador OTA con blindaje SHA-256 verificado
-│   │       │       ├── extractors/             # Extractores de Video y Audio Web
+│   │       │       ├── extractors/             # Extractores de Video, Audio Web, Piped, Invidious y Cookies
 │   │       │       │   ├── OnlineVideoAudioImporter.kt # Orquestador de importación web
-│   │       │       │   ├── InnerTubeClient.kt          # Cliente directo YouTube InnerTube (<300ms)
-│   │       │       │   ├── InvidiousStreamResolver.kt  # Bypass de streams Invidious
+│   │       │       │   ├── PipedStreamResolver.kt      # Red abierta Piped API (/streams/:id, music_songs, proxy anti-403)
+│   │       │       │   ├── InnerTubeClient.kt          # Cliente directo YouTube InnerTube (ANDROID_VR, IOS, TV + visitorData)
+│   │       │       │   ├── InvidiousStreamResolver.kt  # Bypass de streams Invidious con proxy local=true y auto-descubrimiento
+│   │       │       │   ├── WebViewCookieBridge.kt      # Extractor automático de cookies del WebView a cookies.txt (--cookies)
 │   │       │       │   ├── HeadlessWebViewExtractor.kt # Extractor headless de respaldo con cascada de portadas
-│   │       │       │   └── WebStreamExtractor.kt       # Extractor web universal
+│   │       │       │   └── WebStreamExtractor.kt       # Extractor web universal multicapa
 │   │       │       ├── audio/                  # Procesamiento Acústico, Formatos Especiales y Metadatos
 │   │       │       │   ├── AudioMetadataParser.kt      # Extracción de tags ID3, Vorbis y WebP
 │   │       │       │   ├── AudioSilenceTrimmer.kt      # Supresión de silencios al inicio y fin (-42 dB RMS)
