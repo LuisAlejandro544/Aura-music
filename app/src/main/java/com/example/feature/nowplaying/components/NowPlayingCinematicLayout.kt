@@ -113,138 +113,20 @@ fun NowPlayingCinematicLayout(
                 .padding(horizontal = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // 1. Barra Superior Cinemática
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    IconButton(
-                        onClick = onCollapse,
-                        modifier = Modifier
-                            .size(48.dp)
-                            .testTag("cinematic_collapse_btn")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.KeyboardArrowDown,
-                            contentDescription = "Ocultar reproductor",
-                            tint = TextPrimary,
-                            modifier = Modifier.size(32.dp)
-                        )
-                    }
-                    currentTrack.streamingPlatform?.let { platform ->
-                        com.example.feature.streaming.StreamingPlatformBadge(platform = platform)
-                    }
-                }
-
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = 8.dp)
-                ) {
-                    Text(
-                        text = if (isWaitingForNetwork) {
-                            "SIN RED • ESPERANDO CONEXIÓN..."
-                        } else if (isLoadingOrBuffering || isVideoLoading) {
-                            "CARGANDO STREAM..."
-                        } else {
-                            "REPRODUCIENDO DESDE"
-                        },
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            color = if (isWaitingForNetwork) Color(0xFFF59E0B) else if (isLoadingOrBuffering || isVideoLoading) animatedPrimary else TextSecondary,
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 10.sp,
-                            letterSpacing = 1.sp
-                        ),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = collectionContextTitle.ifBlank { currentTrack.album },
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            color = TextPrimary,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp
-                        ),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.basicMarquee()
-                    )
-                }
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (currentTrack.isStreamingTrack && onDownloadStreamingTrack != null) {
-                        IconButton(
-                            onClick = {
-                                if (!isStreamingTrackDownloading && !isStreamingTrackDownloaded) {
-                                    onDownloadStreamingTrack()
-                                }
-                            },
-                            modifier = Modifier
-                                .size(42.dp)
-                                .testTag("cinematic_download_streaming_btn")
-                        ) {
-                            when {
-                                isStreamingTrackDownloading -> {
-                                    com.example.ui.components.AnimatedDownloadingArrowIcon(
-                                        tint = animatedPrimary,
-                                        size = 22.dp
-                                    )
-                                }
-                                isStreamingTrackDownloaded -> {
-                                    Icon(
-                                        imageVector = Icons.Default.Check,
-                                        contentDescription = "Descargado en biblioteca local",
-                                        tint = Color(0xFF10B981),
-                                        modifier = Modifier.size(22.dp)
-                                    )
-                                }
-                                else -> {
-                                    Icon(
-                                        imageVector = Icons.Default.CloudDownload,
-                                        contentDescription = "Descargar pista en biblioteca local",
-                                        tint = animatedPrimary,
-                                        modifier = Modifier.size(22.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    IconButton(
-                        onClick = onOpenDesignSelector,
-                        modifier = Modifier
-                            .size(42.dp)
-                            .testTag("cinematic_design_btn")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.DashboardCustomize,
-                            contentDescription = "Cambiar diseño del reproductor",
-                            tint = animatedPrimary,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-                    IconButton(
-                        onClick = onOpenDetails,
-                        modifier = Modifier
-                            .size(42.dp)
-                            .testTag("cinematic_more_btn")
-                        ) {
-                        Icon(
-                            imageVector = Icons.Default.MoreVert,
-                            contentDescription = "Opciones y ficha técnica",
-                            tint = TextPrimary,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                }
-            }
+            CinematicTopBar(
+                currentTrack = currentTrack,
+                animatedPrimary = animatedPrimary,
+                isLoadingOrBuffering = isLoadingOrBuffering,
+                isVideoLoading = isVideoLoading,
+                isWaitingForNetwork = isWaitingForNetwork,
+                collectionContextTitle = collectionContextTitle,
+                onCollapse = onCollapse,
+                onDownloadStreamingTrack = onDownloadStreamingTrack,
+                isStreamingTrackDownloading = isStreamingTrackDownloading,
+                isStreamingTrackDownloaded = isStreamingTrackDownloaded,
+                onOpenDesignSelector = onOpenDesignSelector,
+                onOpenDetails = onOpenDetails
+            )
 
             // 2. Área Central Despejada para el Video Canvas
             Spacer(modifier = Modifier.weight(1f))
@@ -258,113 +140,14 @@ fun NowPlayingCinematicLayout(
                 onOpenFullScreenLyrics = onOpenFullScreenLyrics
             )
 
-            // 3. Fila de Información de Pista (Miniatura + Título/Artista + Favorito)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Miniatura cuadrada de carátula oficial de 54dp con indicador de carga de video/red
-                Box(
-                    modifier = Modifier
-                        .size(54.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .shadow(4.dp, RoundedCornerShape(10.dp))
-                        .testTag("cinematic_mini_artwork"),
-                    contentAlignment = Alignment.Center
-                ) {
-                    ArtworkImage(
-                        track = currentTrack,
-                        modifier = Modifier.fillMaxSize(),
-                        cornerRadius = 10.dp
-                    )
-                    if (isLoadingOrBuffering || isVideoLoading || isWaitingForNetwork) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(Color.Black.copy(alpha = 0.48f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(22.dp),
-                                color = if (isWaitingForNetwork) Color(0xFFF59E0B) else animatedPrimary,
-                                strokeWidth = 2.4.dp
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.width(14.dp))
-
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clipToBounds()
-                ) {
-                    Text(
-                        text = currentTrack.title,
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            color = TextPrimary,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 19.sp
-                        ),
-                        maxLines = 1,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clipToBounds()
-                            .basicMarquee()
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clipToBounds()
-                    ) {
-                        Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = animatedPrimary.copy(alpha = 0.18f),
-                            modifier = Modifier.padding(end = 6.dp)
-                        ) {
-                            Text(
-                                text = currentTrack.formatBadge(),
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = animatedPrimary,
-                                    fontSize = 10.sp
-                                ),
-                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
-                            )
-                        }
-                        Text(
-                            text = currentTrack.artist,
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                color = TextSecondary,
-                                fontWeight = FontWeight.Medium,
-                                fontSize = 14.sp
-                            ),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-
-                // Botón de Favorito
-                IconButton(
-                    onClick = { onToggleFavorite(currentTrack) },
-                    modifier = Modifier
-                        .size(48.dp)
-                        .testTag("cinematic_favorite_btn")
-                ) {
-                    Icon(
-                        imageVector = if (currentTrack.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        contentDescription = if (currentTrack.isFavorite) "Quitar de favoritos" else "Guardar en favoritos",
-                        tint = if (currentTrack.isFavorite) Color(0xFFEF4444) else TextSecondary,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-            }
+            CinematicTrackInfoRow(
+                currentTrack = currentTrack,
+                animatedPrimary = animatedPrimary,
+                isLoadingOrBuffering = isLoadingOrBuffering,
+                isVideoLoading = isVideoLoading,
+                isWaitingForNetwork = isWaitingForNetwork,
+                onToggleFavorite = onToggleFavorite
+            )
 
             Spacer(modifier = Modifier.height(4.dp))
 
@@ -379,238 +162,40 @@ fun NowPlayingCinematicLayout(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // 5. Controles Principales de Reproducción
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Aleatorio (Shuffle)
-                IconButton(
-                    onClick = onToggleShuffle,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .testTag("cinematic_shuffle_btn")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Shuffle,
-                        contentDescription = "Modo aleatorio",
-                        tint = if (shuffleEnabled) animatedPrimary else TextSecondary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-
-                // Canción Anterior
-                IconButton(
-                    onClick = onPlayPrevious,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .testTag("cinematic_prev_btn")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.SkipPrevious,
-                        contentDescription = "Canción anterior",
-                        tint = TextPrimary,
-                        modifier = Modifier.size(34.dp)
-                    )
-                }
-
-                // Botón Play / Pausa Central Circular Blanco de 64dp con halo aislado y anillo de carga en vivo
-                Box(contentAlignment = Alignment.Center) {
-                    CinematicPlayButtonHalo(
-                        isPlaying = isPlaying,
-                        animatedPrimary = animatedPrimary,
-                        fallbackIntensity = audioIntensity,
-                        audioIntensityFlow = audioIntensityFlow
-                    )
-                    Surface(
-                        onClick = onTogglePlayPause,
-                        shape = CircleShape,
-                        color = Color.White,
-                        border = BorderStroke(1.5.dp, animatedPrimary.copy(alpha = 0.65f)),
-                        shadowElevation = 8.dp,
-                        modifier = Modifier
-                            .size(64.dp)
-                            .clip(CircleShape)
-                            .testTag("cinematic_play_pause_btn")
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                contentDescription = if (isPlaying) "Pausar" else "Reproducir",
-                                tint = Color.Black,
-                                modifier = Modifier.size(34.dp)
-                            )
-                        }
-                    }
-                    if (isLoadingOrBuffering || isVideoLoading || isWaitingForNetwork) {
-                        CircularProgressIndicator(
-                            modifier = Modifier
-                                .size(72.dp)
-                                .testTag("cinematic_play_pause_loading_ring"),
-                            color = if (isWaitingForNetwork) Color(0xFFF59E0B) else animatedPrimary,
-                            strokeWidth = 3.dp
-                        )
-                    }
-                }
-
-                // Canción Siguiente
-                IconButton(
-                    onClick = onPlayNext,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .testTag("cinematic_next_btn")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.SkipNext,
-                        contentDescription = "Siguiente canción",
-                        tint = TextPrimary,
-                        modifier = Modifier.size(34.dp)
-                    )
-                }
-
-                // Repetir
-                IconButton(
-                    onClick = onCycleRepeat,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .testTag("cinematic_repeat_btn")
-                ) {
-                    Icon(
-                        imageVector = when (repeatMode) {
-                            RepeatMode.ONE -> Icons.Default.RepeatOne
-                            RepeatMode.ALL -> Icons.Default.Repeat
-                            RepeatMode.OFF -> Icons.Default.Repeat
-                        },
-                        contentDescription = "Modo de repetición",
-                        tint = if (repeatMode != RepeatMode.OFF) animatedPrimary else TextSecondary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
+            CinematicMainControls(
+                isPlaying = isPlaying,
+                shuffleEnabled = shuffleEnabled,
+                repeatMode = repeatMode,
+                animatedPrimary = animatedPrimary,
+                audioIntensity = audioIntensity,
+                audioIntensityFlow = audioIntensityFlow,
+                isLoadingOrBuffering = isLoadingOrBuffering,
+                isVideoLoading = isVideoLoading,
+                isWaitingForNetwork = isWaitingForNetwork,
+                onToggleShuffle = onToggleShuffle,
+                onPlayPrevious = onPlayPrevious,
+                onTogglePlayPause = onTogglePlayPause,
+                onPlayNext = onPlayNext,
+                onCycleRepeat = onCycleRepeat
+            )
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // 6. Fila de Utilidades Inferiores
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Ecualizador y Efectos
-                IconButton(
-                    onClick = onOpenEffects,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .testTag("cinematic_effects_btn")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Tune,
-                        contentDescription = "Efectos de audio y ecualizador",
-                        tint = TextSecondary,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-
-                // Selector de Diseño del Reproductor
-                IconButton(
-                    onClick = onOpenDesignSelector,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .testTag("cinematic_layout_btn")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ViewCarousel,
-                        contentDescription = "Estilo de reproductor",
-                        tint = TextSecondary,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-
-                // Letras Sincronizadas (Karaoke a Pantalla Completa)
-                IconButton(
-                    onClick = onOpenFullScreenLyrics,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .testTag("cinematic_lyrics_icon_btn")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Mic,
-                        contentDescription = "Letras sincronizadas",
-                        tint = if (lyricsState.isSynced) animatedPrimary else TextSecondary,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-
-                // Cola de Reproducción
-                IconButton(
-                    onClick = onOpenQueue,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .testTag("cinematic_queue_btn")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.QueueMusic,
-                        contentDescription = "Cola de reproducción",
-                        tint = TextSecondary,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-            }
+            CinematicUtilityRow(
+                lyricsState = lyricsState,
+                animatedPrimary = animatedPrimary,
+                onOpenEffects = onOpenEffects,
+                onOpenDesignSelector = onOpenDesignSelector,
+                onOpenFullScreenLyrics = onOpenFullScreenLyrics,
+                onOpenQueue = onOpenQueue
+            )
 
             Spacer(modifier = Modifier.height(6.dp))
 
-            // 7. Tarjeta Deslizable / Acceso Inferior a "Vista previa de la letra" con acento armónico reactivo
-            Surface(
-                shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
-                color = animatedPrimary.copy(alpha = 0.12f),
-                border = BorderStroke(1.dp, animatedPrimary.copy(alpha = 0.35f)),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(44.dp)
-                    .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-                    .clickable { onOpenFullScreenLyrics() }
-                    .testTag("cinematic_lyrics_sheet_preview")
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.KeyboardArrowUp,
-                            contentDescription = null,
-                            tint = Color.White.copy(alpha = 0.70f),
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "Vista previa de la letra",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp
-                            )
-                        )
-                    }
-                    Text(
-                        text = "KARAOKE SING",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            color = animatedPrimary,
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 10.sp,
-                            letterSpacing = 1.sp
-                        )
-                    )
-                }
-            }
+            CinematicLyricsPreview(
+                animatedPrimary = animatedPrimary,
+                onOpenFullScreenLyrics = onOpenFullScreenLyrics
+            )
         }
     }
 }
@@ -652,7 +237,7 @@ private fun CinematicReactiveVignette(
 }
 
 @Composable
-private fun CinematicPlayButtonHalo(
+internal fun CinematicPlayButtonHalo(
     isPlaying: Boolean,
     animatedPrimary: Color,
     fallbackIntensity: Float,
