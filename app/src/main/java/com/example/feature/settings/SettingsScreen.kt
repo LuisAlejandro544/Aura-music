@@ -37,6 +37,7 @@ import com.example.feature.settings.components.*
 import com.example.feature.settings.components.about.behindTheProjectSettingsContent
 import com.example.feature.settings.components.appearance.appWallpaperSettingsSection
 import com.example.feature.settings.components.widgets.widgetSettingsContent
+import com.example.feature.settings.components.ytdlp.ytDlpCookiesAndPoTokenSettingsContent
 import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
@@ -63,6 +64,7 @@ enum class SettingsSubScreen {
     HEADPHONES_GESTURES,
     STORED_MEDIA,
     ENGINES_AND_DIAGNOSTICS,
+    DOWNLOADS_AND_COOKIES,
     BEHIND_THE_PROJECT
 }
 
@@ -227,6 +229,7 @@ fun SettingsScreen(
                         onOpenHeadphones = { activeSubScreen = SettingsSubScreen.HEADPHONES },
                         onOpenStoredMedia = { activeSubScreen = SettingsSubScreen.STORED_MEDIA },
                         onOpenEnginesAndDiagnostics = { activeSubScreen = SettingsSubScreen.ENGINES_AND_DIAGNOSTICS },
+                        onOpenDownloadsAndCookies = { activeSubScreen = SettingsSubScreen.DOWNLOADS_AND_COOKIES },
                         onOpenBehindTheProject = { activeSubScreen = SettingsSubScreen.BEHIND_THE_PROJECT },
                         onOpenOnboarding = onOpenOnboarding
                     )
@@ -506,6 +509,20 @@ fun SettingsScreen(
                     testTag = "subscreen_engines_diagnostics"
                 ) {
                     enginesAndDiagnosticsSettingsContent(onOpenOnboarding = onOpenOnboarding)
+                }
+            }
+
+            // PANTALLA INDEPENDIENTE: DESCARGAS, COOKIES (ESTILO YTDLNIS) & PO TOKEN WEB
+            SettingsSubScreen.DOWNLOADS_AND_COOKIES -> {
+                SettingsSubMenuScreen(
+                    title = "Descargas & Cookies (YTDLnis)",
+                    subtitle = "Estrategia yt-dlp natural, Cookies.txt opcionales, PO Token Web y OTA",
+                    icon = Icons.Default.CloudDownload,
+                    iconTint = MaterialTheme.colorScheme.secondary,
+                    onBack = { activeSubScreen = SettingsSubScreen.MAIN_MENU },
+                    testTag = "subscreen_downloads_and_cookies"
+                ) {
+                    ytDlpCookiesAndPoTokenSettingsContent()
                 }
             }
 

@@ -204,10 +204,14 @@ object YtDlpAutoUpdater {
     }
 
     /**
-     * Inicia la verificación asíncrona en segundo plano al abrir la aplicación.
+     * Inicia la verificación asíncrona en segundo plano al abrir la aplicación si está habilitada en Ajustes.
      */
     fun startBackgroundStartupCheck(context: Context) {
         val appContext = context.applicationContext
+        if (!YtDlpCookieManager.isAutoCheckOtaStartupEnabled(appContext)) {
+            AuraDebugManager.logInfo(TAG, "Verificación OTA al inicio omitida por configuración del usuario.")
+            return
+        }
         updaterScope.launch {
             checkAndUpdate(appContext, forceDownload = false, showNotifications = true)
         }
@@ -567,6 +571,76 @@ object YtDlpAutoUpdater {
                 AuraDownloadService.dismissPackageNotification(context)
             }
             return false
+        }
+    }
+
+    /**
+     * Fallback de consulta directa de versión en GitHub si la API REST está bloqueada por rate-limit (HTTP 403).
+     */
+    private fun fetchLatestTagFallback(): String? {
+        return try {
+            val req = Request.Builder()
+                .url("https://raw.githubusercontent.com/yt-dlp/yt-dlp/master/yt_dlp/version.py")
+                .header("User-Agent", "AuraMusic-Android-Client")
+                .build()
+            httpClient.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return null
+                val body = resp.body?.string() ?: return null
+                val match = """__version__\s*=\s*'([^']+)'""".toRegex().find(body)
+                match?.groupValues?.get(1)?.trim()
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Diagnóstico y verificación nativa de ejecución CLI para yt-dlp.
+     * Ejecuta `yt-dlp --version` en el subproceso Python nativo para confirmar
+     * que la arquitectura (32/64 bits), librerías C++ y QuickJS operan sin bloqueos.
+     */
+    suspend fun testYtDlpCliExecution(context: Context): Pair<Boolean, String> = withContext(Dispatchers.IO) {
+        try {
+            val ytdlpFile = getYtDlpFile(context)
+            val pythonBin = YtDlpNativeEngine.getPythonExecutable(context)
+            if (!ytdlpFile.exists() || pythonBin == null) {
+                return@withContext Pair(false, "Binario de yt-dlp o entorno Python nativo no encontrado.")
+            }
+            val nativeDir = context.applicationInfo.nativeLibraryDir
+            val pythonEnvDir = File(context.filesDir, "env/python")
+            val stdlibZip = File(pythonEnvDir, "stdlib.zip")
+            val stdlibDir = File(pythonEnvDir, "stdlib")
+            val modulesDir = File(pythonEnvDir, "modules")
+            val directPythonZipSo = File(nativeDir, "libpython.zip.so")
+
+            val cmd = listOf(pythonBin.absolutePath, "-I", ytdlpFile.absolutePath, "--version")
+            val pb = ProcessBuilder(cmd)
+                .directory(File(nativeDir))
+                .redirectErrorStream(true)
+
+            pb.environment().apply {
+                this["PYTHONHOME"] = pythonEnvDir.absolutePath
+                this["PYTHONPATH"] = "${directPythonZipSo.absolutePath}:${stdlibZip.absolutePath}:${stdlibDir.absolutePath}:${modulesDir.absolutePath}:${pythonEnvDir.absolutePath}"
+                this["HOME"] = pythonEnvDir.absolutePath
+                this["LD_LIBRARY_PATH"] = nativeDir
+                this["PATH"] = "$nativeDir:${context.filesDir.absolutePath}/bin"
+            }
+
+            val proc = pb.start()
+            val completed = proc.waitFor(6, TimeUnit.SECONDS)
+            if (!completed) {
+                proc.destroyForcibly()
+                return@withContext Pair(false, "Tiempo de espera agotado (6s) ejecutando yt-dlp --version.")
+            }
+            val output = proc.inputStream.bufferedReader().readText().trim()
+            val exitCode = proc.exitValue()
+            if (exitCode == 0 && output.isNotBlank()) {
+                Pair(true, "yt-dlp $output ejecutado exitosamente en Python 3.11 nativo.")
+            } else {
+                Pair(false, "Código de salida $exitCode: $output")
+            }
+        } catch (e: Exception) {
+            Pair(false, "Error ejecutando diagnóstico: ${e.message}")
         }
     }
 }
