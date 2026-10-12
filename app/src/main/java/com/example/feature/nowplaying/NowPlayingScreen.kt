@@ -1,31 +1,20 @@
 package com.example.feature.nowplaying
-import com.example.core.model.LyricsState
 import com.example.core.model.RepeatMode
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.StateFlow
 import com.example.core.model.ABLoopState
@@ -39,18 +28,11 @@ import com.example.core.model.SleepTimerState
 import com.example.core.model.Spatial8DConfig
 import com.example.core.model.Track
 import com.example.core.model.VideoDisplayMode
-import com.example.ui.components.AudioEffectsBottomSheet
 import com.example.ui.components.AudioVisualizer
-import com.example.ui.components.BackgroundVideoPlayer
-import com.example.ui.components.EditTrackDialog
-import com.example.ui.components.SearchLyricsDialog
 import com.example.core.model.LyricSearchResult
 import com.example.core.model.NowPlayingDesignMode
 import com.example.feature.nowplaying.components.*
-import com.example.ui.theme.ArtworkColorExtractor
 import com.example.ui.theme.BackgroundDark
-import com.example.ui.theme.ExtractedArtworkColors
-import com.example.ui.theme.TextSecondary
 
 /**
  * Pantalla completa de Reproducción en Curso (Now Playing).
@@ -193,87 +175,22 @@ fun NowPlayingScreen(
 
     if (currentTrack == null) return
 
-    val context = LocalContext.current
-    val fallbackPrimary = MaterialTheme.colorScheme.primary
-    val fallbackSecondary = MaterialTheme.colorScheme.secondary
-
-    var activeColors by remember {
-        mutableStateOf(
-            ExtractedArtworkColors(
-                primary = fallbackPrimary,
-                secondary = fallbackSecondary,
-                accent = fallbackPrimary,
-                ambientTopGlow = fallbackPrimary.copy(alpha = 0.28f)
-            )
-        )
-    }
-
-    val isVideoVisual = (videoDisplayMode != VideoDisplayMode.OFF) && !currentTrack.videoUri.isNullOrEmpty()
-    val isRemoteVideo = isVideoVisual && (
-        currentTrack.videoUri.orEmpty().startsWith("http://", ignoreCase = true) ||
-            currentTrack.videoUri.orEmpty().startsWith("https://", ignoreCase = true)
-        )
-    val liveVideoSnapshot by ArtworkColorExtractor.liveVideoColorsFlow.collectAsStateWithLifecycle()
-    val isVideoBufferingLive by com.example.ui.components.BackgroundVideoLoadingState.isVideoBufferingFlow.collectAsStateWithLifecycle()
-    val isVideoNetworkStalledLive by com.example.ui.components.BackgroundVideoLoadingState.isVideoNetworkStalledFlow.collectAsStateWithLifecycle()
-    val effectiveVideoLoading = currentTrack.isStreamingTrack && isRemoteVideo && isVideoBufferingLive
-    val effectiveWaitingNetwork = currentTrack.isStreamingTrack && (isWaitingForNetwork || (isRemoteVideo && isVideoNetworkStalledLive))
-    var activeSampleIntervalMs by remember {
-        mutableLongStateOf(ArtworkColorExtractor.getAdaptiveSampleIntervalMs(context))
-    }
-
-    // Extracción inicial y respaldo reactivo cuando cambia la pista, modo de video o preferencia
-    LaunchedEffect(
-        currentTrack.id,
-        currentTrack.albumArtPath,
-        currentTrack.videoUri,
-        videoDisplayMode,
-        isDynamicArtworkColorEnabled
-    ) {
-        activeSampleIntervalMs = ArtworkColorExtractor.getAdaptiveSampleIntervalMs(context)
-        activeColors = ArtworkColorExtractor.extractPlaybackColors(
-            context = context,
-            track = currentTrack,
-            isVideoActive = isVideoVisual,
-            isDynamicEnabled = isDynamicArtworkColorEnabled,
-            fallbackPrimary = fallbackPrimary,
-            fallbackSecondary = fallbackSecondary,
-            positionMs = currentPositionFlow?.value ?: currentPositionMs
-        )
-    }
-
-    // Recibir instantáneamente cada cambio de paleta emitido en tiempo real por el TextureView del video
-    LaunchedEffect(liveVideoSnapshot, isVideoVisual, isDynamicArtworkColorEnabled, currentTrack.videoUri) {
-        if (isDynamicArtworkColorEnabled && isVideoVisual) {
-            val snapshot = liveVideoSnapshot
-            if (snapshot != null && snapshot.videoUri == currentTrack.videoUri) {
-                activeSampleIntervalMs = snapshot.sampleIntervalMs
-                activeColors = snapshot.colors
-            }
-        }
-    }
-
-    val colorTransitionDurationMs = if (isVideoVisual && isDynamicArtworkColorEnabled) {
-        if (activeSampleIntervalMs <= ArtworkColorExtractor.INTERVAL_NORMAL_MS) 1000 else 1400
-    } else {
-        600
-    }
-
-    val animatedPrimary by animateColorAsState(
-        targetValue = activeColors.primary,
-        animationSpec = tween(colorTransitionDurationMs),
-        label = "PrimaryAuraColor"
+    val visual = rememberNowPlayingVisualState(
+        track = currentTrack,
+        videoDisplayMode = videoDisplayMode,
+        isDynamicEnabled = isDynamicArtworkColorEnabled,
+        currentPositionMs = currentPositionMs,
+        currentPositionFlow = currentPositionFlow,
+        isWaitingForNetwork = isWaitingForNetwork
     )
-    val animatedSecondary by animateColorAsState(
-        targetValue = activeColors.secondary,
-        animationSpec = tween(colorTransitionDurationMs),
-        label = "SecondaryAuraColor"
-    )
-    val animatedTopGlow by animateColorAsState(
-        targetValue = activeColors.ambientTopGlow,
-        animationSpec = tween(colorTransitionDurationMs),
-        label = "TopAuraGlow"
-    )
+    val animatedPrimary = visual.animatedPrimary
+    val animatedSecondary = visual.animatedSecondary
+    val animatedTopGlow = visual.animatedTopGlow
+    val isVideoVisual = visual.isVideoVisual
+    val effectiveVideoLoading = visual.effectiveVideoLoading
+    val effectiveWaitingNetwork = visual.effectiveWaitingNetwork
+    val isFullscreenVideo = visual.isFullscreenVideo
+    val hasVideo = visual.hasVideo
 
     var showQueueSheet by remember { mutableStateOf(false) }
     var showEffectsSheet by remember { mutableStateOf(false) }
@@ -285,16 +202,9 @@ fun NowPlayingScreen(
     var isFullScreenLyricsOpen by remember { mutableStateOf(false) }
     var showDesignSelectorDialog by remember { mutableStateOf(false) }
 
-    val hasVideo = !currentTrack.videoUri.isNullOrEmpty()
-    val isFullscreenVideo = hasVideo && videoDisplayMode.isFullscreen
-
     // Determinación del diseño visual activo (Automático o forzado por el usuario)
     val isCinematicActive = remember(nowPlayingDesignMode, isFullscreenVideo, currentTrack.videoUri) {
-        when (nowPlayingDesignMode) {
-            NowPlayingDesignMode.CINEMATIC_CANVAS -> true
-            NowPlayingDesignMode.CLASSIC -> false
-            NowPlayingDesignMode.AUTO -> isFullscreenVideo && !currentTrack.videoUri.isNullOrEmpty()
-        }
+        isCinematicCanvasActive(nowPlayingDesignMode, isFullscreenVideo, currentTrack.videoUri)
     }
 
     Box(
@@ -316,34 +226,13 @@ fun NowPlayingScreen(
     ) {
         // Modo FONDO COMPLETO (Rellenar o Adaptado): Renderiza el video detrás de toda la pantalla
         if (isFullscreenVideo && currentTrack.videoUri != null) {
-            key(currentTrack.id, currentTrack.videoUri) {
-                BackgroundVideoPlayer(
-                    videoUriString = currentTrack.videoUri,
-                    isVideoLoop = currentTrack.isVideoLoop,
-                    isPlaying = isPlaying,
-                    currentPositionMs = currentPositionMs,
-                    currentPositionFlow = currentPositionFlow,
-                    playbackSpeed = playbackSpeed,
-                    placeholderTrack = currentTrack,
-                    modifier = Modifier.fillMaxSize(),
-                    cornerRadius = 0.dp,
-                    fitHorizontalInFullscreen = (videoDisplayMode == VideoDisplayMode.FULLSCREEN_ADAPTED)
-                )
-            }
-
-            // Velo oscuro y gradiente cinematográfico para máximo contraste y legibilidad
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color.Black.copy(alpha = 0.65f),
-                                Color.Black.copy(alpha = 0.50f),
-                                BackgroundDark.copy(alpha = 0.94f)
-                            )
-                        )
-                    )
+            NowPlayingFullscreenBackground(
+                currentTrack = currentTrack,
+                isPlaying = isPlaying,
+                currentPositionMs = currentPositionMs,
+                currentPositionFlow = currentPositionFlow,
+                playbackSpeed = playbackSpeed,
+                videoDisplayMode = videoDisplayMode
             )
         }
 
@@ -357,7 +246,7 @@ fun NowPlayingScreen(
         )
 
         if (isCinematicActive && !showLyrics) {
-            NowPlayingCinematicLayout(
+            NowPlayingCinematicHost(
                 currentTrack = currentTrack,
                 isPlaying = isPlaying,
                 currentPositionMs = currentPositionMs,
@@ -388,9 +277,7 @@ fun NowPlayingScreen(
                 onOpenFullScreenLyrics = { isFullScreenLyricsOpen = true },
                 onOpenDetails = { showDetailsDialog = true },
                 collectionContextTitle = collectionContextTitle,
-                onDownloadStreamingTrack = if (currentTrack.isStreamingTrack && onDownloadStreamingTrack != null) {
-                    { onDownloadStreamingTrack(currentTrack) }
-                } else null,
+                onDownloadStreamingTrack = onDownloadStreamingTrack,
                 isStreamingTrackDownloading = isStreamingTrackDownloading,
                 isStreamingTrackDownloaded = isStreamingTrackDownloaded,
                 isLoadingOrBuffering = isLoadingOrBuffering,
@@ -398,94 +285,7 @@ fun NowPlayingScreen(
                 isWaitingForNetwork = effectiveWaitingNetwork
             )
         } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .windowInsetsPadding(WindowInsets.statusBars)
-                    .windowInsetsPadding(WindowInsets.navigationBars)
-                    .padding(horizontal = 24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Barra Superior
-                NowPlayingTopBar(
-                    currentTrack = currentTrack,
-                    sleepTimerState = sleepTimerState,
-                    spatial8DConfig = spatial8DConfig,
-                    videoDisplayMode = videoDisplayMode,
-                    animatedPrimary = animatedPrimary,
-                    onCollapse = onCollapse,
-                    onOpenEffects = {
-                        effectsInitialTab = 1
-                        showEffectsSheet = true
-                    },
-                    onOpenDetails = { showDetailsDialog = true },
-                    onOpenVideoMode = { showVideoModeDialog = true },
-                    isLyricsActive = showLyrics,
-                    onToggleLyrics = { showLyrics = !showLyrics },
-                    isABLoopActive = abLoopState.isLoopingActive,
-                    isVocalClarityActive = vocalClarityConfig.enabled,
-                    onOpenDesignSelector = { showDesignSelectorDialog = true },
-                    onDownloadStreamingTrack = if (currentTrack.isStreamingTrack && onDownloadStreamingTrack != null) {
-                        { onDownloadStreamingTrack(currentTrack) }
-                    } else null,
-                    isStreamingTrackDownloading = isStreamingTrackDownloading,
-                    isStreamingTrackDownloaded = isStreamingTrackDownloaded
-                )
-
-            Spacer(modifier = Modifier.weight(0.5f))
-
-            // Carátula / Video Canvas O Letras Sincronizadas (.LRC) Karaoke
-            if (showLyrics) {
-                NowPlayingLyricsCard(
-                    currentTrack = currentTrack,
-                    lyricsState = lyricsState,
-                    currentPositionMs = currentPositionMs,
-                    currentPositionFlow = currentPositionFlow,
-                    animatedPrimary = animatedPrimary,
-                    onSeekTo = onSeekTo,
-                    onFetchOnlineLyrics = onFetchOnlineLyrics,
-                    onSaveCustomLyrics = onSaveCustomLyrics,
-                    onImportLyricsUri = onImportLyricsUri,
-                    onOpenSearchLyrics = onOpenSearchLyrics,
-                    onOpenFullScreen = { isFullScreenLyricsOpen = true },
-                    onCloseLyrics = { showLyrics = false }
-                )
-            } else {
-                NowPlayingArtworkCard(
-                    currentTrack = currentTrack,
-                    isPlaying = isPlaying,
-                    currentPositionMs = currentPositionMs,
-                    currentPositionFlow = currentPositionFlow,
-                    videoDisplayMode = videoDisplayMode,
-                    animatedPrimary = animatedPrimary,
-                    animatedSecondary = animatedSecondary,
-                    playbackSpeed = playbackSpeed,
-                    onCycleVideoDisplayMode = onCycleVideoDisplayMode,
-                    audioIntensity = audioIntensity,
-                    onOpenVideoMode = { showVideoModeDialog = true },
-                    isLoadingOrBuffering = isLoadingOrBuffering || effectiveVideoLoading,
-                    isWaitingForNetwork = effectiveWaitingNetwork
-                )
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Visualizador dinámico de audio en tiempo real aislado (recolecta bandsFlow localmente)
-            AudioVisualizer(
-                isPlaying = isPlaying,
-                realBands = visualizerBands,
-                bandsFlow = visualizerBandsFlow,
-                modifier = Modifier.fillMaxWidth(0.9f),
-                barCount = 28,
-                barHeight = 40.dp,
-                customPrimaryColor = animatedPrimary,
-                customSecondaryColor = animatedSecondary
-            )
-
-            Spacer(modifier = Modifier.height(18.dp))
-
-            // Controles de Reproducción y Seekbar
-            NowPlayingPlaybackControls(
+            NowPlayingClassicLayout(
                 currentTrack = currentTrack,
                 isPlaying = isPlaying,
                 currentPositionMs = currentPositionMs,
@@ -494,6 +294,26 @@ fun NowPlayingScreen(
                 shuffleEnabled = shuffleEnabled,
                 repeatMode = repeatMode,
                 animatedPrimary = animatedPrimary,
+                animatedSecondary = animatedSecondary,
+                sleepTimerState = sleepTimerState,
+                spatial8DConfig = spatial8DConfig,
+                videoDisplayMode = videoDisplayMode,
+                showLyrics = showLyrics,
+                abLoopState = abLoopState,
+                vocalClarityEnabled = vocalClarityConfig.enabled,
+                lyricsState = lyricsState,
+                visualizerBands = visualizerBands,
+                visualizerBandsFlow = visualizerBandsFlow,
+                audioIntensity = audioIntensity,
+                playbackSpeed = playbackSpeed,
+                headphoneConfig = headphoneConfig,
+                queueSize = queue.size,
+                isContentLoading = isLoadingOrBuffering || effectiveVideoLoading,
+                effectiveWaitingNetwork = effectiveWaitingNetwork,
+                activeMixtapeChapter = activeMixtapeChapter,
+                mixtapeChapterIndex = mixtapeChapterIndex,
+                mixtapeTotalChapters = mixtapeTotalChapters,
+                onCollapse = onCollapse,
                 onTogglePlayPause = onTogglePlayPause,
                 onSeekTo = onSeekTo,
                 onPlayNext = onPlayNext,
@@ -501,329 +321,142 @@ fun NowPlayingScreen(
                 onToggleShuffle = onToggleShuffle,
                 onCycleRepeat = onCycleRepeat,
                 onToggleFavorite = onToggleFavorite,
-                abLoopState = abLoopState,
+                onCycleVideoDisplayMode = onCycleVideoDisplayMode,
+                onSetStereoBalance = onSetStereoBalance,
+                onFetchOnlineLyrics = onFetchOnlineLyrics,
+                onSaveCustomLyrics = onSaveCustomLyrics,
+                onImportLyricsUri = onImportLyricsUri,
+                onOpenSearchLyrics = onOpenSearchLyrics,
                 onMarkABPointA = onMarkABPointA,
                 onMarkABPointB = onMarkABPointB,
                 onClearABLoop = onClearABLoop,
-                activeMixtapeChapter = activeMixtapeChapter,
-                mixtapeChapterIndex = mixtapeChapterIndex,
-                mixtapeTotalChapters = mixtapeTotalChapters,
-                isLoadingOrBuffering = isLoadingOrBuffering || effectiveVideoLoading,
-                isWaitingForNetwork = effectiveWaitingNetwork
+                onDownloadStreamingTrack = onDownloadStreamingTrack,
+                isStreamingTrackDownloading = isStreamingTrackDownloading,
+                isStreamingTrackDownloaded = isStreamingTrackDownloaded,
+                onOpenEffectsTab = {
+                    effectsInitialTab = it
+                    showEffectsSheet = true
+                },
+                onOpenDetails = { showDetailsDialog = true },
+                onOpenVideoMode = { showVideoModeDialog = true },
+                onToggleLyrics = { showLyrics = !showLyrics },
+                onOpenDesignSelector = { showDesignSelectorDialog = true },
+                onOpenFullScreenLyrics = { isFullScreenLyricsOpen = true },
+                onCloseLyrics = { showLyrics = false },
+                onOpenQueue = { showQueueSheet = true }
             )
-
-            // Barra de Balance Estéreo Fino L/R en Tiempo Real
-            NowPlayingBalanceBar(
-                headphoneConfig = headphoneConfig,
-                onSetStereoBalance = onSetStereoBalance,
-                modifier = Modifier.padding(top = 10.dp)
-            )
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Atajos Inferiores: Ecualizador, Letras Karaoke y Cola de Reproducción
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 4.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Ecualizador
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = Color.White.copy(alpha = 0.05f),
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(44.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .clickable {
-                            effectsInitialTab = 0
-                            showEffectsSheet = true
-                        }
-                        .testTag("now_playing_eq_shortcut")
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxSize().padding(horizontal = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Tune,
-                            contentDescription = null,
-                            tint = animatedSecondary,
-                            modifier = Modifier.size(17.dp)
-                        )
-                        Spacer(modifier = Modifier.width(5.dp))
-                        Text(
-                            text = "EQ FX",
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = animatedSecondary,
-                                fontSize = 12.sp
-                            ),
-                            maxLines = 1
-                        )
-                    }
-                }
-
-                // Letras / Carátula
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = Color.White.copy(alpha = 0.05f),
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(44.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .clickable { showLyrics = !showLyrics }
-                        .testTag("now_playing_lyrics_shortcut")
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxSize().padding(horizontal = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            imageVector = if (showLyrics) Icons.Default.Album else Icons.Default.Mic,
-                            contentDescription = null,
-                            tint = if (showLyrics) animatedPrimary else TextSecondary,
-                            modifier = Modifier.size(17.dp)
-                        )
-                        Spacer(modifier = Modifier.width(5.dp))
-                        Text(
-                            text = if (showLyrics) "Carátula" else "Letras",
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = if (showLyrics) FontWeight.Bold else FontWeight.Medium,
-                                color = if (showLyrics) animatedPrimary else TextSecondary,
-                                fontSize = 12.sp
-                            ),
-                            maxLines = 1
-                        )
-                    }
-                }
-
-                // Cola de Reproducción
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = Color.White.copy(alpha = 0.05f),
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(44.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .clickable { showQueueSheet = true }
-                        .testTag("now_playing_queue_btn")
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxSize().padding(horizontal = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.QueueMusic,
-                            contentDescription = null,
-                            tint = TextSecondary,
-                            modifier = Modifier.size(17.dp)
-                        )
-                        Spacer(modifier = Modifier.width(5.dp))
-                        Text(
-                            text = "Cola (${queue.size})",
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = FontWeight.Medium,
-                                color = TextSecondary,
-                                fontSize = 12.sp
-                            ),
-                            maxLines = 1
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.weight(0.5f))
-        }
     }
 
-        // Hoja Inferior: Cola de Reproducción (Up Next)
-        if (showQueueSheet) {
-            NowPlayingQueueSheet(
-                queue = queue,
-                currentIndex = currentIndex,
-                isPlaying = isPlaying,
-                onTrackSelect = onTrackSelectFromQueue,
-                onDismissRequest = { showQueueSheet = false }
-            )
-        }
-
-        // Diálogo de detalles técnicos de la pista
-        if (showDetailsDialog) {
-            AudioSpecsDialog(
-                currentTrack = currentTrack,
-                canEdit = onEditTrack != null || onEditTrackDetails != null || onEditTrackDetailsWithVideo != null,
-                onOpenEditDialog = {
-                    showDetailsDialog = false
-                    showEditDialog = true
-                },
-                onDismissRequest = { showDetailsDialog = false }
-            )
-        }
-
-        // Diálogo de edición de metadatos, carátula y video
-        if (showEditDialog && (onEditTrack != null || onEditTrackDetails != null || onEditTrackDetailsWithVideo != null)) {
-            EditTrackDialog(
-                track = currentTrack,
-                onDismiss = { showEditDialog = false },
-                onConfirm = { trackId, title, artist, album, customArtUri, removeArtwork, customVideoUri, removeVideo ->
-                    if (onEditTrackDetailsWithVideo != null) {
-                        onEditTrackDetailsWithVideo(trackId, title, artist, album, customArtUri, removeArtwork, customVideoUri, removeVideo, null)
-                    } else if (onEditTrackDetails != null) {
-                        onEditTrackDetails(trackId, title, artist, album, customArtUri, removeArtwork)
-                    } else if (onEditTrack != null) {
-                        onEditTrack(trackId, title, artist, album)
-                    }
-                },
-                onConfirmWithLoopOption = { trackId, title, artist, album, customArtUri, removeArtwork, customVideoUri, removeVideo, forceLoop ->
-                    if (onEditTrackDetailsWithVideo != null) {
-                        onEditTrackDetailsWithVideo(trackId, title, artist, album, customArtUri, removeArtwork, customVideoUri, removeVideo, forceLoop)
-                    } else if (onEditTrackDetails != null) {
-                        onEditTrackDetails(trackId, title, artist, album, customArtUri, removeArtwork)
-                    } else if (onEditTrack != null) {
-                        onEditTrack(trackId, title, artist, album)
-                    }
-                },
-                onConfirmWithLoopStyle = { trackId, title, artist, album, customArtUri, removeArtwork, customVideoUri, removeVideo, forceLoop, loopStyle ->
-                    if (onEditTrackDetailsWithLoopStyle != null) {
-                        onEditTrackDetailsWithLoopStyle(trackId, title, artist, album, customArtUri, removeArtwork, customVideoUri, removeVideo, forceLoop, loopStyle)
-                    } else if (onEditTrackDetailsWithVideo != null) {
-                        onEditTrackDetailsWithVideo(trackId, title, artist, album, customArtUri, removeArtwork, customVideoUri, removeVideo, forceLoop)
-                    } else if (onEditTrackDetails != null) {
-                        onEditTrackDetails(trackId, title, artist, album, customArtUri, removeArtwork)
-                    } else if (onEditTrack != null) {
-                        onEditTrack(trackId, title, artist, album)
-                    }
-                }
-            )
-        }
-
-        // Diálogo de selección de modo de video
-        if (showVideoModeDialog && hasVideo) {
-            VideoDisplayModeDialog(
-                videoDisplayMode = videoDisplayMode,
-                animatedPrimary = animatedPrimary,
-                onSetVideoDisplayMode = onSetVideoDisplayMode,
-                onDismissRequest = { showVideoModeDialog = false }
-            )
-        }
-
-        // Hoja modal unificada de efectos de audio
-        if (showEffectsSheet) {
-            AudioEffectsBottomSheet(
-                onDismissRequest = { showEffectsSheet = false },
-                isEqEnabled = isEqEnabled,
-                eqScopeMode = eqScopeMode,
-                onSetEqScopeMode = onSetEqScopeMode,
-                eqBands = eqBands,
-                bassBoostLevel = bassBoostLevel,
-                currentPreset = currentPreset,
-                onToggleEqEnabled = onToggleEqEnabled,
-                onBandLevelChange = onBandLevelChange,
-                onBassBoostChange = onBassBoostChange,
-                onPresetSelect = onPresetSelect,
-                vocalClarityConfig = vocalClarityConfig,
-                onSetVocalClarityEnabled = onSetVocalClarityEnabled,
-                onSetVocalClarityStrength = onSetVocalClarityStrength,
-                sleepTimerState = sleepTimerState,
-                onStartSleepTimer = onStartSleepTimer,
-                onCancelSleepTimer = onCancelSleepTimer,
-                onAddSleepTimerMinutes = onAddSleepTimerMinutes,
-                spatial8DConfig = spatial8DConfig,
-                onSet8DEnabled = onSet8DEnabled,
-                onSet8DMode16D = onSet8DMode16D,
-                onSet8DOrbitSpeed = onSet8DOrbitSpeed,
-                onSet8DSpatialIntensity = onSet8DSpatialIntensity,
-                onSet8DRoomDepth = onSet8DRoomDepth,
-                reverbConfig = reverbConfig,
-                onSetReverbEnabled = onSetReverbEnabled,
-                onSetReverbPreset = onSetReverbPreset,
-                onSetReverbCustomParameters = onSetReverbCustomParameters,
-                playbackSpeed = playbackSpeed,
-                onSetPlaybackSpeed = onSetPlaybackSpeed,
-                playbackPitch = playbackPitch,
-                onSetPlaybackPitch = onSetPlaybackPitch,
-                onResetSpeedAndPitch = onResetSpeedAndPitch,
-                crossfadeSeconds = crossfadeSeconds,
-                onSetCrossfadeSeconds = onSetCrossfadeSeconds,
-                isGaplessEnabled = isGaplessEnabled,
-                onSetGaplessEnabled = onSetGaplessEnabled,
-                isDjAutomixEnabled = isDjAutomixEnabled,
-                onSetDjAutomixEnabled = onSetDjAutomixEnabled,
-                isDjEqCurveEnabled = isDjEqCurveEnabled,
-                onSetDjEqCurveEnabled = onSetDjEqCurveEnabled,
-                volumeNormalizationConfig = volumeNormalizationConfig,
-                onSetVolumeNormalizationEnabled = onSetVolumeNormalizationEnabled,
-                onSetVolumeNormalizationMode = onSetVolumeNormalizationMode,
-                abLoopState = abLoopState,
-                onMarkABPointA = onMarkABPointA,
-                onMarkABPointB = onMarkABPointB,
-                onToggleABLoopEnabled = onToggleABLoopEnabled,
-                onAdjustABPointA = onAdjustABPointA,
-                onAdjustABPointB = onAdjustABPointB,
-                onClearABLoop = onClearABLoop,
-                headphoneConfig = headphoneConfig,
-                onSetCrossfeedEnabled = onSetCrossfeedEnabled,
-                onSetCrossfeedStrength = onSetCrossfeedStrength,
-                onSetBalanceControlEnabled = onSetBalanceControlEnabled,
-                onSetStereoBalance = onSetStereoBalance,
-                initialTab = effectsInitialTab
-            )
-        }
-
-        // Diálogo para buscar letras personalizadas y elegir versiones con recomendación oficial
-        if (isSearchLyricsDialogOpen) {
-            SearchLyricsDialog(
-                currentTrack = currentTrack,
-                isSearching = isSearchingLyrics,
-                searchResults = lyricsSearchResults,
-                searchError = searchLyricsError,
-                accentColor = animatedPrimary,
-                onDismissRequest = onCloseSearchLyrics,
-                onSearch = onSearchLyrics,
-                onSelectResult = onSelectLyricSearchResult
-            )
-        }
-
-        // Modo Karaoke a Pantalla Completa Inmersivo (Full Screen Lyrics)
-        if (isFullScreenLyricsOpen && currentTrack != null) {
-            FullScreenLyricsScreen(
-                currentTrack = currentTrack,
-                lyricsState = lyricsState,
-                isPlaying = isPlaying,
-                currentPositionMs = currentPositionMs,
-                currentPositionFlow = currentPositionFlow,
-                durationMs = durationMs,
-                animatedPrimary = animatedPrimary,
-                animatedSecondary = animatedSecondary,
-                audioIntensity = audioIntensity,
-                audioIntensityFlow = audioIntensityFlow,
-                onSeekTo = onSeekTo,
-                onTogglePlayPause = onTogglePlayPause,
-                onPlayNext = onPlayNext,
-                onPlayPrevious = onPlayPrevious,
-                onClose = { isFullScreenLyricsOpen = false },
-                onOpenSearchLyrics = onOpenSearchLyrics,
-                onImportLyricsUri = onImportLyricsUri,
-                onSaveCustomLyrics = onSaveCustomLyrics,
-                onFetchOnlineLyrics = onFetchOnlineLyrics
-            )
-        }
-
-        // Diálogo para seleccionar el diseño del reproductor (Clásico vs Cinemático Canvas)
-        if (showDesignSelectorDialog) {
-            NowPlayingDesignSelectorDialog(
-                currentDesignMode = nowPlayingDesignMode,
-                animatedPrimary = animatedPrimary,
-                onSetDesignMode = onSetNowPlayingDesignMode,
-                onDismissRequest = { showDesignSelectorDialog = false }
-            )
-        }
+        NowPlayingDialogsHost(
+            currentTrack = currentTrack,
+            isPlaying = isPlaying,
+            currentPositionMs = currentPositionMs,
+            currentPositionFlow = currentPositionFlow,
+            durationMs = durationMs,
+            queue = queue,
+            currentIndex = currentIndex,
+            onTrackSelectFromQueue = onTrackSelectFromQueue,
+            showQueueSheet = showQueueSheet,
+            onDismissQueue = { showQueueSheet = false },
+            showDetailsDialog = showDetailsDialog,
+            onEditTrack = onEditTrack,
+            onEditTrackDetails = onEditTrackDetails,
+            onEditTrackDetailsWithVideo = onEditTrackDetailsWithVideo,
+            onOpenEditDetails = { showDetailsDialog = false; showEditDialog = true },
+            onDismissDetails = { showDetailsDialog = false },
+            showEditDialog = showEditDialog,
+            onEditTrackDetailsWithLoopStyle = onEditTrackDetailsWithLoopStyle,
+            onDismissEdit = { showEditDialog = false },
+            showVideoModeDialog = showVideoModeDialog,
+            hasVideo = hasVideo,
+            videoDisplayMode = videoDisplayMode,
+            animatedPrimary = animatedPrimary,
+            animatedSecondary = animatedSecondary,
+            onSetVideoDisplayMode = onSetVideoDisplayMode,
+            onDismissVideoMode = { showVideoModeDialog = false },
+            showEffectsSheet = showEffectsSheet,
+            onDismissEffects = { showEffectsSheet = false },
+            isEqEnabled = isEqEnabled,
+            eqScopeMode = eqScopeMode,
+            onSetEqScopeMode = onSetEqScopeMode,
+            eqBands = eqBands,
+            bassBoostLevel = bassBoostLevel,
+            currentPreset = currentPreset,
+            onToggleEqEnabled = onToggleEqEnabled,
+            onBandLevelChange = onBandLevelChange,
+            onBassBoostChange = onBassBoostChange,
+            onPresetSelect = onPresetSelect,
+            vocalClarityConfig = vocalClarityConfig,
+            onSetVocalClarityEnabled = onSetVocalClarityEnabled,
+            onSetVocalClarityStrength = onSetVocalClarityStrength,
+            sleepTimerState = sleepTimerState,
+            onStartSleepTimer = onStartSleepTimer,
+            onCancelSleepTimer = onCancelSleepTimer,
+            onAddSleepTimerMinutes = onAddSleepTimerMinutes,
+            spatial8DConfig = spatial8DConfig,
+            onSet8DEnabled = onSet8DEnabled,
+            onSet8DMode16D = onSet8DMode16D,
+            onSet8DOrbitSpeed = onSet8DOrbitSpeed,
+            onSet8DSpatialIntensity = onSet8DSpatialIntensity,
+            onSet8DRoomDepth = onSet8DRoomDepth,
+            reverbConfig = reverbConfig,
+            onSetReverbEnabled = onSetReverbEnabled,
+            onSetReverbPreset = onSetReverbPreset,
+            onSetReverbCustomParameters = onSetReverbCustomParameters,
+            playbackSpeed = playbackSpeed,
+            onSetPlaybackSpeed = onSetPlaybackSpeed,
+            playbackPitch = playbackPitch,
+            onSetPlaybackPitch = onSetPlaybackPitch,
+            onResetSpeedAndPitch = onResetSpeedAndPitch,
+            crossfadeSeconds = crossfadeSeconds,
+            onSetCrossfadeSeconds = onSetCrossfadeSeconds,
+            isGaplessEnabled = isGaplessEnabled,
+            onSetGaplessEnabled = onSetGaplessEnabled,
+            isDjAutomixEnabled = isDjAutomixEnabled,
+            onSetDjAutomixEnabled = onSetDjAutomixEnabled,
+            isDjEqCurveEnabled = isDjEqCurveEnabled,
+            onSetDjEqCurveEnabled = onSetDjEqCurveEnabled,
+            volumeNormalizationConfig = volumeNormalizationConfig,
+            onSetVolumeNormalizationEnabled = onSetVolumeNormalizationEnabled,
+            onSetVolumeNormalizationMode = onSetVolumeNormalizationMode,
+            abLoopState = abLoopState,
+            onMarkABPointA = onMarkABPointA,
+            onMarkABPointB = onMarkABPointB,
+            onToggleABLoopEnabled = onToggleABLoopEnabled,
+            onAdjustABPointA = onAdjustABPointA,
+            onAdjustABPointB = onAdjustABPointB,
+            onClearABLoop = onClearABLoop,
+            headphoneConfig = headphoneConfig,
+            onSetCrossfeedEnabled = onSetCrossfeedEnabled,
+            onSetCrossfeedStrength = onSetCrossfeedStrength,
+            onSetBalanceControlEnabled = onSetBalanceControlEnabled,
+            onSetStereoBalance = onSetStereoBalance,
+            effectsInitialTab = effectsInitialTab,
+            isSearchLyricsDialogOpen = isSearchLyricsDialogOpen,
+            isSearchingLyrics = isSearchingLyrics,
+            lyricsSearchResults = lyricsSearchResults,
+            searchLyricsError = searchLyricsError,
+            lyricsState = lyricsState,
+            onCloseSearchLyrics = onCloseSearchLyrics,
+            onSearchLyrics = onSearchLyrics,
+            onSelectLyricSearchResult = onSelectLyricSearchResult,
+            isFullScreenLyricsOpen = isFullScreenLyricsOpen,
+            audioIntensity = audioIntensity,
+            audioIntensityFlow = audioIntensityFlow,
+            onSeekTo = onSeekTo,
+            onTogglePlayPause = onTogglePlayPause,
+            onPlayNext = onPlayNext,
+            onPlayPrevious = onPlayPrevious,
+            onCloseFullScreenLyrics = { isFullScreenLyricsOpen = false },
+            onOpenSearchLyrics = onOpenSearchLyrics,
+            onImportLyricsUri = onImportLyricsUri,
+            onSaveCustomLyrics = onSaveCustomLyrics,
+            onFetchOnlineLyrics = onFetchOnlineLyrics,
+            showDesignSelectorDialog = showDesignSelectorDialog,
+            nowPlayingDesignMode = nowPlayingDesignMode,
+            onSetNowPlayingDesignMode = onSetNowPlayingDesignMode,
+            onDismissDesign = { showDesignSelectorDialog = false }
+        )
     }
 }
 

@@ -90,7 +90,7 @@ app/
     │       │   │   │   └── UserPublicMediaExporter.kt # Exportador SAF a carpeta pública del usuario con fusión FFmpeg (.mp4 con audio)
     │       │   │   │
     │       │   │   ├── updater/                # Actualizador Automático de Versiones APK
-    │       │   │   │   └── AppReleaseUpdater.kt # Comparador semántico de tags -beta, selector ABI y verificador SHA-256
+    │       │   │   │   └── AppReleaseUpdater.kt # Fachada que delega en ApkVersionComparator, UpdatePreferences, ApkDownloadManager y UpdateCheckOrchestrator
     │       │   │   │
     │       │   │   ├── importer/               # Motores de Descarga, Conversión y Medios Organizados
     │       │   │   │   ├── IncomingMediaHandler.kt # Triaje seguro de Intents ("Abrir con..." y "Compartir con...")
@@ -136,7 +136,10 @@ app/
     │       │   │   │       └── TikTokMediaResolver.kt # Extracción libre de audio/video de TikTok sin marcas de agua
     │       │   │   │
     │       │   │   └── streaming/              # Modo Streaming Híbrido Tri-Plataforma (YT Music + YouTube + SoundCloud)
-    │       │   │       ├── StreamingApiService.kt           # Búsqueda tri-plataforma, Radio Similar y resolución híbrida
+    │       │   │       ├── StreamingApiService.kt           # Fachada que delega en los motores de búsqueda y utils
+    │       │   │       ├── YouTubeMusicSearchEngine.kt      # Búsqueda YT Music (WEB_REMIX) y parseo
+    │       │   │       ├── YouTubeSearchEngine.kt           # Búsqueda YouTube (WEB), Watch Next y recomendaciones
+    │       │   │       ├── StreamingSearchUtils.kt          # Parseo JSON, intercalado tri-plataforma y POST HTTP
     │       │   │       ├── SoundCloudApiClient.kt           # Cliente modular de SoundCloud (hidratación client_id v2 y streams)
     │       │   │       ├── StreamingCacheManager.kt         # Caché inteligente (50-500 MB, 30 min TTL, LRU) y Pre-descarga No Lineal
     │       │   │       └── StreamingHttpDataSourceConfig.kt # Alineación de cabeceras User-Agent/Origin por perfil firmado c=
@@ -163,6 +166,9 @@ app/
     │       │   │
     │       │   └── playback/                   # Capa de Audio y Reproducción ExoPlayer / Media3
     │       │       ├── AuraAudioPlayer.kt          # Fachada del reproductor de audio y soporte Dual-Deck
+   │       │       ├── DualDeckTransitionManager.kt  # Handoff al Deck B y entrada con crossfade/fade-in
+   │       │       ├── TrackMediaFactory.kt          # URIs, metadatos con carátula y recortes de silencio
+   │       │       ├── PlayerStateListener.kt        # Listener de estado ExoPlayer hacia los flujos
    │       │       ├── PlaybackProgressTracker.kt    # Sondeo de progreso, bucle A-B, prefetch y disparo de crossfade
    │       │       ├── StreamingErrorRecoveryHandler.kt # Reintento ante HTTP 403/416 y cortes de red
    │       │       ├── PlaybackParametersManager.kt  # Velocidad/tono con throttling de 40ms en Main
