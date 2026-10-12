@@ -19,7 +19,7 @@ import com.example.core.model.ExternalPlaylistTrackItem
 import com.example.core.model.PlaylistImportSaveMode
 import com.example.core.model.StreamingSearchItem
 import com.example.core.model.StreamingSourcePlatform
-import com.example.playback.AuraDownloadService
+import com.example.core.playback.AuraDownloadService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job

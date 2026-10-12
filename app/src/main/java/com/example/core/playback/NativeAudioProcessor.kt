@@ -1,4 +1,4 @@
-package com.example.playback
+package com.example.core.playback
 
 import androidx.annotation.OptIn
 import androidx.media3.common.C

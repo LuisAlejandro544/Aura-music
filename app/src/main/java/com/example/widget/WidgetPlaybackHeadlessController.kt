@@ -3,8 +3,8 @@ package com.example.widget
 import android.content.Context
 import com.example.data.local.AppDatabase
 import com.example.core.model.Track
-import com.example.playback.AudioEffectManager
-import com.example.playback.AuraAudioPlayer
+import com.example.core.playback.AudioEffectManager
+import com.example.core.playback.AuraAudioPlayer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob

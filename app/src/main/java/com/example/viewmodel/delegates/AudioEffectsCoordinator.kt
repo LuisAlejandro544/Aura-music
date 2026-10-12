@@ -3,8 +3,8 @@ package com.example.viewmodel.delegates
 import com.example.core.model.EqualizerPreset
 import com.example.core.model.ReverbPreset
 import com.example.core.model.SleepTimerState
-import com.example.playback.AudioEffectManager
-import com.example.playback.AuraAudioPlayer
+import com.example.core.playback.AudioEffectManager
+import com.example.core.playback.AuraAudioPlayer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job

@@ -7,8 +7,8 @@ import com.example.data.importer.OnlineVideoAudioImporter
 import com.example.data.repository.MusicRepository
 import com.example.core.model.DownloadProgress
 import com.example.core.model.Track
-import com.example.playback.AuraAudioPlayer
-import com.example.playback.AuraDownloadService
+import com.example.core.playback.AuraAudioPlayer
+import com.example.core.playback.AuraDownloadService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

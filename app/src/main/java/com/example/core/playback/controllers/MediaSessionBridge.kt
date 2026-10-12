@@ -1,4 +1,4 @@
-package com.example.playback.controllers
+package com.example.core.playback.controllers
 
 import android.app.PendingIntent
 import android.content.Context
@@ -7,7 +7,7 @@ import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
-import com.example.playback.AuraMediaPlaybackService
+import com.example.core.playback.AuraMediaPlaybackService
 
 /**
  * Aura Music - Puente Modular para Jetpack Media3 MediaSession y System Media Controls

@@ -13,7 +13,7 @@ import com.example.MainActivity
 import com.example.R
 import com.example.core.model.Track
 import com.example.core.model.WidgetPersistedState
-import com.example.playback.NativeAudioEngine
+import com.example.core.playback.NativeAudioEngine
 
 /**
  * Aura Music - Widget 1: Reproductor Interactivo Adaptativo con Color Dinámico

@@ -17,10 +17,10 @@ import com.example.data.local.AppDatabase
 import com.example.data.repository.MusicRepository
 import com.example.data.storage.AppStorageManager
 import com.example.core.model.*
-import com.example.playback.AudioEffectManager
-import com.example.playback.AuraAudioPlayer
-import com.example.playback.HeadphoneController
-import com.example.playback.NativeAudioEngine
+import com.example.core.playback.AudioEffectManager
+import com.example.core.playback.AuraAudioPlayer
+import com.example.core.playback.HeadphoneController
+import com.example.core.playback.NativeAudioEngine
 import com.example.ui.navigation.LibraryTab
 import com.example.ui.navigation.NavScreen
 import com.example.viewmodel.delegates.*

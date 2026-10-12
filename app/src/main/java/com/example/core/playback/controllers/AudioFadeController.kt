@@ -1,4 +1,4 @@
-package com.example.playback.controllers
+package com.example.core.playback.controllers
 
 import android.os.Looper
 import androidx.media3.exoplayer.ExoPlayer

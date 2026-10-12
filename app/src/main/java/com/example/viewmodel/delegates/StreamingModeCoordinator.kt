@@ -11,8 +11,8 @@ import com.example.core.model.StreamingSearchItem
 import com.example.core.model.StreamingSourcePlatform
 import com.example.core.model.StreamingVideoNetworkPolicy
 import com.example.core.model.Track
-import com.example.playback.AuraAudioPlayer
-import com.example.playback.AuraDownloadService
+import com.example.core.playback.AuraAudioPlayer
+import com.example.core.playback.AuraDownloadService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job

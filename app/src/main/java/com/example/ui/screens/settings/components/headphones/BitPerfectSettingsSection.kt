@@ -22,7 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.model.HeadphoneConfig
 import com.example.core.model.HiResTargetPreset
-import com.example.playback.NativeAudioEngine
+import com.example.core.playback.NativeAudioEngine
 import com.example.ui.theme.CardBorder
 import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.TextPrimary

@@ -1,4 +1,4 @@
-package com.example.playback
+package com.example.core.playback
 import com.example.core.model.RepeatMode
 
 import android.content.Context
@@ -14,10 +14,10 @@ import androidx.media3.session.MediaSession
 import com.example.data.importer.AudioSilenceTrimmer
 import com.example.core.model.ABLoopState
 import com.example.core.model.Track
-import com.example.playback.controllers.ABLoopController
-import com.example.playback.controllers.AudioFadeController
-import com.example.playback.controllers.MediaSessionBridge
-import com.example.playback.controllers.PlayerQueueController
+import com.example.core.playback.controllers.ABLoopController
+import com.example.core.playback.controllers.AudioFadeController
+import com.example.core.playback.controllers.MediaSessionBridge
+import com.example.core.playback.controllers.PlayerQueueController
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

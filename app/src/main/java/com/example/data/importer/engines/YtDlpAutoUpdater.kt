@@ -8,7 +8,7 @@ import android.net.Uri
 import com.example.AuraApplication
 import com.example.debug.AuraDebugManager
 import com.example.core.model.PackageUpdateState
-import com.example.playback.AuraDownloadService
+import com.example.core.playback.AuraDownloadService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob

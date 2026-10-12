@@ -1,4 +1,4 @@
-package com.example.playback
+package com.example.core.playback
 
 import android.content.BroadcastReceiver
 import android.content.Context

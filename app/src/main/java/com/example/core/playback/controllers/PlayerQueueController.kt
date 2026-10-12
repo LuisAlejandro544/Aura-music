@@ -1,4 +1,4 @@
-package com.example.playback.controllers
+package com.example.core.playback.controllers
 import com.example.core.model.RepeatMode
 
 import com.example.core.model.Track

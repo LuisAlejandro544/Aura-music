@@ -85,11 +85,11 @@ class MainActivity : ComponentActivity() {
             }
 
             val downloadedTrackId = incomingIntent.getLongExtra(
-                com.example.playback.AuraDownloadService.EXTRA_PLAY_DOWNLOADED_TRACK_ID,
+                com.example.core.playback.AuraDownloadService.EXTRA_PLAY_DOWNLOADED_TRACK_ID,
                 -1L
             )
             if (downloadedTrackId > 0L) {
-                incomingIntent.removeExtra(com.example.playback.AuraDownloadService.EXTRA_PLAY_DOWNLOADED_TRACK_ID)
+                incomingIntent.removeExtra(com.example.core.playback.AuraDownloadService.EXTRA_PLAY_DOWNLOADED_TRACK_ID)
                 incomingIntent.removeExtra(com.example.widget.AuraMusicWidgetProvider.EXTRA_INTERNAL_AUTH_TOKEN)
                 if (isInternalAuthenticated) {
                     vm.playDownloadedTrackFromNotification(downloadedTrackId)
@@ -151,7 +151,7 @@ class MainActivity : ComponentActivity() {
             pkgState is com.example.core.model.PackageUpdateState.UpToDate ||
             pkgState is com.example.core.model.PackageUpdateState.Idle
         ) {
-            com.example.playback.AuraDownloadService.dismissPackageNotification(applicationContext)
+            com.example.core.playback.AuraDownloadService.dismissPackageNotification(applicationContext)
         }
         super.onStop()
     }

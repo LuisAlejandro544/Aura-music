@@ -2,8 +2,8 @@ package com.example.viewmodel.delegates
 
 import com.example.core.model.HeadphoneConfig
 import com.example.core.model.HeadsetButtonAction
-import com.example.playback.AuraAudioPlayer
-import com.example.playback.HeadphoneController
+import com.example.core.playback.AuraAudioPlayer
+import com.example.core.playback.HeadphoneController
 import kotlinx.coroutines.flow.StateFlow
 
 /**

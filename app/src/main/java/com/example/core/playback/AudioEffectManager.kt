@@ -1,4 +1,4 @@
-package com.example.playback
+package com.example.core.playback
 
 import android.media.audiofx.BassBoost
 import android.media.audiofx.EnvironmentalReverb
