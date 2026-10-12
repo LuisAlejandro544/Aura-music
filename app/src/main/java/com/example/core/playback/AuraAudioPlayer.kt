@@ -141,6 +141,17 @@ class AuraAudioPlayer(
         getNearEndPrefetch = { onStreamingNearEndPrefetchCallback },
         onTrackEnded = { autoOverlap -> handleTrackEnded(isAutoCrossfadeOverlap = autoOverlap) }
     )
+    private val dualDeckTransitions = DualDeckTransitionManager(
+        fadeController = fadeController,
+        getPlayer = { exoPlayer },
+        getOutgoingDeck = { outgoingExoPlayer },
+        getCurrentTrack = { _currentTrack.value },
+        getCrossfadeSeconds = { _crossfadeSeconds.value },
+        isDjAutomixEnabled = { _isDjAutomixEnabled.value },
+        isDjEqCurveEnabled = { _isDjEqCurveEnabled.value },
+        resolveClipBounds = { uri -> AudioSilenceTrimmer.getClippingBounds(context, uri) },
+        onDjAutomixTransition = { enabled, progress -> effectManager.setDjAutomixTransition(enabled, progress) }
+    )
     private val nativeAudioProcessor = NativeAudioProcessor()
     private var mediaSessionBridge: MediaSessionBridge? = null
 
@@ -232,60 +243,23 @@ class AuraAudioPlayer(
             .setMediaSourceFactory(mediaSourceFactory)
             .build()
 
-        player.addListener(object : Player.Listener {
-            override fun onIsPlayingChanged(isPlaying: Boolean) {
-                _isPlaying.value = isPlaying
-                com.example.widget.AuraMusicWidgetProvider.pushPlaybackState(
-                    context = context,
-                    track = _currentTrack.value,
-                    isPlaying = isPlaying,
-                    positionMs = player.currentPosition.coerceAtLeast(0L),
-                    durationMs = player.duration.coerceAtLeast(_duration.value)
-                )
-                if (isPlaying) {
-                    startProgressTracking()
-                } else {
-                    stopProgressTracking()
-                }
-            }
-
-            override fun onPlaybackStateChanged(playbackState: Int) {
-                when (playbackState) {
-                    Player.STATE_READY -> {
-                        _isBuffering.value = false
-                        _isNetworkStalled.value = false
-                        _duration.value = player.duration.coerceAtLeast(0L)
-                        _playbackError.value = null
-                        effectManager.attachToSession(player.audioSessionId)
-                        com.example.widget.AuraMusicWidgetProvider.pushPlaybackState(
-                            context = context,
-                            track = _currentTrack.value,
-                            isPlaying = player.isPlaying,
-                            positionMs = player.currentPosition.coerceAtLeast(0L),
-                            durationMs = _duration.value
-                        )
-                    }
-                    Player.STATE_ENDED -> {
-                        _isBuffering.value = false
-                        handleTrackEnded()
-                    }
-                    Player.STATE_IDLE -> {
-                        _isBuffering.value = false
-                    }
-                    Player.STATE_BUFFERING -> {
-                        val cur = _currentTrack.value
-                        val isRemoteStream = cur?.isStreamingTrack == true &&
-                            (cur.uriString.startsWith("http://", ignoreCase = true) ||
-                                cur.uriString.startsWith("https://", ignoreCase = true))
-                        _isBuffering.value = isRemoteStream
-                    }
-                }
-            }
-
-                        override fun onPlayerError(error: PlaybackException) {
-                streamingRecovery.handlePlayerError(player, error)
-            }
-        })
+        val stateListener = PlayerStateListener(
+            appContext = context,
+            player = player,
+            getTrack = { _currentTrack.value },
+            getDuration = { _duration.value },
+            setPlaying = { _isPlaying.value = it },
+            setDuration = { _duration.value = it },
+            setBuffering = { _isBuffering.value = it },
+            setNetworkStalled = { _isNetworkStalled.value = it },
+            setPlaybackError = { _playbackError.value = it },
+            attachAudioSession = { effectManager.attachToSession(it) },
+            onTrackEnded = { handleTrackEnded() },
+            onPlayerError = { streamingRecovery.handlePlayerError(player, it) },
+            onStartTracking = { startProgressTracking() },
+            onStopTracking = { stopProgressTracking() }
+        )
+        player.addListener(stateListener)
 
         mediaSessionBridge = MediaSessionBridge(
             context = context,
@@ -339,56 +313,8 @@ class AuraAudioPlayer(
         }
 
         val player = exoPlayer ?: return
-        val outDeck = outgoingExoPlayer
-        val previousTrack = _currentTrack.value
-        val previousTrackId = previousTrack?.id
-        val isLocalPair = previousTrack != null && !previousTrack.isStreamingTrack && !track.isStreamingTrack
-        val effectiveCrossfadeSecs = if (_isDjAutomixEnabled.value && isLocalPair && _crossfadeSeconds.value == 0) 6 else _crossfadeSeconds.value
-
-        // Si el Crossfade o Smart AutoMix DJ (música local) está activo y había una pista sonando en el reproductor primario,
-        // transferimos la cola final de la pista saliente al Deck B auxiliar para que ambas suenen superpuestas
-        var handoffToDualDeckSucceeded = false
-        if (effectiveCrossfadeSecs > 0 && outDeck != null && previousTrack != null && previousTrack.id != track.id && (player.isPlaying || player.playWhenReady)) {
-            val outgoingPos = player.currentPosition.coerceAtLeast(0L)
-            val outgoingDur = player.duration
-            if (outgoingDur <= 0L || (outgoingDur - outgoingPos) > 350L) {
-                try {
-                    outDeck.stop()
-                    outDeck.clearMediaItems()
-                    val prevMediaUri = if (previousTrack.uriString.startsWith("/")) {
-                        Uri.fromFile(File(previousTrack.uriString))
-                    } else {
-                        Uri.parse(previousTrack.uriString)
-                    }
-                    val prevClipBounds = if (previousTrack.isStreamingTrack) {
-                        null
-                    } else {
-                        AudioSilenceTrimmer.getClippingBounds(context, previousTrack.uriString)
-                    }
-                    val absoluteSeekPos = (prevClipBounds?.startMs ?: 0L) + outgoingPos
-                    val outItemBuilder = MediaItem.Builder().setUri(prevMediaUri)
-                    if (prevClipBounds != null && prevClipBounds.endMs > absoluteSeekPos) {
-                        outItemBuilder.setClippingConfiguration(
-                            MediaItem.ClippingConfiguration.Builder()
-                                .setStartPositionMs(0L)
-                                .setEndPositionMs(prevClipBounds.endMs)
-                                .build()
-                        )
-                    }
-                    outDeck.setMediaItem(outItemBuilder.build(), absoluteSeekPos)
-                    outDeck.playbackParameters = player.playbackParameters
-                    // La Canción A comienza la transición al 100% del volumen base para bajar simultáneamente de 100% a 0%
-                    outDeck.volume = fadeController.getVolume().coerceIn(0.0f, 1.0f)
-                    outDeck.prepare()
-                    outDeck.play()
-                    handoffToDualDeckSucceeded = true
-                } catch (_: Throwable) {
-                    handoffToDualDeckSucceeded = false
-                }
-            }
-        } else {
-            fadeController.stopOutgoingDeckImmediately(outDeck)
-        }
+        val previousTrackId = _currentTrack.value?.id
+        val handoff = dualDeckTransitions.prepareHandoff(track)
 
         _currentTrack.value = track
         _currentPosition.value = 0L
@@ -412,90 +338,16 @@ class AuraAudioPlayer(
         )
 
         try {
-            val artworkUri = if (!track.albumArtPath.isNullOrBlank()) {
-                if (track.albumArtPath.startsWith("http://", ignoreCase = true) ||
-                    track.albumArtPath.startsWith("https://", ignoreCase = true)
-                ) {
-                    Uri.parse(track.albumArtPath)
-                } else {
-                    val artFile = File(track.albumArtPath)
-                    if (artFile.exists()) Uri.fromFile(artFile) else null
-                }
-            } else null
-
-            val mediaMetadata = MediaMetadata.Builder()
-                .setTitle(track.title)
-                .setArtist(track.artist)
-                .setAlbumTitle(track.album)
-                .apply {
-                    if (artworkUri != null) {
-                        setArtworkUri(artworkUri)
-                    }
-                }
-                .build()
-
-            val clipBounds = if (track.isStreamingTrack) {
-                null
-            } else {
-                AudioSilenceTrimmer.getClippingBounds(context, track.uriString)
-            }
-            val resolvedMediaUri = if (track.uriString.startsWith("/")) {
-                Uri.fromFile(File(track.uriString))
-            } else {
-                Uri.parse(track.uriString)
-            }
-            val mediaItemBuilder = MediaItem.Builder()
-                .setUri(resolvedMediaUri)
-                .setMediaMetadata(mediaMetadata)
-
-            if (clipBounds != null && clipBounds.endMs > clipBounds.startMs) {
-                mediaItemBuilder.setClippingConfiguration(
-                    MediaItem.ClippingConfiguration.Builder()
-                        .setStartPositionMs(clipBounds.startMs)
-                        .setEndPositionMs(clipBounds.endMs)
-                        .build()
-                )
-            }
-
-            val mediaItem = mediaItemBuilder.build()
+            val mediaItem = TrackMediaFactory.buildTrackMedia(track) { uri ->
+                AudioSilenceTrimmer.getClippingBounds(context, uri)
+            }.mediaItem
             player.setMediaItem(mediaItem)
             player.playbackParameters = androidx.media3.common.PlaybackParameters(_playbackSpeed.value, _playbackPitch.value)
             player.prepare()
             ensurePlaybackServiceStarted()
             player.play()
 
-            if (handoffToDualDeckSucceeded && outDeck != null) {
-                val overlapDurationMs = if (isAutoCrossfadeOverlap) {
-                    (effectiveCrossfadeSecs * 1000L).coerceIn(1200L, 12000L)
-                } else {
-                    // En cambio manual de canción con Crossfade activo, mezcla sedosa y rápida (1.6s a 3.0s)
-                    (effectiveCrossfadeSecs * 650L).coerceIn(1500L, 3200L)
-                }
-                val applyEqCurve = _isDjEqCurveEnabled.value && isLocalPair
-                fadeController.startDualDeckCrossfade(
-                    durationMs = overlapDurationMs,
-                    outgoingPlayer = outDeck,
-                    incomingPlayer = player,
-                    onProgressStep = { progress ->
-                        if (applyEqCurve) {
-                            // Modulación progresiva Smart AutoMix DJ (pico de limpieza en el centro de la mezcla)
-                            val bellCurve = kotlin.math.sin(progress * kotlin.math.PI).toFloat().coerceIn(0.15f, 1.0f)
-                            effectManager.setDjAutomixTransition(true, bellCurve)
-                        }
-                    }
-                ) {
-                    effectManager.setDjAutomixTransition(false, 0.0f)
-                }
-            } else {
-                val fadeDurationMs = if (effectiveCrossfadeSecs > 0) {
-                    (effectiveCrossfadeSecs * 1000L).coerceIn(1200L, 5000L)
-                } else if (fadeController.isFadeInOnResume) {
-                    1500L
-                } else {
-                    1000L
-                }
-                fadeController.startSmoothFadeIn(fadeDurationMs, player)
-            }
+            dualDeckTransitions.startEntryTransition(handoff, isAutoCrossfadeOverlap)
         } catch (e: Exception) {
             _playbackError.value = "No se pudo cargar la pista: ${e.message}"
         }
