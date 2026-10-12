@@ -28,7 +28,7 @@ import com.example.ui.screens.importmusic.ImportMusicScreen
 import com.example.ui.screens.library.LibraryScreen
 import com.example.ui.screens.nowplaying.NowPlayingScreen
 import com.example.feature.onboarding.OnboardingScreen
-import com.example.ui.screens.playlist.PlaylistDetailScreen
+import com.example.feature.playlist.PlaylistDetailScreen
 import com.example.ui.screens.settings.SettingsScreen
 import com.example.ui.theme.ArtworkColorExtractor
 import com.example.ui.theme.BackgroundDark

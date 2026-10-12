@@ -1,4 +1,4 @@
-package com.example.ui.screens.playlist
+package com.example.feature.playlist
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
