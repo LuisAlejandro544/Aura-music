@@ -1,4 +1,4 @@
-package com.example.ui.screens.onboarding
+package com.example.feature.onboarding
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background

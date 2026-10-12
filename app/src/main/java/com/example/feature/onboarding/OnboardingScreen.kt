@@ -1,4 +1,4 @@
-package com.example.ui.screens.onboarding
+package com.example.feature.onboarding
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
