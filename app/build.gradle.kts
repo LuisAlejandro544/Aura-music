@@ -663,16 +663,13 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
       return false
     }
 
-    // Módulos C nativos (.so) y librerías compartidas que yt-dlp nunca usa (bases de datos, tests, GUI, audioop, codecs CJK pesados, profilers)
-    val prunedNativeSharedLibs = setOf(
-      "libsqlite3_chaquopy.so", "libsqlite3.so"
-    )
+    // Módulos C nativos (.so) y librerías compartidas que yt-dlp nunca usa (solo tests, GUI de escritorio y audioop legado; _sqlite3 y libsqlite3 SE CONSERVAN para yt-dlp)
+    val prunedNativeSharedLibs = emptySet<String>()
     val prunedPythonCModules = listOf(
-      "_sqlite3", "_tkinter", "_test", "_ctypes_test", "_xxtestfuzz", "xxlimited",
+      "_tkinter", "_test", "_ctypes_test", "_xxtestfuzz", "xxlimited",
       "_curses", "_dbm", "_gdbm", "nis", "ossaudiodev", "spwd", "syslog",
       "audioop", "_codecs_cn", "_codecs_hk", "_codecs_iso2022", "_codecs_jp", "_codecs_kr", "_codecs_tw",
-      "_decimal", "_lsprof", "_xxsubinterpreters", "_statistics", "_zoneinfo", "termios", "resource",
-      "cmath", "mmap", "_multiprocessing", "_posixshmem", "grp", "crypt"
+      "_lsprof", "_xxsubinterpreters"
     )
 
     fun shouldPrunePythonCModule(fileName: String): Boolean {
@@ -808,21 +805,240 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
     }
 
     // -------------------------------------------------------------------------
-    // 4. Aprovisionamiento de FFmpeg Nativo Puro Multi-ABI + Lanzador PIE (Sin Duplicación .zip.so ni librerías no usadas)
+    // 4. Aprovisionamiento y Compilación de FFmpeg n6.0.1 CLI 100% Puro en C Multi-ABI
+    //    - Conserva todas las librerías nativas base (incluyendo libavdevice.so / libavdevice_neon.so).
+    //    - Elimina por completo el wrapper obsoleto libffmpegkit.so y libffmpegkit_abidetect.so.
+    //    - Compila fftools oficial de FFmpeg n6.0.1 enlazado directamente contra libavfilter, libavformat,
+    //      libavcodec, libswresample, libswscale y libavutil para las 4 ABIs.
     // -------------------------------------------------------------------------
     val resolvedFfmpegFiles = try { ffmpegRuntimeFiles.files } catch (_: Throwable) { emptySet<File>() }
     val ffmpegAarFile = resolvedFfmpegFiles.firstOrNull { it.name.endsWith(".aar") || it.name.endsWith(".zip") }
     val ffmpegLauncherC = File(cppDir, "native_ffmpeg_launcher.c")
     val prunedFfmpegLibs = setOf(
       "libc++_shared.so",
-      "libavdevice.so",
-      "libavdevice_neon.so",
+      "libffmpegkit.so",
+      "libffmpegkit_armv7a_neon.so",
       "libffmpegkit_abidetect.so"
+    )
+
+    // Descargar y preparar fuentes oficiales de FFmpeg n6.0.1 (fftools + cabeceras) para compilar libffmpeg.so puro
+    val ffmpegSrcDir = File(tempBuildDir, "ffmpeg_n6_0_1_src")
+    var ffmpegSourcesReady = File(ffmpegSrcDir, "fftools/ffmpeg.c").exists() &&
+      File(ffmpegSrcDir, "libavutil/log2_tab.c").exists() &&
+      File(ffmpegSrcDir, "libpostproc/postprocess.h").exists()
+    if (!ffmpegSourcesReady) {
+      ffmpegSrcDir.deleteRecursively()
+      ffmpegSrcDir.mkdirs()
+      val ffmpegTarGz = File(tempBuildDir, "FFmpeg-n6.0.1.tar.gz")
+      val ffmpegTarUrl = "https://github.com/FFmpeg/FFmpeg/archive/refs/tags/n6.0.1.tar.gz"
+      if (ffmpegTarGz.exists() || downloadUrlToFile(ffmpegTarUrl, ffmpegTarGz, connectTimeoutMs = 20000, readTimeoutMs = 60000)) {
+        ProcessBuilder(
+          "tar", "-xzf", ffmpegTarGz.absolutePath, "-C", ffmpegSrcDir.absolutePath, "--strip-components=1",
+          "FFmpeg-n6.0.1/fftools", "FFmpeg-n6.0.1/libavutil", "FFmpeg-n6.0.1/libavcodec",
+          "FFmpeg-n6.0.1/libavformat", "FFmpeg-n6.0.1/libavfilter", "FFmpeg-n6.0.1/libavdevice",
+          "FFmpeg-n6.0.1/libswscale", "FFmpeg-n6.0.1/libswresample", "FFmpeg-n6.0.1/libpostproc", "FFmpeg-n6.0.1/compat"
+        ).start().waitFor()
+        ffmpegSourcesReady = File(ffmpegSrcDir, "fftools/ffmpeg.c").exists()
+      }
+    }
+
+    if (ffmpegSourcesReady) {
+      File(ffmpegSrcDir, "libavutil/ffversion.h").writeText(
+        """
+        #ifndef AVUTIL_FFVERSION_H
+        #define AVUTIL_FFVERSION_H
+        #define FFMPEG_VERSION "n6.0.1-AuraMusic-Pure"
+        #endif
+        """.trimIndent() + "\n"
+      )
+      File(ffmpegSrcDir, "libavutil/avconfig.h").writeText(
+        """
+        #ifndef AVUTIL_AVCONFIG_H
+        #define AVUTIL_AVCONFIG_H
+        #define AV_HAVE_BIGENDIAN 0
+        #define AV_HAVE_FAST_UNALIGNED 1
+        #endif
+        """.trimIndent() + "\n"
+      )
+      File(ffmpegSrcDir, "config.h").writeText(
+        """
+        #ifndef FFMPEG_CONFIG_H
+        #define FFMPEG_CONFIG_H
+        #define FFMPEG_CONFIGURATION "--enable-version3 --enable-gpl --enable-shared"
+        #define FFMPEG_LICENSE "GPL version 3 or later"
+        #define CONFIG_THIS_YEAR 2023
+        #define FFMPEG_DATADIR "/data/local/tmp"
+        #define AVCONV_DATADIR "/data/local/tmp"
+        #define CC_IDENT "Android NDK Clang"
+        #define OS_NAME android
+        #define EXTERN_PREFIX ""
+        #define EXTERN_ASM
+        #define BUILDSUF ""
+        #define SLIBSUF ".so"
+        #define HAVE_MMX2 HAVE_MMXEXT
+        #define SWS_MAX_FILTER_SIZE 256
+        #define ARCH_AARCH64 0
+        #define ARCH_ARM 0
+        #define ARCH_IA64 0
+        #define ARCH_LOONGARCH 0
+        #define ARCH_M68K 0
+        #define ARCH_MIPS 0
+        #define ARCH_PARISC 0
+        #define ARCH_PPC 0
+        #define ARCH_RISCV 0
+        #define ARCH_S390 0
+        #define ARCH_SPARC 0
+        #define ARCH_TILEGX 0
+        #define ARCH_TILEPRO 0
+        #define ARCH_X86 0
+        #define ARCH_X86_32 0
+        #define ARCH_X86_64 0
+        #define HAVE_FAST_64BIT 1
+        #define HAVE_FAST_UNALIGNED 1
+        #define HAVE_LOCAL_ALIGNED 1
+        #define HAVE_SIMD_ALIGN_16 1
+        #define HAVE_SIMD_ALIGN_32 1
+        #define HAVE_SIMD_ALIGN_64 1
+        #define HAVE_THREADS 1
+        #define HAVE_PTHREADS 1
+        #define HAVE_W32THREADS 0
+        #define HAVE_OS2THREADS 0
+        #define HAVE_ATOMICS_NATIVE 1
+        #define HAVE_ATANF 1
+        #define HAVE_ATAN2F 1
+        #define HAVE_CBRT 1
+        #define HAVE_CBRTF 1
+        #define HAVE_COPYSIGN 1
+        #define HAVE_COSF 1
+        #define HAVE_ERF 1
+        #define HAVE_EXP2 1
+        #define HAVE_EXP2F 1
+        #define HAVE_EXPF 1
+        #define HAVE_HYPOT 1
+        #define HAVE_ISFINITE 1
+        #define HAVE_ISINF 1
+        #define HAVE_ISNAN 1
+        #define HAVE_LDEXPF 1
+        #define HAVE_LLRINT 1
+        #define HAVE_LLRINTF 1
+        #define HAVE_LOG2 1
+        #define HAVE_LOG2F 1
+        #define HAVE_LOG10F 1
+        #define HAVE_LRINT 1
+        #define HAVE_LRINTF 1
+        #define HAVE_POWF 1
+        #define HAVE_RINT 1
+        #define HAVE_ROUND 1
+        #define HAVE_ROUNDF 1
+        #define HAVE_SINF 1
+        #define HAVE_TRUNC 1
+        #define HAVE_TRUNCF 1
+        #define HAVE_ACCESS 1
+        #define HAVE_FCNTL 1
+        #define HAVE_GETADDRINFO 1
+        #define HAVE_GETOPT 1
+        #define HAVE_GETRUSAGE 1
+        #define HAVE_GETTIMEOFDAY 1
+        #define HAVE_GMTIME_R 1
+        #define HAVE_INET_ATON 1
+        #define HAVE_ISATTY 1
+        #define HAVE_LOCALTIME_R 1
+        #define HAVE_LSTAT 1
+        #define HAVE_MEMALIGN 1
+        #define HAVE_MKSTEMP 1
+        #define HAVE_MMAP 1
+        #define HAVE_MPROTECT 1
+        #define HAVE_NANOSLEEP 1
+        #define HAVE_POSIX_MEMALIGN 1
+        #define HAVE_PTHREAD_CANCEL 0
+        #define HAVE_SCHED_GETAFFINITY 1
+        #define HAVE_SETENV 1
+        #define HAVE_SETRLIMIT 1
+        #define HAVE_STRERROR_R 1
+        #define HAVE_SYSCONF 1
+        #define HAVE_SYSCTL 0
+        #define HAVE_USLEEP 1
+        #define HAVE_UTIME 1
+        #define HAVE_ARC4RANDOM 1
+        #define HAVE_CLOCK_GETTIME 1
+        #define HAVE_MACH_ABSOLUTE_TIME 0
+        #define HAVE_GETPROCESSMEMORYINFO 0
+        #define HAVE_GETPROCESSTIMES 0
+        #define HAVE_GETSYSTEMTIMEASFILETIME 0
+        #define HAVE_GLOB 0
+        #define HAVE_KBHIT 0
+        #define HAVE_PEEKPNAMEDPIPE 0
+        #define HAVE_SETCONSOLECTRLHANDLER 0
+        #define HAVE_SETDLLDIRECTORY 0
+        #define HAVE_SETMODE 0
+        #define HAVE_SLEEP 0
+        #define HAVE_VIRTUALALLOC 0
+        #define HAVE_UNISTD_H 1
+        #define HAVE_SYS_RESOURCE_H 1
+        #define HAVE_SYS_SELECT_H 1
+        #define HAVE_SYS_TIME_H 1
+        #define HAVE_TERMIOS_H 1
+        #define HAVE_IO_H 0
+        #define HAVE_DIRECT_H 0
+        #define HAVE_COMMANDLINETOARGVW 0
+        #define HAVE_PRCTL 1
+        #define HAVE_VALGRIND_VALGRIND_H 0
+        #define HAVE_SOCKLEN_T 1
+        #define HAVE_STRUCT_ADDRINFO 1
+        #define HAVE_STRUCT_GROUP_SOURCE_REQ 1
+        #define HAVE_STRUCT_IP_MREQ_SOURCE 1
+        #define HAVE_STRUCT_IPV6_MREQ 1
+        #define HAVE_STRUCT_MSGHDR_MSG_FLAGS 1
+        #define HAVE_STRUCT_POLLFD 1
+        #define HAVE_STRUCT_RUSAGE_RU_MAXRSS 1
+        #define HAVE_STRUCT_SCTP_EVENT_SUBSCRIBE 0
+        #define HAVE_STRUCT_SOCKADDR_IN6 1
+        #define HAVE_STRUCT_SOCKADDR_SA_LEN 0
+        #define HAVE_STRUCT_SOCKADDR_STORAGE 1
+        #define HAVE_STRUCT_STAT_ST_MTIM_TV_NSEC 1
+        #define HAVE_STRUCT_V4L2_FRMIVALENUM_DISCRETE 1
+        #define CONFIG_AVUTIL 1
+        #define CONFIG_AVCODEC 1
+        #define CONFIG_AVFORMAT 1
+        #define CONFIG_AVFILTER 1
+        #define CONFIG_AVDEVICE 0
+        #define CONFIG_SWRESAMPLE 1
+        #define CONFIG_SWSCALE 1
+        #define CONFIG_POSTPROC 0
+        #define CONFIG_FFMPEG 1
+        #define CONFIG_Network 1
+        #define CONFIG_NETWORK 1
+        #define CONFIG_NONFREE 0
+        #define CONFIG_GPL 1
+        #define CONFIG_VERSION3 1
+        #define CONFIG_OPENCL 0
+        #define CONFIG_VULKAN 0
+        #define CONFIG_CUDA 0
+        #define CONFIG_LIBMFX 0
+        #endif
+        """.trimIndent() + "\n"
+      )
+    }
+
+    val fftoolsCFiles = listOf(
+      "fftools/ffmpeg.c",
+      "fftools/ffmpeg_demux.c",
+      "fftools/ffmpeg_filter.c",
+      "fftools/ffmpeg_hw.c",
+      "fftools/ffmpeg_mux.c",
+      "fftools/ffmpeg_mux_init.c",
+      "fftools/ffmpeg_opt.c",
+      "fftools/objpool.c",
+      "fftools/sync_queue.c",
+      "fftools/thread_queue.c",
+      "fftools/cmdutils.c",
+      "fftools/opt_common.c",
+      "libavutil/log2_tab.c"
     )
 
     for (abi in abis) {
       val abiDir = File(jniLibsDir, abi).apply { mkdirs() }
-      // Eliminar cualquier libffmpeg.zip.so duplicado anterior y librerías FFmpeg innecesarias (libavdevice, abidetect)
+      // Eliminar cualquier libffmpeg.zip.so duplicado anterior y el wrapper obsoleto libffmpegkit.so (conservando libavdevice.so)
       File(abiDir, "libffmpeg.zip.so").delete()
       prunedFfmpegLibs.forEach { File(abiDir, it).delete() }
       val ffmpegSo = File(abiDir, "libffmpeg.so")
@@ -848,10 +1064,45 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
       val compilerInfo = findCompilerForAbi(abi)
       if (compilerInfo != null) {
         val (clangBin, archFlags) = compilerInfo
-        val cmd = mutableListOf(clangBin, "-pie", "-fPIE") + sizeOptFlags + archFlags +
-          listOf("-Wl,-rpath,\$ORIGIN", ffmpegLauncherC.absolutePath, "-ldl", "-o", ffmpegSo.absolutePath)
-        ProcessBuilder(cmd).start().waitFor()
-        ffmpegSo.setExecutable(true, false)
+        val useNeonSuffix = File(abiDir, "libavcodec_neon.so").exists()
+        val avLibsFlags = if (useNeonSuffix) {
+          listOf("-lavfilter_neon", "-lavformat_neon", "-lavcodec_neon", "-lswresample_neon", "-lswscale_neon", "-lavutil_neon")
+        } else {
+          listOf("-lavfilter", "-lavformat", "-lavcodec", "-lswresample", "-lswscale", "-lavutil")
+        }
+
+        var builtPureFfmpeg = false
+        if (ffmpegSourcesReady) {
+          val cmd = mutableListOf(clangBin, "-pie", "-fPIE") + sizeOptFlags + archFlags +
+            listOf(
+              "-I${ffmpegSrcDir.absolutePath}",
+              "-I${File(ffmpegSrcDir, "fftools").absolutePath}",
+              "-DHAVE_AV_CONFIG_H",
+              "-w"
+            ) +
+            fftoolsCFiles.map { File(ffmpegSrcDir, it).absolutePath } +
+            listOf("-L${abiDir.absolutePath}", "-Wl,-rpath,\$ORIGIN") +
+            avLibsFlags +
+            listOf("-lm", "-ldl", "-lz", "-pthread", "-o", ffmpegSo.absolutePath)
+
+          val proc = ProcessBuilder(cmd).directory(ffmpegSrcDir).redirectErrorStream(true).start()
+          val outLog = proc.inputStream.bufferedReader().readText()
+          val exitCode = proc.waitFor()
+          if (exitCode == 0 && ffmpegSo.exists() && ffmpegSo.length() > 100_000L) {
+            ffmpegSo.setExecutable(true, false)
+            builtPureFfmpeg = true
+            logger.lifecycle("✅ [Aura Gradle] Motor FFmpeg n6.0.1 C Puro (sin libffmpegkit.so) compilado para $abi: ${ffmpegSo.length() / 1024} KB.")
+          } else {
+            logger.warn("⚠️ [Aura Gradle] Compilación directa de fftools para $abi devolvió $exitCode: $outLog")
+          }
+        }
+
+        if (!builtPureFfmpeg) {
+          val cmd = mutableListOf(clangBin, "-pie", "-fPIE") + sizeOptFlags + archFlags +
+            listOf("-Wl,-rpath,\$ORIGIN", ffmpegLauncherC.absolutePath, "-ldl", "-o", ffmpegSo.absolutePath)
+          ProcessBuilder(cmd).start().waitFor()
+          ffmpegSo.setExecutable(true, false)
+        }
       }
     }
 
@@ -889,7 +1140,7 @@ val ensureDebugKeystore = tasks.register<EnsureDebugKeystoreTask>("ensureDebugKe
 
 val provisionNativeDeps = tasks.register<ProvisionNativeDepsTask>("provisionNativeDeps") {
   dependsOn(ensureDebugKeystore)
-  provisionVersion.set("v2.5-pure-quickjs-c99-real")
+  provisionVersion.set("v2.6-pure-ffmpeg-c-and-sqlite3-restored")
   val mobileOnlyMode = gradle.startParameter.taskNames.any { it.contains("Beta", ignoreCase = true) } ||
     System.getenv("AURA_BETA_MOBILE_ONLY") == "true" ||
     System.getenv("AURA_SPLIT_APKS") == "true"

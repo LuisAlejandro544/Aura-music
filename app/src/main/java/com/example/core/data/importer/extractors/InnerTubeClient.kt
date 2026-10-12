@@ -84,6 +84,30 @@ object InnerTubeClient {
         )
         if (iosResult != null) return@withContext iosResult
 
+        // Estrategia 5: MWEB (Cliente web móvil para pistas con restricción)
+        val mwebResult = queryInnerTube(
+            videoId = videoId,
+            originalUrl = originalUrl,
+            endpointUrl = "https://www.youtube.com/youtubei/v1/player?prettyPrint=false",
+            clientName = "MWEB",
+            clientVersion = "2.20240715.01.00",
+            userAgent = "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36",
+            extraClientProps = emptyMap()
+        )
+        if (mwebResult != null) return@withContext mwebResult
+
+        // Estrategia 6: TVHTML5 (Cliente de televisión embebida)
+        val tvEmbedResult = queryInnerTube(
+            videoId = videoId,
+            originalUrl = originalUrl,
+            endpointUrl = "https://www.youtube.com/youtubei/v1/player?prettyPrint=false",
+            clientName = "TVHTML5_SIMPLY_EMBEDDED_PLAYER",
+            clientVersion = "2.0",
+            userAgent = "Mozilla/5.0 (SMART-TV; LINUX; Tizen 5.0) AppleWebKit/537.36",
+            extraClientProps = emptyMap()
+        )
+        if (tvEmbedResult != null) return@withContext tvEmbedResult
+
         null
     }
 

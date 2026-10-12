@@ -197,33 +197,73 @@ object ChunkedStreamDownloader {
 
             var response = httpClient.newCall(reqBuilder.build()).execute()
 
-            // Si devuelve 403, reintentar exclusivamente con el User-Agent canónico puro del cliente `c=` sin cabeceras extra
-            if (response.code == 403 && (isYoutubeStream || isGoogleVideoHost)) {
+            // Si devuelve 403, reintentar con fallbacks de autenticación de cliente y bypass de IP-binding
+            if (response.code == 403) {
                 response.close()
-                val clientParam = try { Uri.parse(cleanUrl).getQueryParameter("c") } catch (_: Exception) { null }
-                val canonicalUa = com.example.core.data.streaming.StreamingHttpDataSourceConfig.inferCanonicalUserAgentForClient(clientParam)
-                    ?: alignedHeaders["User-Agent"]
-                    ?: "Mozilla/5.0 (Android; VR; Meta Quest 3) AppleWebKit/537.36"
 
-                val fallbackReqBuilder = Request.Builder()
-                    .url(cleanUrl)
-                    .header("User-Agent", canonicalUa)
-                    .header("Accept", "*/*")
-                    .header("Accept-Encoding", "identity")
-
-                if (clientParam == null || clientParam.startsWith("WEB", ignoreCase = true) || clientParam.startsWith("MWEB", ignoreCase = true)) {
-                    fallbackReqBuilder
-                        .header("Origin", "https://www.youtube.com")
-                        .header("Referer", "https://www.youtube.com/")
+                // Fallback 1: Si era URL de proxy de Invidious y devolvió 403, intentar URL directa
+                val fallbackDirectUrl = customHeaders["X-Direct-Url"]
+                if (!fallbackDirectUrl.isNullOrBlank() && fallbackDirectUrl != cleanUrl) {
+                    val directReqBuilder = Request.Builder().url(fallbackDirectUrl)
+                    for ((k, v) in alignedHeaders) {
+                        if (!k.equals("Range", ignoreCase = true) && !k.startsWith("X-", ignoreCase = true)) {
+                            directReqBuilder.header(k, v)
+                        }
+                    }
+                    response = httpClient.newCall(directReqBuilder.build()).execute()
                 }
 
-                response = httpClient.newCall(fallbackReqBuilder.build()).execute()
+                // Fallback 2: Si era URL directa con ip= y devolvió 403, intentar proxy Invidious
+                if (response.code == 403) {
+                    val invidiousBase = customHeaders["X-Invidious-Base"]
+                    if (!invidiousBase.isNullOrBlank() && cleanUrl.contains("googlevideo.com")) {
+                        val q = try { Uri.parse(cleanUrl).query } catch (_: Exception) { null }
+                        if (!q.isNullOrBlank()) {
+                            response.close()
+                            val proxyUrl = "${invidiousBase.trimEnd('/')}/videoplayback?$q"
+                            val proxyReqBuilder = Request.Builder()
+                                .url(proxyUrl)
+                                .header("User-Agent", customHeaders["User-Agent"] ?: "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36")
+                                .header("Referer", "$invidiousBase/")
+                                .header("Origin", invidiousBase)
+                            response = httpClient.newCall(proxyReqBuilder.build()).execute()
+                        }
+                    }
+                }
+
+                // Fallback 3: Reintentar exclusivamente con el User-Agent canónico puro del cliente `c=` sin cabeceras extra
+                if (response.code == 403 && (isYoutubeStream || isGoogleVideoHost)) {
+                    response.close()
+                    val clientParam = try { Uri.parse(cleanUrl).getQueryParameter("c") } catch (_: Exception) { null }
+                    val canonicalUa = com.example.core.data.streaming.StreamingHttpDataSourceConfig.inferCanonicalUserAgentForClient(clientParam)
+                        ?: alignedHeaders["User-Agent"]
+                        ?: "Mozilla/5.0 (Android; VR; Meta Quest 3) AppleWebKit/537.36"
+
+                    val fallbackReqBuilder = Request.Builder()
+                        .url(cleanUrl)
+                        .header("User-Agent", canonicalUa)
+                        .header("Accept", "*/*")
+                        .header("Accept-Encoding", "identity")
+
+                    if (clientParam == null || clientParam.startsWith("WEB", ignoreCase = true) || clientParam.startsWith("MWEB", ignoreCase = true)) {
+                        fallbackReqBuilder
+                            .header("Origin", "https://www.youtube.com")
+                            .header("Referer", "https://www.youtube.com/")
+                    }
+
+                    response = httpClient.newCall(fallbackReqBuilder.build()).execute()
+                }
             }
 
             response.use { res ->
                 if (!res.isSuccessful) {
                     val clientTag = try { Uri.parse(cleanUrl).getQueryParameter("c") ?: "N/A" } catch (_: Exception) { "N/A" }
                     AuraDebugManager.logWarning("Downloader", "HTTP ${res.code} (c=$clientTag) al descargar: ${cleanUrl.take(55)}...")
+                    return false
+                }
+                val contentType = res.header("Content-Type", "") ?: ""
+                if (contentType.contains("text/html", ignoreCase = true)) {
+                    AuraDebugManager.logWarning("Downloader", "Respuesta rechazada: Servidor devolvió página HTML en lugar de contenido multimedia (posible captcha o bloqueo Cloudflare).")
                     return false
                 }
                 val body = res.body ?: return false

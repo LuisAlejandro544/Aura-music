@@ -255,7 +255,7 @@ object YtDlpNativeEngine {
             add("--dump-single-json")
             add("--no-warnings")
             add("--extractor-args")
-            add("youtube:player_client=android_vr,ios,web")
+            add("youtube:player_client=tv,web_embedded,mweb,android_vr,ios,web")
             add("--format")
             add("bestvideo[height<=480][ext=mp4][vcodec^=avc1][protocol^=http]+bestaudio[ext=m4a][protocol^=http]/bestvideo[height<=480][ext=mp4][protocol^=http]+bestaudio[protocol^=http]/best[height<=480][ext=mp4][protocol^=http]/best[height<=480]")
             if (qjsBin != null && qjsBin.exists()) {
@@ -505,6 +505,9 @@ object YtDlpNativeEngine {
                     lower.contains("c=ios") -> 1200.0
                     lower.contains("c=android_music") -> 1000.0
                     lower.contains("c=visionos") -> 900.0
+                    lower.contains("c=tv") -> 850.0
+                    lower.contains("c=web_embedded") -> 800.0
+                    lower.contains("c=mweb") -> 750.0
                     else -> 0.0
                 }
             }
@@ -723,7 +726,7 @@ object YtDlpNativeEngine {
                 add("--no-part")
                 add("--no-playlist")
                 add("--extractor-args")
-                add("youtube:player_client=android_vr,ios,web")
+                add("youtube:player_client=tv,web_embedded,mweb,android_vr,ios,web")
                 add("--format")
                 add(formatSelector)
                 if (qjsBin != null && qjsBin.exists()) {

@@ -1,9 +1,11 @@
 package com.example
 
-import com.example.model.PlaybackTransitionConfig
-import com.example.model.SleepTimerState
-import com.example.model.Spatial8DConfig
-import com.example.playback.AudioEffectManager
+import com.example.core.model.PlaybackTransitionConfig
+import com.example.core.model.SleepTimerState
+import com.example.core.model.Spatial8DConfig
+import com.example.core.model.VocalClarityConfig
+import com.example.core.model.PackageUpdateState
+import com.example.core.playback.AudioEffectManager
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -41,7 +43,7 @@ class ExampleUnitTest {
 
     @Test
     fun vocalClarityConfig_defaultAndClampingWorkCorrectly() {
-        val defaultConfig = com.example.model.VocalClarityConfig()
+        val defaultConfig = VocalClarityConfig()
         assertFalse(defaultConfig.enabled)
         assertEquals(0.65f, defaultConfig.strength, 0.001f)
 
@@ -54,15 +56,15 @@ class ExampleUnitTest {
 
     @Test
     fun packageUpdateState_locksYtDlpOnlyWhenDownloadingOrRestartRequired() {
-        val idle = com.example.model.PackageUpdateState.Idle
-        val checking = com.example.model.PackageUpdateState.Checking()
-        val upToDate = com.example.model.PackageUpdateState.UpToDate("2025.02.19")
-        val downloading = com.example.model.PackageUpdateState.Downloading(
+        val idle = PackageUpdateState.Idle
+        val checking = PackageUpdateState.Checking()
+        val upToDate = PackageUpdateState.UpToDate("2025.02.19")
+        val downloading = PackageUpdateState.Downloading(
             progressPercent = 50,
             downloadedBytes = 1500_000L,
             totalBytes = 3000_000L
         )
-        val restartReq = com.example.model.PackageUpdateState.RestartRequired("2025.03.01")
+        val restartReq = PackageUpdateState.RestartRequired("2025.03.01")
 
         assertFalse(idle.isYtDlpTemporarilyLocked)
         assertFalse(checking.isYtDlpTemporarilyLocked)

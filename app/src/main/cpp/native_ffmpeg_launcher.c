@@ -94,15 +94,23 @@ int main(int argc, char **argv) {
     char self_dir[PATH_MAX];
     extract_dir(argc > 0 ? argv[0] : NULL, self_dir, sizeof(self_dir));
 
-    /* 1. Precargar bibliotecas nativas de FFmpeg en orden topológico estricto */
+    /* 1. Precargar bibliotecas nativas de FFmpeg en orden topológico estricto (incluyendo libavdevice y variantes NEON de 32 bits) */
     const char *ffmpeg_libs[] = {
         "libc++_shared.so",
         "libavutil.so",
+        "libavutil_neon.so",
         "libswresample.so",
+        "libswresample_neon.so",
         "libswscale.so",
+        "libswscale_neon.so",
         "libavcodec.so",
+        "libavcodec_neon.so",
         "libavformat.so",
+        "libavformat_neon.so",
         "libavfilter.so",
+        "libavfilter_neon.so",
+        "libavdevice.so",
+        "libavdevice_neon.so",
         NULL
     };
 
@@ -112,7 +120,6 @@ int main(int argc, char **argv) {
 
     /* 2. Cargar módulo de punto de entrada CLI de FFmpeg */
     const char *entry_libs[] = {
-        "libffmpegkit.so",
         "libffmpeg_cli.so",
         NULL
     };
