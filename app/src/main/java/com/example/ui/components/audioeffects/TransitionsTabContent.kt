@@ -19,7 +19,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.core.model.ABLoopState
-import com.example.ui.screens.nowplaying.components.formatPlaybackTime
+import com.example.feature.nowplaying.components.formatPlaybackTime
 import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary

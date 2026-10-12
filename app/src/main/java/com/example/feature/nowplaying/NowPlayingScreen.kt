@@ -1,4 +1,4 @@
-package com.example.ui.screens.nowplaying
+package com.example.feature.nowplaying
 import com.example.core.model.LyricsState
 import com.example.core.model.RepeatMode
 
@@ -46,7 +46,7 @@ import com.example.ui.components.EditTrackDialog
 import com.example.ui.components.SearchLyricsDialog
 import com.example.core.model.LyricSearchResult
 import com.example.core.model.NowPlayingDesignMode
-import com.example.ui.screens.nowplaying.components.*
+import com.example.feature.nowplaying.components.*
 import com.example.ui.theme.ArtworkColorExtractor
 import com.example.ui.theme.BackgroundDark
 import com.example.ui.theme.ExtractedArtworkColors
@@ -55,7 +55,7 @@ import com.example.ui.theme.TextSecondary
 /**
  * Pantalla completa de Reproducción en Curso (Now Playing).
  * Arquitectura Modular (MVVM):
- * Orquestador principal de UI que integra submódulos especializados en [com.example.ui.screens.nowplaying.components]:
+ * Orquestador principal de UI que integra submódulos especializados en [com.example.feature.nowplaying.components]:
  * - [NowPlayingTopBar]: Barra superior con botones de colapso, insignia de efectos, video y ficha técnica.
  * - [NowPlayingArtworkCard]: Carátula flotante y soporte para los 3 modos de Video Canvas.
  * - [AudioVisualizer]: Visualizador animado de ondas en tiempo real.

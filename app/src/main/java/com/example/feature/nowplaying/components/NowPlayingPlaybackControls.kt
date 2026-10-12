@@ -1,4 +1,4 @@
-package com.example.ui.screens.nowplaying.components
+package com.example.feature.nowplaying.components
 import com.example.core.model.RepeatMode
 
 import androidx.compose.foundation.ExperimentalFoundationApi

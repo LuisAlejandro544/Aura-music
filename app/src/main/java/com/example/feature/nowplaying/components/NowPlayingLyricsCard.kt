@@ -1,4 +1,4 @@
-package com.example.ui.screens.nowplaying.components
+package com.example.feature.nowplaying.components
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
