@@ -19,7 +19,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.example.model.Track
+import com.example.core.model.Track
 import com.example.ui.components.ArtworkImage
 import com.example.ui.theme.CardBorder
 import com.example.ui.theme.SurfaceCard
@@ -55,7 +55,7 @@ fun AlbumGroupCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             com.example.ui.components.PlaylistCoverCollage(
-                playlist = com.example.model.Playlist(id = -2L, name = albumName),
+                playlist = com.example.core.model.Playlist(id = -2L, name = albumName),
                 tracksOverride = previewTracks.take(4),
                 modifier = Modifier.size(54.dp),
                 cornerRadius = 8.dp
@@ -119,7 +119,7 @@ fun ArtistGroupCard(
                 modifier = Modifier.size(50.dp)
             ) {
                 com.example.ui.components.PlaylistCoverCollage(
-                    playlist = com.example.model.Playlist(id = -3L, name = artistName),
+                    playlist = com.example.core.model.Playlist(id = -3L, name = artistName),
                     tracksOverride = previewTracks.take(4),
                     modifier = Modifier.fillMaxSize(),
                     cornerRadius = 25.dp

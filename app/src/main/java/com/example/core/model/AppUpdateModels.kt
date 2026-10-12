@@ -1,4 +1,4 @@
-package com.example.model
+package com.example.core.model
 
 /**
  * Modelos de estado y metadatos para el Actualizador Automático de APK (OTA App Updater).

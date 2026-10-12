@@ -25,7 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.model.Track
+import com.example.core.model.Track
 import com.example.ui.theme.SurfaceElevatedDark
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary

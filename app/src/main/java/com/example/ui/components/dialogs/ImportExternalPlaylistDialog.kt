@@ -62,9 +62,9 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.example.data.importer.playlist.ExternalPlaylistImporter
-import com.example.model.ExternalPlaylistPreview
-import com.example.model.ExternalPlaylistSource
-import com.example.model.PlaylistImportSaveMode
+import com.example.core.model.ExternalPlaylistPreview
+import com.example.core.model.ExternalPlaylistSource
+import com.example.core.model.PlaylistImportSaveMode
 import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.SurfaceVariantDark
 import com.example.ui.theme.TextMuted

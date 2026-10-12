@@ -1,4 +1,4 @@
-package com.example.model
+package com.example.core.model
 
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color

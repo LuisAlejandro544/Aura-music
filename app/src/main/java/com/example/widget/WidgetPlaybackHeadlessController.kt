@@ -2,7 +2,7 @@ package com.example.widget
 
 import android.content.Context
 import com.example.data.local.AppDatabase
-import com.example.model.Track
+import com.example.core.model.Track
 import com.example.playback.AudioEffectManager
 import com.example.playback.AuraAudioPlayer
 import kotlinx.coroutines.CoroutineScope
@@ -215,7 +215,7 @@ object WidgetPlaybackHeadlessController {
 
                 val domainPlaylists = playlistEntities.map { entity ->
                     val plTracks = db.playlistDao().getTracksForPlaylist(entity.id).firstOrNull()?.map { it.toDomain() } ?: emptyList()
-                    com.example.model.Playlist(
+                    com.example.core.model.Playlist(
                         id = entity.id,
                         name = entity.name,
                         description = entity.description,

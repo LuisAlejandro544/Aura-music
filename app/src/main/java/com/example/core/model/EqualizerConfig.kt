@@ -1,4 +1,4 @@
-package com.example.model
+package com.example.core.model
 
 /**
  * Modelo de configuración y presets para el ecualizador paramétrico de 10 bandas

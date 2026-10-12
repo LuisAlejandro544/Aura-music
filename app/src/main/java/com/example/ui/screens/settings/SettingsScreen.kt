@@ -23,16 +23,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import android.net.Uri
-import com.example.model.AppWallpaperConfig
-import com.example.model.AuraTheme
-import com.example.model.HeadphoneConfig
-import com.example.model.HeadsetButtonAction
-import com.example.model.NowPlayingDesignMode
-import com.example.model.Playlist
-import com.example.model.Track
-import com.example.model.WallpaperScreenScope
-import com.example.model.WidgetConfig
-import com.example.model.WidgetGridContentMode
+import com.example.core.model.AppWallpaperConfig
+import com.example.core.model.AuraTheme
+import com.example.core.model.HeadphoneConfig
+import com.example.core.model.HeadsetButtonAction
+import com.example.core.model.NowPlayingDesignMode
+import com.example.core.model.Playlist
+import com.example.core.model.Track
+import com.example.core.model.WallpaperScreenScope
+import com.example.core.model.WidgetConfig
+import com.example.core.model.WidgetGridContentMode
 import com.example.ui.screens.settings.components.*
 import com.example.ui.screens.settings.components.about.behindTheProjectSettingsContent
 import com.example.ui.screens.settings.components.appearance.appWallpaperSettingsSection
@@ -130,8 +130,8 @@ fun SettingsScreen(
     onDeleteTrackVideo: (Track) -> Unit = {},
     onOpenOnboarding: () -> Unit = {},
     // Configuración de Streaming (Video Canvas Wi-Fi/Datos + Caché 50MB-500MB 30 min)
-    streamingCacheConfig: com.example.model.StreamingCacheConfig = com.example.model.StreamingCacheConfig(),
-    onSelectStreamingVideoPolicy: (com.example.model.StreamingVideoNetworkPolicy) -> Unit = {},
+    streamingCacheConfig: com.example.core.model.StreamingCacheConfig = com.example.core.model.StreamingCacheConfig(),
+    onSelectStreamingVideoPolicy: (com.example.core.model.StreamingVideoNetworkPolicy) -> Unit = {},
     onChangeStreamingCacheMaxMb: (Int) -> Unit = {},
     onClearStreamingCache: () -> Unit = {},
     modifier: Modifier = Modifier

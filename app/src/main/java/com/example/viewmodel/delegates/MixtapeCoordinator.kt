@@ -2,9 +2,9 @@ package com.example.viewmodel.delegates
 
 import android.content.Context
 import com.example.data.importer.mixtape.MixtapeEngine
-import com.example.model.MixtapeChapter
-import com.example.model.MixtapeMetadata
-import com.example.model.Track
+import com.example.core.model.MixtapeChapter
+import com.example.core.model.MixtapeMetadata
+import com.example.core.model.Track
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -84,7 +84,7 @@ class MixtapeCoordinator(
         trackA: Track,
         trackB: Track,
         title: String,
-        style: com.example.model.AutoRemixStyle,
+        style: com.example.core.model.AutoRemixStyle,
         crossfadeSeconds: Int = 6,
         onCreated: ((Track) -> Unit)? = null
     ) {

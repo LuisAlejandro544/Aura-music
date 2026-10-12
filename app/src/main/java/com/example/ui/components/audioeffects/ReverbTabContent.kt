@@ -16,8 +16,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.model.ReverbConfig
-import com.example.model.ReverbPreset
+import com.example.core.model.ReverbConfig
+import com.example.core.model.ReverbPreset
 import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary

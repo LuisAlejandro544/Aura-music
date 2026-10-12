@@ -20,10 +20,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.model.EqualizerBand
-import com.example.model.EqualizerPreset
-import com.example.model.EqualizerScopeMode
-import com.example.model.VocalClarityConfig
+import com.example.core.model.EqualizerBand
+import com.example.core.model.EqualizerPreset
+import com.example.core.model.EqualizerScopeMode
+import com.example.core.model.VocalClarityConfig
 import com.example.ui.theme.BackgroundDark
 import com.example.ui.theme.CardBorder
 import com.example.ui.theme.SurfaceCard

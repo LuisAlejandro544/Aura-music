@@ -10,10 +10,10 @@ import android.webkit.WebViewClient
 import com.example.data.importer.YtDlpNativeEngine
 import com.example.data.streaming.StreamingApiService
 import com.example.debug.AuraDebugManager
-import com.example.model.ExternalPlaylistPreview
-import com.example.model.ExternalPlaylistSource
-import com.example.model.ExternalPlaylistTrackItem
-import com.example.model.StreamingSearchFilter
+import com.example.core.model.ExternalPlaylistPreview
+import com.example.core.model.ExternalPlaylistSource
+import com.example.core.model.ExternalPlaylistTrackItem
+import com.example.core.model.StreamingSearchFilter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll

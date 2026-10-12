@@ -22,7 +22,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.model.Track
+import com.example.core.model.Track
 import com.example.ui.theme.CardBorder
 import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.TextMuted
@@ -45,7 +45,7 @@ fun ImportMusicScreen(
     onSeedDemoTracks: () -> Unit,
     onClearLibrary: () -> Unit,
     onDismissStatusMessage: () -> Unit,
-    downloadProgress: com.example.model.DownloadProgress = com.example.model.DownloadProgress(),
+    downloadProgress: com.example.core.model.DownloadProgress = com.example.core.model.DownloadProgress(),
     onImportVideoAsMusic: (videoUri: Uri, title: String, artist: String, album: String, attachAsCanvas: Boolean, forceLoop: Boolean?, trimSilence: Boolean) -> Unit = { _, _, _, _, _, _, _ -> },
     onImportVideoAsMusicWithLoopStyle: (videoUri: Uri, title: String, artist: String, album: String, attachAsCanvas: Boolean, forceLoop: Boolean?, trimSilence: Boolean, loopStyle: com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle) -> Unit = { uri, title, artist, album, attach, forceLoop, trim, _ ->
         onImportVideoAsMusic(uri, title, artist, album, attach, forceLoop, trim)

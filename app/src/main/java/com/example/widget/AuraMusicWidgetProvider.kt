@@ -11,8 +11,8 @@ import android.view.View
 import android.widget.RemoteViews
 import com.example.MainActivity
 import com.example.R
-import com.example.model.Track
-import com.example.model.WidgetPersistedState
+import com.example.core.model.Track
+import com.example.core.model.WidgetPersistedState
 import com.example.playback.NativeAudioEngine
 
 /**
@@ -187,7 +187,7 @@ class AuraMusicWidgetProvider : AppWidgetProvider() {
         private fun updateAllActiveInstances(
             context: Context,
             state: WidgetPersistedState,
-            config: com.example.model.WidgetConfig
+            config: com.example.core.model.WidgetConfig
         ) {
             val appWidgetManager = AppWidgetManager.getInstance(context)
             val componentName = ComponentName(context, AuraMusicWidgetProvider::class.java)
@@ -206,7 +206,7 @@ class AuraMusicWidgetProvider : AppWidgetProvider() {
             appWidgetId: Int,
             options: Bundle?,
             state: WidgetPersistedState,
-            config: com.example.model.WidgetConfig
+            config: com.example.core.model.WidgetConfig
         ) {
             val minWidthDp = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250)?.takeIf { it > 0 } ?: 250
             val minHeightDp = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 72)?.takeIf { it > 0 } ?: 72

@@ -1,4 +1,8 @@
 package com.example.viewmodel
+import com.example.core.model.LyricsState
+import com.example.core.model.LyricSearchResult
+import com.example.core.model.VideoDisplayMode
+import com.example.core.model.NowPlayingDesignMode
 import com.example.core.model.RepeatMode
 
 import android.app.Application
@@ -12,7 +16,7 @@ import com.example.data.importer.YtDlpAutoUpdater
 import com.example.data.local.AppDatabase
 import com.example.data.repository.MusicRepository
 import com.example.data.storage.AppStorageManager
-import com.example.model.*
+import com.example.core.model.*
 import com.example.playback.AudioEffectManager
 import com.example.playback.AuraAudioPlayer
 import com.example.playback.HeadphoneController
@@ -505,7 +509,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     fun setBackgroundGameModeEnabled(enabled: Boolean) = navigationCoordinator.setBackgroundGameModeEnabled(enabled)
     fun toggleBackgroundGameMode(enabled: Boolean) = setBackgroundGameModeEnabled(enabled)
     fun setAppWallpaperEnabled(enabled: Boolean) = navigationCoordinator.setAppWallpaperEnabled(enabled)
-    fun setAppWallpaperScope(scope: com.example.model.WallpaperScreenScope) = navigationCoordinator.setAppWallpaperScope(scope)
+    fun setAppWallpaperScope(scope: com.example.core.model.WallpaperScreenScope) = navigationCoordinator.setAppWallpaperScope(scope)
     fun setAppWallpaperDimAlpha(alpha: Float) = navigationCoordinator.setAppWallpaperDimAlpha(alpha)
     fun setAppWallpaperBlurDp(blurDp: Int) = navigationCoordinator.setAppWallpaperBlurDp(blurDp)
     fun setCustomWallpaperImage(uri: Uri) {
@@ -515,7 +519,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             val savedPath = storageManager.saveAppWallpaperImageFromUri(uri, oldPath)
             if (!savedPath.isNullOrBlank()) {
                 navigationCoordinator.updateAppWallpaperMedia(
-                    type = com.example.model.WallpaperMediaType.IMAGE,
+                    type = com.example.core.model.WallpaperMediaType.IMAGE,
                     path = savedPath,
                     enabled = true
                 )
@@ -529,7 +533,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             val savedPath = storageManager.saveAppWallpaperVideoFromUri(uri, oldPath)
             if (!savedPath.isNullOrBlank()) {
                 navigationCoordinator.updateAppWallpaperMedia(
-                    type = com.example.model.WallpaperMediaType.VIDEO,
+                    type = com.example.core.model.WallpaperMediaType.VIDEO,
                     path = savedPath,
                     enabled = true
                 )
@@ -542,7 +546,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             val oldPath = appWallpaperConfig.value.mediaPath
             storageManager.deleteAppWallpaperFile(oldPath)
             navigationCoordinator.updateAppWallpaperMedia(
-                type = com.example.model.WallpaperMediaType.NONE,
+                type = com.example.core.model.WallpaperMediaType.NONE,
                 path = "",
                 enabled = false
             )

@@ -24,8 +24,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.model.Playlist
-import com.example.model.Track
+import com.example.core.model.Playlist
+import com.example.core.model.Track
 import com.example.ui.components.ArtworkImage
 import com.example.ui.components.TrackListItem
 import com.example.ui.navigation.LibraryTab

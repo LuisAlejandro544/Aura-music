@@ -2,7 +2,7 @@ package com.example.data.local.entity
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import com.example.model.Track
+import com.example.core.model.Track
 
 /**
  * Entidad Room para persistir las pistas de música importadas por el usuario.

@@ -15,16 +15,16 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.model.ABLoopState
-import com.example.model.EqualizerBand
-import com.example.model.EqualizerPreset
-import com.example.model.EqualizerScopeMode
-import com.example.model.HeadphoneConfig
-import com.example.model.ReverbConfig
-import com.example.model.ReverbPreset
-import com.example.model.SleepTimerState
-import com.example.model.Spatial8DConfig
-import com.example.model.VocalClarityConfig
+import com.example.core.model.ABLoopState
+import com.example.core.model.EqualizerBand
+import com.example.core.model.EqualizerPreset
+import com.example.core.model.EqualizerScopeMode
+import com.example.core.model.HeadphoneConfig
+import com.example.core.model.ReverbConfig
+import com.example.core.model.ReverbPreset
+import com.example.core.model.SleepTimerState
+import com.example.core.model.Spatial8DConfig
+import com.example.core.model.VocalClarityConfig
 import com.example.ui.components.audioeffects.*
 import com.example.ui.theme.BackgroundDark
 import com.example.ui.theme.SurfaceCard
@@ -102,7 +102,7 @@ fun AudioEffectsBottomSheet(
     onSetDjAutomixEnabled: (Boolean) -> Unit = {},
     isDjEqCurveEnabled: Boolean = true,
     onSetDjEqCurveEnabled: (Boolean) -> Unit = {},
-    volumeNormalizationConfig: com.example.model.VolumeNormalizationConfig = com.example.model.VolumeNormalizationConfig(),
+    volumeNormalizationConfig: com.example.core.model.VolumeNormalizationConfig = com.example.core.model.VolumeNormalizationConfig(),
     onSetVolumeNormalizationEnabled: (Boolean) -> Unit = {},
     onSetVolumeNormalizationMode: (Int) -> Unit = {},
     // Auriculares y Balance L/R

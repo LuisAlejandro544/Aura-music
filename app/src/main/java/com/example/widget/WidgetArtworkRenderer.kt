@@ -10,9 +10,9 @@ import android.graphics.RadialGradient
 import android.graphics.RectF
 import android.graphics.Shader
 import androidx.core.graphics.ColorUtils
-import com.example.model.WidgetConfig
-import com.example.model.WidgetPersistedState
-import com.example.model.WidgetQuickItem
+import com.example.core.model.WidgetConfig
+import com.example.core.model.WidgetPersistedState
+import com.example.core.model.WidgetQuickItem
 import java.io.File
 import kotlin.math.abs
 

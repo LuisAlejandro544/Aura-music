@@ -32,7 +32,7 @@ import androidx.media3.exoplayer.SeekParameters
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.example.R
-import com.example.model.Track
+import com.example.core.model.Track
 import com.example.ui.theme.ArtworkColorExtractor
 import com.example.ui.theme.CardBorder
 import com.example.ui.theme.ExtractedArtworkColors

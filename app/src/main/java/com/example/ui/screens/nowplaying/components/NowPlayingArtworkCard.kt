@@ -9,8 +9,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.example.model.Track
-import com.example.model.VideoDisplayMode
+import com.example.core.model.Track
+import com.example.core.model.VideoDisplayMode
 import com.example.ui.components.ArtworkImage
 import com.example.ui.components.BackgroundVideoPlayer
 

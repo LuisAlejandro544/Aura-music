@@ -20,8 +20,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.model.HeadphoneConfig
-import com.example.model.HiResTargetPreset
+import com.example.core.model.HeadphoneConfig
+import com.example.core.model.HiResTargetPreset
 import com.example.playback.NativeAudioEngine
 import com.example.ui.theme.CardBorder
 import com.example.ui.theme.SurfaceCard

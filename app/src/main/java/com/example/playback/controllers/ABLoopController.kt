@@ -1,6 +1,6 @@
 package com.example.playback.controllers
 
-import com.example.model.ABLoopState
+import com.example.core.model.ABLoopState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

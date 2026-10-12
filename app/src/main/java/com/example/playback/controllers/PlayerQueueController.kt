@@ -1,7 +1,7 @@
 package com.example.playback.controllers
 import com.example.core.model.RepeatMode
 
-import com.example.model.Track
+import com.example.core.model.Track
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

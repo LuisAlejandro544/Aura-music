@@ -4,8 +4,8 @@ import android.content.Context
 import com.example.data.importer.OnlineVideoAudioImporter
 import com.example.data.importer.YtDlpNativeEngine
 import com.example.debug.AuraDebugManager
-import com.example.model.StreamingSearchItem
-import com.example.model.StreamingSourcePlatform
+import com.example.core.model.StreamingSearchItem
+import com.example.core.model.StreamingSourcePlatform
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray

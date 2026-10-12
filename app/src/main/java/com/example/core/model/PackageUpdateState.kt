@@ -1,4 +1,4 @@
-package com.example.model
+package com.example.core.model
 
 /**
  * Representa el estado reactivo del motor de verificación y actualización transparente

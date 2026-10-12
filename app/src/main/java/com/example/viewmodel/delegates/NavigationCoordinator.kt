@@ -2,16 +2,16 @@ package com.example.viewmodel.delegates
 
 import android.content.SharedPreferences
 import com.example.data.repository.MusicRepository
-import com.example.model.AppWallpaperConfig
-import com.example.model.AuraTheme
-import com.example.model.NowPlayingDesignMode
-import com.example.model.Playlist
-import com.example.model.Track
-import com.example.model.VideoDisplayMode
-import com.example.model.WallpaperMediaType
-import com.example.model.WallpaperScreenScope
-import com.example.model.WidgetConfig
-import com.example.model.WidgetGridContentMode
+import com.example.core.model.AppWallpaperConfig
+import com.example.core.model.AuraTheme
+import com.example.core.model.NowPlayingDesignMode
+import com.example.core.model.Playlist
+import com.example.core.model.Track
+import com.example.core.model.VideoDisplayMode
+import com.example.core.model.WallpaperMediaType
+import com.example.core.model.WallpaperScreenScope
+import com.example.core.model.WidgetConfig
+import com.example.core.model.WidgetGridContentMode
 import com.example.ui.navigation.LibraryTab
 import com.example.ui.navigation.NavScreen
 import kotlinx.coroutines.CoroutineScope

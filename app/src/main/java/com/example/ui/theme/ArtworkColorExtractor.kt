@@ -12,7 +12,7 @@ import android.os.PowerManager
 import android.util.LruCache
 import androidx.compose.ui.graphics.Color
 import androidx.palette.graphics.Palette
-import com.example.model.Track
+import com.example.core.model.Track
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

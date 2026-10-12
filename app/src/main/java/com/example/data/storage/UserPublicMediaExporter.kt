@@ -7,7 +7,7 @@ import android.provider.DocumentsContract
 import androidx.documentfile.provider.DocumentFile
 import com.example.data.importer.FFmpegNativeEngine
 import com.example.debug.AuraDebugManager
-import com.example.model.Track
+import com.example.core.model.Track
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File

@@ -1,4 +1,4 @@
-package com.example.model
+package com.example.core.model
 
 /**
  * Modo de contenido para el segundo Widget independiente de cuadrícula (2x2) en Aura Music.

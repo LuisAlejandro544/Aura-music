@@ -10,7 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.model.Track
+import com.example.core.model.Track
 
 /**
  * Aura Music - Diálogos Modulares de Confirmación para Eliminación de Medios

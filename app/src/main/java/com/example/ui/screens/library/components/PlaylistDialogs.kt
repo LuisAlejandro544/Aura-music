@@ -22,8 +22,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.example.model.Playlist
-import com.example.model.Track
+import com.example.core.model.Playlist
+import com.example.core.model.Track
 import com.example.ui.components.PlaylistCoverCollage
 import com.example.ui.theme.CardBorder
 import com.example.ui.theme.SurfaceCard

@@ -37,7 +37,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.example.model.PackageUpdateState
+import com.example.core.model.PackageUpdateState
 
 /**
  * Banner compacto y no intrusivo que muestra dentro de Aura Music el estado en tiempo real

@@ -1,4 +1,4 @@
-package com.example.model
+package com.example.core.model
 
 /**
  * Modelo de datos para un resultado de búsqueda de letras en el servicio libre LRCLIB.

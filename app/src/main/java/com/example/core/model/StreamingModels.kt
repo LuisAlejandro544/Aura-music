@@ -1,4 +1,4 @@
-package com.example.model
+package com.example.core.model
 
 /**
  * Modelos de datos y configuración para el Modo Streaming Híbrido,

@@ -1,4 +1,4 @@
-package com.example.model
+package com.example.core.model
 
 /**
  * Modelo de datos reactivo que encapsula las métricas en tiempo real de una descarga multimedia.

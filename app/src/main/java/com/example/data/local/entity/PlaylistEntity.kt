@@ -2,7 +2,7 @@ package com.example.data.local.entity
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import com.example.model.Playlist
+import com.example.core.model.Playlist
 
 /**
  * Entidad Room para representar listas de reproducción de usuario.
@@ -18,7 +18,7 @@ data class PlaylistEntity(
 ) {
     fun toDomain(
         trackCount: Int = 0,
-        previewTracks: List<com.example.model.Track> = emptyList(),
+        previewTracks: List<com.example.core.model.Track> = emptyList(),
         totalPlays: Int = 0
     ): Playlist = Playlist(
         id = id,

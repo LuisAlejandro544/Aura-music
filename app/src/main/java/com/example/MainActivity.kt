@@ -147,9 +147,9 @@ class MainActivity : ComponentActivity() {
     override fun onStop() {
         AuraApplication.isAppInForeground = false
         val pkgState = com.example.data.importer.YtDlpAutoUpdater.packageUpdateState.value
-        if (pkgState is com.example.model.PackageUpdateState.Checking ||
-            pkgState is com.example.model.PackageUpdateState.UpToDate ||
-            pkgState is com.example.model.PackageUpdateState.Idle
+        if (pkgState is com.example.core.model.PackageUpdateState.Checking ||
+            pkgState is com.example.core.model.PackageUpdateState.UpToDate ||
+            pkgState is com.example.core.model.PackageUpdateState.Idle
         ) {
             com.example.playback.AuraDownloadService.dismissPackageNotification(applicationContext)
         }

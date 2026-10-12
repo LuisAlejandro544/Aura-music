@@ -14,11 +14,11 @@ import com.example.data.local.AppDatabase
 import com.example.data.repository.MusicRepository
 import com.example.data.storage.AppStorageManager
 import com.example.debug.AuraDebugManager
-import com.example.model.AutoRemixPairRecommendation
-import com.example.model.AutoRemixStyle
-import com.example.model.MixtapeChapter
-import com.example.model.MixtapeMetadata
-import com.example.model.Track
+import com.example.core.model.AutoRemixPairRecommendation
+import com.example.core.model.AutoRemixStyle
+import com.example.core.model.MixtapeChapter
+import com.example.core.model.MixtapeMetadata
+import com.example.core.model.Track
 import java.io.BufferedReader
 import java.io.File
 import java.io.FileOutputStream

@@ -26,9 +26,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.model.AppWallpaperConfig
-import com.example.model.WallpaperMediaType
-import com.example.model.WallpaperScreenScope
+import com.example.core.model.AppWallpaperConfig
+import com.example.core.model.WallpaperMediaType
+import com.example.core.model.WallpaperScreenScope
 import com.example.ui.theme.CardBorder
 import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.TextPrimary

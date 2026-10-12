@@ -65,11 +65,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.example.model.StreamingCacheConfig
-import com.example.model.StreamingSearchFilter
-import com.example.model.StreamingSearchItem
-import com.example.model.StreamingSourcePlatform
-import com.example.model.Track
+import com.example.core.model.StreamingCacheConfig
+import com.example.core.model.StreamingSearchFilter
+import com.example.core.model.StreamingSearchItem
+import com.example.core.model.StreamingSourcePlatform
+import com.example.core.model.Track
 import com.example.ui.theme.BackgroundDark
 import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.SurfaceVariantDark

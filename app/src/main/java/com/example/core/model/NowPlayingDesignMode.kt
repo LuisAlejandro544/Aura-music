@@ -1,4 +1,4 @@
-package com.example.model
+package com.example.core.model
 
 /**
  * Modos de diseño visual para la pantalla completa Now Playing:

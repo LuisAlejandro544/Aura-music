@@ -1,4 +1,5 @@
 package com.example.ui
+import com.example.core.model.LyricSearchResult
 
 import android.net.Uri
 import androidx.compose.foundation.BorderStroke
@@ -13,10 +14,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.data.updater.AppReleaseUpdater
-import com.example.model.AppUpdateState
-import com.example.model.DownloadProgress
-import com.example.model.HeadphoneConfig
-import com.example.model.SleepTimerState
+import com.example.core.model.AppUpdateState
+import com.example.core.model.DownloadProgress
+import com.example.core.model.HeadphoneConfig
+import com.example.core.model.SleepTimerState
 import com.example.ui.components.AppUpdateDialog
 import com.example.ui.components.AudioEffectsBottomSheet
 import com.example.ui.components.DownloadFromLinkDialog
@@ -46,21 +47,21 @@ fun GlobalDialogsHost(
     downloadProgress: DownloadProgress,
     isSearchLyricsDialogOpen: Boolean,
     isSearchingLyrics: Boolean,
-    lyricsSearchResults: List<com.example.model.LyricSearchResult>,
+    lyricsSearchResults: List<com.example.core.model.LyricSearchResult>,
     searchLyricsError: String?,
-    eqBands: List<com.example.model.EqualizerBand>,
+    eqBands: List<com.example.core.model.EqualizerBand>,
     bassBoostLevel: Int,
-    currentPreset: com.example.model.EqualizerPreset,
+    currentPreset: com.example.core.model.EqualizerPreset,
     isEqEnabled: Boolean,
-    spatial8DConfig: com.example.model.Spatial8DConfig,
-    vocalClarityConfig: com.example.model.VocalClarityConfig,
-    reverbConfig: com.example.model.ReverbConfig,
+    spatial8DConfig: com.example.core.model.Spatial8DConfig,
+    vocalClarityConfig: com.example.core.model.VocalClarityConfig,
+    reverbConfig: com.example.core.model.ReverbConfig,
     sleepTimerState: SleepTimerState,
     playbackSpeed: Float,
     playbackPitch: Float,
     crossfadeSeconds: Int,
     isGaplessEnabled: Boolean,
-    abLoopState: com.example.model.ABLoopState,
+    abLoopState: com.example.core.model.ABLoopState,
     headphoneConfig: HeadphoneConfig
 ) {
     // 0. Modal de Actualización Automática de APK (GitHub Pre-Releases -beta / Releases)

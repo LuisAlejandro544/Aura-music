@@ -16,8 +16,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.model.HeadphoneConfig
-import com.example.model.HeadsetButtonAction
+import com.example.core.model.HeadphoneConfig
+import com.example.core.model.HeadsetButtonAction
 import com.example.ui.theme.CardBorder
 import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.TextPrimary

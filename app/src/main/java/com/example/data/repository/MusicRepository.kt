@@ -6,8 +6,8 @@ import com.example.data.importer.FFmpegNativeEngine
 import com.example.data.local.AppDatabase
 import com.example.data.local.entity.TrackEntity
 import com.example.data.storage.AppStorageManager
-import com.example.model.Playlist
-import com.example.model.Track
+import com.example.core.model.Playlist
+import com.example.core.model.Track
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map

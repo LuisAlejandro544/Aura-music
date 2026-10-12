@@ -12,9 +12,9 @@ import com.example.data.local.AppDatabase
 import com.example.data.repository.MusicRepository
 import com.example.data.storage.AppStorageManager
 import com.example.debug.AuraDebugManager
-import com.example.model.MixtapeChapter
-import com.example.model.MixtapeMetadata
-import com.example.model.Track
+import com.example.core.model.MixtapeChapter
+import com.example.core.model.MixtapeMetadata
+import com.example.core.model.Track
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject

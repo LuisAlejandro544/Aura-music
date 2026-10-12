@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.importer.YtDlpAutoUpdater
 import com.example.data.importer.YoutubeExtractionEngine
-import com.example.model.PackageUpdateState
+import com.example.core.model.PackageUpdateState
 import com.example.ui.components.DownloadSourceMode
 import com.example.ui.theme.TextSecondary
 

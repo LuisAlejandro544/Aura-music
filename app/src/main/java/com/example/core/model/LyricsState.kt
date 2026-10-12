@@ -1,4 +1,4 @@
-package com.example.model
+package com.example.core.model
 
 /**
  * Modelo de datos para una línea individual de letra sincronizada (.LRC).

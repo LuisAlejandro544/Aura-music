@@ -27,8 +27,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.StateFlow
-import com.example.model.ABLoopState
-import com.example.model.Track
+import com.example.core.model.ABLoopState
+import com.example.core.model.Track
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
@@ -62,7 +62,7 @@ fun NowPlayingPlaybackControls(
     onMarkABPointA: () -> Unit = {},
     onMarkABPointB: () -> Unit = {},
     onClearABLoop: () -> Unit = {},
-    activeMixtapeChapter: com.example.model.MixtapeChapter? = null,
+    activeMixtapeChapter: com.example.core.model.MixtapeChapter? = null,
     mixtapeChapterIndex: Int = -1,
     mixtapeTotalChapters: Int = -1,
     isLoadingOrBuffering: Boolean = false,

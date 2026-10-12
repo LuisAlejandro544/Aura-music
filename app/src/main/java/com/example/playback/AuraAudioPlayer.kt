@@ -12,8 +12,8 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import com.example.data.importer.AudioSilenceTrimmer
-import com.example.model.ABLoopState
-import com.example.model.Track
+import com.example.core.model.ABLoopState
+import com.example.core.model.Track
 import com.example.playback.controllers.ABLoopController
 import com.example.playback.controllers.AudioFadeController
 import com.example.playback.controllers.MediaSessionBridge

@@ -24,8 +24,8 @@ import com.example.data.local.AppDatabase
 import com.example.data.repository.MusicRepository
 import com.example.data.storage.AppStorageManager
 import com.example.debug.AuraDebugManager
-import com.example.model.DownloadProgress
-import com.example.model.Track
+import com.example.core.model.DownloadProgress
+import com.example.core.model.Track
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob

@@ -6,10 +6,10 @@ import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
 import com.example.data.storage.AppStorageManager
 import com.example.debug.AuraDebugManager
-import com.example.model.LyricLine
-import com.example.model.LyricSearchResult
-import com.example.model.LyricsState
-import com.example.model.Track
+import com.example.core.model.LyricLine
+import com.example.core.model.LyricSearchResult
+import com.example.core.model.LyricsState
+import com.example.core.model.Track
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient

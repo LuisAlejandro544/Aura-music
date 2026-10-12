@@ -17,9 +17,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.AuraApplication
-import com.example.model.AppWallpaperConfig
-import com.example.model.WallpaperMediaType
-import com.example.model.WallpaperScreenScope
+import com.example.core.model.AppWallpaperConfig
+import com.example.core.model.WallpaperMediaType
+import com.example.core.model.WallpaperScreenScope
 import com.example.ui.navigation.NavScreen
 import java.io.File
 

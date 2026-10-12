@@ -1,4 +1,4 @@
-package com.example.model
+package com.example.core.model
 
 /**
  * Modelos de datos para la gestión avanzada de Audífonos y Auriculares en Aura Music:

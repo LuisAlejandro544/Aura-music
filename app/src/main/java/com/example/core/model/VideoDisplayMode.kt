@@ -1,4 +1,4 @@
-package com.example.model
+package com.example.core.model
 
 /**
  * Modos de visualización para videos asociados a pistas de música en Now Playing:

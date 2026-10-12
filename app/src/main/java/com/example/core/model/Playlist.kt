@@ -1,4 +1,4 @@
-package com.example.model
+package com.example.core.model
 
 /**
  * Representa una lista de reproducción creada localmente por el usuario.

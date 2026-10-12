@@ -4,9 +4,9 @@ import android.content.Context
 import android.net.Uri
 import com.example.data.importer.LyricsManager
 import com.example.data.storage.AppStorageManager
-import com.example.model.LyricSearchResult
-import com.example.model.LyricsState
-import com.example.model.Track
+import com.example.core.model.LyricSearchResult
+import com.example.core.model.LyricsState
+import com.example.core.model.Track
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow

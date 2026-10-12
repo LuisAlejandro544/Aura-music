@@ -2,7 +2,7 @@ package com.example.data.importer.download
 
 import android.net.Uri
 import com.example.debug.AuraDebugManager
-import com.example.model.DownloadProgress
+import com.example.core.model.DownloadProgress
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Request

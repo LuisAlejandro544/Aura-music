@@ -11,10 +11,10 @@ import android.view.View
 import android.widget.RemoteViews
 import com.example.MainActivity
 import com.example.R
-import com.example.model.WidgetConfig
-import com.example.model.WidgetGridContentMode
-import com.example.model.WidgetPersistedState
-import com.example.model.WidgetQuickItem
+import com.example.core.model.WidgetConfig
+import com.example.core.model.WidgetGridContentMode
+import com.example.core.model.WidgetPersistedState
+import com.example.core.model.WidgetQuickItem
 
 /**
  * Aura Music - Widget 2 Independiente: Cuadrícula 2x2 de 4 Canciones Más Escuchadas o 4 Playlists

@@ -7,7 +7,7 @@ import android.net.NetworkCapabilities
 import android.net.Uri
 import com.example.AuraApplication
 import com.example.debug.AuraDebugManager
-import com.example.model.PackageUpdateState
+import com.example.core.model.PackageUpdateState
 import com.example.playback.AuraDownloadService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

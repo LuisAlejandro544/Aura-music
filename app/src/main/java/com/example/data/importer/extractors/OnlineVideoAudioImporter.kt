@@ -7,8 +7,8 @@ import com.example.data.importer.download.ChunkedStreamDownloader
 import com.example.data.importer.tiktok.TikTokMediaResolver
 import com.example.data.storage.AppStorageManager
 import com.example.debug.AuraDebugManager
-import com.example.model.DownloadProgress
-import com.example.model.Track
+import com.example.core.model.DownloadProgress
+import com.example.core.model.Track
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File

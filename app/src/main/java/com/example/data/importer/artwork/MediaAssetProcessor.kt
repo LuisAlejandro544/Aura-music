@@ -7,7 +7,7 @@ import android.media.MediaMetadataRetriever
 import android.os.Build
 import com.example.data.storage.AppStorageManager
 import com.example.debug.AuraDebugManager
-import com.example.model.DownloadProgress
+import com.example.core.model.DownloadProgress
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File

@@ -1,8 +1,8 @@
 package com.example.viewmodel.delegates
 
-import com.example.model.EqualizerPreset
-import com.example.model.ReverbPreset
-import com.example.model.SleepTimerState
+import com.example.core.model.EqualizerPreset
+import com.example.core.model.ReverbPreset
+import com.example.core.model.SleepTimerState
 import com.example.playback.AudioEffectManager
 import com.example.playback.AuraAudioPlayer
 import kotlinx.coroutines.CoroutineScope
@@ -45,7 +45,7 @@ class AudioEffectsCoordinator(
     // Acciones de Ecualizador
     fun setEqEnabled(enabled: Boolean) = effectManager.setEnabled(enabled)
 
-    fun setEqScopeMode(mode: com.example.model.EqualizerScopeMode) =
+    fun setEqScopeMode(mode: com.example.core.model.EqualizerScopeMode) =
         effectManager.setEqScopeMode(mode, audioPlayer.currentTrack.value?.id)
 
     fun setBandLevel(bandIndex: Int, levelMb: Int) = effectManager.setBandLevel(bandIndex, levelMb)

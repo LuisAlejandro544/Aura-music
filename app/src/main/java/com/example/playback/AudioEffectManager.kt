@@ -4,13 +4,13 @@ import android.media.audiofx.BassBoost
 import android.media.audiofx.EnvironmentalReverb
 import android.media.audiofx.Equalizer
 import android.media.audiofx.PresetReverb
-import com.example.model.EqualizerBand
-import com.example.model.EqualizerPreset
-import com.example.model.EqualizerScopeMode
-import com.example.model.ReverbConfig
-import com.example.model.ReverbPreset
-import com.example.model.Spatial8DConfig
-import com.example.model.VocalClarityConfig
+import com.example.core.model.EqualizerBand
+import com.example.core.model.EqualizerPreset
+import com.example.core.model.EqualizerScopeMode
+import com.example.core.model.ReverbConfig
+import com.example.core.model.ReverbPreset
+import com.example.core.model.Spatial8DConfig
+import com.example.core.model.VocalClarityConfig
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -62,8 +62,8 @@ class AudioEffectManager {
     private val _reverbConfig = MutableStateFlow(ReverbConfig())
     val reverbConfig: StateFlow<ReverbConfig> = _reverbConfig.asStateFlow()
 
-    private val _volumeNormalizationConfig = MutableStateFlow(com.example.model.VolumeNormalizationConfig())
-    val volumeNormalizationConfig: StateFlow<com.example.model.VolumeNormalizationConfig> = _volumeNormalizationConfig.asStateFlow()
+    private val _volumeNormalizationConfig = MutableStateFlow(com.example.core.model.VolumeNormalizationConfig())
+    val volumeNormalizationConfig: StateFlow<com.example.core.model.VolumeNormalizationConfig> = _volumeNormalizationConfig.asStateFlow()
 
     init {
         // Inicializar motor DSP nativo C++20 con el ecualizador desactivado por defecto

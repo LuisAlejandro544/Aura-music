@@ -13,10 +13,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.model.SleepTimerState
-import com.example.model.Spatial8DConfig
-import com.example.model.Track
-import com.example.model.VideoDisplayMode
+import com.example.core.model.SleepTimerState
+import com.example.core.model.Spatial8DConfig
+import com.example.core.model.Track
+import com.example.core.model.VideoDisplayMode
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 

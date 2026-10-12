@@ -31,11 +31,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import android.net.Uri
-import com.example.model.AppWallpaperConfig
-import com.example.model.AuraTheme
-import com.example.model.NowPlayingDesignMode
-import com.example.model.WallpaperScreenScope
-import com.example.model.WidgetConfig
+import com.example.core.model.AppWallpaperConfig
+import com.example.core.model.AuraTheme
+import com.example.core.model.NowPlayingDesignMode
+import com.example.core.model.WallpaperScreenScope
+import com.example.core.model.WidgetConfig
 import com.example.ui.screens.settings.components.appearance.appWallpaperSettingsSection
 import com.example.ui.theme.CardBorder
 import com.example.ui.theme.SurfaceCard
@@ -228,7 +228,7 @@ fun LazyListScope.visualBehaviorMenuSection(
     isMiniPlayerVideoEnabled: Boolean,
     isBackgroundGameModeEnabled: Boolean,
     appWallpaperConfig: AppWallpaperConfig,
-    streamingCacheConfig: com.example.model.StreamingCacheConfig,
+    streamingCacheConfig: com.example.core.model.StreamingCacheConfig,
     onOpenStreamingAndCache: () -> Unit,
     onOpenAuraAndMiniPlayer: () -> Unit,
     onOpenGameMode: () -> Unit,
@@ -508,8 +508,8 @@ fun LazyListScope.visualCustomizationSettingsContent(
     onSelectWallpaperScope: (WallpaperScreenScope) -> Unit = {},
     onChangeWallpaperDimAlpha: (Float) -> Unit = {},
     onChangeWallpaperBlurDp: (Int) -> Unit = {},
-    streamingCacheConfig: com.example.model.StreamingCacheConfig = com.example.model.StreamingCacheConfig(),
-    onSelectStreamingVideoPolicy: (com.example.model.StreamingVideoNetworkPolicy) -> Unit = {},
+    streamingCacheConfig: com.example.core.model.StreamingCacheConfig = com.example.core.model.StreamingCacheConfig(),
+    onSelectStreamingVideoPolicy: (com.example.core.model.StreamingVideoNetworkPolicy) -> Unit = {},
     onChangeStreamingCacheMaxMb: (Int) -> Unit = {},
     onClearStreamingCache: () -> Unit = {}
 ) {

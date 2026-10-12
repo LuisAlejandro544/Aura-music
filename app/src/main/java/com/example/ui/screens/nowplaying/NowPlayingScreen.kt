@@ -1,4 +1,5 @@
 package com.example.ui.screens.nowplaying
+import com.example.core.model.LyricsState
 import com.example.core.model.RepeatMode
 
 import androidx.activity.compose.BackHandler
@@ -27,24 +28,24 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.StateFlow
-import com.example.model.ABLoopState
-import com.example.model.EqualizerBand
-import com.example.model.EqualizerPreset
-import com.example.model.EqualizerScopeMode
-import com.example.model.HeadphoneConfig
-import com.example.model.ReverbConfig
-import com.example.model.ReverbPreset
-import com.example.model.SleepTimerState
-import com.example.model.Spatial8DConfig
-import com.example.model.Track
-import com.example.model.VideoDisplayMode
+import com.example.core.model.ABLoopState
+import com.example.core.model.EqualizerBand
+import com.example.core.model.EqualizerPreset
+import com.example.core.model.EqualizerScopeMode
+import com.example.core.model.HeadphoneConfig
+import com.example.core.model.ReverbConfig
+import com.example.core.model.ReverbPreset
+import com.example.core.model.SleepTimerState
+import com.example.core.model.Spatial8DConfig
+import com.example.core.model.Track
+import com.example.core.model.VideoDisplayMode
 import com.example.ui.components.AudioEffectsBottomSheet
 import com.example.ui.components.AudioVisualizer
 import com.example.ui.components.BackgroundVideoPlayer
 import com.example.ui.components.EditTrackDialog
 import com.example.ui.components.SearchLyricsDialog
-import com.example.model.LyricSearchResult
-import com.example.model.NowPlayingDesignMode
+import com.example.core.model.LyricSearchResult
+import com.example.core.model.NowPlayingDesignMode
 import com.example.ui.screens.nowplaying.components.*
 import com.example.ui.theme.ArtworkColorExtractor
 import com.example.ui.theme.BackgroundDark
@@ -107,7 +108,7 @@ fun NowPlayingScreen(
     onSet8DSpatialIntensity: (Float) -> Unit = {},
     onSet8DRoomDepth: (Float) -> Unit = {},
     // Clarificador de Voces HD C++20 (Mid-Side)
-    vocalClarityConfig: com.example.model.VocalClarityConfig = com.example.model.VocalClarityConfig(),
+    vocalClarityConfig: com.example.core.model.VocalClarityConfig = com.example.core.model.VocalClarityConfig(),
     onSetVocalClarityEnabled: (Boolean) -> Unit = {},
     onSetVocalClarityStrength: (Float) -> Unit = {},
     // Suite Reverb & Filtros Acústicos
@@ -128,7 +129,7 @@ fun NowPlayingScreen(
     onSetDjAutomixEnabled: (Boolean) -> Unit = {},
     isDjEqCurveEnabled: Boolean = true,
     onSetDjEqCurveEnabled: (Boolean) -> Unit = {},
-    volumeNormalizationConfig: com.example.model.VolumeNormalizationConfig = com.example.model.VolumeNormalizationConfig(),
+    volumeNormalizationConfig: com.example.core.model.VolumeNormalizationConfig = com.example.core.model.VolumeNormalizationConfig(),
     onSetVolumeNormalizationEnabled: (Boolean) -> Unit = {},
     onSetVolumeNormalizationMode: (Int) -> Unit = {},
     // Repetidor de Segmento A-B
@@ -161,7 +162,7 @@ fun NowPlayingScreen(
     visualizerBandsFlow: StateFlow<FloatArray>? = null,
     audioIntensity: Float = 0.15f,
     audioIntensityFlow: StateFlow<Float>? = null,
-    lyricsState: com.example.model.LyricsState = com.example.model.LyricsState(),
+    lyricsState: com.example.core.model.LyricsState = com.example.core.model.LyricsState(),
     isSearchLyricsDialogOpen: Boolean = false,
     isSearchingLyrics: Boolean = false,
     lyricsSearchResults: List<LyricSearchResult> = emptyList(),
@@ -173,7 +174,7 @@ fun NowPlayingScreen(
     onCloseSearchLyrics: () -> Unit = {},
     onSearchLyrics: (title: String, artist: String) -> Unit = { _, _ -> },
     onSelectLyricSearchResult: (LyricSearchResult) -> Unit = {},
-    activeMixtapeChapter: com.example.model.MixtapeChapter? = null,
+    activeMixtapeChapter: com.example.core.model.MixtapeChapter? = null,
     mixtapeChapterIndex: Int = -1,
     mixtapeTotalChapters: Int = 0,
     nowPlayingDesignMode: NowPlayingDesignMode = NowPlayingDesignMode.AUTO,

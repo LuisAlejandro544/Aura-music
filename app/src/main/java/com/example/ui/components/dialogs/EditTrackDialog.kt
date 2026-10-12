@@ -1,4 +1,5 @@
 package com.example.ui.components
+import com.example.core.model.VideoDisplayMode
 
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -23,7 +24,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.example.model.Track
+import com.example.core.model.Track
 import com.example.ui.theme.CardBorder
 import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.TextMuted
@@ -299,11 +300,11 @@ fun EditTrackDialog(
                             val editContext = androidx.compose.ui.platform.LocalContext.current
                             val appPrefs = remember { editContext.getSharedPreferences("aura_music_ui_prefs", android.content.Context.MODE_PRIVATE) }
                             var selectedFramingMode by remember {
-                                val saved = appPrefs.getString("pref_video_display_mode", com.example.model.VideoDisplayMode.FULLSCREEN_BACKGROUND.name)
-                                val initial = if (saved == com.example.model.VideoDisplayMode.FULLSCREEN_ADAPTED.name) {
-                                    com.example.model.VideoDisplayMode.FULLSCREEN_ADAPTED
+                                val saved = appPrefs.getString("pref_video_display_mode", com.example.core.model.VideoDisplayMode.FULLSCREEN_BACKGROUND.name)
+                                val initial = if (saved == com.example.core.model.VideoDisplayMode.FULLSCREEN_ADAPTED.name) {
+                                    com.example.core.model.VideoDisplayMode.FULLSCREEN_ADAPTED
                                 } else {
-                                    com.example.model.VideoDisplayMode.FULLSCREEN_BACKGROUND
+                                    com.example.core.model.VideoDisplayMode.FULLSCREEN_BACKGROUND
                                 }
                                 mutableStateOf(initial)
                             }
@@ -317,17 +318,17 @@ fun EditTrackDialog(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 FilterChip(
-                                    selected = selectedFramingMode == com.example.model.VideoDisplayMode.FULLSCREEN_BACKGROUND,
+                                    selected = selectedFramingMode == com.example.core.model.VideoDisplayMode.FULLSCREEN_BACKGROUND,
                                     onClick = {
-                                        selectedFramingMode = com.example.model.VideoDisplayMode.FULLSCREEN_BACKGROUND
+                                        selectedFramingMode = com.example.core.model.VideoDisplayMode.FULLSCREEN_BACKGROUND
                                         appPrefs.edit().putString("pref_video_display_mode", selectedFramingMode.name).apply()
                                     },
                                     label = { Text("📱 Rellenar (Recortar)", style = MaterialTheme.typography.labelSmall) }
                                 )
                                 FilterChip(
-                                    selected = selectedFramingMode == com.example.model.VideoDisplayMode.FULLSCREEN_ADAPTED,
+                                    selected = selectedFramingMode == com.example.core.model.VideoDisplayMode.FULLSCREEN_ADAPTED,
                                     onClick = {
-                                        selectedFramingMode = com.example.model.VideoDisplayMode.FULLSCREEN_ADAPTED
+                                        selectedFramingMode = com.example.core.model.VideoDisplayMode.FULLSCREEN_ADAPTED
                                         appPrefs.edit().putString("pref_video_display_mode", selectedFramingMode.name).apply()
                                     },
                                     label = { Text("🎬 Adaptado horizontal", style = MaterialTheme.typography.labelSmall) }

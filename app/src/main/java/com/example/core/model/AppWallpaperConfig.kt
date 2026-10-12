@@ -1,4 +1,4 @@
-package com.example.model
+package com.example.core.model
 
 /**
  * Tipos de medio admitidos para el fondo de pantalla personalizado de la aplicación.

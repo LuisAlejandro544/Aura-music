@@ -1,4 +1,6 @@
 package com.example.ui
+import com.example.core.model.LyricSearchResult
+import com.example.core.model.NowPlayingDesignMode
 import com.example.core.model.RepeatMode
 
 import androidx.activity.compose.BackHandler
@@ -15,7 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.model.VideoDisplayMode
+import com.example.core.model.VideoDisplayMode
 import com.example.ui.components.BottomNavBar
 import com.example.ui.components.MiniPlayer
 import com.example.ui.components.PackageUpdateBanner
@@ -268,11 +270,11 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
             false
         } else {
             when (appWallpaperConfig.screenScope) {
-                com.example.model.WallpaperScreenScope.LIBRARY_ONLY ->
+                com.example.core.model.WallpaperScreenScope.LIBRARY_ONLY ->
                     currentScreen is NavScreen.Library || currentScreen is NavScreen.PlaylistDetail
-                com.example.model.WallpaperScreenScope.HOME_AND_LIBRARY ->
+                com.example.core.model.WallpaperScreenScope.HOME_AND_LIBRARY ->
                     currentScreen is NavScreen.Home || currentScreen is NavScreen.Library || currentScreen is NavScreen.PlaylistDetail
-                com.example.model.WallpaperScreenScope.ALL_SCREENS ->
+                com.example.core.model.WallpaperScreenScope.ALL_SCREENS ->
                     true
             }
         }

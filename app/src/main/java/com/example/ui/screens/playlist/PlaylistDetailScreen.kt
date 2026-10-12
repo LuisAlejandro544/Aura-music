@@ -19,8 +19,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.model.Playlist
-import com.example.model.Track
+import com.example.core.model.Playlist
+import com.example.core.model.Track
 import com.example.ui.components.TrackListItem
 import com.example.ui.theme.CardBorder
 import com.example.ui.theme.SurfaceCard
@@ -53,7 +53,7 @@ fun PlaylistDetailScreen(
     onEditTrack: (Long, String, String, String) -> Unit = { _, _, _, _ -> },
     onEditTrackDetails: (Long, String, String, String, android.net.Uri?, Boolean) -> Unit = { _, _, _, _, _, _ -> },
     onCreateMixtape: ((List<Track>, String, Int, ((Track) -> Unit)?) -> Unit)? = null,
-    onCreateAutoRemix: ((Track, Track, String, com.example.model.AutoRemixStyle, Int, ((Track) -> Unit)?) -> Unit)? = null,
+    onCreateAutoRemix: ((Track, Track, String, com.example.core.model.AutoRemixStyle, Int, ((Track) -> Unit)?) -> Unit)? = null,
     isCreatingMixtape: Boolean = false,
     mixtapeProgress: Float = 0f,
     mixtapeStatusMessage: String? = null,

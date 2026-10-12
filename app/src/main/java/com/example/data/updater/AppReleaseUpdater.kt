@@ -8,8 +8,8 @@ import android.provider.Settings
 import androidx.core.content.FileProvider
 import com.example.BuildConfig
 import com.example.debug.AuraDebugManager
-import com.example.model.AppUpdateReleaseInfo
-import com.example.model.AppUpdateState
+import com.example.core.model.AppUpdateReleaseInfo
+import com.example.core.model.AppUpdateState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

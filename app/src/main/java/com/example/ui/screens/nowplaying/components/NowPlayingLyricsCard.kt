@@ -29,8 +29,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.model.LyricsState
-import com.example.model.Track
+import com.example.core.model.LyricsState
+import com.example.core.model.Track
 import com.example.ui.theme.CardBorder
 import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.TextPrimary
@@ -501,7 +501,7 @@ fun NowPlayingLyricsCard(
 /**
  * Búsqueda binaria O(log N) sobre líneas sincronizadas ordenadas cronológicamente.
  */
-internal fun findActiveLyricIndexBinary(lines: List<com.example.model.LyricLine>, positionMs: Long): Int {
+internal fun findActiveLyricIndexBinary(lines: List<com.example.core.model.LyricLine>, positionMs: Long): Int {
     if (lines.isEmpty()) return -1
     var low = 0
     var high = lines.size - 1

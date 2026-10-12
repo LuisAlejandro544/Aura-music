@@ -11,7 +11,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
-import com.example.model.AuraTheme
+import com.example.core.model.AuraTheme
 
 /**
  * Tema principal de Aura Music.

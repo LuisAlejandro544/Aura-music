@@ -1,4 +1,4 @@
-package com.example.model
+package com.example.core.model
 
 /**
  * Representa una pista de audio local importada por el usuario.

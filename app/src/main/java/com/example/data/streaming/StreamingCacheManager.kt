@@ -5,8 +5,8 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import com.example.data.importer.download.ChunkedStreamDownloader
 import com.example.debug.AuraDebugManager
-import com.example.model.StreamingCacheConfig
-import com.example.model.StreamingVideoNetworkPolicy
+import com.example.core.model.StreamingCacheConfig
+import com.example.core.model.StreamingVideoNetworkPolicy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job

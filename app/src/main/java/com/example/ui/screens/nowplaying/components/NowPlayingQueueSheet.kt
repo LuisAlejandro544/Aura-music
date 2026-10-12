@@ -18,7 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.example.model.Track
+import com.example.core.model.Track
 import com.example.ui.components.ArtworkImage
 import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.TextMuted

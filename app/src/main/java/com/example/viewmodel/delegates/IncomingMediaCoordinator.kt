@@ -6,7 +6,7 @@ import android.net.Uri
 import com.example.data.importer.IncomingMedia
 import com.example.data.importer.IncomingMediaHandler
 import com.example.data.repository.MusicRepository
-import com.example.model.Track
+import com.example.core.model.Track
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

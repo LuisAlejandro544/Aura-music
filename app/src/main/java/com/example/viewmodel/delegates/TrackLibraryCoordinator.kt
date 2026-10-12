@@ -5,8 +5,8 @@ import android.net.Uri
 import com.example.data.importer.FFmpegNativeEngine
 import com.example.data.importer.OnlineVideoAudioImporter
 import com.example.data.repository.MusicRepository
-import com.example.model.DownloadProgress
-import com.example.model.Track
+import com.example.core.model.DownloadProgress
+import com.example.core.model.Track
 import com.example.playback.AuraAudioPlayer
 import com.example.playback.AuraDownloadService
 import kotlinx.coroutines.CoroutineScope

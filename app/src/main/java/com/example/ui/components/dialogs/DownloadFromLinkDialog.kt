@@ -25,8 +25,8 @@ import com.example.data.importer.FFmpegNativeEngine
 import com.example.data.importer.OnlineVideoAudioImporter
 import com.example.data.importer.YoutubeExtractionEngine
 import com.example.data.importer.YtDlpAutoUpdater
-import com.example.model.DownloadProgress
-import com.example.model.VideoDisplayMode
+import com.example.core.model.DownloadProgress
+import com.example.core.model.VideoDisplayMode
 import com.example.ui.components.download.DownloadCanvasOptionsSection
 import com.example.ui.components.download.DownloadProgressStatusCard
 import com.example.ui.components.download.DownloadResolvedMediaCard
