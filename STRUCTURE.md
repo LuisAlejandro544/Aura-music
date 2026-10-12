@@ -14,7 +14,7 @@ El proyecto sigue una arquitectura reactiva y desacoplada organizada en capas:
    - Acceso al almacenamiento estructurado en `Android/data/com.aistudio.musicplayer.aurasound/files/` (Debug) y `Android/data/com.auramusic.beta/files/` (APK Beta `Aura Beta` • Codename `Nebula`) con subcarpetas (`songs/`, `images/`, `lyrics/`, `metadata/`, `videos/`), además de **Carpeta Pública / Personalizada del Usuario (`UserPublicMediaExporter` & `UserPublicFolderCard`)** mediante SAF (`OpenDocumentTree`) con subcarpeta `Videos/` (y preparada para `Images/`) para exportar vídeos descargados con su audio completo.
    - Motores de importación, sincronización de letras LRCLIB, extracción FFmpeg, descarga directa prioritaria con motor nativo yt-dlp (`YtDlpStreamDownloader`) con métricas de progreso en tiempo real y respaldo resiliente multi-nivel con separación de `audioHeaders`/`videoHeaders` por perfil `c=` (`ChunkedStreamDownloader` -> `InnerTubeClient` -> `InvidiousStreamResolver` -> `HeadlessWebViewExtractor`), arquitectura modular desacoplada en `engines/` (< 500 líneas por módulo), y actualizador automático de versiones APK (`AppReleaseUpdater` con comparador semántico de tags dinámicos `-beta`, selección por arquitectura móvil y verificación SHA-256).
 3. **Capa de Control & Reproducción (Playback Layer)**:
-   - `AuraAudioPlayer` con ExoPlayer/Media3, modularizado con controladores especializados (`PlayerQueueController`, `AudioFadeController`, `ABLoopController`, `MediaSessionBridge`).
+   - `AuraAudioPlayer` con ExoPlayer/Media3, modularizado con controladores especializados (`PlayerQueueController`, `AudioFadeController`, `ABLoopController`, `MediaSessionBridge`) y coordinadores de reproducción (`PlaybackProgressTracker`, `StreamingErrorRecoveryHandler`, `PlaybackParametersManager`, `StreamingUrlPolicy`).
    - `NativeAudioEngine` conectando buffers de audio PCM en C++20 vía JNI.
 4. **Capa de Lógica de Negocio & Estado (ViewModel Layer)**:
    - `MusicViewModel` modularizado y ultra liviano, orquestado por coordinadores y delegados especializados:
@@ -95,7 +95,10 @@ app/
     │       │   │   ├── importer/               # Motores de Descarga, Conversión y Medios Organizados
     │       │   │   │   ├── IncomingMediaHandler.kt # Triaje seguro de Intents ("Abrir con..." y "Compartir con...")
     │       │   │   │   ├── engines/            # Motores Nativos CLI (FFmpeg, CPython + QuickJS C99 y OTA yt-dlp)
-    │       │   │   │   │   ├── FFmpegNativeEngine.kt     # Extracción, loops xfade/Boomerang, GOP corto y prevención de Flag Injection
+    │       │   │   │   │   ├── FFmpegNativeEngine.kt     # Fachada de audio/video que delega en FFmpegAudioOperations y FFmpegCanvasOperations
+   │       │   │   │   ├── FFmpegCommandExecutor.kt      # Ejecutor interno de procesos nativos y extracción ZIP segura
+   │       │   │   │   ├── FFmpegAudioOperations.kt      # Extracción, fusión y recorte de audio
+   │       │   │   │   ├── FFmpegCanvasOperations.kt     # Loops xfade/Boomerang, lienzo 9:16, GOP corto y probe de dimensiones
     │       │   │   │   │   ├── YtDlpNativeEngine.kt      # Fachada modular nativa yt-dlp, inspección y flat-playlists (< 500 líneas)
     │       │   │   │   │   ├── YtDlpEnvironmentSetup.kt  # Detección de binarios, symlinks CPython 0 bytes y certificados TLS Android 14+
     │       │   │   │   │   ├── YtDlpStreamDownloader.kt  # Descarga directa nativa con captura y parseo de progreso en vivo (DownloadProgress)
@@ -123,7 +126,10 @@ app/
     │       │   │   │   │   ├── MixtapeEngine.kt        # Fusión FFmpeg acrossfade, collage WebP y capítulos reactivos
     │       │   │   │   │   └── SmartAutoRemixEngine.kt # Auto-Remix de 2 pistas (Mashup Voz A + Base B / Remix DJ) y Auto-Match
     │       │   │   │   ├── playlist/           # Importador Universal de Playlists Públicas
-    │       │   │   │   │   └── ExternalPlaylistImporter.kt # Extracción de Playlists de Spotify y YouTube Music sin login ni API keys
+    │       │   │   │   │   └── ExternalPlaylistImporter.kt # Fachada que delega en SpotifyPlaylistExtractor y YouTubePlaylistExtractor
+   │       │   │   │   ├── PlaylistHttpClient.kt         # Cliente HTTP/JSON interno (GET/POST, redirects, unescape)
+   │       │   │   │   ├── SpotifyPlaylistExtractor.kt   # Embed/oEmbed + WebView sin login ni API keys
+   │       │   │   │   └── YouTubePlaylistExtractor.kt   # InnerTube browse + respaldo yt-dlp --flat-playlist
     │       │   │   │   ├── download/           # Acelerador de Descargas HTTP Range
     │       │   │   │   │   └── ChunkedStreamDownloader.kt # Descarga acelerada HTTP Range multi-bloque con guardia anti-SSRF
     │       │   │   │   └── tiktok/             # Resolución Directa de TikTok
@@ -157,6 +163,10 @@ app/
     │       │   │
     │       │   └── playback/                   # Capa de Audio y Reproducción ExoPlayer / Media3
     │       │       ├── AuraAudioPlayer.kt          # Fachada del reproductor de audio y soporte Dual-Deck
+   │       │       ├── PlaybackProgressTracker.kt    # Sondeo de progreso, bucle A-B, prefetch y disparo de crossfade
+   │       │       ├── StreamingErrorRecoveryHandler.kt # Reintento ante HTTP 403/416 y cortes de red
+   │       │       ├── PlaybackParametersManager.kt  # Velocidad/tono con throttling de 40ms en Main
+   │       │       ├── StreamingUrlPolicy.kt         # Detección de URLs de streaming sin resolver
     │       │       ├── AuraMediaPlaybackService.kt # MediaSessionService para System Media Controls y Android Auto
     │       │       ├── AuraDownloadService.kt      # Servicio en primer plano para descargas web y lotes de Playlists
     │       │       ├── AudioEffectManager.kt       # Gestión de ecualizador y efectos nativos C++20

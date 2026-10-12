@@ -48,12 +48,10 @@ class AuraAudioPlayer(
 ) {
 
     private val playerScope = CoroutineScope(Dispatchers.Main + Job())
-    private var progressJob: Job? = null
 
     private var exoPlayer: ExoPlayer? = null
     private var outgoingExoPlayer: ExoPlayer? = null
     private var outgoingNativeAudioProcessor: NativeAudioProcessor? = null
-    private var crossfadeTriggeredForTrackId: Long = -1L
 
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
@@ -105,9 +103,44 @@ class AuraAudioPlayer(
     val abLoopState: StateFlow<ABLoopState> = abLoopController.abLoopState
 
     private val fadeController = AudioFadeController(playerScope)
-    private var playbackParamsJob: Job? = null
-    private var isTransitioningTrack = false
+    private val playbackParamsManager = PlaybackParametersManager(
+        scope = playerScope,
+        getPlayer = { exoPlayer },
+        getSpeed = { _playbackSpeed.value },
+        getPitch = { _playbackPitch.value },
+        setSpeedPitch = { s, p -> _playbackSpeed.value = s; _playbackPitch.value = p }
+    )
+    private val streamingRecovery = StreamingErrorRecoveryHandler(
+        scope = playerScope,
+        getTrack = { _currentTrack.value },
+        getFallbackPosition = { _currentPosition.value },
+        getLivePlayer = { exoPlayer },
+        setBuffering = { _isBuffering.value = it },
+        setNetworkStalled = { _isNetworkStalled.value = it },
+        setPlaybackError = { _playbackError.value = it },
+        resetSpeedPitch = { _playbackSpeed.value = 1.0f; _playbackPitch.value = 1.0f },
+        getHttpRecoveryHandler = { onStreamingHttpErrorRecoveryCallback },
+        requestPlayNext = { playNext() }
+    )
 
+    private val progressTracker = PlaybackProgressTracker(
+        scope = playerScope,
+        appContext = context,
+        getPlayer = { exoPlayer },
+        getTrack = { _currentTrack.value },
+        getDuration = { _duration.value },
+        setDuration = { _duration.value = it },
+        setPosition = { _currentPosition.value = it },
+        getAbLoopState = { abLoopState.value },
+        getCrossfadeSeconds = { _crossfadeSeconds.value },
+        isDjAutomixEnabled = { _isDjAutomixEnabled.value },
+        isDjEqCurveEnabled = { _isDjEqCurveEnabled.value },
+        getQueueSize = { queue.value.size },
+        getRepeatMode = { repeatMode.value },
+        onDjAutomixTransition = { enabled, progress -> effectManager.setDjAutomixTransition(enabled, progress) },
+        getNearEndPrefetch = { onStreamingNearEndPrefetchCallback },
+        onTrackEnded = { autoOverlap -> handleTrackEnded(isAutoCrossfadeOverlap = autoOverlap) }
+    )
     private val nativeAudioProcessor = NativeAudioProcessor()
     private var mediaSessionBridge: MediaSessionBridge? = null
 
@@ -122,15 +155,12 @@ class AuraAudioPlayer(
      * a la API una canción similar y resolverla con yt-dlp por adelantado.
      */
     var onStreamingNearEndPrefetchCallback: ((Track) -> Unit)? = null
-    private var streamingPrefetchTriggeredForId: Long = 0L
 
     /**
      * Callback invocado cuando ExoPlayer recibe un rechazo HTTP (ej. HTTP 403 Forbidden por firma o token expirado)
      * en una pista de Streaming para conmutar a la copia en caché o regenerar el flujo automáticamente.
      */
     var onStreamingHttpErrorRecoveryCallback: ((Track, Long) -> Boolean)? = null
-    private var lastHttpRecoveryTrackId: Long = 0L
-    private var lastHttpRecoveryTimestampMs: Long = 0L
 
     companion object {
         /**
@@ -252,77 +282,8 @@ class AuraAudioPlayer(
                 }
             }
 
-            override fun onPlayerError(error: PlaybackException) {
-                val activeTrack = _currentTrack.value
-                val isBadHttpStatus = error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS
-
-                // Recuperación transparente ante HTTP 403 / 416 en pistas de Streaming:
-                // En lugar de re-preparar la misma URL rechazada, delegamos al coordinador para usar el archivo
-                // en caché o resolver un stream fresco con cabeceras firmadas y continuar en la posición actual.
-                if (isBadHttpStatus && activeTrack?.isStreamingTrack == true) {
-                    val now = System.currentTimeMillis()
-                    val canAttemptRecovery = lastHttpRecoveryTrackId != activeTrack.id || (now - lastHttpRecoveryTimestampMs) > 6000L
-                    if (canAttemptRecovery) {
-                        lastHttpRecoveryTrackId = activeTrack.id
-                        lastHttpRecoveryTimestampMs = now
-                        _isBuffering.value = true
-                        val resumePos = player.currentPosition.coerceAtLeast(_currentPosition.value)
-                        com.example.debug.AuraDebugManager.logWarning(
-                            "ExoPlayer",
-                            "Detectado rechazo HTTP en stream (${error.errorCodeName}). Regenerando flujo firmado automáticamente..."
-                        )
-                        val handled = onStreamingHttpErrorRecoveryCallback?.invoke(activeTrack, resumePos) ?: false
-                        if (handled) return
-                    }
-                }
-
-                val isNetworkError = error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ||
-                    error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT ||
-                    error.errorCode == PlaybackException.ERROR_CODE_IO_UNSPECIFIED
-
-                if (isNetworkError && activeTrack?.isStreamingTrack == true) {
-                    _isBuffering.value = true
-                    _isNetworkStalled.value = true
-                    com.example.debug.AuraDebugManager.logWarning(
-                        "ExoPlayer",
-                        "Interrupción de red en streaming (${error.errorCodeName}), esperando reconexión..."
-                    )
-                    playerScope.launch {
-                        delay(2200L)
-                        val p = exoPlayer
-                        if (p != null && _currentTrack.value?.isStreamingTrack == true && p.playbackState == Player.STATE_IDLE) {
-                            try {
-                                p.prepare()
-                                p.play()
-                            } catch (_: Throwable) {}
-                        }
-                    }
-                    return
-                }
-
-                _isBuffering.value = false
-                _playbackError.value = "Error al reproducir pista: ${error.message}"
-                com.example.debug.AuraDebugManager.logError(
-                    "ExoPlayer",
-                    "Error durante la reproducción: ${error.errorCodeName} - ${error.message}",
-                    error
-                )
-
-                val p = exoPlayer
-                if (p != null && activeTrack != null && !activeTrack.isStreamingTrack) {
-                    try {
-                        _playbackSpeed.value = 1.0f
-                        _playbackPitch.value = 1.0f
-                        p.playbackParameters = androidx.media3.common.PlaybackParameters.DEFAULT
-                        p.prepare()
-                        p.play()
-                        com.example.debug.AuraDebugManager.logWarning("ExoPlayer", "Recuperación automática de reproducción tras error de procesador de audio.")
-                        return
-                    } catch (e: Throwable) {
-                        com.example.debug.AuraDebugManager.logCritical("ExoPlayer", "Fallo al recuperar reproducción local: ${e.message}", e)
-                    }
-                }
-                playNext()
+                        override fun onPlayerError(error: PlaybackException) {
+                streamingRecovery.handlePlayerError(player, error)
             }
         })
 
@@ -434,8 +395,7 @@ class AuraAudioPlayer(
         _duration.value = track.durationMs
         _isBuffering.value = track.isStreamingTrack && (track.uriString.startsWith("http://", ignoreCase = true) || track.uriString.startsWith("https://", ignoreCase = true))
         _isNetworkStalled.value = false
-        crossfadeTriggeredForTrackId = -1L
-        streamingPrefetchTriggeredForId = 0L
+        progressTracker.resetForNewTrack()
         abLoopController.reset()
         // En modo Streaming omitimos por ahora el motor C++20 DSP; en modo local lo mantenemos 100% activo
         NativeAudioProcessor.isStreamingBypassActive = track.isStreamingTrack
@@ -544,47 +504,20 @@ class AuraAudioPlayer(
     fun setPlaybackSpeed(speed: Float) {
         val clamped = speed.coerceIn(0.5f, 2.0f)
         _playbackSpeed.value = clamped
-        schedulePlaybackParameters()
+        playbackParamsManager.schedule()
     }
 
     fun setPlaybackPitch(pitch: Float) {
         val clamped = pitch.coerceIn(0.5f, 2.0f)
         _playbackPitch.value = clamped
-        schedulePlaybackParameters()
+        playbackParamsManager.schedule()
     }
 
     fun resetSpeedAndPitch() {
-        playbackParamsJob?.cancel()
-        _playbackSpeed.value = 1.0f
-        _playbackPitch.value = 1.0f
-        applyPlaybackParametersDirect(1.0f, 1.0f)
+        playbackParamsManager.reset()
     }
 
-    private fun schedulePlaybackParameters() {
-        playbackParamsJob?.cancel()
-        playbackParamsJob = playerScope.launch(Dispatchers.Main) {
-            delay(40L)
-            val speedTarget = _playbackSpeed.value
-            val pitchTarget = _playbackPitch.value
-            applyPlaybackParametersDirect(speedTarget, pitchTarget)
-        }
-    }
 
-    private fun applyPlaybackParametersDirect(speed: Float, pitch: Float) {
-        val player = exoPlayer ?: return
-        val current = player.playbackParameters
-        if (kotlin.math.abs(current.speed - speed) > 0.01f || kotlin.math.abs(current.pitch - pitch) > 0.01f) {
-            val wasPlaying = player.isPlaying || player.playWhenReady
-            try {
-                player.playbackParameters = androidx.media3.common.PlaybackParameters(speed, pitch)
-                if (wasPlaying && !player.isPlaying && player.playbackState != Player.STATE_ENDED) {
-                    player.play()
-                }
-            } catch (t: Throwable) {
-                com.example.debug.AuraDebugManager.logWarning("ExoPlayer", "Fallo al aplicar velocidad/tono: ${t.message}", t)
-            }
-        }
-    }
 
     fun setVolume(volume: Float) = fadeController.setVolume(volume, exoPlayer, outgoingExoPlayer)
 
@@ -835,137 +768,11 @@ class AuraAudioPlayer(
         }
     }
 
-    private var widgetProgressTickCounter = 0
-
-    private fun startProgressTracking() {
-        progressJob?.cancel()
-        widgetProgressTickCounter = 0
-        progressJob = playerScope.launch {
-            while (isActive) {
-                val loopState = abLoopState.value
-                val isBackgroundGaming = com.example.AuraApplication.shouldSuspendBackgroundVisuals()
-                var nextDelayMs = if (loopState.isLooping) 75L else 180L
-
-                exoPlayer?.let { player ->
-                    val pos = player.currentPosition.coerceAtLeast(0L)
-                    val dur = if (player.duration > 0) player.duration else _duration.value
-                    if (player.duration > 0) {
-                        _duration.value = player.duration
-                    }
-
-                    val crossfadeSecs = _crossfadeSeconds.value
-                    val isCurrentLocal = _currentTrack.value?.isStreamingTrack != true
-                    val isDjMix = _isDjAutomixEnabled.value && isCurrentLocal
-                    val effectiveCrossfadeSecs = if (isDjMix && crossfadeSecs == 0) 6 else crossfadeSecs
-                    val remainingMs = if (dur > 0L) (dur - pos) else Long.MAX_VALUE
-                    val crossfadeWindowMs = (effectiveCrossfadeSecs * 1000L).coerceAtLeast(4500L)
-                    val isNearTransitionOrEnd = dur > 0L && remainingMs <= (crossfadeWindowMs + 1500L)
-
-                    // Si estamos en segundo plano mientras el usuario juega, solo actualizamos los flujos
-                    // visuales de alta frecuencia si realmente hay una transición activa, un bucle A-B o Mixtape
-                    if (!isBackgroundGaming || loopState.isLooping || isNearTransitionOrEnd) {
-                        _currentPosition.value = pos
-                    }
-
-                    widgetProgressTickCounter++
-                    val widgetTickThreshold = if (isBackgroundGaming) 5 else 12
-                    if (widgetProgressTickCounter >= widgetTickThreshold) {
-                        widgetProgressTickCounter = 0
-                        _currentPosition.value = pos
-                        com.example.widget.AuraMusicWidgetProvider.pushPlaybackProgress(
-                            context = context,
-                            positionMs = pos,
-                            durationMs = _duration.value
-                        )
-                    }
-
-                    if (loopState.isLooping) {
-                        val aMs = loopState.pointAMs ?: 0L
-                        val bMs = loopState.pointBMs ?: Long.MAX_VALUE
-                        if (pos >= bMs || pos < (aMs - 350L)) {
-                            player.seekTo(aMs)
-                            _currentPosition.value = aMs
-                        }
-                    } else {
-                        val curTrack = _currentTrack.value
-                        val curTrackId = curTrack?.id ?: -1L
-                        val crossfadeMs = (effectiveCrossfadeSecs * 1000L).coerceIn(0L, 12000L)
-
-                        // Si es una pista en modo Streaming y le quedan menos de 35 segundos (o superó el 65%),
-                        // notificamos una sola vez al coordinador para que consulte a la API una canción similar
-                        // y la resuelva con yt-dlp antes de terminar la canción actual.
-                        if (curTrack != null && curTrack.isStreamingTrack &&
-                            streamingPrefetchTriggeredForId != curTrackId &&
-                            dur > 5000L && (remainingMs in 1..35000L || pos > (dur * 65L / 100L))
-                        ) {
-                            streamingPrefetchTriggeredForId = curTrackId
-                            onStreamingNearEndPrefetchCallback?.invoke(curTrack)
-                        }
-
-                        // Si el Crossfade profesional o Smart AutoMix DJ (música local) está activo y la pista entra
-                        // en la ventana de los últimos N segundos (y dura al menos el doble del crossfade), disparamos el
-                        // cruce Dual-Deck superpuesto: la canción saliente sigue sonando en el Deck B mientras
-                        // la siguiente canción arranca simultáneamente en el Deck A sin pausa alguna.
-                        val canOverlapNext = effectiveCrossfadeSecs > 0 &&
-                            dur > (crossfadeMs + 4000L) &&
-                            pos > 2500L &&
-                            repeatMode.value != RepeatMode.ONE &&
-                            queue.value.size > 1 &&
-                            !isTransitioningTrack &&
-                            crossfadeTriggeredForTrackId != curTrackId
-
-                        // Smart Outro Cue Point (Smart AutoMix DJ para música local):
-                        // Detecta cuando la energía vocal/instrumental de la canción saliente cae en el tramo final
-                        // (o alcanza la ventana armónica de los últimos segundos) para iniciar la mezcla sin choques.
-                        val currentIntensity = if (isDjMix) NativeAudioEngine.getAudioIntensity() else 0.25f
-                        val shouldTriggerEarlyOutro = isDjMix &&
-                            remainingMs in 800L..(crossfadeMs + 4500L) &&
-                            (currentIntensity < 0.095f || remainingMs <= (crossfadeMs + 1200L))
-
-                        val shouldTriggerCrossfadeWindow = remainingMs in 300L..crossfadeMs
-
-                        if (canOverlapNext && player.isPlaying && (shouldTriggerCrossfadeWindow || shouldTriggerEarlyOutro)) {
-                            crossfadeTriggeredForTrackId = curTrackId
-                            isTransitioningTrack = true
-                            if (_isDjEqCurveEnabled.value && isCurrentLocal) {
-                                effectManager.setDjAutomixTransition(true, 0.35f)
-                            }
-                            playerScope.launch(Dispatchers.Main) {
-                                handleTrackEnded(isAutoCrossfadeOverlap = true)
-                                delay(650L)
-                                isTransitioningTrack = false
-                            }
-                        } else if (dur > 0 && player.isPlaying && !isTransitioningTrack) {
-                            if (remainingMs in 1..250L) {
-                                isTransitioningTrack = true
-                                playerScope.launch(Dispatchers.Main) {
-                                    handleTrackEnded(isAutoCrossfadeOverlap = false)
-                                    delay(600L)
-                                    isTransitioningTrack = false
-                                }
-                            }
-                        }
-                    }
-
-                    // Si la app está en segundo plano (Modo Juego) y el usuario NO está usando A-B Loop
-                    // ni está en los segundos finales de Crossfade/DJ Automix, espaciamos el sondeo a 1000 ms
-                    // para reducir más de un 80% los despertares de CPU en el hilo principal.
-                    nextDelayMs = when {
-                        loopState.isLooping -> 75L
-                        isBackgroundGaming && !isNearTransitionOrEnd -> 1000L
-                        else -> 180L
-                    }
-                }
-                delay(nextDelayMs)
-            }
-        }
-    }
+    private fun startProgressTracking() = progressTracker.start()
 
     private fun stopProgressTracking() {
-        progressJob?.cancel()
-        progressJob = null
-        playbackParamsJob?.cancel()
-        playbackParamsJob = null
+        progressTracker.stop()
+        playbackParamsManager.cancel()
     }
 
     fun release() {
@@ -990,18 +797,6 @@ class AuraAudioPlayer(
      * YouTube Music, SoundCloud permalink o marcador `aura_stream://`) que requiere resolución
      * previa mediante `StreamingModeCoordinator` antes de entregarse a ExoPlayer.
      */
-    private fun isUnresolvedStreamingPageUrl(uri: String): Boolean {
-        val clean = uri.trim().lowercase()
-        if (clean.isBlank() || clean.startsWith("aura_stream://")) return true
-        if (clean.contains("youtube.com/watch") ||
-            clean.contains("music.youtube.com/watch") ||
-            clean.contains("youtu.be/")
-        ) {
-            return true
-        }
-        if (clean.contains("soundcloud.com/") && !clean.contains("cf-media.sndcdn.com") && !clean.contains("akmedia.sndcdn.com")) {
-            return true
-        }
-        return false
-    }
+        private fun isUnresolvedStreamingPageUrl(uri: String): Boolean =
+        StreamingUrlPolicy.isUnresolvedStreamingPageUrl(uri)
 }
