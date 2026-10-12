@@ -11,12 +11,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.DashboardCustomize
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PermMedia
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.*
@@ -71,6 +73,7 @@ fun LazyListScope.mainSettingsMenuContent(
     onOpenHeadphones: () -> Unit,
     onOpenStoredMedia: () -> Unit,
     onOpenEnginesAndDiagnostics: () -> Unit,
+    onOpenDownloadsAndCookies: () -> Unit = {},
     onOpenBehindTheProject: () -> Unit = {},
     onOpenOnboarding: () -> Unit
 ) {
@@ -191,7 +194,25 @@ fun LazyListScope.mainSettingsMenuContent(
         Spacer(modifier = Modifier.height(12.dp))
     }
 
-    // 8. Detrás del Proyecto (Creador & Contribuidores en GitHub)
+    // 8. Descargas & Cookies (Estilo YTDLnis), PO Token Web y yt-dlp OTA
+    item {
+        val context = androidx.compose.ui.platform.LocalContext.current
+        val cookiesActive = com.example.core.data.importer.YtDlpCookieManager.isCookiesEnabled(context)
+        val cookiesBadge = if (cookiesActive) "COOKIES ON" else "YTDLnis"
+        SettingsNavigationCard(
+            icon = Icons.Default.CloudDownload,
+            title = "Descargas & Cookies (Estilo YTDLnis)",
+            subtitle = "Estrategia yt-dlp natural (player_client=default), cookies.txt opcionales, PO Token Web y OTA",
+            iconTint = MaterialTheme.colorScheme.secondary,
+            badgeText = cookiesBadge,
+            badgeColor = MaterialTheme.colorScheme.secondary,
+            onClick = onOpenDownloadsAndCookies,
+            testTag = "settings_nav_downloads_and_cookies"
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+    }
+
+    // 9. Detrás del Proyecto (Creador & Contribuidores en GitHub)
     item {
         SettingsNavigationCard(
             icon = Icons.Default.Groups,

@@ -198,6 +198,27 @@ object YtDlpNativeEngine {
     }
 
     /**
+     * Construye los argumentos de extracción para YouTube:
+     * - Estrategia natural (player_client=default por defecto, o la configurada por el usuario).
+     * - Vinculación de PO Token Web y Visitor Data si está habilitado.
+     */
+    suspend fun buildYouTubeExtractorArgs(context: Context): String {
+        val strategy = YtDlpCookieManager.getPlayerClientStrategy(context)
+        val poTokenPair = PoTokenGenerator.getOrGeneratePoToken(context)
+        val builder = StringBuilder("youtube:player_client=$strategy")
+        if (poTokenPair != null) {
+            val (poToken, visitorData) = poTokenPair
+            if (poToken.isNotBlank()) {
+                builder.append(";po_token=web+$poToken")
+            }
+            if (visitorData.isNotBlank()) {
+                builder.append(";visitor_data=$visitorData")
+            }
+        }
+        return builder.toString()
+    }
+
+    /**
      * Resuelve los flujos de audio y video de YouTube utilizando yt-dlp y Python localmente.
      */
     suspend fun resolveStream(
@@ -249,15 +270,21 @@ object YtDlpNativeEngine {
         ensureTlsCertificates(pythonEnvDir)
         val localCert = File(pythonEnvDir, "usr/etc/tls/cert.pem")
 
+        val extractorArgs = buildYouTubeExtractorArgs(context)
+        val activeCookies = YtDlpCookieManager.getActiveCookiesFileIfEnabled(context)
+
         val cmdList = mutableListOf<String>().apply {
             add(activePython.absolutePath)
             add(ytdlpFile.absolutePath)
             add("--dump-single-json")
             add("--no-warnings")
+            add("--no-playlist")
             add("--extractor-args")
-            add("youtube:player_client=android_vr,ios,web")
-            add("--format")
-            add("bestvideo[height<=480][ext=mp4][vcodec^=avc1][protocol^=http]+bestaudio[ext=m4a][protocol^=http]/bestvideo[height<=480][ext=mp4][protocol^=http]+bestaudio[protocol^=http]/best[height<=480][ext=mp4][protocol^=http]/best[height<=480]")
+            add(extractorArgs)
+            if (activeCookies != null && activeCookies.exists()) {
+                add("--cookies")
+                add(activeCookies.absolutePath)
+            }
             if (qjsBin != null && qjsBin.exists()) {
                 add("--js-runtimes")
                 add("quickjs:${qjsBin.absolutePath}")
@@ -344,9 +371,14 @@ object YtDlpNativeEngine {
             }
             stderrThread.start()
 
-            var exitCode = process.waitFor()
-            stdoutThread.join()
-            stderrThread.join()
+            var completedInTime = process.waitFor(20, java.util.concurrent.TimeUnit.SECONDS)
+            if (!completedInTime) {
+                try { process.destroy() } catch (_: Throwable) {}
+                AuraDebugManager.logWarning(TAG, "yt-dlp excedió el tiempo límite de 20s. Proceso cancelado.")
+            }
+            var exitCode = if (completedInTime) process.exitValue() else -1
+            stdoutThread.join(1000)
+            stderrThread.join(1000)
 
             val errString = errorLog.toString()
             // Auto-recuperación ante error de validación SSL de OpenSSL en Android 14+ regenerando el almacén CA oficial (sin desactivar jamás TLS)
@@ -395,13 +427,17 @@ object YtDlpNativeEngine {
                 }
                 retryErrThread.start()
 
-                exitCode = retryProcess.waitFor()
-                retryOutThread.join()
-                retryErrThread.join()
+                val retryCompleted = retryProcess.waitFor(15, java.util.concurrent.TimeUnit.SECONDS)
+                if (!retryCompleted) {
+                    try { retryProcess.destroy() } catch (_: Throwable) {}
+                }
+                exitCode = if (retryCompleted) retryProcess.exitValue() else -1
+                retryOutThread.join(1000)
+                retryErrThread.join(1000)
             }
 
-            // Reintento automático inmediato ante fallos transitorios (ej. conexión efímera o firma temporal)
-            if (exitCode != 0 || jsonOutput.isBlank()) {
+            // Reintento automático inmediato ante fallos transitorios rápidos (solo si no fue timeout)
+            if (completedInTime && (exitCode != 0 || jsonOutput.isBlank())) {
                 AuraDebugManager.logWarning(TAG, "Primer intento de yt-dlp finalizó con código $exitCode. Ejecutando reintento automático inmediato...")
                 jsonOutput.clear()
                 errorLog.clear()
@@ -436,9 +472,13 @@ object YtDlpNativeEngine {
                 }
                 secondErrThread.start()
 
-                exitCode = secondProcess.waitFor()
-                secondOutThread.join()
-                secondErrThread.join()
+                val secondCompleted = secondProcess.waitFor(15, java.util.concurrent.TimeUnit.SECONDS)
+                if (!secondCompleted) {
+                    try { secondProcess.destroy() } catch (_: Throwable) {}
+                }
+                exitCode = if (secondCompleted) secondProcess.exitValue() else -1
+                secondOutThread.join(1000)
+                secondErrThread.join(1000)
             }
 
             if (exitCode != 0 || jsonOutput.isBlank()) {
@@ -505,6 +545,9 @@ object YtDlpNativeEngine {
                     lower.contains("c=ios") -> 1200.0
                     lower.contains("c=android_music") -> 1000.0
                     lower.contains("c=visionos") -> 900.0
+                    lower.contains("c=tv") -> 850.0
+                    lower.contains("c=web_embedded") -> 800.0
+                    lower.contains("c=mweb") -> 750.0
                     else -> 0.0
                 }
             }
@@ -709,10 +752,13 @@ object YtDlpNativeEngine {
             targetFile.parentFile?.mkdirs()
 
             val formatSelector = if (isAudioOnly) {
-                "bestaudio[ext=m4a][protocol^=http]/bestaudio[protocol^=http]/best[ext=mp4][protocol^=http]/best"
+                "bestaudio[ext=m4a]/bestaudio/best[ext=mp4]/best"
             } else {
-                "bestvideo[height<=480][ext=mp4][vcodec^=avc1][protocol^=http]/best[height<=480][ext=mp4][protocol^=http]/best[height<=480]"
+                "bestvideo[height<=480][ext=mp4]/bestvideo[height<=480]/best[height<=480][ext=mp4]/best[height<=480]/best"
             }
+
+            val extractorArgs = buildYouTubeExtractorArgs(context)
+            val activeCookies = YtDlpCookieManager.getActiveCookiesFileIfEnabled(context)
 
             val cmdList = mutableListOf<String>().apply {
                 add(activePython.absolutePath)
@@ -723,9 +769,13 @@ object YtDlpNativeEngine {
                 add("--no-part")
                 add("--no-playlist")
                 add("--extractor-args")
-                add("youtube:player_client=android_vr,ios,web")
+                add(extractorArgs)
                 add("--format")
                 add(formatSelector)
+                if (activeCookies != null && activeCookies.exists()) {
+                    add("--cookies")
+                    add(activeCookies.absolutePath)
+                }
                 if (qjsBin != null && qjsBin.exists()) {
                     add("--js-runtimes")
                     add("quickjs:${qjsBin.absolutePath}")
@@ -768,8 +818,19 @@ object YtDlpNativeEngine {
 
             AuraDebugManager.logInfo(TAG, "Ejecutando descarga directa nativa con yt-dlp (${if (isAudioOnly) "Audio" else "Video 480p"}) para: $cleanUrl")
             val process = pb.start()
-            process.inputStream.bufferedReader().use { it.readText() }
-            val exitCode = process.waitFor()
+            val stdoutThread = Thread {
+                try {
+                    process.inputStream.bufferedReader().use { it.readText() }
+                } catch (_: Throwable) {}
+            }
+            stdoutThread.start()
+            val completed = process.waitFor(90, java.util.concurrent.TimeUnit.SECONDS)
+            if (!completed) {
+                try { process.destroy() } catch (_: Throwable) {}
+                AuraDebugManager.logWarning(TAG, "Descarga directa de yt-dlp excedió timeout de 90s.")
+            }
+            val exitCode = if (completed) process.exitValue() else -1
+            stdoutThread.join(1000)
 
             val ok = exitCode == 0 && targetFile.exists() && targetFile.length() > 1024L
             if (ok) {
@@ -1000,7 +1061,10 @@ object YtDlpNativeEngine {
                 trimmedInput
             }
 
-            val command = listOf(
+            val extractorArgs = buildYouTubeExtractorArgs(context)
+            val activeCookies = YtDlpCookieManager.getActiveCookiesFileIfEnabled(context)
+
+            val command = mutableListOf(
                 activePython.absolutePath,
                 "-I",
                 ytdlpBin.absolutePath,
@@ -1010,10 +1074,16 @@ object YtDlpNativeEngine {
                 "--no-warnings",
                 "--no-progress",
                 "--socket-timeout", "14",
-                "--js-runtimes", jsRuntimeSpec,
-                "--",
-                normalizedInput
-            )
+                "--extractor-args", extractorArgs,
+                "--js-runtimes", jsRuntimeSpec
+            ).apply {
+                if (activeCookies != null && activeCookies.exists()) {
+                    add("--cookies")
+                    add(activeCookies.absolutePath)
+                }
+                add("--")
+                add(normalizedInput)
+            }
 
             val processBuilder = ProcessBuilder(command)
                 .directory(File(nativeDir))

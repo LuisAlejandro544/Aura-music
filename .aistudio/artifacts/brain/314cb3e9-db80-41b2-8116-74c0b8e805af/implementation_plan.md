@@ -1,95 +1,55 @@
-# Sincronización Automática de Código por Archivo ZIP (Mobile-First GitHub Sync)
+# Plan de Restauración Integral de `yt-dlp` para Búsqueda y Descarga por URL en Aura Music 🛠️
 
-Este sistema permite actualizar el código completo de cualquier rama del repositorio directamente desde un teléfono móvil subiendo un único archivo `.zip` dentro de la carpeta `zips/`, sin necesidad de usar una PC ni comandos `git` locales. Al detectar el archivo `.zip`, GitHub Actions descomprime el paquete, reemplaza el código del repositorio (creando archivos nuevos, actualizando modificados y eliminando los que ya no existan en el `.zip`), protege los workflows de `.github` y borra automáticamente el `.zip` para mantener el repositorio limpio.
-
-## Revisión del Usuario y Decisiones Confirmadas
-
-> [!IMPORTANT]
-> Estas son las decisiones de diseño confirmadas para la automatización:
-
-- **Rama de Destino Confirmada**: Los cambios se aplicarán **siempre en la misma rama** donde hayas subido el archivo `.zip` (ideal para trabajar en `main`, `beta` o cualquier rama experimental creada desde GitHub móvil).
-- **Limpieza Automática del `.zip` Confirmada**: Una vez descomprimido y aplicado el nuevo código, el Action **eliminará automáticamente el archivo `.zip`** de la carpeta `zips/` en el mismo commit (dejando únicamente el marcador de la carpeta) para no inflar el peso del repositorio.
-- **Protección Inteligente de `.github/workflows` Confirmada**: Si el `.zip` que subes no incluye la carpeta `.github/` (por ejemplo, si ciertas exportaciones omiten carpetas ocultas), el sistema conservará intacta tu carpeta `.github/workflows` actual para nunca borrar tus Actions por accidente. Si el `.zip` sí trae `.github/workflows`, actualizará los workflows y preservará el propio workflow de sincronización ZIP.
+Este plan define los cambios específicos y quirúrgicos para solucionar el problema reportado: **restaurar la capacidad de `yt-dlp` de encontrar e inspeccionar cualquier video de YouTube por URL**, eliminando los argumentos conflictivos introducidos recientemente y asegurando que las descargas inicien y avancen fluidamente sin quedarse atascadas en 0.0 MB.
 
 ---
 
-## 1. Visión General y Concepto Principal
+## 📋 Diagnóstico de la Causa Raíz (¿Qué causó el fallo?)
 
-- **Qué hace**: Crea una carpeta dedicada en la raíz del proyecto para recibir paquetes `.zip` con versiones nuevas o completas del código fuente. En cuanto GitHub detecta un `.zip` en esa carpeta en cualquier rama, se dispara automáticamente un flujo de trabajo que sincroniza todo el árbol del proyecto de forma exacta (`1:1`).
-- **Para quién está diseñado**: Flujo 100% *Mobile-First* pensado para cuando descargas el `.zip` de tu proyecto desde el navegador de tu teléfono y quieres actualizar tu repositorio de GitHub o una rama específica usando únicamente el botón **"Upload files"** de la interfaz móvil de GitHub.
-- **Valor clave**: Resuelve la limitación de GitHub en navegadores móviles (donde no se pueden subir carpetas enteras ni borrar decenas de archivos obsoletos a la vez), convirtiendo la subida de un solo `.zip` en una sincronización completa de rama.
-
----
-
-## 2. Experiencia de Uso y Flujo Paso a Paso
-
-- **Flujo del Usuario desde el Teléfono**:
-  1. Descargas el archivo `.zip` del proyecto en tu celular.
-  2. Entras a tu repositorio en GitHub desde el navegador del teléfono y seleccionas la rama que quieres actualizar (por ejemplo, `main` o una rama nueva).
-  3. Abres la carpeta `zips/`, tocas **"Add file" -> "Upload files"**, seleccionas tu `.zip` y confirmas el commit.
-  4. **GitHub Actions entra en acción automáticamente**:
-     - Detecta el `.zip` recién subido.
-     - Analiza su interior (incluso si el `.zip` viene envuelto dentro de una carpeta raíz contenedora o si trae los archivos directamente en la raíz).
-     - Limpia los binarios pesados prohibidos (`.so`, `.apk`, `.gradle`, `build`) por si el `.zip` los traía por error.
-     - Elimina del repositorio los archivos antiguos que ya no existan en el `.zip`, agrega los archivos nuevos y sobrescribe los modificados.
-     - Elimina el archivo `.zip` subido para liberar espacio.
-     - Hace commit y push automático en esa misma rama y genera un **Resumen Ejecutivo en Español** en la pestaña *Actions* indicando cuántos archivos se agregaron, modificaron y eliminaron.
+1. **Parámetro `--format` restrictivo en `--dump-single-json`**:
+   - Se añadió un selector de formato rígido (`bestvideo[height<=480][ext=mp4][vcodec^=avc1][protocol^=http]+bestaudio[ext=m4a]...`) directamente en la llamada de inspección. Si el video no tiene exactamente esa combinación disponible (o se sirve bajo protocolos https/dash), `yt-dlp` aborta inmediatamente con:  
+     `ERROR: Requested format is not available`.
+   - Al fallar el comando, Kotlin no recibe ningún JSON y la app no puede mostrar el título ni la carátula, quedando el botón trabado o fallando.
+2. **Priorización de clientes bloqueados (`player_client=tv`)**:
+   - Se forzó `--extractor-args youtube:player_client=tv,web_embedded,mweb,android_vr,ios,web`. Los servidores de YouTube actualmente rechazan o bloquean las peticiones sin PO Token del cliente `tv` y `web_embedded`, provocando que `yt-dlp` falle o demore demasiado recorriendo la lista de clientes.
+3. **Ausencia de Timeout y Reintentos Lentos**:
+   - `process.waitFor()` se ejecuta sin un límite de tiempo razonable. Si `yt-dlp` demora en la red, la interfaz permanece bloqueada indefinidamente en *"Inspeccionando enlace..."*.
+4. **Fallo en el inicio de la descarga (Screenshot 1: Pedro Capó 0.0 MB)**:
+   - Las URLs de streaming resueltas requieren que las cabeceras coincidan o que, ante cualquier bloqueo HTTP 403, se active de inmediato la descarga directa nativa con `YtDlpNativeEngine.downloadStreamDirectToFile`.
 
 ---
 
-## 3. Decisiones Técnicas y Ventajas
+## 🎯 Decisiones Confirmadas por el Usuario
 
-- **Detección Inteligente de Carpeta Contenedora (Root Folder Unwrapping)**:
-  - *Enfoque elegido*: Al descomprimir en un directorio temporal, el motor verifica si todos los archivos están dentro de una única carpeta superior (ej. `Aura-Music-main/app/...`) o directamente en la raíz (`app/...`, `build.gradle.kts`). Si están dentro de una subcarpeta contenedora, aplana automáticamente ese nivel.
-  - *Por qué*: Dependiendo de cómo se genere o comprima un `.zip` en Android o en plataformas en la nube, a veces se incluye una carpeta contenedora y a veces no. Esto garantiza que nunca se dupliquen carpetas por error.
-- **Validación de Seguridad (Anti-Zip Slip y Filtro de Binarios)**:
-  - *Enfoque elegido*: Antes de aplicar los archivos, se verifica que ninguna ruta del `.zip` intente escapar del directorio (`..`) y se excluyen automáticamente archivos temporales o binarios compilados (`.apk`, `.so`, `.zip.so`, `local.properties`) respetando las reglas del proyecto.
-  - *Por qué*: Evita que un `.zip` sucio ensucie el historial de Git con binarios compilados que luego bloqueen la subida a GitHub.
-- **Prevención de Bucles Infinitos en CI/CD**:
-  - *Enfoque elegido*: El workflow se activa exclusivamente cuando se agrega o modifica un archivo `zips/*.zip`. Como el commit automático del propio Action borra el `.zip`, no vuelve a dispararse en bucle.
+- **Prioridad Absoluta a `yt-dlp`**: Si el usuario selecciona el motor `yt-dlp`, la app debe utilizar `yt-dlp` de forma directa y fiel para inspeccionar y resolver el video por URL, tal como funcionaba antes del cambio.
 
 ---
 
-## 4. Arquitectura Técnica del Flujo de Sincronización
+## 🛠️ Plan de Cambios Paso a Paso
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│             📱 Teléfono del Usuario (GitHub Web / Mobile)               │
-│        Sube cualquier archivo .zip dentro de la carpeta zips/           │
-│                  (en main o en cualquier otra rama)                     │
-└───────────────────────────────────┬─────────────────────────────────────┘
-                                    │ Push detectado (zips/**/*.zip)
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│               ⚙️ GitHub Actions: Sync Repo from ZIP                     │
-│  1. Checkout de la misma rama (${{ github.ref_name }}) con permisos RW  │
-│  2. Localiza el archivo .zip más reciente dentro de zips/               │
-│  3. Extrae en área segura temporal (/tmp/aura_zip_extract)              │
-│  4. Detecta si hay carpeta raíz contenedora única y normaliza estructura│
-└───────────────────────────────────┬─────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                🛡️ Reglas de Protección y Sincronización                 │
-│  • Protege .git/ siempre intacto                                        │
-│  • Protege .github/workflows/ si el .zip no trae carpeta .github        │
-│  • Preserva zips/.gitkeep y elimina todos los zips/*.zip                │
-│  • Filtra artefactos prohibidos (.apk, .so, .gradle/, build/)           │
-│  • Sincroniza 1:1:                                                      │
-│      - Borra archivos del repo que ya no existen en el .zip             │
-│      - Crea archivos nuevos presentes en el .zip                        │
-│      - Actualiza archivos modificados                                   │
-└───────────────────────────────────┬─────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│         ✅ Commit Automático en la Rama + Reporte en Español            │
-│  • Commit: "chore(sync): actualizar código desde paquete ZIP"           │
-│  • Muestra tabla en $GITHUB_STEP_SUMMARY (Creados / Editados / Borrados)│
-└─────────────────────────────────────────────────────────────────────────┘
-```
+### 1. Restaurar Invocación Limpia de `yt-dlp` en `YtDlpNativeEngine.kt`
+- **Eliminar el filtro restrictivo `--format` en `resolveStream`**:  
+  En `--dump-single-json`, `yt-dlp` debe obtener la metadata completa de todos los formatos disponibles. La selección inteligente del mejor audio y del video 480p H.264 ya está implementada y probada en Kotlin dentro de `YtDlpNativeEngine.kt` (líneas 540-600) evaluando los formatos del JSON recibido.
+- **Corregir `--extractor-args`**:  
+  Remover `tv` y `web_embedded` que causan bloqueos de PO Token. Configurar los clientes limpios que no exigen login ni firma estricta (`android_vr,ios,mweb,android`) o permitir que `yt-dlp` use su configuración óptima.
+- **Implementar Timeout Seguro en la Inspección**:  
+  Incorporar un timeout controlado (con hilo o corrutina) para que si el proceso de Python no responde en un tiempo prudente, no bloquee la interfaz de usuario.
+- **Optimizar `downloadStreamDirectToFile`**:  
+  Asegurar que los argumentos de descarga directa usen el selector de formato flexible sin flags rotos.
 
-### Componentes e Interacciones del Sistema
-- **Carpeta Receptora (`zips/`)**: Incluye un archivo guía en español que mantiene la carpeta visible en GitHub para que siempre aparezca en el navegador del celular lista para recibir archivos `.zip`.
-- **Reglas de `.gitignore`**: Se asegura que los archivos `.zip` dentro de `zips/` estén permitidos en Git para que puedas subirlos desde la web móvil sin bloqueos.
-- **Motor de Sincronización en Python3 (integrado en el Workflow)**: Ejecuta la validación de integridad del archivo `.zip`, el cálculo exacto de diferencias (archivos añadidos, modificados y eliminados), la protección de `.github/workflows` y el borrado del `.zip` original en una sola operación atómica.
+### 2. Blindar el Flujo de Inspección en `WebStreamExtractor.kt` y `DownloadFromLinkDialog.kt`
+- Asegurar que cuando el motor seleccionado sea `YTDLP`, se llame a `YtDlpNativeEngine.resolveStream` de forma prioritaria y limpia.
+- Si `yt-dlp` resuelve exitosamente, devolver inmediatamente el `ResolvedMediaInfo` a la pantalla para mostrar el título, la duración, la carátula y el botón de descarga habilitado.
+
+### 3. Garantizar el Avance de la Descarga en `OnlineVideoAudioImporter.kt` / `ChunkedStreamDownloader.kt`
+- En `OnlineVideoAudioImporter.downloadAndImport`, si el flujo de audio de YouTube o video devuelve HTTP 403 o no transfiere bytes en `ChunkedStreamDownloader`, activar inmediatamente el método nativo de descarga directa (`YtDlpNativeEngine.downloadStreamDirectToFile`), asegurando que la barra de progreso reporte bytes reales (> 0 MB) y velocidad (> 0 KB/s) hasta el 100%.
+
+---
+
+## 🧪 Plan de Verificación
+
+1. **Compilación**: Ejecutar `compile_applet` para garantizar que no existan errores de sintaxis, imports ni compatibilidad en el proyecto.
+2. **Revisión de Casos Límite**:
+   - Enlace estándar: `https://youtu.be/1_zgKRBrT0Y` (Pedro Capó - Calma).
+   - Enlace con parámetros adicionales: `?si=...`, `?t=...`, `music.youtube.com`.
+   - Videos oficiales VEVO y videos regulares.

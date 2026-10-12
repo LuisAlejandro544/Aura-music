@@ -141,6 +141,11 @@ object HeadlessWebViewExtractor {
                                     streamExtracted = true
                                     Handler(Looper.getMainLooper()).post {
                                         if (continuation.isActive) {
+                                            val streamHeaders = mapOf(
+                                                "User-Agent" to "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
+                                                "Referer" to "https://m.youtube.com/watch?v=$cleanVideoId",
+                                                "Origin" to "https://m.youtube.com"
+                                            )
                                             val info = OnlineVideoAudioImporter.ResolvedMediaInfo(
                                                 originalUrl = originalUrl,
                                                 suggestedTitle = "Audio Extraído ($videoId)",
@@ -148,7 +153,10 @@ object HeadlessWebViewExtractor {
                                                 videoUrl = capturedVideoUrl ?: capturedAudioUrl!!,
                                                 audioUrl = capturedAudioUrl,
                                                 coverUrl = "https://i.ytimg.com/vi/$videoId/maxresdefault.jpg",
-                                                durationSeconds = 0L
+                                                durationSeconds = 0L,
+                                                httpHeaders = streamHeaders,
+                                                audioHeaders = streamHeaders,
+                                                videoHeaders = streamHeaders
                                             )
                                             cleanup()
                                             continuation.resume(info)
@@ -278,6 +286,11 @@ object HeadlessWebViewExtractor {
                                                 rawCover.startsWith("https://") -> rawCover
                                                 else -> "https://i.ytimg.com/vi/$videoId/hqdefault.jpg"
                                             }
+                                            val streamHeaders = mapOf(
+                                                "User-Agent" to "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
+                                                "Referer" to "https://m.youtube.com/watch?v=$cleanVideoId",
+                                                "Origin" to "https://m.youtube.com"
+                                            )
                                             val info = OnlineVideoAudioImporter.ResolvedMediaInfo(
                                                 originalUrl = originalUrl,
                                                 suggestedTitle = obj.optString("title", "Audio de YouTube"),
@@ -285,7 +298,10 @@ object HeadlessWebViewExtractor {
                                                 videoUrl = obj.optString("videoUrl", aUrl),
                                                 audioUrl = aUrl,
                                                 coverUrl = safeCover,
-                                                durationSeconds = obj.optLong("duration", 0L)
+                                                durationSeconds = obj.optLong("duration", 0L),
+                                                httpHeaders = streamHeaders,
+                                                audioHeaders = streamHeaders,
+                                                videoHeaders = streamHeaders
                                             )
                                             cleanup()
                                             if (continuation.isActive) {

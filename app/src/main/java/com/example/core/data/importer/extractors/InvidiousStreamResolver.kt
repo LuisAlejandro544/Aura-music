@@ -197,14 +197,39 @@ object InvidiousStreamResolver {
             }
 
             if (!bestAudioUrl.isNullOrBlank()) {
+                val directAudio = bestAudioUrl
+                val directVideo = bestVideoUrl ?: bestAudioUrl
+
+                val proxiedAudio = if (directAudio.contains("googlevideo.com")) {
+                    val q = try { Uri.parse(directAudio).query } catch (_: Exception) { null }
+                    if (!q.isNullOrBlank()) "$baseInstance/videoplayback?$q" else directAudio
+                } else directAudio
+
+                val proxiedVideo = if (directVideo.contains("googlevideo.com")) {
+                    val q = try { Uri.parse(directVideo).query } catch (_: Exception) { null }
+                    if (!q.isNullOrBlank()) "$baseInstance/videoplayback?$q" else directVideo
+                } else directVideo
+
+                val headers = mapOf(
+                    "User-Agent" to "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36",
+                    "Referer" to "$baseInstance/watch?v=$videoId",
+                    "Origin" to baseInstance,
+                    "X-Invidious-Base" to baseInstance,
+                    "X-Direct-Url" to directAudio,
+                    "X-Direct-Video-Url" to directVideo
+                )
+
                 OnlineVideoAudioImporter.ResolvedMediaInfo(
                     originalUrl = originalUrl,
                     suggestedTitle = title,
                     suggestedArtist = author,
-                    videoUrl = bestVideoUrl ?: bestAudioUrl,
-                    audioUrl = bestAudioUrl,
+                    videoUrl = proxiedVideo,
+                    audioUrl = proxiedAudio,
                     coverUrl = coverUrl,
-                    durationSeconds = durationSeconds
+                    durationSeconds = durationSeconds,
+                    httpHeaders = headers,
+                    audioHeaders = headers,
+                    videoHeaders = headers
                 )
             } else {
                 null

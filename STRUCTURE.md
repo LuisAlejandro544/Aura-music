@@ -96,8 +96,10 @@ app/
     │       │   │   │   ├── IncomingMediaHandler.kt # Triaje seguro de Intents ("Abrir con..." y "Compartir con...")
     │       │   │   │   ├── engines/            # Motores Nativos CLI (FFmpeg, CPython + QuickJS C99 y OTA yt-dlp)
     │       │   │   │   │   ├── FFmpegNativeEngine.kt # Extracción, loops xfade/Boomerang, GOP corto y prevención de Flag Injection
-    │       │   │   │   │   ├── YtDlpNativeEngine.kt  # Ejecución nativa CPython + QuickJS C99 puro y CA TLS Android 14+ APEX
-    │       │   │   │   │   └── YtDlpAutoUpdater.kt   # Actualizador OTA de yt-dlp con blindaje criptográfico SHA-256
+    │       │   │   │   │   ├── YtDlpNativeEngine.kt  # Ejecución nativa CPython + QuickJS C99 puro, estrategia natural y extractor-args
+    │       │   │   │   │   ├── YtDlpAutoUpdater.kt   # Actualizador OTA de yt-dlp con blindaje criptográfico SHA-256 y diagnóstico CLI
+    │       │   │   │   │   ├── YtDlpCookieManager.kt # Gestor opcional de cookies (cookies.txt formato Netscape estilo YTDLnis)
+    │       │   │   │   │   └── PoTokenGenerator.kt   # Generador ligero de PO Token Web vinculado a Visitor Data para YouTube/GVS
     │       │   │   │   ├── extractors/         # Extractores de Video y Audio Web
     │       │   │   │   │   ├── OnlineVideoAudioImporter.kt # Orquestador de importación web con cascada anti-HTTP 403 de 5 niveles
     │       │   │   │   │   ├── InnerTubeClient.kt          # Cliente directo YouTube InnerTube multi-perfil (<300ms)

@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de arquitectura e implementación para la carpeta `zips/` y el workflow automatizado de GitHub Actions que detecta archivos `.zip`, sincroniza el código completo en la misma rama (agregando, modificando y eliminando archivos obsoletos), protege `.github/workflows` si el `.zip` no la incluye y auto-elimina el archivo `.zip` al finalizar.",
-  "updatedAt":  "2026-10-12T04:02:19.169811187Z",
-  "requestFeedback":  true,
-  "userFacing":  true
+  "summary": "Plan de Restauración Integral de yt-dlp para Búsqueda e Inspección de Videos por URL y Descarga Fluida en Aura Music.",
+  "updatedAt": "2026-10-12T14:02:58.782938327Z",
+  "requestFeedback": true,
+  "userFacing": true
 }
