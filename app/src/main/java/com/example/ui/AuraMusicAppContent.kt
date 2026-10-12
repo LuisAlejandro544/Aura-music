@@ -23,7 +23,7 @@ import com.example.ui.components.MiniPlayer
 import com.example.ui.components.PackageUpdateBanner
 import com.example.ui.components.SettingsDiscoveryBanner
 import com.example.ui.navigation.NavScreen
-import com.example.ui.screens.home.HomeScreen
+import com.example.feature.home.HomeScreen
 import com.example.ui.screens.importmusic.ImportMusicScreen
 import com.example.ui.screens.library.LibraryScreen
 import com.example.ui.screens.nowplaying.NowPlayingScreen

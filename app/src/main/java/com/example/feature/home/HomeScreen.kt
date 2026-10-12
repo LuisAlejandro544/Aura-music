@@ -1,4 +1,4 @@
-package com.example.ui.screens.home
+package com.example.feature.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
