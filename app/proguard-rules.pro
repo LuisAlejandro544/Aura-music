@@ -14,7 +14,7 @@
 
 # 1. Preservar el puente JNI hacia el motor nativo C++20 (libauramusic_dsp.so)
 # Solo se preservan los nombres de métodos 'native' para que el enlace dinámico JNI funcione sin impedir la ofuscación del resto.
--keep class com.example.playback.NativeAudioEngine {
+-keep class com.example.core.playback.NativeAudioEngine {
     native <methods>;
 }
 -keepclasseswithmembernames class * {
@@ -37,9 +37,10 @@
 # Solo aseguramos que se conserven los constructores por defecto sin usar el comodín { *; }.
 -keepclassmembers class com.example.AuraApplication { <init>(); }
 -keepclassmembers class com.example.MainActivity { <init>(); }
--keepclassmembers class com.example.playback.AuraMediaPlaybackService { <init>(); }
--keepclassmembers class com.example.playback.AuraDownloadService { <init>(); }
+-keepclassmembers class com.example.core.playback.AuraMediaPlaybackService { <init>(); }
+-keepclassmembers class com.example.core.playback.AuraDownloadService { <init>(); }
 -keepclassmembers class com.example.widget.AuraMusicWidgetProvider { <init>(); }
+-keepclassmembers class com.example.widget.AuraLibraryWidgetProvider { <init>(); }
 
 # 4. Preservar métodos estáticos de Enums usados por el runtime de Kotlin/Java
 -keepclassmembers enum * {

@@ -188,7 +188,7 @@ class AppStorageManager(private val context: Context) {
              if (!oldArtworkPath.isNullOrEmpty()) {
                  try {
                      val oldFile = File(oldArtworkPath)
-                     if (oldFile.exists() && oldFile.canonicalPath.startsWith(imagesDir.canonicalPath)) {
+                     if (oldFile.exists() && isInsideDirectoryCanonical(oldFile, imagesDir)) {
                          oldFile.delete()
                      }
                  } catch (ignored: Exception) {}
@@ -231,7 +231,7 @@ class AppStorageManager(private val context: Context) {
             if (!oldArtworkPath.isNullOrEmpty()) {
                 try {
                     val oldFile = File(oldArtworkPath)
-                    if (oldFile.exists() && oldFile.canonicalPath.startsWith(imagesDir.canonicalPath)) {
+                    if (oldFile.exists() && isInsideDirectoryCanonical(oldFile, imagesDir)) {
                         oldFile.delete()
                     }
                 } catch (_: Exception) {}
@@ -261,7 +261,7 @@ class AppStorageManager(private val context: Context) {
          if (artworkPath.isNullOrEmpty()) return@withContext false
          try {
              val file = File(artworkPath)
-             if (file.exists() && file.canonicalPath.startsWith(imagesDir.canonicalPath)) {
+             if (file.exists() && isInsideDirectoryCanonical(file, imagesDir)) {
                  file.delete()
              } else {
                  false
@@ -293,12 +293,15 @@ class AppStorageManager(private val context: Context) {
              } else {
                  try {
                      val retriever = android.media.MediaMetadataRetriever()
+                     try {
                      retriever.setDataSource(context, sourceUri)
                      val durStr = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)
                      val durationMs = durStr?.toLongOrNull() ?: 0L
                      // Si dura 20 segundos o menos, se cataloga automáticamente como bucle continuo de Canvas
                      isLoop = durationMs in 1..20500L
-                     retriever.release()
+                     } finally {
+                     try { retriever.release() } catch (_: Exception) {}
+                     }
                  } catch (e: Exception) {
                      isLoop = false
                  }
@@ -308,7 +311,7 @@ class AppStorageManager(private val context: Context) {
              if (!oldVideoPath.isNullOrEmpty()) {
                  try {
                      val oldFile = File(oldVideoPath)
-                     if (oldFile.exists() && oldFile.canonicalPath.startsWith(videosDir.canonicalPath)) {
+                     if (oldFile.exists() && isInsideDirectoryCanonical(oldFile, videosDir)) {
                          oldFile.delete()
                      }
                  } catch (ignored: Exception) {}
@@ -354,7 +357,7 @@ class AppStorageManager(private val context: Context) {
          if (videoPath.isNullOrEmpty()) return@withContext false
          try {
              val file = File(videoPath)
-             if (file.exists() && file.canonicalPath.startsWith(videosDir.canonicalPath)) {
+             if (file.exists() && isInsideDirectoryCanonical(file, videosDir)) {
                  file.delete()
              } else {
                  false

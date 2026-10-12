@@ -690,6 +690,7 @@ class AuraAudioPlayer(
         if (player.isPlaying) {
             fadeController.stopOutgoingDeckImmediately(outgoingExoPlayer)
             player.pause()
+            effectManager.flushBuffers()
         } else {
             if (_currentTrack.value == null && queue.value.isNotEmpty()) {
                 playTrackList(queue.value, 0)

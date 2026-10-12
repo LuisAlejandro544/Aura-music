@@ -142,6 +142,7 @@ fun DownloadFromLinkDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .verticalScroll(scrollState)
+                    .imePadding()
                     .padding(20.dp)
             ) {
                 val isYoutube = linkUrl.contains("youtu", ignoreCase = true) || selectedMode == DownloadSourceMode.YOUTUBE_WEB
@@ -187,7 +188,7 @@ fun DownloadFromLinkDialog(
                         )
                     }
 
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(36.dp)) {
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) {
                         Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = TextSecondary)
                     }
                 }

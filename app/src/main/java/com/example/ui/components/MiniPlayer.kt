@@ -65,21 +65,25 @@ fun MiniPlayer(
 ) {
     if (currentTrack == null) return
 
-    val gradientBorder = Brush.horizontalGradient(
-        listOf(
-            dynamicPrimary.copy(alpha = 0.85f),
-            dynamicSecondary.copy(alpha = 0.65f)
+    val gradientBorder = androidx.compose.runtime.remember(dynamicPrimary, dynamicSecondary) {
+        Brush.horizontalGradient(
+            listOf(
+                dynamicPrimary.copy(alpha = 0.85f),
+                dynamicSecondary.copy(alpha = 0.65f)
+            )
         )
-    )
+    }
 
     // Fondo del mini reproductor completamente tintado con el color dinámico extraído
-    val tintedBackgroundBrush = Brush.horizontalGradient(
-        listOf(
-            dynamicPrimary.copy(alpha = 0.35f),
-            dynamicSecondary.copy(alpha = 0.22f),
-            SurfaceElevatedDark.copy(alpha = 0.95f)
+    val tintedBackgroundBrush = androidx.compose.runtime.remember(dynamicPrimary, dynamicSecondary) {
+        Brush.horizontalGradient(
+            listOf(
+                dynamicPrimary.copy(alpha = 0.35f),
+                dynamicSecondary.copy(alpha = 0.22f),
+                SurfaceElevatedDark.copy(alpha = 0.95f)
+            )
         )
-    )
+    }
 
     val hasVideo = !currentTrack.videoUri.isNullOrEmpty()
     val showVideoThumb = isMiniPlayerVideoEnabled && hasVideo
@@ -209,7 +213,7 @@ fun MiniPlayer(
                 IconButton(
                     onClick = onSkipPrevious,
                     modifier = Modifier
-                        .size(44.dp)
+                        .size(48.dp)
                         .testTag("mini_player_skip_previous")
                 ) {
                     Icon(

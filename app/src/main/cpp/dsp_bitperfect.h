@@ -49,6 +49,7 @@ public:
         AAudioStreamBuilder* builder = nullptr;
         aaudio_result_t res = AAudio_createStreamBuilder(&builder);
         if (res != AAUDIO_OK || builder == nullptr) {
+            if (builder != nullptr) AAudioStreamBuilder_delete(builder);
             mCapabilities.isSupported = false;
             mCapabilities.isExclusiveSupported = false;
             mCapabilities.isLowLatencySupported = false;

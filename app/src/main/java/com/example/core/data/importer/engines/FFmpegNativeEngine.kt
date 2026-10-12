@@ -591,13 +591,12 @@ object FFmpegNativeEngine {
      */
     fun probeVideoDimensions(videoFile: File): Pair<Int, Int>? {
         if (!videoFile.exists() || videoFile.length() < 1024L) return null
+        val retriever = MediaMetadataRetriever()
         return try {
-            val retriever = MediaMetadataRetriever()
             retriever.setDataSource(videoFile.absolutePath)
             val w = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 0
             val h = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 0
             val rot = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull() ?: 0
-            retriever.release()
             if (w <= 0 || h <= 0) return null
             if (rot == 90 || rot == 270) {
                 Pair(h, w)
@@ -606,6 +605,8 @@ object FFmpegNativeEngine {
             }
         } catch (_: Throwable) {
             null
+        } finally {
+            try { retriever.release() } catch (_: Throwable) {}
         }
     }
 

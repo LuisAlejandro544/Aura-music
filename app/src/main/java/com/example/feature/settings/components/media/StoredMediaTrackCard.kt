@@ -81,13 +81,18 @@ fun StoredMediaTrackCard(
                 val f = File(path)
                 if (f.exists()) {
                     val retriever = android.media.MediaMetadataRetriever()
-                    retriever.setDataSource(f.absolutePath)
-                    val w = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 0
-                    val h = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 0
-                    val rot = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull() ?: 0
-                    retriever.release()
-                    val isHoriz = if (rot == 90 || rot == 270) h > (w * 1.15f) else w > (h * 1.15f)
-                    if (isHoriz) "16:9 Panorámico" else "9:16 Vertical"
+                    try {
+                        retriever.setDataSource(f.absolutePath)
+                        val w = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 0
+                        val h = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 0
+                        val rot = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull() ?: 0
+                        val isHoriz = if (rot == 90 || rot == 270) h > (w * 1.15f) else w > (h * 1.15f)
+                        if (isHoriz) "16:9 Panorámico" else "9:16 Vertical"
+                    } catch (_: Exception) {
+                        null
+                    } finally {
+                        try { retriever.release() } catch (_: Exception) {}
+                    }
                 } else null
             } catch (_: Exception) { null }
         }
@@ -144,7 +149,16 @@ fun StoredMediaTrackCard(
                         text = "${track.artist} • ${track.album}",
                         style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Clip,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clipToBounds()
+                            .basicMarquee(
+                                iterations = Int.MAX_VALUE,
+                                repeatDelayMillis = 1800,
+                                initialDelayMillis = 1000,
+                                velocity = 28.dp
+                            )
                     )
                 }
             }

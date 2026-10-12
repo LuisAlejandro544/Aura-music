@@ -99,7 +99,7 @@
         </activity>
 
         <service
-            android:name=".playback.AuraMediaPlaybackService"
+            android:name=".core.playback.AuraMediaPlaybackService"
             android:exported="true"
             android:foregroundServiceType="mediaPlayback">
             <intent-filter>
@@ -109,7 +109,7 @@
 
         <!-- Servicio en primer plano para descargas continuas en segundo plano con notificación nativa -->
         <service
-            android:name=".playback.AuraDownloadService"
+            android:name=".core.playback.AuraDownloadService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="dataSync" />

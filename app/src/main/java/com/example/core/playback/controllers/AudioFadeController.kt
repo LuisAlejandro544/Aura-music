@@ -65,7 +65,7 @@ class AudioFadeController(
     fun startSmoothFadeIn(durationMs: Long = 1500L, exoPlayer: ExoPlayer?) {
         val player = exoPlayer ?: return
         fadeInJob?.cancel()
-        player.volume = 0.05f * baseVolume
+        try { player.volume = 0.05f * baseVolume } catch (_: Throwable) {}
         fadeInJob = scope.launch(Dispatchers.Main) {
             val steps = 25
             val delayStep = (durationMs / steps).coerceAtLeast(25L)
@@ -75,9 +75,9 @@ class AudioFadeController(
                 val progress = (i.toFloat() / steps.toFloat()).coerceIn(0.0f, 1.0f)
                 // Curva sinusoidal de igual potencia para subida orgánica de estudio
                 val factor = sin(progress * (PI / 2.0)).toFloat().coerceIn(0.05f, 1.0f)
-                player.volume = (baseVolume * factor).coerceIn(0.0f, 1.0f)
+                try { player.volume = (baseVolume * factor).coerceIn(0.0f, 1.0f) } catch (_: Throwable) { break }
             }
-            player.volume = baseVolume
+            try { player.volume = baseVolume } catch (_: Throwable) {}
         }
     }
 
@@ -113,7 +113,7 @@ class AudioFadeController(
         try {
             outgoingPlayer.volume = startVol
         } catch (_: Throwable) {}
-        inPlayer.volume = 0.0f
+        try { inPlayer.volume = 0.0f } catch (_: Throwable) { return }
 
         dualCrossfadeJob = scope.launch(Dispatchers.Main) {
             // Esperar un breve instante (máx 400ms) si los reproductores aún están preparando el primer buffer PCM
@@ -142,7 +142,7 @@ class AudioFadeController(
                 val outGain = cos(t * (PI / 2.0)).toFloat().coerceIn(0.0f, 1.0f)
 
                 val currentBase = baseVolume.coerceIn(0.0f, 1.0f)
-                inPlayer.volume = (currentBase * inGain).coerceIn(0.0f, 1.0f)
+                try { inPlayer.volume = (currentBase * inGain).coerceIn(0.0f, 1.0f) } catch (_: Throwable) { break }
                 try {
                     outgoingPlayer.volume = (currentBase * outGain).coerceIn(0.0f, 1.0f)
                 } catch (_: Throwable) {}
@@ -151,7 +151,7 @@ class AudioFadeController(
                 delay(stepDelay)
             }
 
-            inPlayer.volume = baseVolume
+            try { inPlayer.volume = baseVolume } catch (_: Throwable) {}
             try {
                 outgoingPlayer.volume = 0.0f
                 outgoingPlayer.pause()
@@ -169,7 +169,7 @@ class AudioFadeController(
             if (remainingMs in 0..crossfadeMs) {
                 val t = (1.0f - (remainingMs.toFloat() / crossfadeMs.toFloat())).coerceIn(0.0f, 1.0f)
                 val factor = (1.0f - t).coerceIn(0.0f, 1.0f)
-                player.volume = (baseVolume * factor).coerceIn(0.0f, 1.0f)
+                try { player.volume = (baseVolume * factor).coerceIn(0.0f, 1.0f) } catch (_: Throwable) {}
             }
         }
     }
@@ -187,7 +187,7 @@ class AudioFadeController(
     fun restoreFullVolume(exoPlayer: ExoPlayer?) {
         fadeInJob?.cancel()
         dualCrossfadeJob?.cancel()
-        exoPlayer?.volume = baseVolume
+        try { exoPlayer?.volume = baseVolume } catch (_: Throwable) {}
     }
 
     fun cancel() {
