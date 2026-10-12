@@ -1,33 +1,18 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "model": "opencode/meta/muse-spark-1.3-contributor-free",
-  "provider": "opencode",
-  "reasoningEffort": "high",
+  "instructions": [
+    "AGENTS.md",
+    "Eres un ingeniero senior de software trabajando en Aura Music. Razona a profundidad antes de modificar código, conserva la arquitectura modular MVVM, mantén los archivos por debajo de 500 líneas y comenta tu lógica en español."
+  ],
   "tools": {
-    "websearch": {
-      "permission": "allow"
-    },
-    "webfetch": {
-      "permission": "allow"
-    },
-    "bash": {
-      "permission": "allow"
-    },
-    "edit": {
-      "permission": "allow"
-    },
-    "write": {
-      "permission": "allow"
-    },
-    "read": {
-      "permission": "allow"
-    },
-    "grep": {
-      "permission": "allow"
-    },
-    "glob": {
-      "permission": "allow"
-    }
-  },
-  "instructions": "Eres un ingeniero senior de software trabajando en el proyecto Aura Music. Siempre analiza el código cuidadosamente con razonamiento profundo antes de hacer modificaciones. Conserva la arquitectura MVVM, mantén los archivos por debajo de 500 líneas y comenta tu lógica en español. Para cada cambio, crea una rama descriptiva que inicie con 'opencode/' y abre un Pull Request detallado hacia main."
+    "websearch": true,
+    "webfetch": true,
+    "bash": true,
+    "edit": true,
+    "write": true,
+    "read": true,
+    "grep": true,
+    "glob": true
+  }
 }
