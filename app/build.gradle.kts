@@ -1153,9 +1153,9 @@ val provisionNativeDeps = tasks.register<ProvisionNativeDepsTask>("provisionNati
   tempBuildDirectory.set(layout.buildDirectory.dir("tmp/nativeProvision"))
 }
 
-tasks.named("preBuild") {
-  dependsOn(provisionNativeDeps)
-}
+// tasks.named("preBuild") {
+//   dependsOn(provisionNativeDeps)
+// }
 
 dependencies {
   // Artefactos nativos multi-ABI resueltos por Gradle para CPython 3.11 y FFmpeg puro

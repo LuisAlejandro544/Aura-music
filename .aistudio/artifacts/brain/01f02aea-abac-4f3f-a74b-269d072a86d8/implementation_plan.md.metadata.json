@@ -1,0 +1,6 @@
+{
+  "summary": "Plan de implementación para corregir la descarga directa con yt-dlp con reporte de progreso en vivo y modularizar la integración de Python/yt-dlp para una arquitectura limpia y ordenada.",
+  "updatedAt": "2026-10-12T16:25:44.597728693Z",
+  "requestFeedback": true,
+  "userFacing": true
+}

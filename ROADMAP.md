@@ -368,5 +368,10 @@ Este documento traza las fases de evolución técnica y funcional para convertir
     3. **Nivel 3**: Bypass vía **`InvidiousStreamResolver`**.
     4. **Nivel 4**: Extracción vía **`HeadlessWebViewExtractor`** (`m.youtube.com`).
     5. **Nivel 5**: Descarga directa nativa a archivo mediante **`YtDlpNativeEngine.downloadStreamDirectToFile`** usando el propio transporte TLS/HTTP de Python.
+- [x] **Descarga Directa Nativa con `yt-dlp`, Telemetría de Progreso en Vivo y Reorganización Modular (`YtDlpStreamDownloader` & `YtDlpEnvironmentSetup`)**:
+  - **Descarga Directa Nativa sin Intermediarios**: Descarga de audio (`.m4a` / Opus) y Video Canvas (480p) ejecutada directamente por el proceso CLI nativo de `yt-dlp` (`YtDlpStreamDownloader`), eliminando el bloqueo `HTTP 403 Forbidden` al utilizar el propio transporte TLS y sesión autenticada con PO Token Web.
+  - **Telemetría de Progreso en Tiempo Real**: Análisis sintáctico en vivo de la salida estándar de `yt-dlp` con emisión continua hacia `DownloadProgress` (porcentaje, bytes descargados, tamaño total estimado, velocidad instantánea en MB/s y tiempo restante ETA).
+  - **Modularización Limpia del Subsistema Nativo (< 500 Líneas por Módulo)**: División limpia de la arquitectura en `YtDlpEnvironmentSetup` (configuración de runtime CPython, symlinks de módulos C y certificados TLS Conscrypt APEX), `YtDlpStreamDownloader` (ejecución y monitoreo de descarga) y `YtDlpNativeEngine` (fachada unificada conservando 100% la compatibilidad pública del proyecto).
+
 
 

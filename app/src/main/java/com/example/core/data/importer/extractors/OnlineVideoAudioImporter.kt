@@ -178,8 +178,42 @@ object OnlineVideoAudioImporter {
                 return audioFile.exists() && audioFile.length() > 0L
             }
 
-            // 1. Descarga prioritaria del audio de alta fidelidad (o copia instantánea si ya estaba en caché de streaming)
-            if (!resolvedInfo.audioUrl.isNullOrBlank()) {
+            // 1. Descarga directa prioritaria con motor nativo yt-dlp para enlaces de YouTube/Web
+            val isWebVideo = WebStreamExtractor.isWebVideoUrl(resolvedInfo.originalUrl)
+            if (isWebVideo && YtDlpNativeEngine.isAvailable(context)) {
+                AuraDebugManager.logInfo("OnlineImporter", "Intentando descarga directa nativa con yt-dlp para '${resolvedInfo.originalUrl}'...")
+                val directAudioSuccess = YtDlpNativeEngine.downloadStreamDirectToFile(
+                    context = context,
+                    url = resolvedInfo.originalUrl,
+                    targetFile = audioFile,
+                    isAudioOnly = true,
+                    onProgressUpdate = onProgressUpdate
+                )
+                if (directAudioSuccess && audioFile.exists() && audioFile.length() > 0L) {
+                    audioReady = true
+                    AuraDebugManager.logInfo("OnlineImporter", "¡Audio descargado directamente con éxito mediante yt-dlp (${audioFile.length()} bytes)!")
+
+                    // Descarga directa opcional de Video Canvas en 480p si fue solicitado
+                    if (attachAsCanvas) {
+                        AuraDebugManager.logInfo("OnlineImporter", "Descargando Video Canvas 480p directamente con yt-dlp...")
+                        val directVideoSuccess = YtDlpNativeEngine.downloadStreamDirectToFile(
+                            context = context,
+                            url = resolvedInfo.originalUrl,
+                            targetFile = tempVideoFile,
+                            isAudioOnly = false,
+                            onProgressUpdate = onProgressUpdate
+                        )
+                        if (directVideoSuccess && tempVideoFile.exists() && tempVideoFile.length() > 0L) {
+                            AuraDebugManager.logInfo("OnlineImporter", "¡Video Canvas 480p descargado directamente con éxito mediante yt-dlp!")
+                        }
+                    }
+                } else {
+                    AuraDebugManager.logWarning("OnlineImporter", "Descarga directa de yt-dlp no completó el archivo. Recurriendo a respaldo con OkHttp...")
+                }
+            }
+
+            // 2. Respaldo: Descarga de audio de alta fidelidad con OkHttp (o copia instantánea si ya estaba en caché)
+            if (!audioReady && !resolvedInfo.audioUrl.isNullOrBlank()) {
                 val localCachedAudio = if (resolvedInfo.audioUrl.startsWith("/")) File(resolvedInfo.audioUrl) else null
                 if (localCachedAudio != null && localCachedAudio.exists() && localCachedAudio.length() > 0L) {
                     localCachedAudio.copyTo(audioFile, overwrite = true)

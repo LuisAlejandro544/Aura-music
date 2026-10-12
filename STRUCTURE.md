@@ -12,7 +12,7 @@ El proyecto sigue una arquitectura reactiva y desacoplada organizada en capas:
 2. **Capa de Datos & Almacenamiento (Data & Storage)**:
    - Base de datos SQLite reactiva con **Room**.
    - Acceso al almacenamiento estructurado en `Android/data/com.aistudio.musicplayer.aurasound/files/` (Debug) y `Android/data/com.auramusic.beta/files/` (APK Beta `Aura Beta` • Codename `Nebula`) con subcarpetas (`songs/`, `images/`, `lyrics/`, `metadata/`, `videos/`), además de **Carpeta Pública / Personalizada del Usuario (`UserPublicMediaExporter` & `UserPublicFolderCard`)** mediante SAF (`OpenDocumentTree`) con subcarpeta `Videos/` (y preparada para `Images/`) para exportar vídeos descargados con su audio completo.
-   - Motores de importación, sincronización de letras LRCLIB, extracción FFmpeg, descarga resiliente con separación de `audioHeaders`/`videoHeaders` por perfil `c=` y cascada anti-HTTP 403 de 5 niveles (`ChunkedStreamDownloader` -> `InnerTubeClient` -> `InvidiousStreamResolver` -> `HeadlessWebViewExtractor` -> `YtDlpNativeEngine.downloadStreamDirectToFile` con actualización OTA activa en Debug y Beta) y actualizador automático de versiones APK (`AppReleaseUpdater` con comparador semántico de tags dinámicos `-beta`, selección por arquitectura móvil y verificación SHA-256).
+   - Motores de importación, sincronización de letras LRCLIB, extracción FFmpeg, descarga directa prioritaria con motor nativo yt-dlp (`YtDlpStreamDownloader`) con métricas de progreso en tiempo real y respaldo resiliente multi-nivel con separación de `audioHeaders`/`videoHeaders` por perfil `c=` (`ChunkedStreamDownloader` -> `InnerTubeClient` -> `InvidiousStreamResolver` -> `HeadlessWebViewExtractor`), arquitectura modular desacoplada en `engines/` (< 500 líneas por módulo), y actualizador automático de versiones APK (`AppReleaseUpdater` con comparador semántico de tags dinámicos `-beta`, selección por arquitectura móvil y verificación SHA-256).
 3. **Capa de Control & Reproducción (Playback Layer)**:
    - `AuraAudioPlayer` con ExoPlayer/Media3, modularizado con controladores especializados (`PlayerQueueController`, `AudioFadeController`, `ABLoopController`, `MediaSessionBridge`).
    - `NativeAudioEngine` conectando buffers de audio PCM en C++20 vía JNI.
@@ -95,11 +95,13 @@ app/
     │       │   │   ├── importer/               # Motores de Descarga, Conversión y Medios Organizados
     │       │   │   │   ├── IncomingMediaHandler.kt # Triaje seguro de Intents ("Abrir con..." y "Compartir con...")
     │       │   │   │   ├── engines/            # Motores Nativos CLI (FFmpeg, CPython + QuickJS C99 y OTA yt-dlp)
-    │       │   │   │   │   ├── FFmpegNativeEngine.kt # Extracción, loops xfade/Boomerang, GOP corto y prevención de Flag Injection
-    │       │   │   │   │   ├── YtDlpNativeEngine.kt  # Ejecución nativa CPython + QuickJS C99 puro, estrategia natural y extractor-args
-    │       │   │   │   │   ├── YtDlpAutoUpdater.kt   # Actualizador OTA de yt-dlp con blindaje criptográfico SHA-256 y diagnóstico CLI
-    │       │   │   │   │   ├── YtDlpCookieManager.kt # Gestor opcional de cookies (cookies.txt formato Netscape estilo YTDLnis)
-    │       │   │   │   │   └── PoTokenGenerator.kt   # Generador ligero de PO Token Web vinculado a Visitor Data para YouTube/GVS
+    │       │   │   │   │   ├── FFmpegNativeEngine.kt     # Extracción, loops xfade/Boomerang, GOP corto y prevención de Flag Injection
+    │       │   │   │   │   ├── YtDlpNativeEngine.kt      # Fachada modular nativa yt-dlp, inspección y flat-playlists (< 500 líneas)
+    │       │   │   │   │   ├── YtDlpEnvironmentSetup.kt  # Detección de binarios, symlinks CPython 0 bytes y certificados TLS Android 14+
+    │       │   │   │   │   ├── YtDlpStreamDownloader.kt  # Descarga directa nativa con captura y parseo de progreso en vivo (DownloadProgress)
+    │       │   │   │   │   ├── YtDlpAutoUpdater.kt       # Actualizador OTA de yt-dlp con blindaje criptográfico SHA-256 y diagnóstico CLI
+    │       │   │   │   │   ├── YtDlpCookieManager.kt     # Gestor opcional de cookies (cookies.txt formato Netscape estilo YTDLnis)
+    │       │   │   │   │   └── PoTokenGenerator.kt       # Generador ligero de PO Token Web vinculado a Visitor Data para YouTube/GVS
     │       │   │   │   ├── extractors/         # Extractores de Video y Audio Web
     │       │   │   │   │   ├── OnlineVideoAudioImporter.kt # Orquestador de importación web con cascada anti-HTTP 403 de 5 niveles
     │       │   │   │   │   ├── InnerTubeClient.kt          # Cliente directo YouTube InnerTube multi-perfil (<300ms)
@@ -370,4 +372,46 @@ app/
 
 8. **Escáner Automatizado Manual en GitHub Actions (`.github/workflows/security-vulnerability-audit.yml`)**:
    - Flujo `workflow_dispatch` ("Escáner de Seguridad y Vulnerabilidades (Aura Shield)") con análisis multicapa (Gitleaks, Google OSV-Scanner, Semgrep Kotlin/C++20, Invariantes de Seguridad de Aura Music y Android Lint opcional) y reporte ejecutivo en español en `$GITHUB_STEP_SUMMARY` optimizado para lectura desde teléfono móvil.
+
+---
+
+## ⚡ Arquitectura Modular del Motor yt-dlp y Descargas Directas
+
+Para garantizar estabilidad, mantenibilidad y cumplir con el estándar de desarrollo modular (< 500 líneas por archivo), el motor nativo de `yt-dlp` en `app/src/main/java/com/example/core/data/importer/engines/` se estructura en 3 módulos especializados:
+
+### 1. `YtDlpEnvironmentSetup.kt` (Entorno y Runtime Nativo)
+- **Rol**: Configuración y aprovisionamiento del entorno de ejecución de Python 3.11 y QuickJS nativo.
+- **Responsabilidades clave**:
+  - Detección de ejecutables en `nativeLibraryDir` (`libpythonlauncher.so`, `libnativeffmpeg.so`) y fallbacks en `files/bin/` o `files/env/bin/`.
+  - Creación de enlaces simbólicos (symlinks) hacia `.so` de tamaño 0 bytes o requeridas por CPython (`libpython3.11.so`, etc.).
+  - Consolidación del almacén de certificados CA (`cacerts`) para Android 14+ (`/apex/com.android.conscrypt/cacerts`, `/system/etc/security/cacerts` y `cert.pem` embebido).
+  - Configuración del mapa de variables de entorno (`PYTHONHOME`, `PYTHONPATH`, `LD_LIBRARY_PATH`, `SSL_CERT_FILE`, `TMPDIR`, `HOME`).
+  - Limpieza y sanitización de URLs de entrada (eliminación de tracking `si=`, listas de reproducción no deseadas, normalización `youtu.be` / `youtube.com`).
+
+### 2. `YtDlpStreamDownloader.kt` (Descarga Directa y Telemetría en Vivo)
+- **Rol**: Ejecución del proceso CLI de `yt-dlp` para descargas directas sin intermediación de clientes HTTP externos.
+- **Responsabilidades clave**:
+  - Descarga nativa de pistas de audio en formato de alta fidelidad (`.m4a` / AAC / Opus) y de Video Canvas sincronizado en resolución 480p (`[height<=480]`).
+  - Prevención de bloqueos `HTTP 403 Forbidden` de Google Video al reutilizar la sesión nativa y tokens criptográficos (PO Token y VisitorData) directamente en el proceso CLI de `yt-dlp`.
+  - Captura y análisis sintáctico (*parsing*) en tiempo real de la salida estándar (`stdout`) formateada con `--newline`:
+    - Porcentaje exacto completado (`45.2%`).
+    - Tamaño descargado y total estimado en bytes (`10.5MiB`).
+    - Velocidad de transferencia instantánea (`2.4MiB/s`).
+    - Tiempo estimado de finalización (`ETA 00:03`).
+  - Emisión continua de métricas hacia el callback `(DownloadProgress) -> Unit` para refrescar la notificación en la barra de estado y la tarjeta de progreso en pantalla.
+  - Verificación estricta de archivo resultante (existencia en disco y tamaño > 0 bytes).
+
+### 3. `YtDlpNativeEngine.kt` (Fachada Principal y Orquestador)
+- **Rol**: Fachada pública unificada de alto nivel (< 450 líneas) que preserva el 100% de la API pública para el resto del proyecto.
+- **Responsabilidades clave**:
+  - Inspección ligera y rápida de streams (`--dump-single-json`) para extraer títulos, artistas, duraciones, miniaturas y metadatos sin descargar el video completo.
+  - Resolución de listas de reproducción públicas mediante modo plano (`--flat-playlist`).
+  - Delegación transparente de la inicialización hacia `YtDlpEnvironmentSetup` y de la descarga directa hacia `YtDlpStreamDownloader`.
+  - Compatibilidad total con `OnlineVideoAudioImporter`, `YtDlpAutoUpdater` y `StreamingApiService`.
+
+### 4. Orquestación Híbrida en `OnlineVideoAudioImporter.kt`
+- **Flujo Resiliente**:
+  1. Si el motor activo es `yt-dlp`, se invoca prioritariamente la descarga directa vía `YtDlpStreamDownloader` para audio y Video Canvas (480p).
+  2. Si `yt-dlp` no está disponible o falla por alguna razón de red o de proceso, el sistema desciende fluidamente al descargador fragmentado por bloques HTTP Range (`ChunkedStreamDownloader`) con reintento lineal en OkHttp.
+  3. Si la URL directa arroja `HTTP 403`, se activan los niveles de respaldo alternativos (InnerTube multi-cliente, Invidious Bypass y Headless WebView en sandbox).
 
