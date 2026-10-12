@@ -115,6 +115,10 @@ fun LazyListScope.enginesAndDiagnosticsSettingsContent(
                     "FFmpeg Puro",
                     if (com.example.core.data.importer.FFmpegNativeEngine.isAvailable(context)) "Listo en dispositivo" else "Habilitado (CLI / NDK)"
                 )
+                SettingDetailRow(
+                    "Motor JS (n-sig)",
+                    com.example.core.data.importer.YtDlpNativeEngine.getQuickJsStatusSummary(context)
+                )
                 SettingDetailRow("Versión yt-dlp", ytdlpVersion)
 
                 if (updateMessage != null) {

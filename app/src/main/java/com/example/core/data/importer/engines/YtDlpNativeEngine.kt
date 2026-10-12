@@ -173,13 +173,28 @@ object YtDlpNativeEngine {
     }
 
     /**
-     * Localiza el binario ejecutable de QuickJS para firma de tokens JS si existe.
+     * Localiza el binario ejecutable de QuickJS C99 real (Bellard ECMAScript Engine > 200 KB)
+     * para resolución de firmas JS (n-sig / cipher) en yt-dlp.
      */
     fun getQuickJsExecutable(context: Context): File? {
         val nativeDir = File(context.applicationInfo.nativeLibraryDir)
         val qjsInNative = File(nativeDir, "libqjs.so")
-        if (qjsInNative.exists() && qjsInNative.canExecute()) return qjsInNative
+        if (qjsInNative.exists() && qjsInNative.length() > 200_000L && qjsInNative.canExecute()) {
+            return qjsInNative
+        }
         return null
+    }
+
+    /**
+     * Devuelve el resumen de estado y peso del binario nativo QuickJS C99 instalado en el dispositivo.
+     */
+    fun getQuickJsStatusSummary(context: Context): String {
+        val qjs = getQuickJsExecutable(context)
+        return if (qjs != null) {
+            "QuickJS C99 Puro Activo (${qjs.length() / 1024} KB)"
+        } else {
+            "QuickJS C99 Puro (Nativo NDK)"
+        }
     }
 
     /**

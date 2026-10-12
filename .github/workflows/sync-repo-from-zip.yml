@@ -1,0 +1,287 @@
+name: 📦 Sincronizar Código desde ZIP (zips/)
+
+# Se dispara ÚNICAMENTE cuando hay cambios en archivos .zip dentro de la carpeta zips/
+on:
+  push:
+    paths:
+      - 'zips/*.zip'
+      - 'zips/**/*.zip'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-repo-from-zip-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  sync_from_zip:
+    name: Extraer ZIP y Reemplazar Código de la Rama
+    runs-on: ubuntu-latest
+    # Evita que el commit de auto-limpieza (que borra el .zip) vuelva a ejecutar el proceso
+    if: "!contains(github.event.head_commit.message, 'chore(zip-sync):')"
+
+    steps:
+      - name: 📥 Checkout de la rama actual (${{ github.ref_name }})
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - name: 🔍 Verificar si se subió un archivo .zip en zips/
+        id: check_zip
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob globstar
+          ZIP_FILES=(zips/*.zip zips/**/*.zip)
+          if [ ${#ZIP_FILES[@]} -eq 0 ]; then
+            echo "⏭️ No hay archivos .zip presentes en zips/ (este commit fue el borrado del .zip). Saliendo sin hacer nada."
+            echo "has_zip=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Tomar el archivo .zip más reciente si se subió más de uno
+          LATEST_ZIP=$(ls -t "${ZIP_FILES[@]}" | head -n 1)
+          echo "📦 Archivo ZIP detectado para sincronizar: $LATEST_ZIP"
+          echo "has_zip=true" >> "$GITHUB_OUTPUT"
+          echo "zip_path=$LATEST_ZIP" >> "$GITHUB_OUTPUT"
+
+      - name: 🔄 Descomprimir ZIP, Sincronizar Archivos (Crear/Modificar/Eliminar) y Limpiar zips/
+        if: steps.check_zip.outputs.has_zip == 'true'
+        id: apply_zip
+        env:
+          TARGET_ZIP: ${{ steps.check_zip.outputs.zip_path }}
+          BRANCH_NAME: ${{ github.ref_name }}
+        shell: python3 {0}
+        run: |
+          import os
+          import sys
+          import shutil
+          import zipfile
+          import hashlib
+          from pathlib import Path
+
+          repo_root = Path.cwd().resolve()
+          zip_rel_path = os.environ.get("TARGET_ZIP", "").strip()
+          branch_name = os.environ.get("BRANCH_NAME", "main").strip()
+          zip_file_path = (repo_root / zip_rel_path).resolve()
+
+          if not zip_file_path.exists() or not zipfile.is_zipfile(zip_file_path):
+              print(f"❌ Error: El archivo '{zip_rel_path}' no existe o no es un archivo .zip válido.")
+              sys.exit(1)
+
+          extract_root = Path("/tmp/aura_zip_sync_staging").resolve()
+          if extract_root.exists():
+              shutil.rmtree(extract_root)
+          extract_root.mkdir(parents=True, exist_ok=True)
+
+          print(f"🔓 Extrayendo '{zip_rel_path}' de forma segura (Anti-Zip Slip)...")
+          with zipfile.ZipFile(zip_file_path, "r") as zf:
+              for member in zf.infolist():
+                  # Ignorar metadatos basura de macOS o Windows
+                  if member.filename.startswith("__MACOSX/") or member.filename.endswith(".DS_Store"):
+                      continue
+                  target_path = (extract_root / member.filename).resolve()
+                  if not str(target_path).startswith(str(extract_root)):
+                      print(f"🚨 Ruta peligrosa bloqueada (Zip Slip): {member.filename}")
+                      sys.exit(1)
+                  if member.is_dir():
+                      target_path.mkdir(parents=True, exist_ok=True)
+                  else:
+                      target_path.parent.mkdir(parents=True, exist_ok=True)
+                      with zf.open(member, "r") as src, open(target_path, "wb") as dst:
+                          shutil.copyfileobj(src, dst)
+
+          # Detectar si el .zip trae todo envuelto dentro de una única carpeta contenedora raíz
+          top_entries = [
+              p for p in extract_root.iterdir()
+              if p.name not in ("__MACOSX", ".DS_Store")
+          ]
+          source_root = extract_root
+          if len(top_entries) == 1 and top_entries[0].is_dir():
+              candidate = top_entries[0]
+              # Si la carpeta única no es en sí misma una carpeta estándar del proyecto (como "app"), desenvolverla
+              if candidate.name not in ("app", "gradle", ".github", "zips"):
+                  print(f"📁 Detectada carpeta contenedora raíz en el ZIP: '{candidate.name}/' -> desenvolviendo niveles...")
+                  source_root = candidate
+
+          # Función para determinar si una ruta relativa del ZIP debe ignorarse (binarios prohibidos, cachés o .git)
+          def is_ignored_from_zip(rel_posix: str) -> bool:
+              parts = rel_posix.split("/")
+              if parts[0] in (".git", ".gradle", ".kotlin", ".idea", "build", ".cxx", ".externalNativeBuild", "captures", ".build-outputs"):
+                  return True
+              if "build" in parts and ("app" in parts):
+                  return True
+              if rel_posix in ("local.properties", ".env", "debug.keystore"):
+                  return True
+              if rel_posix.endswith((".so", ".zip.so", ".apk", ".aab", ".iml", ".DS_Store")):
+                  return True
+              # No copiar otros .zip que pudieran venir dentro de zips/ en el paquete
+              if parts[0] == "zips" and rel_posix.endswith(".zip"):
+                  return True
+              return False
+
+          # Recolectar todos los archivos válidos del ZIP
+          zip_files_map = {}
+          zip_has_github_workflows = False
+
+          for root, dirs, files in os.walk(source_root):
+              for f in files:
+                  full_p = Path(root) / f
+                  rel_p = full_p.relative_to(source_root).as_posix()
+                  if is_ignored_from_zip(rel_p):
+                      continue
+                  if rel_p.startswith(".github/workflows/"):
+                      zip_has_github_workflows = True
+                  zip_files_map[rel_p] = full_p
+
+          if not zip_files_map:
+              print("❌ Error: El archivo .zip está vacío o no contiene archivos de código válidos.")
+              sys.exit(1)
+
+          def sha256_file(path: Path) -> str:
+              h = hashlib.sha256()
+              with open(path, "rb") as fp:
+                  for chunk in iter(lambda: fp.read(65536), b""):
+                      h.update(chunk)
+              return h.hexdigest()
+
+          # Archivos protegidos que NUNCA deben eliminarse del repositorio aunque el ZIP no los traiga
+          ALWAYS_PROTECTED_FILES = {
+              ".github/workflows/sync-repo-from-zip.yml",
+              "zips/.gitkeep",
+              "zips/README.md",
+          }
+
+          # Recolectar los archivos actuales del repositorio (excepto .git/ y los archivos zips/*.zip que vamos a limpiar)
+          repo_existing_files = set()
+          removed_zips = []
+
+          for root, dirs, files in os.walk(repo_root):
+              if ".git" in dirs:
+                  dirs.remove(".git")
+              for f in files:
+                  full_p = Path(root) / f
+                  rel_p = full_p.relative_to(repo_root).as_posix()
+                  # Eliminar cualquier archivo .zip dentro de zips/
+                  if rel_p.startswith("zips/") and rel_p.endswith(".zip"):
+                      full_p.unlink()
+                      removed_zips.append(rel_p)
+                      continue
+                  repo_existing_files.add(rel_p)
+
+          added_files = []
+          modified_files = []
+          deleted_files = []
+
+          # 1. Eliminar archivos del repositorio que ya no existen en el ZIP
+          for existing_rel in sorted(repo_existing_files):
+              if existing_rel in zip_files_map:
+                  continue
+              if existing_rel in ALWAYS_PROTECTED_FILES:
+                  continue
+              # Si el ZIP no traía carpeta .github/workflows, proteger toda la carpeta .github/workflows actual
+              if not zip_has_github_workflows and existing_rel.startswith(".github/"):
+                  continue
+              # Conservar los marcadores .gitkeep de jniLibs y assets/bin si existen
+              if existing_rel.endswith(".gitkeep"):
+                  continue
+
+              target_to_delete = repo_root / existing_rel
+              if target_to_delete.exists():
+                  target_to_delete.unlink()
+                  deleted_files.append(existing_rel)
+
+          # 2. Agregar archivos nuevos y sobrescribir archivos modificados desde el ZIP
+          for rel_p, src_file in sorted(zip_files_map.items()):
+              # Si el ZIP trae una versión de este mismo workflow pero estuviera vacía, protegemos el workflow activo
+              dest_file = repo_root / rel_p
+              if not dest_file.exists():
+                  dest_file.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copy2(src_file, dest_file)
+                  added_files.append(rel_p)
+              else:
+                  if sha256_file(src_file) != sha256_file(dest_file):
+                      shutil.copy2(src_file, dest_file)
+                      modified_files.append(rel_p)
+
+          # 3. Limpiar directorios vacíos que hayan quedado tras borrar archivos antiguos
+          for root, dirs, files in os.walk(repo_root, topdown=False):
+              rel_dir = Path(root).relative_to(repo_root).as_posix()
+              if rel_dir.startswith(".git") or rel_dir in (".", "zips", ".github", ".github/workflows"):
+                  continue
+              try:
+                  if not os.listdir(root):
+                      os.rmdir(root)
+              except OSError:
+                  pass
+
+          # Asegurar que zips/README.md y zips/.gitkeep sigan presentes
+          (repo_root / "zips").mkdir(parents=True, exist_ok=True)
+          gitkeep_file = repo_root / "zips" / ".gitkeep"
+          if not gitkeep_file.exists():
+              gitkeep_file.write_text("# Mantiene la carpeta zips/ en Git.\n", encoding="utf-8")
+
+          print(f"✅ Sincronización completada:")
+          print(f"   ➕ Archivos nuevos agregados : {len(added_files)}")
+          print(f"   ✏️ Archivos modificados      : {len(modified_files)}")
+          print(f"   🗑️ Archivos antiguos borrados: {len(deleted_files)}")
+          print(f"   🧹 Archivos .zip limpiados   : {len(removed_zips)}")
+
+          # Generar resumen visual en español para GitHub Actions ($GITHUB_STEP_SUMMARY)
+          summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summary_path:
+              with open(summary_path, "a", encoding="utf-8") as sf:
+                  sf.write(f"## 📦 Sincronización de Código por ZIP Completada\n\n")
+                  sf.write(f"- **Rama actualizada:** `{branch_name}`\n")
+                  sf.write(f"- **Paquete ZIP procesado y eliminado:** `{zip_rel_path}`\n")
+                  sf.write(f"- **Protección de `.github/workflows`:** `{'Activa (Conservados)' if not zip_has_github_workflows else 'Actualizados desde el ZIP'}`\n\n")
+                  sf.write("| Métrica | Cantidad |\n")
+                  sf.write("| :--- | :---: |\n")
+                  sf.write(f"| ➕ **Archivos Nuevos Creados** | `{len(added_files)}` |\n")
+                  sf.write(f"| ✏️ **Archivos Modificados** | `{len(modified_files)}` |\n")
+                  sf.write(f"| 🗑️ **Archivos Antiguos Eliminados** | `{len(deleted_files)}` |\n")
+                  sf.write(f"| 🧹 **Paquetes `.zip` Eliminados de `zips/`** | `{len(removed_zips)}` |\n\n")
+
+                  if added_files:
+                      sf.write("<details><summary>➕ Ver archivos nuevos agregados</summary>\n\n```text\n")
+                      sf.write("\n".join(added_files[:200]))
+                      sf.write("\n```\n</details>\n\n")
+                  if modified_files:
+                      sf.write("<details><summary>✏️ Ver archivos modificados</summary>\n\n```text\n")
+                      sf.write("\n".join(modified_files[:200]))
+                      sf.write("\n```\n</details>\n\n")
+                  if deleted_files:
+                      sf.write("<details><summary>🗑️ Ver archivos antiguos eliminados</summary>\n\n```text\n")
+                      sf.write("\n".join(deleted_files[:200]))
+                      sf.write("\n```\n</details>\n\n")
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+              out.write(f"added_count={len(added_files)}\n")
+              out.write(f"modified_count={len(modified_files)}\n")
+              out.write(f"deleted_count={len(deleted_files)}\n")
+
+      - name: 💾 Hacer Commit y Push de los cambios en la misma rama (${{ github.ref_name }})
+        if: steps.check_zip.outputs.has_zip == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "ℹ️ No hay diferencias que confirmar."
+            exit 0
+          fi
+
+          ZIP_NAME=$(basename "${{ steps.check_zip.outputs.zip_path }}")
+          ADDED="${{ steps.apply_zip.outputs.added_count }}"
+          MODIFIED="${{ steps.apply_zip.outputs.modified_count }}"
+          DELETED="${{ steps.apply_zip.outputs.deleted_count }}"
+
+          git commit -m "chore(zip-sync): aplicar paquete ${ZIP_NAME} (+${ADDED} ~${MODIFIED} -${DELETED}) y limpiar zips/"
+          git push origin HEAD:${{ github.ref_name }}
+          echo "🚀 Código sincronizado y archivo .zip eliminado exitosamente en la rama ${{ github.ref_name }}."

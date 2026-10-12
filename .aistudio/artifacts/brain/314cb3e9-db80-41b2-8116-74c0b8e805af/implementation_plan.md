@@ -1,114 +1,95 @@
-# Reparación Definitiva del Error HTTP 403 en Descargas de YouTube (`googlevideo.com`) y Cascada Multi-Fallback de 5 Niveles
+# Sincronización Automática de Código por Archivo ZIP (Mobile-First GitHub Sync)
 
-Este plan corrige de raíz el rechazo `HTTP 403 Forbidden` al descargar canciones y videos de YouTube (especialmente videos oficiales VEVO como *"Pedro Capó, Farruko - Calma"*) después de que `yt-dlp` resuelve exitosamente el enlace, e implementa una cadena automática de 5 niveles de respaldo para que ninguna descarga ni pre-carga de caché vuelva a quedar truncada.
+Este sistema permite actualizar el código completo de cualquier rama del repositorio directamente desde un teléfono móvil subiendo un único archivo `.zip` dentro de la carpeta `zips/`, sin necesidad de usar una PC ni comandos `git` locales. Al detectar el archivo `.zip`, GitHub Actions descomprime el paquete, reemplaza el código del repositorio (creando archivos nuevos, actualizando modificados y eliminando los que ya no existan en el `.zip`), protege los workflows de `.github` y borra automáticamente el `.zip` para mantener el repositorio limpio.
 
----
-
-## User Review & Critical Decisions
+## Revisión del Usuario y Decisiones Confirmadas
 
 > [!IMPORTANT]
-> **Diagnóstico Forense del Fallo Actual (`HTTP 403 al descargar: https://rr1---sn-...googlevideo.com`)**:
-> Al inspeccionar el flujo entre `YtDlpNativeEngine`, `ChunkedStreamDownloader` y `OnlineVideoAudioImporter`, encontramos **4 causas técnicas exactas** por las que `yt-dlp` logra obtener la URL pero `Downloader` recibe `HTTP 403`:
-> 1. **Colisión de Cabeceras entre Audio y Video (`resolvedHeaders` compartido)**: `yt-dlp` se invoca con `player_client=android_vr,ios,web`. Cuando extrae los formatos de un video, el mejor audio (`m4a`) suele provenir de un cliente (ej. `c=IOS` o `c=ANDROID_VR`), mientras que el mejor video `480p avc1` suele provenir de otro cliente (ej. `c=WEB`). En el código actual, `YtDlpNativeEngine` guarda todas las cabeceras en un único mapa `resolvedHeaders`: cuando itera por los formatos de video al final, **sobrescribe el `User-Agent` del audio con el del video**. Al intentar descargar el audio con el `User-Agent` de otro cliente distinto al firmado en `&c=...`, `googlevideo.com` devuelve instantáneamente `HTTP 403 Forbidden`.
-> 2. **Reintento en `ChunkedStreamDownloader` que destruye las cabeceras y adjunta Cookies de `m.youtube.com` a clientes no-Web**: En `ChunkedStreamDownloader`, cuando ocurre un fallo o cuando `executeChunkedDownload` no pasa `Origin`/`Referer`, el método cae a un `fallbackReq` que borra las cabeceras firmadas o inyecta cookies de `m.youtube.com` sobre URLs `c=ANDROID_VR` / `c=IOS`, provocando un segundo `HTTP 403`.
-> 3. **`extractVideoId` no reconocía subdominios como `music.youtube.com` en el bloque de Autoreparación**: En `WebStreamExtractor.YOUTUBE_ID_PATTERN`, la expresión regular exigía `(?:youtu\.be/|youtube\.com/...)` sin contemplar `(?:www\.|m\.|music\.)?youtube\.com`, por lo que al fallar una URL de `music.youtube.com`, `extractVideoId` devolvía `null` y **el bloque de fallback nunca se ejecutaba**.
-> 4. **Re-ejecución idéntica en el Fallback**: Cuando sí entraba al bloque de autoreparación en `OnlineVideoAudioImporter`, volvía a llamar a `YtDlpNativeEngine.resolveStream` exactamente con los mismos argumentos, obteniendo la misma URL que acababa de dar `403`, en lugar de pasar inmediatamente a `InnerTube (ANDROID_VR / VISIONOS / ANDROID_MUSIC)` -> `Invidious` -> `WebView` -> `Descarga nativa directa con yt-dlp CLI`.
+> Estas son las decisiones de diseño confirmadas para la automatización:
 
-- **Decisión Confirmada 1 (Alineación Estricta de Cabeceras por Stream)**: Separar `audioHeaders` y `videoHeaders` y alinear dinámicamente el `User-Agent`, `Origin` y `Referer` inspeccionando el parámetro `c=` (`ANDROID_VR`, `IOS`, `ANDROID`, `ANDROID_MUSIC`, `VISIONOS`, `TVHTML5`, `WEB`) propio de cada URL de `googlevideo.com`.
-- **Decisión Confirmada 2 (Cascada Automática de 5 Niveles)**: Cuando una URL de `googlevideo.com` falle con `HTTP 403`, ejecutar en orden automático:
-  1. **Nivel 1**: Reparación y alineación de cabeceras HTTP exactas por cliente (`c=`) en `ChunkedStreamDownloader`.
-  2. **Nivel 2**: Resolución alternativa inmediata vía **InnerTube Multi-Cliente** (`ANDROID_VR`, `VISIONOS`, `ANDROID_MUSIC`, `IOS`).
-  3. **Nivel 3**: Bypass vía **Invidious API** (espejos públicos con descifrado limpio).
-  4. **Nivel 4**: Extracción vía **Headless WebView** móvil (`m.youtube.com`).
-  5. **Nivel 5**: Descarga directa de emergencia mediante el propio binario **`yt-dlp` CLI** hacia el archivo local (`downloadDirectToFile`), garantizando un 100% de éxito incluso cuando el CDN valide la huella TLS (JA3) de Python/OpenSSL.
+- **Rama de Destino Confirmada**: Los cambios se aplicarán **siempre en la misma rama** donde hayas subido el archivo `.zip` (ideal para trabajar en `main`, `beta` o cualquier rama experimental creada desde GitHub móvil).
+- **Limpieza Automática del `.zip` Confirmada**: Una vez descomprimido y aplicado el nuevo código, el Action **eliminará automáticamente el archivo `.zip`** de la carpeta `zips/` en el mismo commit (dejando únicamente el marcador de la carpeta) para no inflar el peso del repositorio.
+- **Protección Inteligente de `.github/workflows` Confirmada**: Si el `.zip` que subes no incluye la carpeta `.github/` (por ejemplo, si ciertas exportaciones omiten carpetas ocultas), el sistema conservará intacta tu carpeta `.github/workflows` actual para nunca borrar tus Actions por accidente. Si el `.zip` sí trae `.github/workflows`, actualizará los workflows y preservará el propio workflow de sincronización ZIP.
 
 ---
 
-## 1. Overview & Core Concept
+## 1. Visión General y Concepto Principal
 
-- **Qué soluciona**: Elimina el error `HTTP 403` al descargar pistas o pre-cargar caché desde YouTube y YouTube Music cuando `yt-dlp` ya resolvió el video correctamente.
-- **Dónde impacta**:
-  - Descargas desde el modal **Descargar de Enlace (YouTube / YT Music)**.
-  - Descargas con 1 toque (`↓`) desde la pestaña **Explorar (Streaming)** y desde **Now Playing**.
-  - Descargas offline masivas del **Importador de Playlists**.
-  - Pre-carga en segundo plano de la **Caché Inteligente de 30 minutos (`StreamingCacheManager`)**.
+- **Qué hace**: Crea una carpeta dedicada en la raíz del proyecto para recibir paquetes `.zip` con versiones nuevas o completas del código fuente. En cuanto GitHub detecta un `.zip` en esa carpeta en cualquier rama, se dispara automáticamente un flujo de trabajo que sincroniza todo el árbol del proyecto de forma exacta (`1:1`).
+- **Para quién está diseñado**: Flujo 100% *Mobile-First* pensado para cuando descargas el `.zip` de tu proyecto desde el navegador de tu teléfono y quieres actualizar tu repositorio de GitHub o una rama específica usando únicamente el botón **"Upload files"** de la interfaz móvil de GitHub.
+- **Valor clave**: Resuelve la limitación de GitHub en navegadores móviles (donde no se pueden subir carpetas enteras ni borrar decenas de archivos obsoletos a la vez), convirtiendo la subida de un solo `.zip` en una sincronización completa de rama.
 
 ---
 
-## 2. User Experience & Visual Design
+## 2. Experiencia de Uso y Flujo Paso a Paso
 
-- **Transparencia y Telemetría Clara en `Aura Monitor`**:
-  - El usuario verá el progreso continuo de la descarga sin cortes ni falsos errores de conexión.
-  - En `Aura Monitor`, cada transición de la cascada quedará registrada con precisión informativa (indicando qué cliente `c=` se utilizó y qué nivel de fallback respondió en caso de bloqueo VEVO/CDN).
-- **Sin Cambios Disruptivos en la Interfaz**:
-  - Se respeta íntegramente el diseño actual de la aplicación, modales, reproductor y notificaciones de `AuraDownloadService`.
-
----
-
-## 3. Key Product Decisions & Trade-Offs
-
-- **Decisión 1: Cabeceras Independientes para Audio (`audioHeaders`) y Video (`videoHeaders`) + Inferencia por Parámetro `c=`**
-  - *Enfoque elegido*: Almacenar cabeceras separadas para el flujo de audio y para el flujo de video en `ResolvedMediaInfo`, y además hacer que `ChunkedStreamDownloader` verifique siempre el parámetro query `c=` de la URL de `googlevideo.com` (por ejemplo, `c=IOS`, `c=ANDROID_VR`, `c=WEB`). Si la URL tiene `c=IOS`, jamás se le enviará un `User-Agent` de Android o Chrome Web ni cookies de navegador.
-  - *Por qué*: `googlevideo.com` firma criptográficamente el parámetro `c=` (Client Name) dentro del `sparams` de la URL. Si el `User-Agent` de la petición HTTP no coincide con la familia del cliente `c=`, el CDN responde `HTTP 403 Forbidden` en el primer bloque.
-
-- **Decisión 2: Cascada Completa de 5 Fallbacks Diferenciados (Sin repetir la misma URL fallida)**
-  - *Enfoque elegido*: Si el stream inicial provino de `yt-dlp` y aun con cabeceras alineadas el nodo de `googlevideo.com` devuelve `HTTP 403` (por ejemplo, porque ese formato específico fue atado a la sesión TLS de Python), el sistema **no vuelve a pedir la misma URL**, sino que ejecuta en cascada:
-    1. **InnerTube (`ANDROID_VR` -> `VISIONOS` -> `ANDROID_MUSIC` -> `IOS`)**
-    2. **Invidious API**
-    3. **Headless WebView (`m.youtube.com`)**
-    4. **Ejecución directa de `yt-dlp -o <archivo>`**: Como último eslabón infalible, invoca a `yt-dlp` para que él mismo descargue los bytes del stream a disco usando su propio motor HTTP/TLS en Python.
+- **Flujo del Usuario desde el Teléfono**:
+  1. Descargas el archivo `.zip` del proyecto en tu celular.
+  2. Entras a tu repositorio en GitHub desde el navegador del teléfono y seleccionas la rama que quieres actualizar (por ejemplo, `main` o una rama nueva).
+  3. Abres la carpeta `zips/`, tocas **"Add file" -> "Upload files"**, seleccionas tu `.zip` y confirmas el commit.
+  4. **GitHub Actions entra en acción automáticamente**:
+     - Detecta el `.zip` recién subido.
+     - Analiza su interior (incluso si el `.zip` viene envuelto dentro de una carpeta raíz contenedora o si trae los archivos directamente en la raíz).
+     - Limpia los binarios pesados prohibidos (`.so`, `.apk`, `.gradle`, `build`) por si el `.zip` los traía por error.
+     - Elimina del repositorio los archivos antiguos que ya no existan en el `.zip`, agrega los archivos nuevos y sobrescribe los modificados.
+     - Elimina el archivo `.zip` subido para liberar espacio.
+     - Hace commit y push automático en esa misma rama y genera un **Resumen Ejecutivo en Español** en la pestaña *Actions* indicando cuántos archivos se agregaron, modificaron y eliminaron.
 
 ---
 
-## 4. Technical Architecture & Data Strategy *(Technical Reference)*
+## 3. Decisiones Técnicas y Ventajas
 
-### Diagrama de Flujo de Resolución y Cascada Anti-403
+- **Detección Inteligente de Carpeta Contenedora (Root Folder Unwrapping)**:
+  - *Enfoque elegido*: Al descomprimir en un directorio temporal, el motor verifica si todos los archivos están dentro de una única carpeta superior (ej. `Aura-Music-main/app/...`) o directamente en la raíz (`app/...`, `build.gradle.kts`). Si están dentro de una subcarpeta contenedora, aplana automáticamente ese nivel.
+  - *Por qué*: Dependiendo de cómo se genere o comprima un `.zip` en Android o en plataformas en la nube, a veces se incluye una carpeta contenedora y a veces no. Esto garantiza que nunca se dupliquen carpetas por error.
+- **Validación de Seguridad (Anti-Zip Slip y Filtro de Binarios)**:
+  - *Enfoque elegido*: Antes de aplicar los archivos, se verifica que ninguna ruta del `.zip` intente escapar del directorio (`..`) y se excluyen automáticamente archivos temporales o binarios compilados (`.apk`, `.so`, `.zip.so`, `local.properties`) respetando las reglas del proyecto.
+  - *Por qué*: Evita que un `.zip` sucio ensucie el historial de Git con binarios compilados que luego bloqueen la subida a GitHub.
+- **Prevención de Bucles Infinitos en CI/CD**:
+  - *Enfoque elegido*: El workflow se activa exclusivamente cuando se agrega o modifica un archivo `zips/*.zip`. Como el commit automático del propio Action borra el `.zip`, no vuelve a dispararse en bucle.
+
+---
+
+## 4. Arquitectura Técnica del Flujo de Sincronización
 
 ```
-┌────────────────────────────────────────────────────────────────────────────┐
-│ 1. YtDlpNativeEngine.resolveStream(url)                                    │
-│    • Prioriza clientes de descarga directa: android_vr, ios, android_music │
-│    • Extrae por separado:                                                  │
-│      - audioUrl + audioHeaders (alineados con el c= del formato de audio)  │
-│      - videoUrl + videoHeaders (alineados con el c= del formato 480p MP4)  │
-└───────────────────────────────────────┬────────────────────────────────────┘
-                                        │
-                                        ▼
-┌────────────────────────────────────────────────────────────────────────────┐
-│ 2. ChunkedStreamDownloader.downloadUrlToFile(url, headers)                 │
-│    • Infiere y normaliza User-Agent/Origin según el parámetro ?c=...       │
-│    • No inyecta cookies de m.youtube.com en clientes ANDROID_VR / IOS      │
-│    • Intenta Chunked Range (2.5 MB) -> Lineal con UA exacto -> Perfil c=   │
-└───────────────────────────────────────┬────────────────────────────────────┘
-                                        │
-                      ¿Devuelve HTTP 403 o falla la descarga?
-                                        │
-          ┌─────────────────────────────┴─────────────────────────────┐
-          │ NO (200 / 206 OK)                                         │ SÍ (HTTP 403)
-          ▼                                                           ▼
-┌──────────────────────────────┐            ┌────────────────────────────────────────────────┐
-│ Continúa flujo normal:       │            │ 3. Cascada Automática de Autoreparación (5x):  │
-│ • Extrae/demuxea audio .m4a  │            │    ├─ [Fallback 1] InnerTube Multi-Cliente     │
-│ • Genera portada WebP        │            │    │   (ANDROID_VR -> VISIONOS -> MUSIC -> IOS)│
-│ • Optimiza Video Canvas 480p │            │    ├─ [Fallback 2] Invidious Stream Resolver   │
-└──────────────────────────────┘            │    ├─ [Fallback 3] Headless WebView Extractor  │
-                                            │    └─ [Fallback 4] yt-dlp Direct File Download │
-                                            │        (descarga nativa directa con Python/TLS)│
-                                            └────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│             📱 Teléfono del Usuario (GitHub Web / Mobile)               │
+│        Sube cualquier archivo .zip dentro de la carpeta zips/           │
+│                  (en main o en cualquier otra rama)                     │
+└───────────────────────────────────┬─────────────────────────────────────┘
+                                    │ Push detectado (zips/**/*.zip)
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│               ⚙️ GitHub Actions: Sync Repo from ZIP                     │
+│  1. Checkout de la misma rama (${{ github.ref_name }}) con permisos RW  │
+│  2. Localiza el archivo .zip más reciente dentro de zips/               │
+│  3. Extrae en área segura temporal (/tmp/aura_zip_extract)              │
+│  4. Detecta si hay carpeta raíz contenedora única y normaliza estructura│
+└───────────────────────────────────┬─────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                🛡️ Reglas de Protección y Sincronización                 │
+│  • Protege .git/ siempre intacto                                        │
+│  • Protege .github/workflows/ si el .zip no trae carpeta .github        │
+│  • Preserva zips/.gitkeep y elimina todos los zips/*.zip                │
+│  • Filtra artefactos prohibidos (.apk, .so, .gradle/, build/)           │
+│  • Sincroniza 1:1:                                                      │
+│      - Borra archivos del repo que ya no existen en el .zip             │
+│      - Crea archivos nuevos presentes en el .zip                        │
+│      - Actualiza archivos modificados                                   │
+└───────────────────────────────────┬─────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│         ✅ Commit Automático en la Rama + Reporte en Español            │
+│  • Commit: "chore(sync): actualizar código desde paquete ZIP"           │
+│  • Muestra tabla en $GITHUB_STEP_SUMMARY (Creados / Editados / Borrados)│
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Componentes y Responsabilidades
-
-1. **Modelo `ResolvedMediaInfo` (`OnlineVideoAudioImporter`)**:
-   - Incorpora `audioHeaders: Map<String, String>` y `videoHeaders: Map<String, String>` además de `httpHeaders` general, para que el descargador de audio y el descargador de Video Canvas 480p utilicen siempre las cabeceras exactas de su propio formato.
-2. **Motor `YtDlpNativeEngine`**:
-   - Separa la captura de `http_headers` de cada formato (`audioHeaders` para el mejor stream `m4a` y `videoHeaders` para el mejor stream `mp4 480p avc1`).
-   - Añade la función de respaldo `downloadStreamDirectToFile(context, url, targetFile, isAudioOnly)` que permite a `yt-dlp` descargar directamente el archivo (audio `.m4a` o video `480p .mp4`) cuando un stream de YouTube exija la misma sesión TLS que lo resolvió.
-3. **Acelerador `ChunkedStreamDownloader` y `StreamingHttpDataSourceConfig`**:
-   - Añade un normalizador inteligente de cabeceras basado en el parámetro `c=` de la URL de `googlevideo.com` (`ANDROID_VR`, `IOS`, `ANDROID_MUSIC`, `VISIONOS`, `WEB`, `MWEB`, `TVHTML5`).
-   - En `executeChunkedDownload` y `executeDownload`, garantiza que todas las peticiones usen las cabeceras alineadas con el cliente `c=` de esa URL específica, y si un nodo rechaza el rango o responde `403`, reintenta limpiando parámetros de transporte conflictivos y aplicando el perfil exacto del cliente antes de reportar fallo.
-4. **Extractor `WebStreamExtractor` y `OnlineVideoAudioImporter` + `MediaAssetProcessor`**:
-   - Actualiza `YOUTUBE_ID_PATTERN` para soportar `music.youtube.com`, `m.youtube.com`, `www.youtube.com` y `youtu.be`.
-   - Implementa la cascada completa (`InnerTube` -> `Invidious` -> `HeadlessWebView` -> `YtDlpNativeEngine.downloadStreamDirectToFile`) tanto en la descarga del audio principal como en la descarga del Video Canvas 480p.
-5. **Documentación y Changelog**:
-   - Actualiza los archivos `.md` y `chanelog-beta.md` conservando todo su contenido previo para reflejar el blindaje anti-HTTP 403 y la cascada de 5 niveles.
+### Componentes e Interacciones del Sistema
+- **Carpeta Receptora (`zips/`)**: Incluye un archivo guía en español que mantiene la carpeta visible en GitHub para que siempre aparezca en el navegador del celular lista para recibir archivos `.zip`.
+- **Reglas de `.gitignore`**: Se asegura que los archivos `.zip` dentro de `zips/` estén permitidos en Git para que puedas subirlos desde la web móvil sin bloqueos.
+- **Motor de Sincronización en Python3 (integrado en el Workflow)**: Ejecuta la validación de integridad del archivo `.zip`, el cálculo exacto de diferencias (archivos añadidos, modificados y eliminados), la protección de `.github/workflows` y el borrado del `.zip` original en una sola operación atómica.

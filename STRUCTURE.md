@@ -37,245 +37,294 @@ El proyecto sigue una arquitectura reactiva y desacoplada organizada en capas:
 ## 📂 Árbol de Directorios y Módulos
 
 ```text
+zips/                                           # Carpeta receptora de paquetes .zip para sincronización automática de ramas
+├── README.md                                   # Guía rápida de uso desde dispositivos móviles
+└── .gitkeep                                    # Mantiene la carpeta visible tras auto-eliminar los .zip procesados
+
 app/
-├── src/
-│   ├── main/
-│   │   ├── AndroidManifest.xml
-│   │   ├── cpp/                                # Núcleo C++20 Nativo DSP & Launchers
-│   │   │   ├── CMakeLists.txt
-│   │   │   ├── auramusic_dsp.h                 # Fachada pública del motor DSP
-│   │   │   ├── auramusic_dsp.cpp               # Implementación JNI y ruteo de buffers
-│   │   │   ├── dsp_filters.h                   # Filtros biquad IIR, EQ 10 bandas y Vocal Clarity
-│   │   │   ├── dsp_spatial.h                   # Paneo 8D y Audio Espacial 16D Multi-Órbita
-│   │   │   ├── dsp_crossfeed.h                 # Filtro Crossfeed acústico binaural Chu Moy
-│   │   │   ├── dsp_reverb.h                    # Reverb digital Schroeder con líneas de retardo
-│   │   │   ├── dsp_bitperfect.h                # Motor Bit-Perfect 1:1 y salida AAudio Ultra-Baja Latencia
-│   │   │   ├── native_ffmpeg_launcher.c        # Invocación directa POSIX a FFmpeg
-│   │   │   ├── native_quickjs_cli.c            # Intérprete QuickJS C99
-│   │   │   └── native_python_launcher.c        # Embebedor CPython 3.11
-│   │   │
-│   │   └── java/com/example/
-│   │       ├── AuraApplication.kt             # Inicialización de la aplicación y DebugManager
-│   │       ├── MainActivity.kt                 # Actividad principal modularizada (< 140 líneas)
-│   │       │
-│   │       ├── data/
-│   │       │   ├── local/                      # Capa de Persistencia Local (Room)
-│   │       │   │   ├── AppDatabase.kt          # Base de datos Room
-│   │       │   │   ├── dao/
-│   │       │   │   │   ├── TrackDao.kt
-│   │       │   │   │   └── PlaylistDao.kt
-│   │       │   │   └── entity/
-│   │       │   │       ├── TrackEntity.kt
-│   │       │   │       ├── PlaylistEntity.kt
-│   │       │   │       └── PlaylistTrackCrossRef.kt
-│   │       │   │
-│   │       │   ├── repository/                 # Repositorios y Operaciones de Datos
-│   │       │   │   ├── MusicRepository.kt      # Fachada principal de repositorio
-│   │       │   │   ├── PlaylistRepository.kt   # Gestión de listas y cross-references
-│   │       │   │   └── SafTrackImporter.kt     # Importador blindado contra colisiones de extensiones
-│   │       │   │
-│   │       │   ├── storage/
-│   │       │   │   └── AppStorageManager.kt    # Manejo de disco en Android/data/.../files/
-│   │       │   │
-│   │       │   ├── updater/
-│   │       │   │   └── AppReleaseUpdater.kt    # Actualizador automático de versiones APK desde GitHub Releases
-│   │       │   │
-│   │       │   └── importer/                   # Motores de Descarga, Conversión y Medios Organizados
-│   │       │       ├── IncomingMediaHandler.kt # Triaje seguro de Intents ("Abrir con..." y "Compartir con...")
-│   │       │       ├── engines/                # Motores Nativos CLI y Actualizador OTA
-│   │       │       │   ├── FFmpegNativeEngine.kt   # Extracción y Canvas con prevención de Flag Injection
-│   │       │       │   ├── YtDlpNativeEngine.kt    # Entorno nativo de ejecución con TLS/SSL y Android 14+ APEX CA
-│   │       │       │   └── YtDlpAutoUpdater.kt     # Actualizador OTA con blindaje SHA-256 verificado
-│   │       │       ├── extractors/             # Extractores de Video y Audio Web
-│   │       │       │   ├── OnlineVideoAudioImporter.kt # Orquestador de importación web
-│   │       │       │   ├── InnerTubeClient.kt          # Cliente directo YouTube InnerTube (<300ms)
-│   │       │       │   ├── InvidiousStreamResolver.kt  # Bypass de streams Invidious
-│   │       │       │   ├── HeadlessWebViewExtractor.kt # Extractor headless de respaldo con cascada de portadas
-│   │       │       │   └── WebStreamExtractor.kt       # Extractor web universal
-│   │       │       ├── audio/                  # Procesamiento Acústico, Formatos Especiales y Metadatos
-│   │       │       │   ├── AudioMetadataParser.kt      # Extracción de tags ID3, Vorbis y WebP
-│   │       │       │   ├── AudioSilenceTrimmer.kt      # Supresión de silencios al inicio y fin (-42 dB RMS)
-│   │       │       │   ├── SpecialAudioFormatDecoder.kt # Decodificador nativo DSD, APE, WavPack y Chiptune
-│   │       │       │   ├── VideoAudioExtractor.kt      # Conversor Video a Música 3 en 1 (Demuxing directo)
-│   │       │       │   └── SampleMusicGenerator.kt     # Generador procedural de pistas demo
-│   │       │       ├── artwork/                # Procesamiento de Portadas WebP y Arte Procedural
-│   │       │       │   ├── MediaAssetProcessor.kt          # Procesamiento de carátulas WebP y Canvas
-│   │       │       │   └── ProceduralArtworkGenerator.kt   # Carátulas matemáticas procedurales
-│   │       │       ├── lyrics/                 # Motor de Letras Sincronizadas (.LRC / .TXT)
-│   │       │       │   └── LyricsManager.kt    # Descarga de letras sincronizadas LRCLIB y caché
-│   │       │       ├── mixtape/                # Motor de Fusión Continua y Auto-Remix / Mashup de 2 Canciones Locales
-│   │       │       │   ├── MixtapeEngine.kt         # Fusión FFmpeg acrossfade, collage WebP y capítulos
-│   │       │       │   └── SmartAutoRemixEngine.kt  # Auto-Remix de 2 canciones locales (Mashup Voz A + Base B / Remix Alternado DJ) y Auto-Match
-│   │       │       ├── playlist/               # Importador Universal de Playlists Públicas
-│   │       │       │   └── ExternalPlaylistImporter.kt # Extracción de Playlists de Spotify y YouTube Music / YouTube sin login ni API keys
-│   │       │       ├── download/               # Acelerador de Descargas HTTP Range
-│   │       │       │   └── ChunkedStreamDownloader.kt # Descarga acelerada HTTP Range multi-bloque
-│   │       │       └── tiktok/                 # Resolución Directa de TikTok
-│   │       │           └── TikTokMediaResolver.kt # Extracción libre de audio/video TikTok
-│   │       │   │
-│   │       │   └── streaming/                  # Modo Streaming Híbrido Tri-Plataforma (API + yt-dlp + Caché 30 min)
-│   │       │       ├── StreamingApiService.kt  # Búsqueda tri-plataforma (YT Music + YouTube + SoundCloud), Radio Similar y resolución
-│   │       │       ├── SoundCloudApiClient.kt  # Cliente modular de SoundCloud (hidratación client_id v2, búsqueda y streams progresivos)
-│   │       │       └── StreamingCacheManager.kt # Caché inteligente (50-500 MB, 30 min TTL, LRU) y Pre-descarga No Lineal
-│   │       │
-│   │       ├── widget/                         # Sistema de 2 Widgets Interactivos de Escritorio
-│   │       │   ├── AuraMusicWidgetProvider.kt  # Widget 1: Reproductor adaptativo (Compacto, Mediano, Expandido) con color de imagen
-│   │       │   ├── AuraLibraryWidgetProvider.kt # Widget 2: Cuadrícula 2x2 independiente de 4 Canciones Más Escuchadas o 4 Playlists
-│   │       │   ├── WidgetStateStore.kt         # Persistencia de estado, colores Palette de carátula y caché JSON Top 4 / Playlists
-│   │       │   ├── WidgetArtworkRenderer.kt    # Renderizador Canvas de fondos Neo-Glass, barras de progreso y collages 2x2
-│   │       │   └── WidgetPlaybackHeadlessController.kt # Reanudación y reproducción directa en segundo plano sin abrir la actividad
-│   │       │
-│   │       ├── playback/                       # Capa de Audio y Reproducción ExoPlayer
-│   │       │   ├── AuraAudioPlayer.kt          # Fachada del reproductor de audio
-│   │       │   ├── AuraMediaPlaybackService.kt # MediaSessionService para controles del sistema
-│   │       │   ├── AuraDownloadService.kt      # Servicio en primer plano para descargas
-│   │       │   ├── AudioEffectManager.kt       # Gestión de ecualizador y efectos nativos
-│   │       │   ├── HeadphoneController.kt      # BroadcastReceiver para audífonos y Becoming Noisy
-│   │       │   ├── NativeAudioEngine.kt        # Interfaz JNI C++20
-│   │       │   ├── NativeAudioProcessor.kt     # Pipe de ExoPlayer hacia DSP C++20
-│   │       │   └── controllers/
-│   │       │       ├── PlayerQueueController.kt # Gestión de cola y modos de repetición/aleatorio
-│   │       │       ├── AudioFadeController.kt  # Crossfade Dual-Deck (Equal-Power sin/cos), Fade-In/Out y Sleep Timer
-│   │       │       ├── ABLoopController.kt     # Bucle de repetición de segmento A-B
-│   │       │       └── MediaSessionBridge.kt   # Notificación nativa System Media Controls
-│   │       │
-│   │       ├── viewmodel/                      # Capa ViewModel y Coordinadores
-│   │       │   ├── MusicViewModel.kt           # ViewModel principal desacoplado
-│   │       │   └── delegates/
-│   │       │       ├── AudioEffectsCoordinator.kt       # Coordinador de efectos C++20 y Sleep Timer
-│   │       │       ├── NavigationCoordinator.kt         # Coordinador de navegación, temas y modos visuales
-│   │       │       ├── TrackLibraryCoordinator.kt       # Operaciones de pistas, playlists y descargas
-│   │       │       ├── LyricsCoordinator.kt             # Coordinación de letras sincronizadas
-│   │       │       ├── IncomingMediaCoordinator.kt      # Recepción de Intents externos y enlaces de Playlists
-│   │       │       ├── HeadphoneSettingsCoordinator.kt  # Ajustes de acústica, Bit-Perfect y auriculares
-│   │       │       ├── MixtapeCoordinator.kt            # Coordinador reactivo de Mixtapes y capítulos
-│   │       │       ├── StreamingModeCoordinator.kt      # Orquestador del Modo Streaming (YT Music, YouTube, SoundCloud, Caché y Radio)
-│   │       │       └── PlaylistImportCoordinator.kt     # Orquestador del Importador de Playlists de Spotify y YouTube Music
-│   │       │
-│   │       ├── model/                          # Modelos de Dominio y Datos
-│   │       │   ├── Track.kt
-│   │       │   ├── Playlist.kt
-│   │       │   ├── StreamingModels.kt               # Modelos de búsqueda streaming (YT Music/YouTube/SoundCloud), importador de playlists y caché
-│   │       │   ├── WidgetModels.kt                  # Modelos de configuración y estado persistido de Widgets
-│   │       │   ├── AppUpdateModels.kt               # Modelos de estado y metadatos de actualización APK
-│   │       │   ├── MixtapeModels.kt                 # Modelos de capítulos y metadatos de Mixtape
-│   │       │   ├── LyricsState.kt
-│   │       │   ├── LyricSearchResult.kt
-│   │       │   ├── EqualizerConfig.kt
-│   │       │   ├── AudioEffectsConfig.kt
-│   │       │   ├── HeadphoneConfig.kt
-│   │       │   ├── DownloadProgress.kt
-│   │       │   ├── PackageUpdateState.kt
-│   │       │   ├── RepeatMode.kt
-│   │       │   ├── ThemePalette.kt
-│   │       │   ├── AppWallpaperConfig.kt            # Configuración de fondo de pantalla personalizado de galería (WebP/MP4)
-│   │       │   ├── VideoDisplayMode.kt
-│   │       │   └── NowPlayingDesignMode.kt          # Modos de diseño: Clásico, Cinemático Canvas y Auto
-│   │       │
-│   │       ├── ui/                             # Capa de Interfaz de Usuario (Compose M3)
-│   │       │   ├── AuraMusicAppContent.kt      # Orquestador del Scaffold y navegación principal
-│   │       │   ├── GlobalDialogsHost.kt        # Contenedor modular de diálogos globales
-│   │       │   │
-│   │       │   ├── navigation/
-│   │       │   │   └── NavScreen.kt            # Destinos de navegación
-│   │       │   │
-│   │       │   ├── screens/                    # Pantallas de la aplicación
-│   │       │   │   ├── home/
-│   │       │   │   │   └── HomeScreen.kt
-│   │       │   │   ├── streaming/
-│   │       │   │   │   └── StreamingExploreScreen.kt # Pestaña Explorar / Streaming Tri-Plataforma (YT Music, YouTube & SoundCloud)
-│   │       │   │   ├── library/
-│   │       │   │   │   ├── LibraryScreen.kt
-│   │       │   │   │   └── components/
-│   │       │   │   ├── nowplaying/
-│   │       │   │   │   ├── NowPlayingScreen.kt
-│   │       │   │   │   └── components/
-│   │       │   │   │       ├── FullScreenLyricsScreen.kt # Modo Karaoke Inmersivo a Pantalla Completa
-│   │       │   │   │       ├── NowPlayingCinematicLayout.kt # Diseño Cinemático Canvas (Estilo Spotify)
-│   │       │   │   │       ├── NowPlayingDesignSelectorDialog.kt # Selector de Diseño de Reproductor
-│   │       │   │   │       ├── NowPlayingArtworkCard.kt
-│   │       │   │   │       ├── NowPlayingLyricsCard.kt
-│   │       │   │   │       ├── NowPlayingPlaybackControls.kt
-│   │       │   │   │       ├── NowPlayingQueueSheet.kt
-│   │       │   │       ├── NowPlayingTopBar.kt
-│   │       │   │       ├── NowPlayingBalanceBar.kt
-│   │       │   │       ├── AudioSpecsDialog.kt
-│   │       │   │       └── VideoDisplayModeDialog.kt
-│   │       │   ├── settings/
-│   │       │   │   ├── SettingsScreen.kt   # Orquestador de Ajustes y navegación a pantallas completas
-│   │       │   │   └── components/
-│   │       │   │       ├── SettingDetailRow.kt            # Fila reutilizable de información de ajuste
-│   │       │   │       ├── SettingsSubScreenComponents.kt # Tarjetas navegables y contenedor de pantalla completa
-│   │       │   │       ├── widgets/                       # Personalización y Vista Previa de Widgets
-│   │       │   │       │   └── WidgetSettingsContent.kt       # Selector Canciones/Playlists, color de imagen y vista previa
-│   │       │   │       ├── about/                         # Detrás del Proyecto (Creador & Contribuidores)
-│   │       │   │       │   └── BehindTheProjectSection.kt     # Perfiles de GitHub y caché único de avatares WebP
-│   │       │   │   │       ├── appearance/                    # Ajustes de Apariencia, Fondo de Galería, Temas y Diseño
-│   │       │   │   │       │   ├── AppearanceSettingsTab.kt       # Menú principal de Ajustes y secciones visuales
-│   │       │   │   │       │   ├── AppWallpaperSettingsSection.kt # Controles de fondo de galería (WebP/Video, Opacidad y Blur)
-│   │       │   │   │       │   ├── EnginesAndDiagnosticsSection.kt # Motores nativos, actualizador OTA y diagnóstico
-│   │       │   │   │       │   └── PlayerDesignSettingsContent.kt # Pantalla dedicada de Diseño del Reproductor
-│   │       │   │   │       ├── headphones/                    # Ajustes de Auriculares, Acústica DSP, Bit-Perfect y Gestos
-│   │       │   │   │       │   ├── BitPerfectSettingsSection.kt   # Configuración Bit-Perfect 1:1 y Google AAudio
-│   │       │   │   │       │   ├── HeadphoneStatusCard.kt         # Tarjeta de estado de conexión de audífonos
-│   │       │   │   │       │   ├── HeadphonesAcousticsSection.kt  # Crossfeed Chu Moy y Balance Estéreo L/R
-│   │       │   │   │       │   ├── HeadphonesSecuritySection.kt   # Becoming Noisy Guard, Fade-In y Memoria de Volumen
-│   │       │   │   │       │   ├── HeadphonesGesturesSection.kt   # Mapeo de 1, 2, 3 clics y pulsación larga
-│   │       │   │   │       │   └── HeadsetButtonActionDialog.kt   # Selector modal de acción de botón de auricular
-│   │       │   │   │       ├── updater/                       # Actualizador Automático de Versiones APK
-│   │       │   │   │       │   └── AppReleaseUpdateSettingsCard.kt # Tarjeta de verificación y descarga de APK Beta
-│   │       │   │   │       └── media/                         # Gestión y Transparencia de Medios Almacenados
-│   │       │   │   │           ├── StoredMediaSettingsTab.kt      # Pestaña Medios modularizada
-│   │       │   │   │           ├── SavedMediaStorageSection.kt    # Resumen de rutas y almacenamiento físico
-│   │       │   │   │           ├── StoredMediaFormatUtils.kt      # Formateo de pesos KB/MB y proporciones
-│   │       │   │   │           ├── StoredMediaSummaryHeader.kt    # Cabecera estadística de medios guardados
-│   │       │   │   │           ├── StoredMediaTrackCard.kt        # Tarjeta individual de pista con carátula/video
-│   │       │   │   │           └── StoredMediaDeleteDialogs.kt    # Diálogos de confirmación de borrado físico
-│   │       │   │   ├── playlist/
-│   │       │   │   │   └── PlaylistDetailScreen.kt
-│   │       │   │   ├── importmusic/
-│   │       │   │   │   └── ImportMusicScreen.kt
-│   │       │   │   └── onboarding/
-│   │       │   │       ├── OnboardingScreen.kt
-│   │       │   │       └── OnboardingStepComponents.kt
-│   │       │   │
-│   │       │   └── components/                 # Componentes y Widgets Modulares Organizados
-│   │       │       ├── MiniPlayer.kt           # Mini reproductor flotante persistente con Video Canvas
-│   │       │       ├── BottomNavBar.kt         # Barra de navegación inferior con insignia de descubrimiento
-│   │       │       ├── TrackListItem.kt        # Elemento modular de canción con marquesina
-│   │       │       ├── AnimatedDownloadingArrowIcon.kt # Icono animado de flecha descendente continua durante descargas
-│   │       │       ├── AudioEffectsBottomSheet.kt # Hoja modal unificada del estudio acústico C++20
-│   │       │       ├── artwork/                # Portadas, Collages, Fondo de Galería, Arte Procedural y Video Canvas
-│   │       │       │   ├── ArtworkImage.kt         # Renderizador WebP con recorte de franjas negras 4:3
-│   │       │       │   ├── AppWallpaperBackground.kt # Capa global de fondo de pantalla personalizado (Imagen WebP o Video)
-│   │       │       │   ├── PlaylistCoverCollage.kt # Collage dinámico de 1 a 4 fotos para Playlists
-│   │       │       │   ├── ProceduralArtwork.kt    # Lienzo matemático vectorial para pistas sin carátula
-│   │       │       │   ├── BackgroundVideoPlayer.kt # Reproductor Video Canvas en bucle o sincronizado
-│   │       │       │   └── AudioVisualizer.kt      # Visualizador espectral de 28 bandas en C++20
-│   │       │       ├── banners/                # Avisos Superiores y Banners Interactivos
-│   │       │       │   ├── PackageUpdateBanner.kt  # Banner de verificación y actualización OTA de yt-dlp
-│   │       │       │   └── SettingsDiscoveryBanner.kt # Aviso de recomendación de Ajustes para nuevos usuarios
-│   │       │       ├── dialogs/                # Diálogos Modales Globales
-│   │       │       │   ├── AppUpdateDialog.kt          # Modal de actualización automática de versión APK
-│   │       │       │   ├── CreateMixtapeDialog.kt      # Diálogo unificado de Mixtape continuo y Auto-Remix de 2 canciones locales
-│   │       │       │   ├── AutoRemixConfigSection.kt   # Configurador modular del Auto-Remix / Mashup (Manual o Auto-Match)
-│   │       │       │   ├── DownloadFromLinkDialog.kt   # Diálogo de descarga web (YouTube/TikTok) modularizado
-│   │       │       │   ├── ImportExternalPlaylistDialog.kt # Diálogo de importación de Playlists de Spotify y YouTube Music
-│   │       │       │   ├── EditTrackDialog.kt          # Editor de metadatos, carátula WebP y Video Canvas
-│   │       │       │   ├── SearchLyricsDialog.kt       # Buscador interactivo de letras LRCLIB con versión oficial #1
-│   │       │       │   └── VideoToMusicDialog.kt       # Conversor 3 en 1 de Video a Música (.m4a + WebP + Canvas)
-│   │       │       ├── audioeffects/           # Pestañas de efectos de audio
-│   │       │       └── download/               # Subcomponentes de descarga
-│   │       │           ├── DownloadProgressStatusCard.kt
-│   │       │           ├── DownloadSourceAndEngineSelector.kt
-│   │       │           ├── DownloadResolvedMediaCard.kt
-│   │       │           └── DownloadCanvasOptionsSection.kt
-│   │       │
-│   │       └── debug/                          # Suite Aura Monitor y Diagnósticos
-│   │           ├── AuraDebugManager.kt
-│   │           ├── DebugMonitorActivity.kt
-│   │           ├── PerformanceTelemetryManager.kt
-│   │           └── ui/
+├── build.gradle.kts                            # Configuración Gradle, NDK C++20 y tarea provisionNativeDeps
+├── proguard-rules.pro                          # Reglas de optimización R8 Full Mode y ofuscación Beta/Release
+└── src/
+    ├── beta/                                   # Recursos y Manifiesto exclusivos del canal APK Beta (Aura Beta • Nebula)
+    │   ├── AndroidManifest.xml                 # Remueve DebugMonitorActivity en compilaciones Beta
+    │   └── res/values/strings.xml              # Nombre de app "Aura Beta"
+    │
+    ├── main/
+    │   ├── AndroidManifest.xml                 # Manifiesto principal, servicios Media3/Descargas, Widgets y Android Auto
+    │   ├── cpp/                                # Núcleo C++20 Nativo DSP & Launchers PIE (QuickJS C99 puro compilado en Gradle)
+    │   │   ├── CMakeLists.txt                  # Configuración CMake C17 / ISO C++20 con optimización LTO y AAudio
+    │   │   ├── auramusic_dsp.h                 # Fachada pública del motor DSP de 64 bits
+    │   │   ├── auramusic_dsp.cpp               # Implementación JNI thread-safe (std::mutex) y ruteo de buffers std::span
+    │   │   ├── dsp_filters.h                   # Filtros Biquad IIR, EQ 10 bandas, Vocal Clarity Mid-Side, EBU R128 y DJ Automix
+    │   │   ├── dsp_spatial.h                   # Paneo 8D Clásico y Audio Espacial 16D Multi-Órbita Binaural
+    │   │   ├── dsp_crossfeed.h                 # Filtro Crossfeed acústico binaural Chu Moy / Bauer para auriculares
+    │   │   ├── dsp_reverb.h                    # Reverb digital Schroeder/Moorer en C++20 con líneas de retardo libres de bloqueo
+    │   │   ├── dsp_bitperfect.h                # Motor Bit-Perfect 1:1 y salida Google AAudio Ultra-Baja Latencia
+    │   │   ├── native_ffmpeg_launcher.c        # Lanzador PIE POSIX con validación stat() y dlopen hacia FFmpeg nativo
+    │   │   ├── native_python_launcher.c        # Lanzador PIE POSIX embebedor de CPython 3.11 nativo
+    │   │   └── aura_ytdlp_fallback.py          # Script Python de respaldo para extracción directa si falla la red en build
+    │   │
+    │   └── java/com/example/
+    │       ├── AuraApplication.kt              # Inicialización global, ciclo de vida Modo Juego, OTA yt-dlp y limpieza OEM
+    │       ├── MainActivity.kt                 # Actividad principal modularizada (< 140 líneas), permisos e Intents
+    │       │
+    │       ├── core/                           # Núcleo de Datos, Modelos de Dominio y Motor de Reproducción
+    │       │   ├── data/
+    │       │   │   ├── local/                  # Capa de Persistencia Local (Room SQLite)
+    │       │   │   │   ├── AppDatabase.kt      # Base de datos Room con migraciones
+    │       │   │   │   ├── dao/
+    │       │   │   │   │   ├── TrackDao.kt
+    │       │   │   │   │   └── PlaylistDao.kt
+    │       │   │   │   └── entity/
+    │       │   │   │       ├── TrackEntity.kt
+    │       │   │   │       ├── PlaylistEntity.kt
+    │       │   │   │       └── PlaylistTrackCrossRef.kt
+    │       │   │   │
+    │       │   │   ├── repository/             # Repositorios y Operaciones de Datos
+    │       │   │   │   ├── MusicRepository.kt  # Fachada principal de repositorio
+    │       │   │   │   ├── PlaylistRepository.kt # Gestión de listas y cross-references
+    │       │   │   │   └── SafTrackImporter.kt # Importador SAF blindado contra colisiones de extensiones
+    │       │   │   │
+    │       │   │   ├── storage/                # Almacenamiento Interno y Exportación Pública del Usuario
+    │       │   │   │   ├── AppStorageManager.kt # Manejo de disco estructurado en Android/data/.../files/
+    │       │   │   │   └── UserPublicMediaExporter.kt # Exportador SAF a carpeta pública del usuario con fusión FFmpeg (.mp4 con audio)
+    │       │   │   │
+    │       │   │   ├── updater/                # Actualizador Automático de Versiones APK
+    │       │   │   │   └── AppReleaseUpdater.kt # Comparador semántico de tags -beta, selector ABI y verificador SHA-256
+    │       │   │   │
+    │       │   │   ├── importer/               # Motores de Descarga, Conversión y Medios Organizados
+    │       │   │   │   ├── IncomingMediaHandler.kt # Triaje seguro de Intents ("Abrir con..." y "Compartir con...")
+    │       │   │   │   ├── engines/            # Motores Nativos CLI (FFmpeg, CPython + QuickJS C99 y OTA yt-dlp)
+    │       │   │   │   │   ├── FFmpegNativeEngine.kt # Extracción, loops xfade/Boomerang, GOP corto y prevención de Flag Injection
+    │       │   │   │   │   ├── YtDlpNativeEngine.kt  # Ejecución nativa CPython + QuickJS C99 puro y CA TLS Android 14+ APEX
+    │       │   │   │   │   └── YtDlpAutoUpdater.kt   # Actualizador OTA de yt-dlp con blindaje criptográfico SHA-256
+    │       │   │   │   ├── extractors/         # Extractores de Video y Audio Web
+    │       │   │   │   │   ├── OnlineVideoAudioImporter.kt # Orquestador de importación web con cascada anti-HTTP 403 de 5 niveles
+    │       │   │   │   │   ├── InnerTubeClient.kt          # Cliente directo YouTube InnerTube multi-perfil (<300ms)
+    │       │   │   │   │   ├── InvidiousStreamResolver.kt  # Bypass de streams mediante instancias Invidious
+    │       │   │   │   │   ├── HeadlessWebViewExtractor.kt # Extractor WebView móvil en sandbox con cascada de portadas
+    │       │   │   │   │   └── WebStreamExtractor.kt       # Extractor web universal y detector de subdominios YouTube
+    │       │   │   │   ├── audio/              # Procesamiento Acústico, Formatos Especiales y Metadatos
+    │       │   │   │   │   ├── AudioMetadataParser.kt      # Extracción de tags ID3, Vorbis y WebP
+    │       │   │   │   │   ├── AudioSilenceTrimmer.kt      # Supresión inteligente de silencios al inicio y fin (-42 dB RMS)
+    │       │   │   │   │   ├── SpecialAudioFormatDecoder.kt # Decodificador nativo DSD, APE, WavPack, ALAC, AIFF, MPC y Chiptune
+    │       │   │   │   │   ├── VideoAudioExtractor.kt      # Conversor Video a Música 3 en 1 (Demuxing directo en ~1s)
+    │       │   │   │   │   └── SampleMusicGenerator.kt     # Generador procedural de pistas sintetizadas demo
+    │       │   │   │   ├── artwork/            # Procesamiento de Portadas WebP y Arte Procedural
+    │       │   │   │   │   ├── MediaAssetProcessor.kt        # Compresión WebP Lossless, recorte letterbox 4:3 y Video Canvas
+    │       │   │   │   │   └── ProceduralArtworkGenerator.kt # Generador matemático de portadas procedurales
+    │       │   │   │   ├── lyrics/             # Motor de Letras Sincronizadas (.LRC / .TXT)
+    │       │   │   │   │   └── LyricsManager.kt # Búsqueda y descarga de letras sincronizadas LRCLIB con versión oficial #1
+    │       │   │   │   ├── mixtape/            # Fusión Continua y Auto-Remix / Mashup de 2 Canciones Locales
+    │       │   │   │   │   ├── MixtapeEngine.kt        # Fusión FFmpeg acrossfade, collage WebP y capítulos reactivos
+    │       │   │   │   │   └── SmartAutoRemixEngine.kt # Auto-Remix de 2 pistas (Mashup Voz A + Base B / Remix DJ) y Auto-Match
+    │       │   │   │   ├── playlist/           # Importador Universal de Playlists Públicas
+    │       │   │   │   │   └── ExternalPlaylistImporter.kt # Extracción de Playlists de Spotify y YouTube Music sin login ni API keys
+    │       │   │   │   ├── download/           # Acelerador de Descargas HTTP Range
+    │       │   │   │   │   └── ChunkedStreamDownloader.kt # Descarga acelerada HTTP Range multi-bloque con guardia anti-SSRF
+    │       │   │   │   └── tiktok/             # Resolución Directa de TikTok
+    │       │   │   │       └── TikTokMediaResolver.kt # Extracción libre de audio/video de TikTok sin marcas de agua
+    │       │   │   │
+    │       │   │   └── streaming/              # Modo Streaming Híbrido Tri-Plataforma (YT Music + YouTube + SoundCloud)
+    │       │   │       ├── StreamingApiService.kt           # Búsqueda tri-plataforma, Radio Similar y resolución híbrida
+    │       │   │       ├── SoundCloudApiClient.kt           # Cliente modular de SoundCloud (hidratación client_id v2 y streams)
+    │       │   │       ├── StreamingCacheManager.kt         # Caché inteligente (50-500 MB, 30 min TTL, LRU) y Pre-descarga No Lineal
+    │       │   │       └── StreamingHttpDataSourceConfig.kt # Alineación de cabeceras User-Agent/Origin por perfil firmado c=
+    │       │   │
+    │       │   ├── model/                      # Modelos de Dominio y Estado
+    │       │   │   ├── Track.kt
+    │       │   │   ├── Playlist.kt
+    │       │   │   ├── StreamingModels.kt      # Modelos de búsqueda streaming, importador de playlists y políticas de red
+    │       │   │   ├── WidgetModels.kt         # Modelos de configuración y estado persistido de los 2 Widgets
+    │       │   │   ├── AppUpdateModels.kt      # Modelos de estado y metadatos del actualizador APK
+    │       │   │   ├── MixtapeModels.kt        # Modelos de capítulos, metadatos de Mixtape y configuración de Auto-Remix
+    │       │   │   ├── LyricsState.kt
+    │       │   │   ├── LyricSearchResult.kt
+    │       │   │   ├── EqualizerConfig.kt
+    │       │   │   ├── AudioEffectsConfig.kt
+    │       │   │   ├── HeadphoneConfig.kt
+    │       │   │   ├── DownloadProgress.kt
+    │       │   │   ├── PackageUpdateState.kt
+    │       │   │   ├── RepeatMode.kt
+    │       │   │   ├── ThemePalette.kt
+    │       │   │   ├── AppWallpaperConfig.kt   # Configuración de fondo de pantalla personalizado de galería (WebP/MP4)
+    │       │   │   ├── VideoDisplayMode.kt
+    │       │   │   └── NowPlayingDesignMode.kt # Modos de diseño del reproductor: Clásico, Cinemático Canvas y Auto
+    │       │   │
+    │       │   └── playback/                   # Capa de Audio y Reproducción ExoPlayer / Media3
+    │       │       ├── AuraAudioPlayer.kt          # Fachada del reproductor de audio y soporte Dual-Deck
+    │       │       ├── AuraMediaPlaybackService.kt # MediaSessionService para System Media Controls y Android Auto
+    │       │       ├── AuraDownloadService.kt      # Servicio en primer plano para descargas web y lotes de Playlists
+    │       │       ├── AudioEffectManager.kt       # Gestión de ecualizador y efectos nativos C++20
+    │       │       ├── HeadphoneController.kt      # BroadcastReceiver para audífonos, Becoming Noisy y botones físicos
+    │       │       ├── NativeAudioEngine.kt        # Puente JNI hacia el motor DSP en ISO C++20 y AAudio
+    │       │       ├── NativeAudioProcessor.kt     # AudioProcessor de ExoPlayer hacia el motor C++20 con Buffer Flushing
+    │       │       └── controllers/
+    │       │           ├── PlayerQueueController.kt # Gestión de cola contextual y modos de repetición/aleatorio
+    │       │           ├── AudioFadeController.kt   # Crossfade Dual-Deck (Equal-Power sin/cos), Smart AutoMix, Fade-In/Out y Sleep Timer
+    │       │           ├── ABLoopController.kt      # Bucle de repetición de segmento A-B
+    │       │           └── MediaSessionBridge.kt    # Puente de notificación nativa System Media Controls
+    │       │
+    │       ├── feature/                        # Pantallas Modulares por Funcionalidad (Feature Layer)
+    │       │   ├── home/
+    │       │   │   └── HomeScreen.kt           # Pantalla de Inicio con acceso rápido, populares y recientes
+    │       │   ├── streaming/
+    │       │   │   └── StreamingExploreScreen.kt # Pestaña Explorar / Streaming Tri-Plataforma (YT Music, YouTube & SoundCloud)
+    │       │   ├── library/
+    │       │   │   ├── LibraryScreen.kt        # Pantalla de Biblioteca (Canciones, Favoritos, Playlists, Artistas y Álbumes)
+    │       │   │   └── components/
+    │       │   │       ├── AlbumAndArtistCards.kt        # Tarjetas de Álbumes y Artistas con apertura de detalle de canciones
+    │       │   │       ├── FavoritesPlaylistBannerCard.kt # Banner destacado de la lista sincronizada "Tus Me Gusta"
+    │       │   │       ├── LibraryEmptyViews.kt          # Vistas de estado vacío para pestañas de la Biblioteca
+    │       │   │       ├── PlaylistDialogs.kt            # Diálogos de creación, edición y adición de pistas a Playlists
+    │       │   │       └── PlaylistRowItem.kt            # Fila interactiva de Playlist con collage dinámico 1-4 fotos o WebP
+    │       │   ├── nowplaying/
+    │       │   │   ├── NowPlayingScreen.kt     # Orquestador del reproductor a pantalla completa (Clásico / Cinemático / Auto)
+    │       │   │   └── components/
+    │       │   │       ├── FullScreenLyricsScreen.kt       # Modo Karaoke Inmersivo a Pantalla Completa estilo Apple Music Sing
+    │       │   │       ├── NowPlayingCinematicLayout.kt    # Diseño Cinemático Canvas (Estilo Spotify) con viñeta reactiva a 1s
+    │       │   │       ├── NowPlayingDesignSelectorDialog.kt # Selector modal de modo de diseño del reproductor
+    │       │   │       ├── NowPlayingArtworkCard.kt        # Tarjeta de carátula 1:1 y lienzo de video despejado
+    │       │   │       ├── NowPlayingLyricsCard.kt         # Tarjeta sincronizada de letras Karaoke 1:1 con auto-scroll
+    │       │   │       ├── NowPlayingPlaybackControls.kt   # Controles de transporte y barra continua con selector circular ("bolita")
+    │       │   │       ├── NowPlayingQueueSheet.kt         # Hoja modal de cola de reproducción con miniaturas HD
+    │       │   │       ├── NowPlayingTopBar.kt             # Barra superior con accesos a especificaciones, Karaoke, diseño y efectos
+    │       │   │       ├── NowPlayingBalanceBar.kt         # Barra interactiva de Balance Estéreo Fino L/R
+    │       │   │       ├── AudioSpecsDialog.kt             # Ficha técnica de pista, telemetría AAudio y estado Bit-Perfect
+    │       │   │       └── VideoDisplayModeDialog.kt       # Selector modal de encuadre de Video Canvas (4 modos)
+    │       │   ├── playlist/
+    │       │   │   └── PlaylistDetailScreen.kt # Vista detallada de canciones para Playlists, Artistas y Álbumes
+    │       │   ├── importmusic/
+    │       │   │   └── ImportMusicScreen.kt    # Centro de importación SAF, Video a Música, descargas web y Playlists externas
+    │       │   ├── onboarding/
+    │       │   │   ├── OnboardingScreen.kt         # Flujo de bienvenida e inducción en 3 etapas
+    │       │   │   └── OnboardingStepComponents.kt # Tarjetas modulares de propuesta de valor y disclaimer de almacenamiento
+    │       │   └── settings/
+    │       │       ├── SettingsScreen.kt       # Orquestador de Ajustes y navegación a sub-menús de pantalla completa
+    │       │       └── components/
+    │       │           ├── SettingDetailRow.kt            # Fila reutilizable de información clave-valor
+    │       │           ├── SettingsSubScreenComponents.kt # Tarjetas navegables y contenedor SettingsSubMenuScreen
+    │       │           ├── widgets/                       # Personalización y Vista Previa de los 2 Widgets
+    │       │           │   └── WidgetSettingsContent.kt   # Selector Top 4 Canciones/Playlists, color de imagen y vista previa
+    │       │           ├── about/                         # Detrás del Proyecto (Creador & Contribuidores)
+    │       │           │   └── BehindTheProjectSection.kt # Perfiles de GitHub con caché permanente de avatares en WebP
+    │       │           ├── appearance/                    # Ajustes de Apariencia, Streaming, Modo Juego, Fondo y Motores
+    │       │           │   ├── AppearanceSettingsTab.kt             # Menú principal de categorías de Ajustes
+    │       │           │   ├── AppWallpaperSettingsSection.kt       # Controles de fondo de pantalla de galería (WebP/Video, Opacidad y Blur)
+    │       │           │   ├── StreamingCacheAndVideoSettingsCard.kt # Ajustes de caché inteligente (50-500 MB), política de red y Modo Juego
+    │       │           │   ├── EnginesAndDiagnosticsSection.kt      # Estado de FFmpeg, QuickJS C99 puro, yt-dlp OTA y Aura Monitor
+    │       │           │   └── PlayerDesignSettingsContent.kt       # Pantalla dedicada de selección de Diseño del Reproductor
+    │       │           ├── headphones/                    # Ajustes de Auriculares, Acústica DSP, Bit-Perfect y Gestos
+    │       │           │   ├── BitPerfectSettingsSection.kt   # Configuración Bit-Perfect 1:1 y Google AAudio Hi-Res
+    │       │           │   ├── HeadphoneStatusCard.kt         # Tarjeta de estado de conexión de audífonos en vivo
+    │       │           │   ├── HeadphonesAcousticsSection.kt  # Crossfeed Chu Moy y Balance Estéreo Fino L/R
+    │       │           │   ├── HeadphonesSecuritySection.kt   # Becoming Noisy Guard, Fade-In y Memoria de Volumen
+    │       │           │   ├── HeadphonesGesturesSection.kt   # Mapeo de 1, 2, 3 pulsaciones y mantener presionado
+    │       │           │   └── HeadsetButtonActionDialog.kt   # Selector modal de acción para botones de auriculares
+    │       │           ├── updater/                       # Actualizador Automático de Versiones APK
+    │       │           │   └── AppReleaseUpdateSettingsCard.kt # Tarjeta de consulta y descarga de nuevas versiones APK
+    │       │           └── media/                         # Gestión de Medios Almacenados y Carpeta Pública del Usuario
+    │       │               ├── StoredMediaSettingsTab.kt   # Pantalla de transparencia de medios guardados
+    │       │               ├── UserPublicFolderCard.kt     # Selector de carpeta pública del usuario y exportación .mp4 con audio
+    │       │               ├── SavedMediaStorageSection.kt # Resumen de rutas estructuradas y espacio físico
+    │       │               ├── StoredMediaFormatUtils.kt   # Utilidades de formato de pesos KB/MB y relaciones de aspecto
+    │       │               ├── StoredMediaSummaryHeader.kt # Cabecera estadística de portadas WebP y videos MP4
+    │       │               ├── StoredMediaTrackCard.kt     # Tarjeta individual de pista con inspección y borrado selectivo
+    │       │               └── StoredMediaDeleteDialogs.kt # Diálogos de confirmación para liberar almacenamiento
+    │       │
+    │       ├── ui/                             # Orquestador UI Global, Componentes Compartidos, Navegación y Tema M3
+    │       │   ├── AuraMusicAppContent.kt      # Scaffold principal, fondo personalizado, MiniPlayer y transiciones
+    │       │   ├── GlobalDialogsHost.kt        # Contenedor centralizado de diálogos y hojas modales globales
+    │       │   ├── navigation/
+    │       │   │   └── NavScreen.kt            # Definición de rutas principales y pestañas de biblioteca
+    │       │   ├── theme/                      # Sistema de Diseño Dark Luxury Neo-Glass OLED y Extracción Cromática
+    │       │   │   ├── ArtworkColorExtractor.kt # Extracción dinámica de color cada 1s (local, URLs https:// y GPU TextureView)
+    │       │   │   ├── Color.kt                 # Paletas de color neón y superficies OLED 100% opacas
+    │       │   │   ├── Theme.kt                 # Configuración MaterialTheme, Material You y blindaje fontScale = 1.0f
+    │       │   │   └── Type.kt                  #Jerarquía tipográfica de Aura Music
+    │       │   └── components/                 # Componentes Modulares Reutilizables
+    │       │       ├── MiniPlayer.kt           # Mini reproductor flotante tintado con Video Canvas e indicador de red
+    │       │       ├── BottomNavBar.kt         # Barra de navegación inferior con pestaña Explorar e insignia de Ajustes
+    │       │       ├── TrackListItem.kt        # Elemento modular de canción con marquesina y menú contextual
+    │       │       ├── AnimatedDownloadingArrowIcon.kt # Icono animado de descarga activa en barra superior
+    │       │       ├── AudioEffectsBottomSheet.kt      # Hoja modal unificada del estudio acústico C++20
+    │       │       ├── artwork/                # Renderizadores de Portadas, Collages, Fondo, Arte Procedural y Video
+    │       │       │   ├── ArtworkImage.kt           # Cargador Coil WebP con recorte de franjas negras 4:3 (Deletterbox)
+    │       │       │   ├── AppWallpaperBackground.kt # Renderizador global de fondo personalizado (Imagen WebP o Video corto)
+    │       │       │   ├── PlaylistCoverCollage.kt   # Collage adaptativo automático de 1, 2, 3 o 4 portadas
+    │       │       │   ├── ProceduralArtwork.kt      # Generador Canvas vectorial para canciones sin carátula
+    │       │       │   ├── BackgroundVideoPlayer.kt  # Reproductor Video Canvas sin pantallas negras y muestreo GPU a 1s
+    │       │       │   └── AudioVisualizer.kt        # Visualizador espectral de 28 bandas impulsado por C++20
+    │       │       ├── audioeffects/           # Pestañas Modulares de la Hoja de Efectos de Audio
+    │       │       │   ├── EqualizerTabContent.kt          # Pestaña del Ecualizador ISO de 10 bandas, Bass Boost y Voces HD
+    │       │       │   ├── Spatial8DTabContent.kt          # Pestaña de Audio Espacial 8D Clásico y 16D Multi-Órbita
+    │       │       │   ├── ReverbTabContent.kt             # Pestaña de Reverb C++20 y espacios acústicos
+    │       │       │   ├── PlaybackParametersTabContent.kt # Pestaña de Velocidad/Tono (0.5x-2.0x), Voces HD y Normalizador LUFS
+    │       │       │   ├── BalanceAndHeadphonesTabContent.kt # Pestaña de Balance Estéreo L/R y Crossfeed Chu Moy
+    │       │       │   ├── TransitionsTabContent.kt        # Pestaña de Crossfade Dual-Deck, Smart AutoMix DJ y Bucle A-B
+    │       │       │   └── SleepTimerTabContent.kt         # Pestaña del Temporizador de Apagado con Fade-Out de 10s
+    │       │       ├── banners/                # Banners Superiores No Intrusivos
+    │       │       │   ├── PackageUpdateBanner.kt     # Banner de verificación y actualización OTA de yt-dlp
+    │       │       │   └── SettingsDiscoveryBanner.kt # Aviso interactivo para descubrir Ajustes en el primer uso
+    │       │       ├── dialogs/                # Diálogos Modales Globales
+    │       │       │   ├── AppUpdateDialog.kt              # Modal de descarga e instalación de actualización APK
+    │       │       │   ├── CreateMixtapeDialog.kt          # Modal unificado de Mixtape continuo y Auto-Remix de 2 pistas
+    │       │       │   ├── AutoRemixConfigSection.kt       # Configurador de Mashup (Voz A + Base B), Remix DJ y Auto-Match
+    │       │       │   ├── DownloadFromLinkDialog.kt       # Modal deslizable de descarga desde YouTube, TikTok y web
+    │       │       │   ├── ImportExternalPlaylistDialog.kt # Modal de importación de Playlists de Spotify y YouTube Music
+    │       │       │   ├── EditTrackDialog.kt              # Editor de metadatos, portada WebP y Video Canvas
+    │       │       │   ├── SearchLyricsDialog.kt           # Buscador interactivo de letras LRCLIB con recomendación #1
+    │       │       │   └── VideoToMusicDialog.kt           # Conversor 3 en 1 de Video a Música (.m4a + WebP + Canvas)
+    │       │       └── download/               # Subcomponentes del Modal de Descargas Web
+    │       │           ├── DownloadProgressStatusCard.kt      # Tarjeta de progreso en vivo (MB/s, porcentaje y 2do plano)
+    │       │           ├── DownloadSourceAndEngineSelector.kt # Selector interactivo de motor (yt-dlp, InnerTube, WebView)
+    │       │           ├── DownloadResolvedMediaCard.kt       # Previsualización de portada, título y edición rápida
+    │       │           └── DownloadCanvasOptionsSection.kt    # Opciones de Video Canvas 480p, Boomerang/Crossfade y silencios
+    │       │
+    │       ├── viewmodel/                      # Capa ViewModel y Coordinadores MVVM
+    │       │   ├── MusicViewModel.kt           # ViewModel principal desacoplado
+    │       │   └── delegates/
+    │       │       ├── AudioEffectsCoordinator.kt      # Coordinador de efectos C++20, Normalizador, AutoMix y Sleep Timer
+    │       │       ├── NavigationCoordinator.kt        # Coordinador de navegación, temas, fondo de galería y modos visuales
+    │       │       ├── TrackLibraryCoordinator.kt      # Operaciones de biblioteca, playlists, SAF y descargas
+    │       │       ├── LyricsCoordinator.kt            # Coordinación de letras sincronizadas LRCLIB y archivos .lrc/.txt
+    │       │       ├── IncomingMediaCoordinator.kt     # Recepción de Intents externos (audios, videos, URLs y Playlists)
+    │       │       ├── HeadphoneSettingsCoordinator.kt # Ajustes de auriculares, Crossfeed, Bit-Perfect y AAudio
+    │       │       ├── MixtapeCoordinator.kt           # Coordinador de Mixtapes, Auto-Remix de 2 pistas y capítulos en vivo
+    │       │       ├── StreamingModeCoordinator.kt     # Orquestador del Modo Streaming (YT Music, YouTube, SoundCloud y Caché)
+    │       │       └── PlaylistImportCoordinator.kt    # Orquestador del Importador de Playlists de Spotify y YouTube Music
+    │       │
+    │       ├── widget/                         # Sistema de 2 Widgets Interactivos para Pantalla de Inicio
+    │       │   ├── AuraMusicWidgetProvider.kt        # Widget 1: Reproductor adaptativo (4x1, 4x2, 4x3) con color de carátula
+    │       │   ├── AuraLibraryWidgetProvider.kt      # Widget 2: Cuadrícula 2x2 de Top 4 Canciones o 4 Playlists principales
+    │       │   ├── WidgetStateStore.kt               # Persistencia de estado, extracción Palette y caché JSON de Widgets
+    │       │   ├── WidgetArtworkRenderer.kt          # Renderizador Canvas de fondos Neo-Glass, barras y collages 2x2
+    │       │   └── WidgetPlaybackHeadlessController.kt # Controlador para reanudar y cambiar pistas en 2do plano con app cerrada
+    │       │
+    │       └── debug/                          # Suite Autónoma de Diagnóstico y Telemetría "Aura Monitor" (Solo Debug)
+    │           ├── AuraDebugManager.kt               # Manejador global de excepciones (UncaughtExceptionHandler) y logs
+    │           ├── DebugMonitorActivity.kt           # Actividad independiente en el launcher con pestañas de Logs y Rendimiento
+    │           ├── DebugLogEntry.kt                  # Modelo de entrada de incidente o evento técnico
+    │           ├── DebugSeverity.kt                  # Niveles de severidad (CRASH, CRITICAL, ERROR, WARNING, INFO)
+    │           ├── DeviceDiagnosticInfo.kt           # Recolector de hardware, ABI, Android SDK, RAM y almacenamiento
+    │           ├── PerformanceDiagnosticModels.kt    # Modelos de memoria segmentada (Java, Native C++, Gráficos, PSS) e hilos
+    │           ├── PerformanceTelemetryManager.kt    # Monitor en vivo de RAM, CPU (%), FPS e inspector de hilos con stacktraces
+    │           └── ui/
+    │               ├── DebugFilterChips.kt               # Chips de filtrado por severidad en Aura Monitor
+    │               ├── DebugLogEntryCard.kt              # Tarjeta resumida de incidente registrado
+    │               ├── DebugLogDetailDialog.kt           # Visor detallado de stacktrace y copia al portapapeles
+    │               ├── DebugSyntheticTestDialog.kt       # Generador de pruebas sintéticas de diagnóstico
+    │               ├── HardwareTelemetryCard.kt          # Tarjeta de especificaciones técnicas del dispositivo
+    │               └── PerformanceTelemetryTabContent.kt # Pestaña interactiva de RAM segmentada, CPU e Inspector de Hilos
+    │
+    ├── test/                                   # Pruebas Unitarias Locales y Robolectric (JVM)
+    │   └── java/com/example/
+    │       ├── ExampleUnitTest.kt              # Pruebas unitarias base
+    │       └── ExampleRobolectricTest.kt       # Pruebas de integración local con Robolectric
+    │
+    └── androidTest/                            # Pruebas Instrumentadas Base de Plantilla Android
+        └── java/com/example/
+            └── ExampleInstrumentedTest.kt
 ```
 
 ---

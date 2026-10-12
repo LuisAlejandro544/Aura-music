@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de ingeniería y diagnóstico forense para eliminar de raíz el error HTTP 403 en las descargas de googlevideo.com resueltas por yt-dlp, separando las cabeceras HTTP por flujo (audio vs. video), infiriendo el perfil exacto del cliente c= de la URL firmada, e integrando la cascada completa de 5 niveles de fallback tanto para el audio como para el Video Canvas 480p.",
-  "updatedAt":  "2026-10-11T22:11:41.341747150Z",
+  "summary":  "Plan de arquitectura e implementación para la carpeta `zips/` y el workflow automatizado de GitHub Actions que detecta archivos `.zip`, sincroniza el código completo en la misma rama (agregando, modificando y eliminando archivos obsoletos), protege `.github/workflows` si el `.zip` no la incluye y auto-elimina el archivo `.zip` al finalizar.",
+  "updatedAt":  "2026-10-12T04:02:19.169811187Z",
   "requestFeedback":  true,
   "userFacing":  true
 }
