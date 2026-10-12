@@ -1,4 +1,5 @@
 package com.example.playback
+import com.example.core.model.RepeatMode
 
 import android.content.Context
 import android.net.Uri
@@ -12,7 +13,6 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import com.example.data.importer.AudioSilenceTrimmer
 import com.example.model.ABLoopState
-import com.example.model.RepeatMode
 import com.example.model.Track
 import com.example.playback.controllers.ABLoopController
 import com.example.playback.controllers.AudioFadeController

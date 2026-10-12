@@ -1,4 +1,4 @@
-package com.example.model
+package com.example.core.model
 
 /**
  * Modos de repetición del reproductor.

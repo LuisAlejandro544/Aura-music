@@ -1,4 +1,5 @@
 package com.example.ui.screens.nowplaying.components
+import com.example.core.model.RepeatMode
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -29,7 +30,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.ABLoopState
 import com.example.model.LyricsState
-import com.example.model.RepeatMode
 import com.example.model.Track
 import com.example.ui.components.ArtworkImage
 import com.example.ui.theme.BackgroundDark
@@ -850,4 +850,3 @@ private fun CinematicSeekBarSection(
         )
     }
 }
-

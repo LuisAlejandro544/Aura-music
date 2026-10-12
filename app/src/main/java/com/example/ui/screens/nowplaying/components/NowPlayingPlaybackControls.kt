@@ -1,4 +1,5 @@
 package com.example.ui.screens.nowplaying.components
+import com.example.core.model.RepeatMode
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -27,7 +28,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.StateFlow
 import com.example.model.ABLoopState
-import com.example.model.RepeatMode
 import com.example.model.Track
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary

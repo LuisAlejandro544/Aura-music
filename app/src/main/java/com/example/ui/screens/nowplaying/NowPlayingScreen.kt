@@ -1,4 +1,5 @@
 package com.example.ui.screens.nowplaying
+import com.example.core.model.RepeatMode
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateColorAsState
@@ -31,7 +32,6 @@ import com.example.model.EqualizerBand
 import com.example.model.EqualizerPreset
 import com.example.model.EqualizerScopeMode
 import com.example.model.HeadphoneConfig
-import com.example.model.RepeatMode
 import com.example.model.ReverbConfig
 import com.example.model.ReverbPreset
 import com.example.model.SleepTimerState
