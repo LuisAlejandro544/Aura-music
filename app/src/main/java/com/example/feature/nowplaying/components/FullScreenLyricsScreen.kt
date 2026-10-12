@@ -144,460 +144,56 @@ fun FullScreenLyricsScreen(
                 .windowInsetsPadding(WindowInsets.statusBars)
                 .windowInsetsPadding(WindowInsets.navigationBars)
                 .padding(horizontal = 20.dp)
-        ) {
-            // Barra superior flotante
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp, bottom = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = onClose,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .testTag("full_screen_lyrics_back_btn")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.KeyboardArrowDown,
-                        contentDescription = "Cerrar modo karaoke",
-                        tint = TextPrimary,
-                        modifier = Modifier.size(32.dp)
+            FullScreenLyricsTopBar(
+                animatedPrimary = animatedPrimary,
+                onClose = onClose,
+                onOpenSearchLyrics = onOpenSearchLyrics,
+                onImportClick = {
+                    importLyricsLauncher.launch(
+                        arrayOf("text/*", "application/octet-stream", "*/*")
                     )
-                }
-
-                Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = animatedPrimary.copy(alpha = 0.16f),
-                    border = BorderStroke(1.dp, animatedPrimary.copy(alpha = 0.45f))
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Mic,
-                            contentDescription = null,
-                            tint = animatedPrimary,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(modifier = Modifier.width(5.dp))
-                        Text(
-                            text = "KARAOKE",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = FontWeight.ExtraBold,
-                                letterSpacing = 1.sp,
-                                color = animatedPrimary,
-                                fontSize = 11.sp
-                            )
-                        )
-                    }
-                }
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(
-                        onClick = onOpenSearchLyrics,
-                        modifier = Modifier.size(40.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = "Buscar versión de letras",
-                            tint = animatedPrimary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                    IconButton(
-                        onClick = {
-                            importLyricsLauncher.launch(
-                                arrayOf("text/*", "application/octet-stream", "*/*")
-                            )
-                        },
-                        modifier = Modifier.size(40.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.FileUpload,
-                            contentDescription = "Importar archivo local",
-                            tint = TextSecondary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                    IconButton(
-                        onClick = { showPasteDialog = true },
-                        modifier = Modifier.size(40.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Edit,
-                            contentDescription = "Editar letra",
-                            tint = TextSecondary,
-                            modifier = Modifier.size(19.dp)
-                        )
-                    }
-                }
-            }
-
-            // Contenedor principal de letras
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-            ) {
-                when {
-                    lyricsState.isLoading -> {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                CircularProgressIndicator(color = animatedPrimary, modifier = Modifier.size(42.dp))
-                                Spacer(modifier = Modifier.height(14.dp))
-                                Text(
-                                    text = "Sincronizando letras para karaoke...",
-                                    style = MaterialTheme.typography.bodyMedium.copy(color = TextSecondary)
-                                )
-                            }
-                        }
-                    }
-
-                    lyricsState.lines.isNotEmpty() -> {
-                        LazyColumn(
-                            state = listState,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 8.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp),
-                            contentPadding = PaddingValues(top = 28.dp, bottom = 120.dp)
-                        ) {
-                            itemsIndexed(lyricsState.lines) { index, line ->
-                                val isCurrent = (index == activeIndex)
-                                val textScale by animateFloatAsState(
-                                    targetValue = if (isCurrent) 1.05f else 1.0f,
-                                    animationSpec = tween(280),
-                                    label = "LyricsLineScale"
-                                )
-
-                                val lineAlpha by animateFloatAsState(
-                                    targetValue = when {
-                                        isCurrent -> 1.0f
-                                        index < activeIndex -> 0.35f
-                                        else -> 0.65f
-                                    },
-                                    animationSpec = tween(280),
-                                    label = "LyricsLineAlpha"
-                                )
-
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .clickable { onSeekTo(line.timeMs) }
-                                        .padding(vertical = 6.dp, horizontal = 4.dp),
-                                    contentAlignment = Alignment.CenterStart
-                                ) {
-                                    Text(
-                                        text = line.text,
-                                        style = if (isCurrent) {
-                                            MaterialTheme.typography.headlineSmall.copy(
-                                                fontSize = 24.sp,
-                                                fontWeight = FontWeight.ExtraBold,
-                                                lineHeight = 32.sp,
-                                                color = animatedPrimary
-                                            )
-                                        } else {
-                                            MaterialTheme.typography.titleLarge.copy(
-                                                fontSize = 20.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                lineHeight = 28.sp,
-                                                color = Color.White.copy(alpha = lineAlpha)
-                                            )
-                                        },
-                                        modifier = Modifier.scale(textScale)
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    else -> {
-                        // Vista vacía cuando no hay letras disponibles
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center,
-                                modifier = Modifier.padding(24.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.MusicNote,
-                                    contentDescription = null,
-                                    tint = animatedPrimary.copy(alpha = 0.5f),
-                                    modifier = Modifier.size(64.dp)
-                                )
-                                Spacer(modifier = Modifier.height(16.dp))
-                                Text(
-                                    text = "No hay letras disponibles para esta canción",
-                                    style = MaterialTheme.typography.titleMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = TextPrimary,
-                                        textAlign = TextAlign.Center
-                                    )
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = "Busca en la base de datos libre LRCLIB o importa tu archivo .LRC",
-                                    style = MaterialTheme.typography.bodySmall.copy(
-                                        color = TextSecondary,
-                                        textAlign = TextAlign.Center
-                                    )
-                                )
-                                Spacer(modifier = Modifier.height(20.dp))
-                                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                    Button(
-                                        onClick = onOpenSearchLyrics,
-                                        colors = ButtonDefaults.buttonColors(containerColor = animatedPrimary)
-                                    ) {
-                                        Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Buscar Letras")
-                                    }
-                                    OutlinedButton(
-                                        onClick = {
-                                            importLyricsLauncher.launch(
-                                                arrayOf("text/*", "application/octet-stream", "*/*")
-                                            )
-                                        }
-                                    ) {
-                                        Icon(Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(18.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Importar .LRC")
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Botón flotante "Volver a la canción" cuando el usuario hace scroll manual
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 16.dp)
-                ) {
-                    androidx.compose.animation.AnimatedVisibility(
-                        visible = userScrolledManually && activeIndex >= 0 && lyricsState.lines.isNotEmpty(),
-                        enter = fadeIn(tween(200)),
-                        exit = fadeOut(tween(200))
-                    ) {
-                        Surface(
-                            shape = RoundedCornerShape(20.dp),
-                            color = animatedPrimary,
-                            shadowElevation = 8.dp,
-                            modifier = Modifier
-                                .clickable {
-                                    userScrolledManually = false
-                                    coroutineScope.launch {
-                                        val targetScroll = (activeIndex - 2).coerceAtLeast(0)
-                                        listState.animateScrollToItem(targetScroll)
-                                    }
-                                }
-                                .testTag("full_screen_lyrics_sync_btn")
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Sync,
-                                    contentDescription = null,
-                                    tint = Color.Black,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "Sincronizar con audio",
-                                    style = MaterialTheme.typography.labelMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.Black
-                                    )
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Barra de transporte flotante inferior
-            Surface(
-                shape = RoundedCornerShape(24.dp),
-                color = Color(0xFF131722).copy(alpha = 0.94f),
-                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.10f)),
-                shadowElevation = 14.dp,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 12.dp)
-                    .testTag("full_screen_lyrics_player_bar")
-            ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    // Fila de metadatos y botón de salir
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        ArtworkImage(
-                            track = currentTrack,
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clipToBounds()
-                        ) {
-                            Text(
-                                text = currentTrack?.title ?: "Sin reproducción",
-                                style = MaterialTheme.typography.titleSmall.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = TextPrimary
-                                ),
-                                maxLines = 1,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clipToBounds()
-                                    .basicMarquee()
-                            )
-                            Text(
-                                text = currentTrack?.artist ?: "Aura Music",
-                                style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                        IconButton(
-                            onClick = onClose,
-                            modifier = Modifier.size(44.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.FullscreenExit,
-                                contentDescription = "Salir de pantalla completa",
-                                tint = animatedPrimary,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    // Seekbar / Slider de progreso compacto aislado en su propio ámbito de composición
-                    FullScreenLyricsSeekBarSection(
-                        fallbackPositionMs = currentPositionMs,
-                        currentPositionFlow = currentPositionFlow,
-                        durationMs = durationMs,
-                        animatedPrimary = animatedPrimary,
-                        onSeekTo = onSeekTo
+                },
+                onEditClick = { showPasteDialog = true }
+            )
+            FullScreenLyricsContent(
+                listState = listState,
+                lyricsState = lyricsState,
+                activeIndex = activeIndex,
+                animatedPrimary = animatedPrimary,
+                userScrolledManually = userScrolledManually,
+                coroutineScope = coroutineScope,
+                onSeekTo = onSeekTo,
+                onOpenSearchLyrics = onOpenSearchLyrics,
+                onImportClick = {
+                    importLyricsLauncher.launch(
+                        arrayOf("text/*", "application/octet-stream", "*/*")
                     )
-
-                    // Controles de transporte
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 2.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(
-                            onClick = onPlayPrevious,
-                            modifier = Modifier.size(48.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.SkipPrevious,
-                                contentDescription = "Pista anterior",
-                                tint = TextPrimary,
-                                modifier = Modifier.size(28.dp)
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.width(18.dp))
-
-                        Surface(
-                            shape = CircleShape,
-                            color = animatedPrimary,
-                            modifier = Modifier
-                                .size(50.dp)
-                                .clickable { onTogglePlayPause() },
-                            shadowElevation = 4.dp
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                    contentDescription = if (isPlaying) "Pausar" else "Reproducir",
-                                    tint = Color.Black,
-                                    modifier = Modifier.size(30.dp)
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.width(18.dp))
-
-                        IconButton(
-                            onClick = onPlayNext,
-                            modifier = Modifier.size(48.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.SkipNext,
-                                contentDescription = "Pista siguiente",
-                                tint = TextPrimary,
-                                modifier = Modifier.size(28.dp)
-                            )
-                        }
-                    }
-                }
-            }
+                },
+                onUserScrollConsumed = { userScrolledManually = false }
+            )
+            FullScreenLyricsTransportBar(
+                currentTrack = currentTrack,
+                animatedPrimary = animatedPrimary,
+                isPlaying = isPlaying,
+                currentPositionMs = currentPositionMs,
+                currentPositionFlow = currentPositionFlow,
+                durationMs = durationMs,
+                onClose = onClose,
+                onSeekTo = onSeekTo,
+                onTogglePlayPause = onTogglePlayPause,
+                onPlayNext = onPlayNext,
+                onPlayPrevious = onPlayPrevious
+            )
         }
-
-        // Diálogo para ingresar o editar letra manualmente
         if (showPasteDialog) {
-            var rawText by remember { mutableStateOf(lyricsState.plainLyrics) }
-            AlertDialog(
-                onDismissRequest = { showPasteDialog = false },
-                title = { Text("Editar o Pegar Letra") },
-                text = {
-                    Column {
-                        Text(
-                            text = "Pega aquí la letra sincronizada (.LRC) o texto plano:",
-                            style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        OutlinedTextField(
-                            value = rawText,
-                            onValueChange = { rawText = it },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(220.dp),
-                            placeholder = { Text("[00:12.50] Tu letra aquí...") }
-                        )
-                    }
+            FullScreenLyricsPasteDialog(
+                initialText = lyricsState.plainLyrics,
+                onSaveLyrics = {
+                    onSaveCustomLyrics(it)
+                    showPasteDialog = false
                 },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            onSaveCustomLyrics(rawText)
-                            showPasteDialog = false
-                        }
-                    ) {
-                        Text("Guardar")
-                    }
-                },
-                    dismissButton = {
-                        TextButton(onClick = { showPasteDialog = false }) {
-                            Text("Cancelar")
-                        }
-                    }
-                )
-            }
+                onDismiss = { showPasteDialog = false }
+            )
         }
     }
 
