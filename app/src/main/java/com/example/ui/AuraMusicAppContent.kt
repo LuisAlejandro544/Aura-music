@@ -25,7 +25,7 @@ import com.example.ui.components.SettingsDiscoveryBanner
 import com.example.ui.navigation.NavScreen
 import com.example.feature.home.HomeScreen
 import com.example.feature.importmusic.ImportMusicScreen
-import com.example.ui.screens.library.LibraryScreen
+import com.example.feature.library.LibraryScreen
 import com.example.ui.screens.nowplaying.NowPlayingScreen
 import com.example.feature.onboarding.OnboardingScreen
 import com.example.feature.playlist.PlaylistDetailScreen

@@ -390,7 +390,7 @@ fun PlaylistDetailScreen(
 
     // Cuadro de diálogo para editar nombre, descripción e imagen de la playlist
     if (showRenameDialog && !isVirtualCollection) {
-        com.example.ui.screens.library.components.RenamePlaylistDialog(
+        com.example.feature.library.components.RenamePlaylistDialog(
             playlist = playlist,
             tracksPreview = tracks.take(4),
             onDismissRequest = { showRenameDialog = false },

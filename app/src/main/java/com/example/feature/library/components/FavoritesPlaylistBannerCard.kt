@@ -1,4 +1,4 @@
-package com.example.ui.screens.library.components
+package com.example.feature.library.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background

@@ -1,4 +1,4 @@
-package com.example.ui.screens.library.components
+package com.example.feature.library.components
 
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult

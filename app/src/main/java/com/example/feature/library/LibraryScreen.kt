@@ -1,4 +1,4 @@
-package com.example.ui.screens.library
+package com.example.feature.library
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
@@ -21,7 +21,7 @@ import com.example.core.model.Track
 import com.example.ui.components.TrackListItem
 import com.example.ui.navigation.LibraryTab
 import com.example.ui.navigation.NavScreen
-import com.example.ui.screens.library.components.*
+import com.example.feature.library.components.*
 import com.example.ui.theme.CardBorder
 import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.TextMuted
@@ -32,7 +32,7 @@ import com.example.ui.theme.TextSecondary
  * Pantalla de Tu Biblioteca con pestañas modulares (Canciones, Álbumes, Artistas, Playlists, Favoritos),
  * barra de búsqueda en tiempo real, creación de listas y filtros ágiles.
  * Arquitectura Modular (MVVM):
- * Delega la representación de elementos y vistas en submódulos especializados en [com.example.ui.screens.library.components]:
+ * Delega la representación de elementos y vistas en submódulos especializados en [com.example.feature.library.components]:
  * - [FavoritesPlaylistBannerCard]: Tarjeta destacada de "Tus Me Gusta".
  * - [PlaylistRowItem]: Fila de lista de reproducción con menú contextual.
  * - [AlbumGroupCard] / [ArtistGroupCard]: Vistas agrupadas de álbumes y artistas.
