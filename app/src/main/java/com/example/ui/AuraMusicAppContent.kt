@@ -415,7 +415,7 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
                                 val nextSimilarPreview by viewModel.nextSimilarTrackPreview.collectAsStateWithLifecycle()
                                 val streamingCacheCfg by viewModel.streamingCacheConfig.collectAsStateWithLifecycle()
 
-                                com.example.ui.screens.streaming.StreamingExploreScreen(
+                                com.example.feature.streaming.StreamingExploreScreen(
                                     searchQuery = streamingQuery,
                                     selectedFilter = streamingFilter,
                                     searchResults = streamingResults,

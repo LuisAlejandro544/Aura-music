@@ -139,7 +139,7 @@ fun NowPlayingCinematicLayout(
                         )
                     }
                     currentTrack.streamingPlatform?.let { platform ->
-                        com.example.ui.screens.streaming.StreamingPlatformBadge(platform = platform)
+                        com.example.feature.streaming.StreamingPlatformBadge(platform = platform)
                     }
                 }
 

@@ -1,4 +1,4 @@
-package com.example.ui.screens.streaming
+package com.example.feature.streaming
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
