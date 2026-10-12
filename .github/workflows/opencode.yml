@@ -38,8 +38,9 @@ jobs:
           node-version: 20
 
       - name: Ejecutar OpenCode CLI con Muse Spark 1.3
-        uses: sst/opencode-action@v1
+        uses: anomalyco/opencode/github@latest
         with:
+          use_github_token: true
           model: "opencode/meta/muse-spark-1.3-contributor-free"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
