@@ -76,7 +76,7 @@ fun EditTrackDialog(
         customVideoUri: Uri?,
         removeVideo: Boolean,
         forceLoop: Boolean?,
-        loopStyle: com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle
+        loopStyle: com.example.core.data.importer.FFmpegNativeEngine.CanvasLoopStyle
     ) -> Unit)? = null
 ) {
     var title by remember { mutableStateOf(track.title) }
@@ -90,7 +90,7 @@ fun EditTrackDialog(
     var shouldRemoveVideo by remember { mutableStateOf(false) }
     var selectedLoopMode by remember { mutableStateOf<Boolean?>(null) }
     var selectedLoopStyle by remember {
-        mutableStateOf(com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE)
+        mutableStateOf(com.example.core.data.importer.FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE)
     }
 
     // Launcher del Android Photo Picker para imágenes (carátula)
@@ -370,16 +370,16 @@ fun EditTrackDialog(
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     FilterChip(
-                                        selected = selectedLoopStyle == com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE,
+                                        selected = selectedLoopStyle == com.example.core.data.importer.FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE,
                                         onClick = {
-                                            selectedLoopStyle = com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE
+                                            selectedLoopStyle = com.example.core.data.importer.FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE
                                         },
                                         label = { Text("✨ Crossfade (xfade)", style = MaterialTheme.typography.labelSmall) }
                                     )
                                     FilterChip(
-                                        selected = selectedLoopStyle == com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle.BOOMERANG,
+                                        selected = selectedLoopStyle == com.example.core.data.importer.FFmpegNativeEngine.CanvasLoopStyle.BOOMERANG,
                                         onClick = {
-                                            selectedLoopStyle = com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle.BOOMERANG
+                                            selectedLoopStyle = com.example.core.data.importer.FFmpegNativeEngine.CanvasLoopStyle.BOOMERANG
                                             selectedLoopMode = true
                                         },
                                         label = { Text("🪃 Boomerang (Ping-Pong)", style = MaterialTheme.typography.labelSmall) }

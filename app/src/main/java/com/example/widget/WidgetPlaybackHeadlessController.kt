@@ -1,7 +1,7 @@
 package com.example.widget
 
 import android.content.Context
-import com.example.data.local.AppDatabase
+import com.example.core.data.local.AppDatabase
 import com.example.core.model.Track
 import com.example.core.playback.AudioEffectManager
 import com.example.core.playback.AuraAudioPlayer

@@ -47,11 +47,11 @@ fun ImportMusicScreen(
     onDismissStatusMessage: () -> Unit,
     downloadProgress: com.example.core.model.DownloadProgress = com.example.core.model.DownloadProgress(),
     onImportVideoAsMusic: (videoUri: Uri, title: String, artist: String, album: String, attachAsCanvas: Boolean, forceLoop: Boolean?, trimSilence: Boolean) -> Unit = { _, _, _, _, _, _, _ -> },
-    onImportVideoAsMusicWithLoopStyle: (videoUri: Uri, title: String, artist: String, album: String, attachAsCanvas: Boolean, forceLoop: Boolean?, trimSilence: Boolean, loopStyle: com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle) -> Unit = { uri, title, artist, album, attach, forceLoop, trim, _ ->
+    onImportVideoAsMusicWithLoopStyle: (videoUri: Uri, title: String, artist: String, album: String, attachAsCanvas: Boolean, forceLoop: Boolean?, trimSilence: Boolean, loopStyle: com.example.core.data.importer.FFmpegNativeEngine.CanvasLoopStyle) -> Unit = { uri, title, artist, album, attach, forceLoop, trim, _ ->
         onImportVideoAsMusic(uri, title, artist, album, attach, forceLoop, trim)
     },
-    onDownloadFromLink: (resolvedInfo: com.example.data.importer.OnlineVideoAudioImporter.ResolvedMediaInfo, customTitle: String, customArtist: String, attachAsCanvas: Boolean, trimSilence: Boolean) -> Unit = { _, _, _, _, _ -> },
-    onDownloadFromLinkWithLoopStyle: (resolvedInfo: com.example.data.importer.OnlineVideoAudioImporter.ResolvedMediaInfo, customTitle: String, customArtist: String, attachAsCanvas: Boolean, trimSilence: Boolean, loopStyle: com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle) -> Unit = { info, title, artist, attach, trim, _ ->
+    onDownloadFromLink: (resolvedInfo: com.example.core.data.importer.OnlineVideoAudioImporter.ResolvedMediaInfo, customTitle: String, customArtist: String, attachAsCanvas: Boolean, trimSilence: Boolean) -> Unit = { _, _, _, _, _ -> },
+    onDownloadFromLinkWithLoopStyle: (resolvedInfo: com.example.core.data.importer.OnlineVideoAudioImporter.ResolvedMediaInfo, customTitle: String, customArtist: String, attachAsCanvas: Boolean, trimSilence: Boolean, loopStyle: com.example.core.data.importer.FFmpegNativeEngine.CanvasLoopStyle) -> Unit = { info, title, artist, attach, trim, _ ->
         onDownloadFromLink(info, title, artist, attach, trim)
     },
     onOpenPlaylistImportDialog: () -> Unit = {},

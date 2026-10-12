@@ -62,7 +62,7 @@ fun LazyListScope.enginesAndDiagnosticsSettingsContent(
                 SettingDetailRow("Persistencia Local", "Room Database SQLite")
                 SettingDetailRow("Acceso a Archivos", "SAF (Storage Access Framework)")
                 SettingDetailRow("Escaneo Automático", "Desactivado (100% bajo control del usuario)")
-                SettingDetailRow("Motor Multimedia", if (com.example.data.importer.FFmpegNativeEngine.isAvailable(context)) "FFmpeg puro nativo (Activo)" else "FFmpeg puro nativo (Fallback MediaMuxer)")
+                SettingDetailRow("Motor Multimedia", if (com.example.core.data.importer.FFmpegNativeEngine.isAvailable(context)) "FFmpeg puro nativo (Activo)" else "FFmpeg puro nativo (Fallback MediaMuxer)")
                 SettingDetailRow("Versión", "${com.example.BuildConfig.VERSION_NAME} (${com.example.BuildConfig.APP_CODENAME})")
                 SettingDetailRow("Código de Build", "${com.example.BuildConfig.APP_BUILD_CODE} (#${com.example.BuildConfig.VERSION_CODE})")
             }
@@ -106,14 +106,14 @@ fun LazyListScope.enginesAndDiagnosticsSettingsContent(
                 )
                 Spacer(modifier = Modifier.height(12.dp))
 
-                var ytdlpVersion by remember { mutableStateOf(com.example.data.importer.YtDlpAutoUpdater.getInstalledVersion(context)) }
+                var ytdlpVersion by remember { mutableStateOf(com.example.core.data.importer.YtDlpAutoUpdater.getInstalledVersion(context)) }
                 var isUpdating by remember { mutableStateOf(false) }
                 var updateMessage by remember { mutableStateOf<String?>(null) }
                 val coroutineScope = rememberCoroutineScope()
 
                 SettingDetailRow(
                     "FFmpeg Puro",
-                    if (com.example.data.importer.FFmpegNativeEngine.isAvailable(context)) "Listo en dispositivo" else "Habilitado (CLI / NDK)"
+                    if (com.example.core.data.importer.FFmpegNativeEngine.isAvailable(context)) "Listo en dispositivo" else "Habilitado (CLI / NDK)"
                 )
                 SettingDetailRow("Versión yt-dlp", ytdlpVersion)
 
@@ -136,18 +136,18 @@ fun LazyListScope.enginesAndDiagnosticsSettingsContent(
                             isUpdating = true
                             updateMessage = "Consultando versión más reciente en GitHub..."
                             coroutineScope.launch {
-                                val result = com.example.data.importer.YtDlpAutoUpdater.checkAndUpdate(context, forceDownload = false)
+                                val result = com.example.core.data.importer.YtDlpAutoUpdater.checkAndUpdate(context, forceDownload = false)
                                 isUpdating = false
                                 when (result) {
-                                    is com.example.data.importer.YtDlpAutoUpdater.UpdateResult.Updated -> {
+                                    is com.example.core.data.importer.YtDlpAutoUpdater.UpdateResult.Updated -> {
                                         ytdlpVersion = result.newVersion
                                         updateMessage = "¡Actualizado con éxito a ${result.newVersion}!"
                                     }
-                                    is com.example.data.importer.YtDlpAutoUpdater.UpdateResult.AlreadyUpToDate -> {
+                                    is com.example.core.data.importer.YtDlpAutoUpdater.UpdateResult.AlreadyUpToDate -> {
                                         ytdlpVersion = result.currentVersion
                                         updateMessage = "yt-dlp ya está al día (${result.currentVersion})."
                                     }
-                                    is com.example.data.importer.YtDlpAutoUpdater.UpdateResult.Error -> {
+                                    is com.example.core.data.importer.YtDlpAutoUpdater.UpdateResult.Error -> {
                                         updateMessage = "Estado: ${result.message}"
                                     }
                                 }

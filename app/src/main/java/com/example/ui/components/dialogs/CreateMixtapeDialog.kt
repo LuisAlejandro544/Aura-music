@@ -24,7 +24,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.example.data.importer.mixtape.SmartAutoRemixEngine
+import com.example.core.data.importer.mixtape.SmartAutoRemixEngine
 import com.example.core.model.AutoRemixStyle
 import com.example.core.model.Track
 import com.example.ui.theme.CardBorder

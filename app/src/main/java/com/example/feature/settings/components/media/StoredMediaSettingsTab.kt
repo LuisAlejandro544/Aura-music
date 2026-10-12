@@ -21,7 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.data.storage.UserPublicMediaExporter
+import com.example.core.data.storage.UserPublicMediaExporter
 import com.example.core.model.Track
 import com.example.feature.settings.components.media.StoredMediaDeleteDialogs
 import com.example.feature.settings.components.media.StoredMediaSummaryHeader

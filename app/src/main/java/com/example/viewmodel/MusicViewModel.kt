@@ -10,12 +10,12 @@ import android.content.Intent
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.data.importer.FFmpegNativeEngine
-import com.example.data.importer.OnlineVideoAudioImporter
-import com.example.data.importer.YtDlpAutoUpdater
-import com.example.data.local.AppDatabase
-import com.example.data.repository.MusicRepository
-import com.example.data.storage.AppStorageManager
+import com.example.core.data.importer.FFmpegNativeEngine
+import com.example.core.data.importer.OnlineVideoAudioImporter
+import com.example.core.data.importer.YtDlpAutoUpdater
+import com.example.core.data.local.AppDatabase
+import com.example.core.data.repository.MusicRepository
+import com.example.core.data.storage.AppStorageManager
 import com.example.core.model.*
 import com.example.core.playback.AudioEffectManager
 import com.example.core.playback.AuraAudioPlayer
@@ -514,7 +514,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     fun setAppWallpaperBlurDp(blurDp: Int) = navigationCoordinator.setAppWallpaperBlurDp(blurDp)
     fun setCustomWallpaperImage(uri: Uri) {
         viewModelScope.launch {
-            val storageManager = com.example.data.storage.AppStorageManager(getApplication())
+            val storageManager = com.example.core.data.storage.AppStorageManager(getApplication())
             val oldPath = appWallpaperConfig.value.mediaPath
             val savedPath = storageManager.saveAppWallpaperImageFromUri(uri, oldPath)
             if (!savedPath.isNullOrBlank()) {
@@ -528,7 +528,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun setCustomWallpaperVideo(uri: Uri) {
         viewModelScope.launch {
-            val storageManager = com.example.data.storage.AppStorageManager(getApplication())
+            val storageManager = com.example.core.data.storage.AppStorageManager(getApplication())
             val oldPath = appWallpaperConfig.value.mediaPath
             val savedPath = storageManager.saveAppWallpaperVideoFromUri(uri, oldPath)
             if (!savedPath.isNullOrBlank()) {
@@ -542,7 +542,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun clearCustomWallpaper() {
         viewModelScope.launch {
-            val storageManager = com.example.data.storage.AppStorageManager(getApplication())
+            val storageManager = com.example.core.data.storage.AppStorageManager(getApplication())
             val oldPath = appWallpaperConfig.value.mediaPath
             storageManager.deleteAppWallpaperFile(oldPath)
             navigationCoordinator.updateAppWallpaperMedia(

@@ -1,10 +1,10 @@
 package com.example.viewmodel.delegates
 
 import android.content.Context
-import com.example.data.importer.FFmpegNativeEngine
-import com.example.data.importer.YtDlpNativeEngine
-import com.example.data.streaming.StreamingApiService
-import com.example.data.streaming.StreamingCacheManager
+import com.example.core.data.importer.FFmpegNativeEngine
+import com.example.core.data.importer.YtDlpNativeEngine
+import com.example.core.data.streaming.StreamingApiService
+import com.example.core.data.streaming.StreamingCacheManager
 import com.example.core.model.StreamingCacheConfig
 import com.example.core.model.StreamingSearchFilter
 import com.example.core.model.StreamingSearchItem

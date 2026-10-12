@@ -11,7 +11,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
-import com.example.data.importer.AudioSilenceTrimmer
+import com.example.core.data.importer.AudioSilenceTrimmer
 import com.example.core.model.ABLoopState
 import com.example.core.model.Track
 import com.example.core.playback.controllers.ABLoopController
@@ -175,7 +175,7 @@ class AuraAudioPlayer(
         }
 
         val mediaSourceFactory = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(
-            com.example.data.streaming.StreamingHttpDataSourceConfig.buildExoPlayerDataSourceFactory(context)
+            com.example.core.data.streaming.StreamingHttpDataSourceConfig.buildExoPlayerDataSourceFactory(context)
         )
 
         val player = ExoPlayer.Builder(context, renderersFactory)

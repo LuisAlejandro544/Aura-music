@@ -1,7 +1,7 @@
 package com.example.viewmodel.delegates
 
 import android.content.Context
-import com.example.data.importer.mixtape.MixtapeEngine
+import com.example.core.data.importer.mixtape.MixtapeEngine
 import com.example.core.model.MixtapeChapter
 import com.example.core.model.MixtapeMetadata
 import com.example.core.model.Track
@@ -98,7 +98,7 @@ class MixtapeCoordinator(
             _mixtapeProgress.value = 0.04f
             _mixtapeStatusMessage.value = "Iniciando preparación del Auto-Remix..."
 
-            val resultTrack = com.example.data.importer.mixtape.SmartAutoRemixEngine.createAutoRemix(
+            val resultTrack = com.example.core.data.importer.mixtape.SmartAutoRemixEngine.createAutoRemix(
                 context = context,
                 trackA = trackA,
                 trackB = trackB,

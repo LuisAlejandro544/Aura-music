@@ -21,10 +21,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import com.example.data.importer.FFmpegNativeEngine
-import com.example.data.importer.OnlineVideoAudioImporter
-import com.example.data.importer.YoutubeExtractionEngine
-import com.example.data.importer.YtDlpAutoUpdater
+import com.example.core.data.importer.FFmpegNativeEngine
+import com.example.core.data.importer.OnlineVideoAudioImporter
+import com.example.core.data.importer.YoutubeExtractionEngine
+import com.example.core.data.importer.YtDlpAutoUpdater
 import com.example.core.model.DownloadProgress
 import com.example.core.model.VideoDisplayMode
 import com.example.ui.components.download.DownloadCanvasOptionsSection

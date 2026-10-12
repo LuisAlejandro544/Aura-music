@@ -2,8 +2,8 @@ package com.example.viewmodel.delegates
 
 import android.content.Context
 import android.net.Uri
-import com.example.data.importer.LyricsManager
-import com.example.data.storage.AppStorageManager
+import com.example.core.data.importer.LyricsManager
+import com.example.core.data.storage.AppStorageManager
 import com.example.core.model.LyricSearchResult
 import com.example.core.model.LyricsState
 import com.example.core.model.Track

@@ -1,7 +1,7 @@
 package com.example.viewmodel.delegates
 
 import android.content.SharedPreferences
-import com.example.data.repository.MusicRepository
+import com.example.core.data.repository.MusicRepository
 import com.example.core.model.AppWallpaperConfig
 import com.example.core.model.AuraTheme
 import com.example.core.model.NowPlayingDesignMode

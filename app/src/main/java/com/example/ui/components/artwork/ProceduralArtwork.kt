@@ -15,7 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
-import com.example.data.importer.ProceduralArtworkGenerator
+import com.example.core.data.importer.ProceduralArtworkGenerator
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin

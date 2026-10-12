@@ -3,10 +3,10 @@ package com.example
 import android.app.Application
 import android.content.ComponentCallbacks2
 import coil.imageLoader
-import com.example.data.importer.FFmpegNativeEngine
-import com.example.data.importer.YtDlpAutoUpdater
-import com.example.data.importer.YtDlpNativeEngine
-import com.example.data.updater.AppReleaseUpdater
+import com.example.core.data.importer.FFmpegNativeEngine
+import com.example.core.data.importer.YtDlpAutoUpdater
+import com.example.core.data.importer.YtDlpNativeEngine
+import com.example.core.data.updater.AppReleaseUpdater
 import com.example.debug.AuraDebugManager
 import com.example.ui.theme.ArtworkColorExtractor
 import kotlinx.coroutines.CoroutineScope
@@ -143,7 +143,7 @@ class AuraApplication : Application() {
         // Inicialización asíncrona en segundo plano de los motores nativos (FFmpeg puro y entorno Python) y limpieza de residuos
         applicationScope.launch {
             try {
-                com.example.data.storage.AppStorageManager.cleanupResidualFiles(applicationContext)
+                com.example.core.data.storage.AppStorageManager.cleanupResidualFiles(applicationContext)
                 FFmpegNativeEngine.init(applicationContext)
                 YtDlpNativeEngine.init(applicationContext)
                 // Chequeo en caliente OTA de yt-dlp sin bloquear la interfaz

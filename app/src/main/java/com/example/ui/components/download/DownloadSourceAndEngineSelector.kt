@@ -15,8 +15,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.data.importer.YtDlpAutoUpdater
-import com.example.data.importer.YoutubeExtractionEngine
+import com.example.core.data.importer.YtDlpAutoUpdater
+import com.example.core.data.importer.YoutubeExtractionEngine
 import com.example.core.model.PackageUpdateState
 import com.example.ui.components.DownloadSourceMode
 import com.example.ui.theme.TextSecondary

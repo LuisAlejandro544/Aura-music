@@ -2,9 +2,9 @@ package com.example.viewmodel.delegates
 
 import android.content.Context
 import android.net.Uri
-import com.example.data.importer.FFmpegNativeEngine
-import com.example.data.importer.OnlineVideoAudioImporter
-import com.example.data.repository.MusicRepository
+import com.example.core.data.importer.FFmpegNativeEngine
+import com.example.core.data.importer.OnlineVideoAudioImporter
+import com.example.core.data.repository.MusicRepository
 import com.example.core.model.DownloadProgress
 import com.example.core.model.Track
 import com.example.core.playback.AuraAudioPlayer

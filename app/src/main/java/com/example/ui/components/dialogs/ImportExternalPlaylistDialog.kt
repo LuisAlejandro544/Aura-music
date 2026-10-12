@@ -61,7 +61,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
-import com.example.data.importer.playlist.ExternalPlaylistImporter
+import com.example.core.data.importer.playlist.ExternalPlaylistImporter
 import com.example.core.model.ExternalPlaylistPreview
 import com.example.core.model.ExternalPlaylistSource
 import com.example.core.model.PlaylistImportSaveMode

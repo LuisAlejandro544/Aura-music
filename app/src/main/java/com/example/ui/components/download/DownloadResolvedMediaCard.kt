@@ -16,8 +16,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.example.data.importer.OnlineVideoAudioImporter
-import com.example.data.importer.WebStreamExtractor
+import com.example.core.data.importer.OnlineVideoAudioImporter
+import com.example.core.data.importer.WebStreamExtractor
 import com.example.ui.theme.CardBorder
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary

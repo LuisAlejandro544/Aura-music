@@ -25,7 +25,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.data.importer.VideoAudioExtractor
+import com.example.core.data.importer.VideoAudioExtractor
 import com.example.ui.theme.CardBorder
 import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.TextMuted
@@ -56,7 +56,7 @@ fun VideoToMusicDialog(
         attachAsCanvas: Boolean,
         forceLoop: Boolean?,
         trimSilence: Boolean,
-        loopStyle: com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle
+        loopStyle: com.example.core.data.importer.FFmpegNativeEngine.CanvasLoopStyle
     ) -> Unit)? = null
 ) {
     val context = LocalContext.current
@@ -71,7 +71,7 @@ fun VideoToMusicDialog(
     var attachAsCanvas by remember { mutableStateOf(true) }
     var selectedLoopMode by remember { mutableStateOf<Boolean?>(null) } // null = Auto (<= 20s), true = Loop, false = Sync
     var selectedLoopStyle by remember {
-        mutableStateOf(com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE)
+        mutableStateOf(com.example.core.data.importer.FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE)
     }
     var trimSilence by remember { mutableStateOf(true) }
 
@@ -365,16 +365,16 @@ fun VideoToMusicDialog(
                                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                                     ) {
                                         FilterChip(
-                                            selected = selectedLoopStyle == com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE,
+                                            selected = selectedLoopStyle == com.example.core.data.importer.FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE,
                                             onClick = {
-                                                selectedLoopStyle = com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE
+                                                selectedLoopStyle = com.example.core.data.importer.FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE
                                             },
                                             label = { Text("✨ Crossfade (xfade)", style = MaterialTheme.typography.labelSmall) }
                                         )
                                         FilterChip(
-                                            selected = selectedLoopStyle == com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle.BOOMERANG,
+                                            selected = selectedLoopStyle == com.example.core.data.importer.FFmpegNativeEngine.CanvasLoopStyle.BOOMERANG,
                                             onClick = {
-                                                selectedLoopStyle = com.example.data.importer.FFmpegNativeEngine.CanvasLoopStyle.BOOMERANG
+                                                selectedLoopStyle = com.example.core.data.importer.FFmpegNativeEngine.CanvasLoopStyle.BOOMERANG
                                                 selectedLoopMode = true
                                             },
                                             label = { Text("🪃 Boomerang (Ping-Pong)", style = MaterialTheme.typography.labelSmall) }

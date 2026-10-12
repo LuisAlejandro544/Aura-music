@@ -13,7 +13,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.data.updater.AppReleaseUpdater
+import com.example.core.data.updater.AppReleaseUpdater
 import com.example.core.model.AppUpdateState
 import com.example.core.model.DownloadProgress
 import com.example.core.model.HeadphoneConfig

@@ -3,9 +3,9 @@ package com.example.viewmodel.delegates
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import com.example.data.importer.IncomingMedia
-import com.example.data.importer.IncomingMediaHandler
-import com.example.data.repository.MusicRepository
+import com.example.core.data.importer.IncomingMedia
+import com.example.core.data.importer.IncomingMediaHandler
+import com.example.core.data.repository.MusicRepository
 import com.example.core.model.Track
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -61,7 +61,7 @@ class IncomingMediaCoordinator(
                 _pendingIncomingVideoUri.value = incoming.uri
             }
             is IncomingMedia.WebLink -> {
-                if (com.example.data.importer.playlist.ExternalPlaylistImporter.isPlaylistUrl(incoming.url) && onOpenPlaylistImportUrl != null) {
+                if (com.example.core.data.importer.playlist.ExternalPlaylistImporter.isPlaylistUrl(incoming.url) && onOpenPlaylistImportUrl != null) {
                     onOpenPlaylistImportUrl.invoke(incoming.url)
                 } else {
                     _pendingIncomingWebLink.value = incoming.url

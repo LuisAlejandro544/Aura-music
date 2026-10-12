@@ -2,16 +2,16 @@ package com.example.viewmodel.delegates
 
 import android.content.Context
 import android.graphics.BitmapFactory
-import com.example.data.importer.FFmpegNativeEngine
-import com.example.data.importer.OnlineVideoAudioImporter
-import com.example.data.importer.playlist.ExternalPlaylistImporter
-import com.example.data.local.dao.PlaylistDao
-import com.example.data.local.dao.TrackDao
-import com.example.data.local.entity.PlaylistEntity
-import com.example.data.local.entity.PlaylistTrackCrossRef
-import com.example.data.local.entity.TrackEntity
-import com.example.data.storage.AppStorageManager
-import com.example.data.streaming.StreamingApiService
+import com.example.core.data.importer.FFmpegNativeEngine
+import com.example.core.data.importer.OnlineVideoAudioImporter
+import com.example.core.data.importer.playlist.ExternalPlaylistImporter
+import com.example.core.data.local.dao.PlaylistDao
+import com.example.core.data.local.dao.TrackDao
+import com.example.core.data.local.entity.PlaylistEntity
+import com.example.core.data.local.entity.PlaylistTrackCrossRef
+import com.example.core.data.local.entity.TrackEntity
+import com.example.core.data.storage.AppStorageManager
+import com.example.core.data.streaming.StreamingApiService
 import com.example.debug.AuraDebugManager
 import com.example.core.model.ExternalPlaylistPreview
 import com.example.core.model.ExternalPlaylistSource

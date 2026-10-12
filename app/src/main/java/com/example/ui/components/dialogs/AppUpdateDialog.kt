@@ -29,7 +29,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.BuildConfig
-import com.example.data.updater.AppReleaseUpdater
+import com.example.core.data.updater.AppReleaseUpdater
 import com.example.core.model.AppUpdateState
 import com.example.ui.theme.CardBorder
 import com.example.ui.theme.SurfaceCard

@@ -222,7 +222,7 @@ fun BackgroundVideoPlayer(
             .build()
 
         val mediaSourceFactory = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(
-            com.example.data.streaming.StreamingHttpDataSourceConfig.buildExoPlayerDataSourceFactory(appCtx)
+            com.example.core.data.streaming.StreamingHttpDataSourceConfig.buildExoPlayerDataSourceFactory(appCtx)
         )
 
         ExoPlayer.Builder(appCtx, renderersFactory)
