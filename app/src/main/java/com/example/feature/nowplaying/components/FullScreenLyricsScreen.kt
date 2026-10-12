@@ -144,6 +144,7 @@ fun FullScreenLyricsScreen(
                 .windowInsetsPadding(WindowInsets.statusBars)
                 .windowInsetsPadding(WindowInsets.navigationBars)
                 .padding(horizontal = 20.dp)
+        ) {
             FullScreenLyricsTopBar(
                 animatedPrimary = animatedPrimary,
                 onClose = onClose,
@@ -196,6 +197,7 @@ fun FullScreenLyricsScreen(
             )
         }
     }
+}
 
 @Composable
 private fun FullScreenLyricsReactiveBackground(
@@ -227,7 +229,7 @@ private fun FullScreenLyricsReactiveBackground(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun FullScreenLyricsSeekBarSection(
+internal fun FullScreenLyricsSeekBarSection(
     fallbackPositionMs: Long,
     currentPositionFlow: StateFlow<Long>?,
     durationMs: Long,

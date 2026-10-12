@@ -2,6 +2,7 @@ package com.example.feature.importmusic
 
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -23,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.model.Track
+import com.example.ui.components.DownloadSourceMode
 import com.example.ui.theme.CardBorder
 import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.TextMuted
@@ -122,41 +124,10 @@ fun ImportMusicScreen(
         // Mensaje de estado / notificación
         if (importStatusMessage != null) {
             item {
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Info,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            text = importStatusMessage,
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                fontWeight = FontWeight.Medium
-                            ),
-                            modifier = Modifier.weight(1f)
-                        )
-                        IconButton(onClick = onDismissStatusMessage) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Cerrar",
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-                }
+                ImportStatusBanner(
+                    importStatusMessage = importStatusMessage,
+                    onDismissStatusMessage = onDismissStatusMessage
+                )
                 Spacer(modifier = Modifier.height(8.dp))
             }
         }
@@ -164,427 +135,61 @@ fun ImportMusicScreen(
         // Indicador de carga activa
         if (isImporting) {
             item {
-                Card(
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = SurfaceCard),
-                    border = CardBorder.let { androidx.compose.foundation.BorderStroke(1.dp, it) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(20.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        CircularProgressIndicator(
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(36.dp)
-                        )
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column {
-                            Text(
-                                text = "Procesando metadatos...",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = TextPrimary
-                                )
-                            )
-                            Text(
-                                text = "Extrayendo etiquetas ID3, duración y carátulas.",
-                                style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
-                            )
-                        }
-                    }
-                }
+                ImportLoadingCard()
                 Spacer(modifier = Modifier.height(8.dp))
             }
         }
 
         // Tarjeta de Privacidad y Consentimiento
         item {
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = SurfaceCard),
-                border = CardBorder.let { androidx.compose.foundation.BorderStroke(1.dp, it) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(46.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Shield,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(14.dp))
-                    Column {
-                        Text(
-                            text = "Privacidad Garantizada",
-                            style = MaterialTheme.typography.titleSmall.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = TextPrimary
-                            )
-                        )
-                        Text(
-                            text = "Sin escaneo masivo del dispositivo. Tus audios sólo se leen cuando tú los seleccionas.",
-                            style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
-                        )
-                    }
-                }
-            }
+            ImportPrivacyCard()
             Spacer(modifier = Modifier.height(8.dp))
         }
 
-        // Opción 1: Descargar desde TikTok (Música, Carátula y Video Canvas)
-        item {
-            ImportActionCard(
-                title = "Descargar desde TikTok",
-                description = "Pega un enlace de video de TikTok: descarga la música en alta fidelidad de cualquier duración, con carátula oficial y Video Canvas de fondo.",
-                buttonText = "Pegar Enlace de TikTok",
-                icon = Icons.Default.MusicNote,
-                accentGradient = Brush.horizontalGradient(
-                    listOf(Color(0xFF00F2FE), Color(0xFF4FACFE), Color(0xFFFF007F))
-                ),
-                onClick = {
-                    downloadDialogMode = com.example.ui.components.DownloadSourceMode.TIKTOK
-                    showDownloadFromLinkDialog = true
-                },
-                testTag = "import_tiktok_link_btn"
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-        }
+        importWebOptionsItems(
+            onOpenTikTokLink = {
+                downloadDialogMode = DownloadSourceMode.TIKTOK
+                showDownloadFromLinkDialog = true
+            },
+            onOpenYouTubeLink = {
+                downloadDialogMode = DownloadSourceMode.YOUTUBE_WEB
+                showDownloadFromLinkDialog = true
+            },
+            onOpenPlaylistImportDialog = onOpenPlaylistImportDialog
+        )
 
-        // Opción 2: Descargar desde YouTube / Enlace Web
-        item {
-            ImportActionCard(
-                title = "Descargar desde YouTube / Web",
-                description = "Pega un enlace de YouTube o video web: extrae el audio de alta fidelidad con resolución rápida y optimizada, carátula en WebP y Video Canvas sincronizado.",
-                buttonText = "Pegar Enlace de Video",
-                icon = Icons.Default.SmartDisplay,
-                accentGradient = Brush.horizontalGradient(
-                    listOf(Color(0xFFFF0033), Color(0xFFFF3366), Color(0xFFFF8800))
-                ),
-                onClick = {
-                    downloadDialogMode = com.example.ui.components.DownloadSourceMode.YOUTUBE_WEB
-                    showDownloadFromLinkDialog = true
-                },
-                testTag = "import_youtube_link_btn"
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-        }
-
-        // Opción 3: Importador Universal de Playlists (Spotify y YouTube Music / YouTube)
-        item {
-            ImportActionCard(
-                title = "Importar Playlist (Spotify / YT Music)",
-                description = "Pega el enlace de cualquier Playlist pública de Spotify o YouTube Music: impórtala en segundos en Modo Streaming o descarga todas sus canciones offline.",
-                buttonText = "Importar Playlist",
-                icon = Icons.Default.PlaylistAdd,
-                accentGradient = Brush.horizontalGradient(
-                    listOf(Color(0xFF1DB954), Color(0xFF10B981), Color(0xFFFF0033))
-                ),
-                onClick = onOpenPlaylistImportDialog,
-                testTag = "import_external_playlist_card_btn"
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-        }
-
-        // Opción 2: Video a Música de Galería (Extraer Audio, Carátula y Video Canvas)
-        item {
-            ImportActionCard(
-                title = "Video a Música (Galería)",
-                description = "Elige un video de tu galería: extraerá el audio en alta fidelidad, capturará la portada en WebP y vinculará el Video Canvas automáticamente.",
-                buttonText = "Elegir Video de Galería",
-                icon = Icons.Default.MovieFilter,
-                accentGradient = Brush.horizontalGradient(
-                    listOf(Color(0xFF8B5CF6), Color(0xFFEC4899))
-                ),
-                onClick = {
-                    videoPickerLauncher.launch(
-                        androidx.activity.result.PickVisualMediaRequest(
-                            ActivityResultContracts.PickVisualMedia.VideoOnly
-                        )
-                    )
-                },
-                testTag = "import_video_to_music_btn"
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-        }
-
-        // Opción 2: Seleccionar archivos
-        item {
-            ImportActionCard(
-                title = "Elegir Archivos de Audio",
-                description = "Selecciona una o varias canciones (MP3, FLAC, WAV, M4A, OGG) desde tu almacenamiento.",
-                buttonText = "Seleccionar Archivos",
-                icon = Icons.Default.AudioFile,
-                accentGradient = Brush.horizontalGradient(
-                    listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)
-                ),
-                onClick = {
-                    filePickerLauncher.launch(
-                        arrayOf(
-                            "audio/*",
-                            "application/ogg"
-                        )
-                    )
-                },
-                testTag = "import_files_btn"
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-        }
-
-        // Opción 2: Seleccionar carpeta
-        item {
-            ImportActionCard(
-                title = "Elegir Carpeta de Música",
-                description = "Elige una carpeta entera (ej: Music, Descargas). Se importarán todos los audios encontrados dentro.",
-                buttonText = "Seleccionar Carpeta",
-                icon = Icons.Default.FolderOpen,
-                accentGradient = Brush.horizontalGradient(
-                    listOf(Color(0xFF06B6D4), Color(0xFF10B981))
-                ),
-                onClick = { folderPickerLauncher.launch(null) },
-                testTag = "import_folder_btn"
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-        }
-
-        // Opción 3: Probar con canciones demo (Exclusivo en compilación Debug; oculto en APK Beta)
-        if (com.example.BuildConfig.ENABLE_DEMO_TRACKS) {
-            item {
-                ImportActionCard(
-                    title = "Cargar Canciones Demo Synthwave",
-                    description = "Añade pistas de demostración con audio sintetizado para probar el reproductor y el ecualizador ahora mismo.",
-                    buttonText = "Añadir Demos",
-                    icon = Icons.Default.ElectricBolt,
-                    accentGradient = Brush.horizontalGradient(
-                        listOf(Color(0xFFF97316), Color(0xFFF43F5E))
-                    ),
-                    onClick = onSeedDemoTracks,
-                    testTag = "import_demos_btn"
+        importLocalOptionsItems(
+            onPickVideo = {
+                videoPickerLauncher.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)
                 )
-                Spacer(modifier = Modifier.height(20.dp))
-            }
-        }
+            },
+            onPickFiles = {
+                filePickerLauncher.launch(arrayOf("audio/*", "application/ogg"))
+            },
+            onPickFolder = { folderPickerLauncher.launch(null) },
+            onSeedDemoTracks = onSeedDemoTracks
+        )
 
-        // Resumen de la biblioteca actual y opción de reinicio
         item {
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = SurfaceCard),
-                border = CardBorder.let { androidx.compose.foundation.BorderStroke(1.dp, it) },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Estado de tu Colección",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = TextPrimary
-                        )
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("Canciones importadas:", color = TextSecondary)
-                        Text("${allTracks.size}", fontWeight = FontWeight.Bold, color = TextPrimary)
-                    }
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("Ubicación:", color = TextSecondary)
-                        Text("Almacenamiento Local", fontWeight = FontWeight.Medium, color = TextPrimary)
-                    }
-
-                    if (allTracks.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        OutlinedButton(
-                            onClick = { showClearConfirmation = true },
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("clear_library_btn")
-                        ) {
-                            Icon(Icons.Default.DeleteSweep, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Limpiar Biblioteca Local")
-                        }
-                    }
-                }
-            }
+            ImportLibrarySummaryCard(
+                trackCount = allTracks.size,
+                onClearClick = { showClearConfirmation = true }
+            )
         }
     }
 
     if (showClearConfirmation) {
-        AlertDialog(
-            onDismissRequest = { showClearConfirmation = false },
-            title = { Text("¿Reiniciar biblioteca de música?") },
-            text = { Text("Se desvincularán todas las canciones importadas de Aura Music. Tus archivos físicos originales no se borrarán de tu teléfono.") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        onClearLibrary()
-                        showClearConfirmation = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Text("Reiniciar")
-                }
+        ImportClearConfirmDialog(
+            onConfirmClear = {
+                onClearLibrary()
+                showClearConfirmation = false
             },
-            dismissButton = {
-                TextButton(onClick = { showClearConfirmation = false }) {
-                    Text("Cancelar")
-                }
-            }
+            onDismiss = { showClearConfirmation = false }
         )
     }
 
-    if (pendingAudioUris != null || pendingFolderUri != null) {
-        val isFolder = pendingFolderUri != null
-        val itemCount = pendingAudioUris?.size ?: 1
-        AlertDialog(
-            onDismissRequest = {
-                pendingAudioUris = null
-                pendingFolderUri = null
-            },
-            title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.AutoFixHigh,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = if (isFolder) "Opciones de Importación de Carpeta" else "Opciones de Importación ($itemCount)",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = TextPrimary
-                        )
-                    )
-                }
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(
-                        text = if (isFolder) {
-                            "Antes de importar las pistas de la carpeta seleccionada, elige si deseas aplicar el recorte inteligente de silencios."
-                        } else {
-                            "Antes de importar ${if (itemCount == 1) "la canción seleccionada" else "las $itemCount canciones seleccionadas"}, configura el recorte inteligente:"
-                        },
-                        style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
-                    )
 
-                    Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(14.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Eliminar silencios al inicio y final",
-                                    style = MaterialTheme.typography.titleSmall.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = TextPrimary
-                                    )
-                                )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = "Detecta y recorta automáticamente espacios vacíos al principio y al final de cada pista sin perder calidad.",
-                                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Switch(
-                                checked = trimSilenceSelection,
-                                onCheckedChange = { trimSilenceSelection = it },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = Color.White,
-                                    checkedTrackColor = Color(0xFF10B981)
-                                ),
-                                modifier = Modifier.testTag("import_files_trim_silence_switch")
-                            )
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val uris = pendingAudioUris
-                        val folder = pendingFolderUri
-                        val shouldTrim = trimSilenceSelection
-                        pendingAudioUris = null
-                        pendingFolderUri = null
-                        if (uris != null) {
-                            onImportUris(uris, shouldTrim)
-                        } else if (folder != null) {
-                            onImportFolder(folder, shouldTrim)
-                        }
-                    },
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.testTag("confirm_import_files_btn")
-                ) {
-                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Importar Ahora", fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        pendingAudioUris = null
-                        pendingFolderUri = null
-                    }
-                ) {
-                    Text("Cancelar", color = TextSecondary)
-                }
-            },
-            containerColor = SurfaceCard,
-            shape = RoundedCornerShape(20.dp)
-        )
-    }
-
-    if (selectedVideoForConversion != null) {
-        com.example.ui.components.VideoToMusicDialog(
-            videoUri = selectedVideoForConversion!!,
-            onDismiss = { selectedVideoForConversion = null },
-            onConfirm = { title, artist, album, attachAsCanvas, forceLoop, trimSilence ->
-                onImportVideoAsMusic(selectedVideoForConversion!!, title, artist, album, attachAsCanvas, forceLoop, trimSilence)
-                selectedVideoForConversion = null
-            },
-            onConfirmWithLoopStyle = { title, artist, album, attachAsCanvas, forceLoop, trimSilence, loopStyle ->
-                onImportVideoAsMusicWithLoopStyle(selectedVideoForConversion!!, title, artist, album, attachAsCanvas, forceLoop, trimSilence, loopStyle)
-                selectedVideoForConversion = null
-            }
-        )
-    }
 
     // Cierre garantizado del diálogo únicamente cuando finaliza la descarga (o si el usuario lo cierra manualmente con la X)
     var wasDownloadingInModal by remember { mutableStateOf(false) }
@@ -597,28 +202,63 @@ fun ImportMusicScreen(
         }
     }
 
-    if (showDownloadFromLinkDialog) {
-        com.example.ui.components.DownloadFromLinkDialog(
-            initialMode = downloadDialogMode,
-            downloadProgress = downloadProgress,
-            onDismiss = {
-                showDownloadFromLinkDialog = false
-                wasDownloadingInModal = false
-            },
-            onConfirmDownload = { info, title, artist, attachCanvas, trimSilence ->
-                wasDownloadingInModal = true
-                onDownloadFromLink(info, title, artist, attachCanvas, trimSilence)
-            },
-            onConfirmDownloadWithLoopStyle = { info, title, artist, attachCanvas, trimSilence, loopStyle ->
-                wasDownloadingInModal = true
-                onDownloadFromLinkWithLoopStyle(info, title, artist, attachCanvas, trimSilence, loopStyle)
+    ImportPendingDialogs(
+        pendingAudioUris = pendingAudioUris,
+        pendingFolderUri = pendingFolderUri,
+        trimSilenceSelection = trimSilenceSelection,
+        onTrimSilenceChange = { trimSilenceSelection = it },
+        onDismissPending = {
+            pendingAudioUris = null
+            pendingFolderUri = null
+        },
+        onConfirmPending = {
+            val uris = pendingAudioUris
+            val folder = pendingFolderUri
+            val shouldTrim = trimSilenceSelection
+            pendingAudioUris = null
+            pendingFolderUri = null
+            if (uris != null) {
+                onImportUris(uris, shouldTrim)
+            } else if (folder != null) {
+                onImportFolder(folder, shouldTrim)
             }
-        )
-    }
+        },
+        selectedVideoForConversion = selectedVideoForConversion,
+        onDismissVideo = { selectedVideoForConversion = null },
+        onImportVideoAsMusic = { title, artist, album, attachAsCanvas, forceLoop, trimSilence ->
+            val videoUri = selectedVideoForConversion
+            if (videoUri != null) {
+                onImportVideoAsMusic(videoUri, title, artist, album, attachAsCanvas, forceLoop, trimSilence)
+                selectedVideoForConversion = null
+            }
+        },
+        onImportVideoAsMusicWithLoopStyle = { title, artist, album, attachAsCanvas, forceLoop, trimSilence, loopStyle ->
+            val videoUri = selectedVideoForConversion
+            if (videoUri != null) {
+                onImportVideoAsMusicWithLoopStyle(videoUri, title, artist, album, attachAsCanvas, forceLoop, trimSilence, loopStyle)
+                selectedVideoForConversion = null
+            }
+        },
+        showDownloadFromLinkDialog = showDownloadFromLinkDialog,
+        downloadProgress = downloadProgress,
+        downloadDialogMode = downloadDialogMode,
+        onDismissDownload = {
+            showDownloadFromLinkDialog = false
+            wasDownloadingInModal = false
+        },
+        onDownloadFromLink = { info, title, artist, attachCanvas, trimSilence ->
+            wasDownloadingInModal = true
+            onDownloadFromLink(info, title, artist, attachCanvas, trimSilence)
+        },
+        onDownloadFromLinkWithLoopStyle = { info, title, artist, attachCanvas, trimSilence, loopStyle ->
+            wasDownloadingInModal = true
+            onDownloadFromLinkWithLoopStyle(info, title, artist, attachCanvas, trimSilence, loopStyle)
+        }
+    )
 }
 
 @Composable
-private fun ImportActionCard(
+internal fun ImportActionCard(
     title: String,
     description: String,
     buttonText: String,

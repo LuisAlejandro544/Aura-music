@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -25,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,7 +59,7 @@ import kotlinx.coroutines.launch
  * Rol arquitectónico: cuerpo desplazable con resaltado neón de la frase activa.
  */
 @Composable
-fun FullScreenLyricsContent(
+fun ColumnScope.FullScreenLyricsContent(
     listState: LazyListState,
     lyricsState: LyricsState,
     activeIndex: Int,
@@ -227,7 +229,7 @@ fun FullScreenLyricsContent(
                                 shadowElevation = 8.dp,
                                 modifier = Modifier
                                     .clickable {
-                                        userScrolledManually = false
+                                        onUserScrollConsumed()
                                         coroutineScope.launch {
                                             val targetScroll = (activeIndex - 2).coerceAtLeast(0)
                                             listState.animateScrollToItem(targetScroll)
