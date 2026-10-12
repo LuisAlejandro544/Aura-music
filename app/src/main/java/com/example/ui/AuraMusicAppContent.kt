@@ -42,7 +42,6 @@ import com.example.viewmodel.MusicViewModel
  */
 @Composable
 fun AuraMusicAppContent(viewModel: MusicViewModel) {
-    val context = LocalContext.current
 
     val currentScreen by viewModel.currentScreen.collectAsStateWithLifecycle()
     val hasVisitedSettings by viewModel.hasVisitedSettings.collectAsStateWithLifecycle()
@@ -51,37 +50,15 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
     // Estados de reproducción Media3 (currentPosition se pasa como StateFlow para evitar recomponer toda la app 5 veces/s)
     val currentTrack by viewModel.currentTrack.collectAsStateWithLifecycle()
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
-    val duration by viewModel.duration.collectAsStateWithLifecycle()
-    val shuffleEnabled by viewModel.shuffleEnabled.collectAsStateWithLifecycle()
-    val repeatMode by viewModel.repeatMode.collectAsStateWithLifecycle()
-    val queue by viewModel.queue.collectAsStateWithLifecycle()
-    val currentIndex by viewModel.currentIndex.collectAsStateWithLifecycle()
-    val isAudioBuffering by viewModel.isAudioBuffering.collectAsStateWithLifecycle()
-    val isNetworkStalled by viewModel.isNetworkStalled.collectAsStateWithLifecycle()
-    val isResolvingStreamGlobal by viewModel.isResolvingStream.collectAsStateWithLifecycle()
-    val isVideoBufferingGlobal by com.example.ui.components.BackgroundVideoLoadingState.isVideoBufferingFlow.collectAsStateWithLifecycle()
-    val isVideoNetworkStalledGlobal by com.example.ui.components.BackgroundVideoLoadingState.isVideoNetworkStalledFlow.collectAsStateWithLifecycle()
 
     // Estados de Room
-    val allTracks by viewModel.allTracks.collectAsStateWithLifecycle()
-    val favoriteTracks by viewModel.favoriteTracks.collectAsStateWithLifecycle()
-    val recentlyAddedTracks by viewModel.recentlyAddedTracks.collectAsStateWithLifecycle()
-    val topPlayedTracks by viewModel.topPlayedTracks.collectAsStateWithLifecycle()
-    val playlists by viewModel.playlists.collectAsStateWithLifecycle()
-    val selectedPlaylist by viewModel.selectedPlaylist.collectAsStateWithLifecycle()
-    val selectedPlaylistTracks by viewModel.selectedPlaylistTracks.collectAsStateWithLifecycle()
 
     // Estados de UI y Ecualizador
-    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
-    val selectedLibraryTab by viewModel.selectedLibraryTab.collectAsStateWithLifecycle()
-    val isImporting by viewModel.isImporting.collectAsStateWithLifecycle()
-    val importStatusMessage by viewModel.importStatusMessage.collectAsStateWithLifecycle()
 
     val eqBands by viewModel.eqBands.collectAsStateWithLifecycle()
     val bassBoostLevel by viewModel.bassBoostLevel.collectAsStateWithLifecycle()
     val currentPreset by viewModel.currentPreset.collectAsStateWithLifecycle()
     val isEqEnabled by viewModel.isEqEnabled.collectAsStateWithLifecycle()
-    val eqScopeMode by viewModel.eqScopeMode.collectAsStateWithLifecycle()
 
     val sleepTimerState by viewModel.sleepTimerState.collectAsStateWithLifecycle()
     val spatial8DConfig by viewModel.spatial8DConfig.collectAsStateWithLifecycle()
@@ -92,20 +69,10 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
     val playbackPitch by viewModel.playbackPitch.collectAsStateWithLifecycle()
     val crossfadeSeconds by viewModel.crossfadeSeconds.collectAsStateWithLifecycle()
     val isGaplessEnabled by viewModel.isGaplessEnabled.collectAsStateWithLifecycle()
-    val isDjAutomixEnabled by viewModel.isDjAutomixEnabled.collectAsStateWithLifecycle()
-    val isDjEqCurveEnabled by viewModel.isDjEqCurveEnabled.collectAsStateWithLifecycle()
-    val volumeNormalizationConfig by viewModel.volumeNormalizationConfig.collectAsStateWithLifecycle()
     val abLoopState by viewModel.abLoopState.collectAsStateWithLifecycle()
-    val videoDisplayMode by viewModel.videoDisplayMode.collectAsStateWithLifecycle()
-    val isVideoCanvasActive by viewModel.isVideoCanvasActive.collectAsStateWithLifecycle()
-    val nowPlayingDesignMode by viewModel.nowPlayingDesignMode.collectAsStateWithLifecycle()
-    val isDynamicArtworkColorEnabled by viewModel.isDynamicArtworkColorEnabled.collectAsStateWithLifecycle()
-    val isMiniPlayerVideoEnabled by viewModel.isMiniPlayerVideoEnabled.collectAsStateWithLifecycle()
     val isBackgroundGameModeEnabled by viewModel.isBackgroundGameModeEnabled.collectAsStateWithLifecycle()
     val appWallpaperConfig by viewModel.appWallpaperConfig.collectAsStateWithLifecycle()
-    val isAppInForeground by com.example.AuraApplication.isAppInForegroundFlow.collectAsStateWithLifecycle()
     val headphoneConfig by viewModel.headphoneConfig.collectAsStateWithLifecycle()
-    val lyricsState by viewModel.lyricsState.collectAsStateWithLifecycle()
     val isSearchLyricsDialogOpen by viewModel.isSearchLyricsDialogOpen.collectAsStateWithLifecycle()
     val isSearchingLyrics by viewModel.isSearchingLyrics.collectAsStateWithLifecycle()
     val lyricsSearchResults by viewModel.lyricsSearchResults.collectAsStateWithLifecycle()
@@ -114,15 +81,9 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
     val pendingIncomingVideoUri by viewModel.pendingIncomingVideoUri.collectAsStateWithLifecycle()
     val pendingIncomingWebLink by viewModel.pendingIncomingWebLink.collectAsStateWithLifecycle()
     val downloadProgress by viewModel.downloadProgress.collectAsStateWithLifecycle()
-    val downloadingStreamingIds by viewModel.downloadingStreamingIds.collectAsStateWithLifecycle()
-    val downloadedStreamingIds by viewModel.downloadedStreamingIds.collectAsStateWithLifecycle()
 
     // Estados de Mixtape Continuo con Capítulos Reactivos
-    val isCreatingMixtape by viewModel.isCreatingMixtape.collectAsStateWithLifecycle()
-    val mixtapeProgress by viewModel.mixtapeProgress.collectAsStateWithLifecycle()
-    val mixtapeStatusMessage by viewModel.mixtapeStatusMessage.collectAsStateWithLifecycle()
     val activeMixtapeChapter by viewModel.activeMixtapeChapter.collectAsStateWithLifecycle()
-    val activeMixtapeMetadata by viewModel.activeMixtapeMetadata.collectAsStateWithLifecycle()
 
     // Si la pista actual es un Mixtape continuo, virtualizamos la pista activa con el capítulo en curso
     val effectiveTrack = remember(currentTrack, activeMixtapeChapter) {
@@ -138,127 +99,14 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
     var showGlobalAudioEffectsSheet by remember { mutableStateOf(false) }
     var initialAudioEffectsTab by remember { mutableIntStateOf(0) }
 
-    val defaultMiniPrimary = MaterialTheme.colorScheme.primary
-    val defaultMiniSecondary = MaterialTheme.colorScheme.secondary
-    var miniPlayerColors by remember {
-        mutableStateOf(
-            ExtractedArtworkColors(
-                primary = defaultMiniPrimary,
-                secondary = defaultMiniSecondary,
-                accent = defaultMiniPrimary,
-                ambientTopGlow = defaultMiniPrimary.copy(alpha = 0.25f)
-            )
-        )
-    }
-
-    val liveVideoSnapshot by ArtworkColorExtractor.liveVideoColorsFlow.collectAsStateWithLifecycle()
-    var miniSampleIntervalMs by remember {
-        mutableLongStateOf(ArtworkColorExtractor.getAdaptiveSampleIntervalMs(context))
-    }
-
-    val shouldRunLiveVisualSampling = isAppInForeground || !isBackgroundGameModeEnabled
-
-    LaunchedEffect(
-        effectiveTrack?.id,
-        effectiveTrack?.albumArtPath,
-        effectiveTrack?.videoUri,
-        videoDisplayMode,
-        isMiniPlayerVideoEnabled,
-        isDynamicArtworkColorEnabled
-    ) {
-        val track = effectiveTrack
-        if (track != null && isDynamicArtworkColorEnabled) {
-            val isVideo = ((videoDisplayMode != VideoDisplayMode.OFF) || isMiniPlayerVideoEnabled) && !track.videoUri.isNullOrEmpty()
-            miniSampleIntervalMs = ArtworkColorExtractor.getAdaptiveSampleIntervalMs(context)
-            miniPlayerColors = ArtworkColorExtractor.extractPlaybackColors(
-                context = context,
-                track = track,
-                isVideoActive = isVideo && shouldRunLiveVisualSampling,
-                isDynamicEnabled = isDynamicArtworkColorEnabled,
-                fallbackPrimary = defaultMiniPrimary,
-                fallbackSecondary = defaultMiniSecondary,
-                positionMs = viewModel.currentPosition.value
-            )
-        } else {
-            miniPlayerColors = ExtractedArtworkColors(
-                primary = defaultMiniPrimary,
-                secondary = defaultMiniSecondary,
-                accent = defaultMiniPrimary,
-                ambientTopGlow = defaultMiniPrimary.copy(alpha = 0.25f)
-            )
-        }
-    }
-
-    // Reacción en tiempo real en el MiniPlayer cuando el Video Canvas emite cambios de escena (cada 1 segundo)
-    LaunchedEffect(
-        liveVideoSnapshot,
-        effectiveTrack?.videoUri,
-        videoDisplayMode,
-        isMiniPlayerVideoEnabled,
-        isDynamicArtworkColorEnabled,
-        shouldRunLiveVisualSampling
-    ) {
-        val track = effectiveTrack
-        val isVideo = track != null && ((videoDisplayMode != VideoDisplayMode.OFF) || isMiniPlayerVideoEnabled) && !track.videoUri.isNullOrEmpty()
-        if (isDynamicArtworkColorEnabled && isVideo && shouldRunLiveVisualSampling) {
-            val snapshot = liveVideoSnapshot
-            if (snapshot != null && snapshot.videoUri == track?.videoUri) {
-                miniSampleIntervalMs = snapshot.sampleIntervalMs
-                miniPlayerColors = snapshot.colors
-            }
-        }
-    }
-
-    // Respaldo periódico cada 1s para cuando el MiniPlayer tiene la miniatura de video oculta pero la canción tiene video activo
-    // Se suspende automáticamente en 2do plano mientras el usuario juega para ahorrar CPU/GPU
-    LaunchedEffect(
-        effectiveTrack?.id,
-        effectiveTrack?.videoUri,
-        isPlaying,
-        isNowPlayingExpanded,
-        isMiniPlayerVideoEnabled,
-        videoDisplayMode,
-        isDynamicArtworkColorEnabled,
-        shouldRunLiveVisualSampling
-    ) {
-        val track = effectiveTrack
-        val hasVideo = track != null && !track.videoUri.isNullOrEmpty()
-        val isVideoColorActive = hasVideo && (videoDisplayMode != VideoDisplayMode.OFF)
-        val hasActiveTextureSampler = isNowPlayingExpanded || isMiniPlayerVideoEnabled
-        if (track != null && isDynamicArtworkColorEnabled && isVideoColorActive && !hasActiveTextureSampler && isPlaying && shouldRunLiveVisualSampling) {
-            while (true) {
-                val intervalMs = ArtworkColorExtractor.getAdaptiveSampleIntervalMs(context)
-                miniSampleIntervalMs = intervalMs
-                miniPlayerColors = ArtworkColorExtractor.extractPlaybackColors(
-                    context = context,
-                    track = track,
-                    isVideoActive = true,
-                    isDynamicEnabled = true,
-                    fallbackPrimary = defaultMiniPrimary,
-                    fallbackSecondary = defaultMiniSecondary,
-                    positionMs = viewModel.currentPosition.value
-                )
-                kotlinx.coroutines.delay(intervalMs)
-            }
-        }
-    }
-
-    val miniTransitionDurationMs = if (isDynamicArtworkColorEnabled && !effectiveTrack?.videoUri.isNullOrEmpty()) {
-        if (miniSampleIntervalMs <= ArtworkColorExtractor.INTERVAL_NORMAL_MS) 1000 else 1400
-    } else {
-        600
-    }
-
-    val animatedMiniPrimary by animateColorAsState(
-        targetValue = miniPlayerColors.primary,
-        animationSpec = tween(miniTransitionDurationMs),
-        label = "MiniPlayerPrimary"
+    val miniColors = rememberMiniPlayerColors(
+        viewModel = viewModel,
+        effectiveTrack = effectiveTrack,
+        isPlaying = isPlaying,
+        isNowPlayingExpanded = isNowPlayingExpanded
     )
-    val animatedMiniSecondary by animateColorAsState(
-        targetValue = miniPlayerColors.secondary,
-        animationSpec = tween(miniTransitionDurationMs),
-        label = "MiniPlayerSecondary"
-    )
+    val animatedMiniPrimary = miniColors.animatedPrimary
+    val animatedMiniSecondary = miniColors.animatedSecondary
 
     val canGoBack = isNowPlayingExpanded || (currentScreen !is NavScreen.Home && currentScreen !is NavScreen.Onboarding)
     BackHandler(enabled = canGoBack) {
@@ -298,51 +146,13 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
             containerColor = if (isCustomWallpaperVisible) androidx.compose.ui.graphics.Color.Transparent else BackgroundDark,
             contentWindowInsets = WindowInsets.statusBars,
             bottomBar = {
-                if (currentScreen !is NavScreen.Onboarding) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(BackgroundDark)
-                    ) {
-                        AnimatedVisibility(
-                            visible = effectiveTrack != null && !isNowPlayingExpanded,
-                            enter = fadeIn(animationSpec = tween(220)) + slideInVertically(
-                                initialOffsetY = { it / 2 },
-                                animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
-                            ),
-                            exit = fadeOut(animationSpec = tween(150)) + slideOutVertically(
-                                targetOffsetY = { it / 2 },
-                                animationSpec = tween(180)
-                            )
-                        ) {
-                            MiniPlayer(
-                                currentTrack = effectiveTrack,
-                                isPlaying = isPlaying,
-                                currentPositionFlow = viewModel.currentPosition,
-                                durationMs = duration,
-                                onTogglePlayPause = { viewModel.togglePlayPause() },
-                                onSkipNext = { viewModel.playNext() },
-                                onSkipPrevious = { viewModel.playPrevious() },
-                                onClick = { viewModel.setNowPlayingExpanded(true) },
-                                dynamicPrimary = animatedMiniPrimary,
-                                dynamicSecondary = animatedMiniSecondary,
-                                isMiniPlayerVideoEnabled = isMiniPlayerVideoEnabled && !isNowPlayingExpanded,
-                                playbackSpeed = playbackSpeed,
-                                isLoadingOrBuffering = effectiveTrack?.isStreamingTrack == true && (isAudioBuffering || isResolvingStreamGlobal),
-                                isVideoLoading = effectiveTrack?.isStreamingTrack == true && isMiniPlayerVideoEnabled && !effectiveTrack?.videoUri.isNullOrEmpty() && isVideoBufferingGlobal,
-                                isWaitingForNetwork = effectiveTrack?.isStreamingTrack == true && (isNetworkStalled || (isMiniPlayerVideoEnabled && !effectiveTrack?.videoUri.isNullOrEmpty() && isVideoNetworkStalledGlobal))
-                            )
-                        }
-
-                        BottomNavBar(
-                            currentScreen = currentScreen,
-                            onNavigate = { viewModel.navigateTo(it) },
-                            showSettingsBadge = !hasVisitedSettings
-                        )
-                    }
-                }
-            }
-        ) { innerPadding ->
+                AppBottomBarHost(
+                    viewModel = viewModel,
+                    effectiveTrack = effectiveTrack,
+                    animatedMiniPrimary = animatedMiniPrimary,
+                    animatedMiniSecondary = animatedMiniSecondary
+                )
+            }        ) { innerPadding ->
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -365,396 +175,27 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
                         .weight(1f)
                         .fillMaxWidth()
                 ) {
-                    AnimatedContent(
-                        targetState = currentScreen,
-                        transitionSpec = {
-                            (fadeIn(animationSpec = tween(240)) + slideInHorizontally(
-                                animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
-                            ) { it / 8 })
-                                .togetherWith(
-                                    fadeOut(animationSpec = tween(180)) + slideOutHorizontally(
-                                        animationSpec = tween(180)
-                                    ) { -it / 8 }
-                                )
-                        },
-                        label = "ScreenTransition"
-                    ) { targetScreen ->
-                        when (targetScreen) {
-                            is NavScreen.Onboarding -> OnboardingScreen(
-                                onFinishOnboarding = { viewModel.completeOnboarding() }
-                            )
-
-                            is NavScreen.Home -> HomeScreen(
-                                allTracks = allTracks,
-                                favoriteTracks = favoriteTracks,
-                                recentlyAddedTracks = recentlyAddedTracks,
-                                topPlayedTracks = topPlayedTracks,
-                                playlists = playlists,
-                                currentTrack = currentTrack,
-                                isPlaying = isPlaying,
-                                onTrackClick = { track, list -> viewModel.playTrack(track, list) },
-                                onFavoriteToggle = { viewModel.toggleFavorite(it) },
-                                onDeleteTrack = { trackId -> allTracks.find { it.id == trackId }?.let { viewModel.deleteTrack(it) } },
-                                onAddToPlaylist = { playlistId, trackId -> viewModel.addTrackToPlaylist(playlistId, trackId) },
-                                onNavigate = { viewModel.navigateTo(it) },
-                                onSelectLibraryTab = { viewModel.setLibraryTab(it) },
-                                onOpenPlaylist = { viewModel.openPlaylist(it) },
-                                onEditTrack = { id, t, a, al -> viewModel.updateTrackInfo(id, t, a, al) },
-                                onEditTrackDetails = { id, t, a, al, art, removeArt ->
-                                    viewModel.updateTrackDetails(id, t, a, al, art, removeArt)
-                                }
-                            )
-
-                            is NavScreen.Streaming -> {
-                                val streamingQuery by viewModel.streamingSearchQuery.collectAsStateWithLifecycle()
-                                val streamingFilter by viewModel.streamingSelectedFilter.collectAsStateWithLifecycle()
-                                val streamingResults by viewModel.streamingSearchResults.collectAsStateWithLifecycle()
-                                val isStreamingSearching by viewModel.isStreamingSearching.collectAsStateWithLifecycle()
-                                val isResolvingStream by viewModel.isResolvingStream.collectAsStateWithLifecycle()
-                                val resolvingVideoId by viewModel.resolvingVideoId.collectAsStateWithLifecycle()
-                                val nextSimilarPreview by viewModel.nextSimilarTrackPreview.collectAsStateWithLifecycle()
-                                val streamingCacheCfg by viewModel.streamingCacheConfig.collectAsStateWithLifecycle()
-
-                                com.example.feature.streaming.StreamingExploreScreen(
-                                    searchQuery = streamingQuery,
-                                    selectedFilter = streamingFilter,
-                                    searchResults = streamingResults,
-                                    isSearching = isStreamingSearching,
-                                    isResolvingStream = isResolvingStream,
-                                    resolvingVideoId = resolvingVideoId,
-                                    currentTrack = effectiveTrack,
-                                    nextSimilarTrackPreview = nextSimilarPreview,
-                                    cacheConfig = streamingCacheCfg,
-                                    downloadingVideoIds = downloadingStreamingIds,
-                                    downloadedVideoIds = downloadedStreamingIds,
-                                    localLibraryTracks = allTracks,
-                                    onSearchQueryChange = { viewModel.updateStreamingSearchQuery(it) },
-                                    onSearchSubmit = { viewModel.performStreamingSearch(it) },
-                                    onFilterChange = { viewModel.setStreamingSearchFilter(it) },
-                                    onPlayStreamingItem = { viewModel.playStreamingItem(it) },
-                                    onDownloadStreamingItem = { viewModel.downloadStreamingItemPermanently(it) },
-                                    onOpenNowPlaying = { viewModel.setNowPlayingExpanded(true) }
-                                )
-                            }
-
-                            is NavScreen.Library -> LibraryScreen(
-                                allTracks = allTracks,
-                                favoriteTracks = favoriteTracks,
-                                playlists = playlists,
-                                selectedTab = selectedLibraryTab,
-                                onTabSelected = { viewModel.setLibraryTab(it) },
-                                searchQuery = searchQuery,
-                                onSearchQueryChange = { viewModel.setSearchQuery(it) },
-                                currentTrack = currentTrack,
-                                isPlaying = isPlaying,
-                                onTrackClick = { track, list -> viewModel.playTrack(track, list) },
-                                onFavoriteToggle = { viewModel.toggleFavorite(it) },
-                                onDeleteTrack = { trackId -> allTracks.find { it.id == trackId }?.let { viewModel.deleteTrack(it) } },
-                                onOpenPlaylist = { viewModel.openPlaylist(it) },
-                                onOpenAlbum = { viewModel.openAlbum(it) },
-                                onOpenArtist = { viewModel.openArtist(it) },
-                                onCreatePlaylist = { name, desc, artUri -> viewModel.createPlaylist(name, desc, artUri) },
-                                onRenamePlaylist = { pId, name, desc, artUri, removeArt ->
-                                    viewModel.updatePlaylist(pId, name, desc, artUri, removeArt)
-                                },
-                                onDeletePlaylist = { viewModel.deletePlaylist(it) },
-                                onAddToPlaylist = { playlistId, trackId -> viewModel.addTrackToPlaylist(playlistId, trackId) },
-                                onNavigate = { viewModel.navigateTo(it) },
-                                onEditTrack = { id, t, a, al -> viewModel.updateTrackInfo(id, t, a, al) },
-                                onEditTrackDetails = { id, t, a, al, art, removeArt ->
-                                    viewModel.updateTrackDetails(id, t, a, al, art, removeArt)
-                                },
-                                onCreateMixtape = { tracksToMix, title, crossfadeSec, onDone ->
-                                    viewModel.createMixtape(tracksToMix, title, crossfadeSec, onDone)
-                                },
-                                onCreateAutoRemix = { trackA, trackB, title, style, crossfadeSec, onDone ->
-                                    viewModel.createAutoRemix(trackA, trackB, title, style, crossfadeSec, onDone)
-                                },
-                                isCreatingMixtape = isCreatingMixtape,
-                                mixtapeProgress = mixtapeProgress,
-                                mixtapeStatusMessage = mixtapeStatusMessage,
-                                onOpenPlaylistImportDialog = { viewModel.openPlaylistImportDialog() }
-                            )
-
-                            is NavScreen.Import -> ImportMusicScreen(
-                                allTracks = allTracks,
-                                isImporting = isImporting,
-                                importStatusMessage = importStatusMessage,
-                                downloadProgress = downloadProgress,
-                                onImportUris = { uris, trimSilence -> viewModel.importUris(uris, trimSilence) },
-                                onImportFolder = { treeUri, trimSilence -> viewModel.importFolder(treeUri, trimSilence) },
-                                onSeedDemoTracks = { viewModel.seedDemoTracks() },
-                                onClearLibrary = { viewModel.clearAllTracks() },
-                                onDismissStatusMessage = { viewModel.dismissImportStatus() },
-                                onImportVideoAsMusic = { videoUri, title, artist, album, attachCanvas, forceLoop, trimSilence ->
-                                    viewModel.importVideoAsTrack(videoUri, title, artist, album, attachCanvas, forceLoop, trimSilence) { createdTrack ->
-                                        viewModel.playTrack(createdTrack)
-                                        viewModel.setNowPlayingExpanded(true)
-                                    }
-                                },
-                                onImportVideoAsMusicWithLoopStyle = { videoUri, title, artist, album, attachCanvas, forceLoop, trimSilence, loopStyle ->
-                                    viewModel.importVideoAsTrack(videoUri, title, artist, album, attachCanvas, forceLoop, trimSilence, loopStyle) { createdTrack ->
-                                        viewModel.playTrack(createdTrack)
-                                        viewModel.setNowPlayingExpanded(true)
-                                    }
-                                },
-                                onDownloadFromLink = { info, title, artist, canvas, trimSilence ->
-                                    viewModel.importFromWebVideoLink(info, title, artist, canvas, trimSilence) { createdTrack ->
-                                        viewModel.playTrack(createdTrack)
-                                        viewModel.setNowPlayingExpanded(true)
-                                    }
-                                },
-                                onDownloadFromLinkWithLoopStyle = { info, title, artist, canvas, trimSilence, loopStyle ->
-                                    viewModel.importFromWebVideoLink(info, title, artist, canvas, trimSilence, loopStyle) { createdTrack ->
-                                        viewModel.playTrack(createdTrack)
-                                        viewModel.setNowPlayingExpanded(true)
-                                    }
-                                },
-                                onOpenPlaylistImportDialog = { viewModel.openPlaylistImportDialog() }
-                            )
-
-                            is NavScreen.PlaylistDetail -> PlaylistDetailScreen(
-                                playlist = selectedPlaylist,
-                                tracks = selectedPlaylistTracks,
-                                allTracks = allTracks,
-                                allPlaylists = playlists,
-                                currentTrack = effectiveTrack,
-                                isPlaying = isPlaying,
-                                onBack = { viewModel.handleBackPress() },
-                                onTrackClick = { track, list -> viewModel.playTrack(track, list) },
-                                onFavoriteToggle = { viewModel.toggleFavorite(it) },
-                                onRemoveFromPlaylist = { pId, tId -> viewModel.removeTrackFromPlaylist(pId, tId) },
-                                onAddToPlaylist = { pId, tId -> viewModel.addTrackToPlaylist(pId, tId) },
-                                onRenamePlaylist = { pId, name, desc, artUri, removeArt ->
-                                    viewModel.updatePlaylist(pId, name, desc, artUri, removeArt)
-                                },
-                                onDeleteTrackFromLibrary = { trackId -> allTracks.find { it.id == trackId }?.let { viewModel.deleteTrack(it) } },
-                                onEditTrack = { id, t, a, al -> viewModel.updateTrackInfo(id, t, a, al) },
-                                onEditTrackDetails = { id, t, a, al, art, removeArt ->
-                                    viewModel.updateTrackDetails(id, t, a, al, art, removeArt)
-                                },
-                                onCreateMixtape = { tracksToMix, title, crossfadeSec, onDone ->
-                                    viewModel.createMixtape(tracksToMix, title, crossfadeSec, onDone)
-                                },
-                                onCreateAutoRemix = { trackA, trackB, title, style, crossfadeSec, onDone ->
-                                    viewModel.createAutoRemix(trackA, trackB, title, style, crossfadeSec, onDone)
-                                },
-                                isCreatingMixtape = isCreatingMixtape,
-                                mixtapeProgress = mixtapeProgress,
-                                mixtapeStatusMessage = mixtapeStatusMessage
-                            )
-
-                            is NavScreen.Settings -> {
-                                val widgetConfig by viewModel.widgetConfig.collectAsStateWithLifecycle()
-                                SettingsScreen(
-                                    currentTheme = viewModel.currentTheme.collectAsStateWithLifecycle().value,
-                                    onSelectTheme = { viewModel.setTheme(it) },
-                                    onOpenOnboarding = { viewModel.reopenOnboarding() },
-                                    isDynamicArtworkColorEnabled = isDynamicArtworkColorEnabled,
-                                    onToggleDynamicArtworkColor = { viewModel.toggleDynamicArtworkColor(it) },
-                                    isMiniPlayerVideoEnabled = isMiniPlayerVideoEnabled,
-                                    onToggleMiniPlayerVideo = { viewModel.toggleMiniPlayerVideoEnabled() },
-                                    isBackgroundGameModeEnabled = isBackgroundGameModeEnabled,
-                                    onToggleBackgroundGameMode = { viewModel.setBackgroundGameModeEnabled(it) },
-                                    appWallpaperConfig = appWallpaperConfig,
-                                    onToggleWallpaperEnabled = { viewModel.setAppWallpaperEnabled(it) },
-                                    onSelectWallpaperImage = { viewModel.setCustomWallpaperImage(it) },
-                                    onSelectWallpaperVideo = { viewModel.setCustomWallpaperVideo(it) },
-                                    onClearWallpaper = { viewModel.clearCustomWallpaper() },
-                                    onSelectWallpaperScope = { viewModel.setAppWallpaperScope(it) },
-                                    onChangeWallpaperDimAlpha = { viewModel.setAppWallpaperDimAlpha(it) },
-                                    onChangeWallpaperBlurDp = { viewModel.setAppWallpaperBlurDp(it) },
-                                    nowPlayingDesignMode = nowPlayingDesignMode,
-                                    onSetNowPlayingDesignMode = { viewModel.setNowPlayingDesignMode(it) },
-                                    widgetConfig = widgetConfig,
-                                    currentTrack = effectiveTrack,
-                                    topPlayedTracks = topPlayedTracks,
-                                    playlists = playlists,
-                                    dynamicPrimaryColor = animatedMiniPrimary,
-                                    dynamicSecondaryColor = animatedMiniSecondary,
-                                    onSetWidgetDynamicColorEnabled = { viewModel.setWidgetDynamicColorEnabled(it) },
-                                    onSetWidgetGridContentMode = { viewModel.setWidgetGridContentMode(it) },
-                                    onSetWidgetShowProgress = { viewModel.setWidgetShowProgress(it) },
-                                    onSetWidgetColorIntensityPercent = { viewModel.setWidgetColorIntensityPercent(it) },
-                                    onForceSyncWidgets = { viewModel.forceSyncAllWidgets() },
-                                    headphoneConfig = headphoneConfig,
-                                    onUpdateHeadphoneConfig = { viewModel.updateHeadphoneConfig(it) },
-                                    onSetCrossfeedEnabled = { viewModel.setCrossfeedEnabled(it) },
-                                    onSetCrossfeedStrength = { viewModel.setCrossfeedStrength(it) },
-                                    onSetBalanceControlEnabled = { viewModel.setBalanceControlEnabled(it) },
-                                    onSetStereoBalance = { viewModel.setStereoBalance(it) },
-                                    onSetBitPerfectEnabled = { viewModel.setBitPerfectEnabled(it) },
-                                    onSetLowLatencyEnabled = { viewModel.setLowLatencyAAudioEnabled(it) },
-                                    onSetUsbDacExclusiveEnabled = { viewModel.setUsbDacExclusiveEnabled(it) },
-                                    onSetHiResTargetMode = { viewModel.setHiResTargetMode(it) },
-                                    onSetBecomingNoisyGuardEnabled = { viewModel.setBecomingNoisyGuardEnabled(it) },
-                                    onSetFadeInOnResumeEnabled = { viewModel.setFadeInOnResumeEnabled(it) },
-                                    onSetDedicatedVolumeMemoryEnabled = { viewModel.setDedicatedVolumeMemoryEnabled(it) },
-                                    onSetHeadsetControlsEnabled = { viewModel.setHeadsetControlsEnabled(it) },
-                                    onSetHeadsetAction = { type, action -> viewModel.setHeadsetAction(type, action) },
-                                    allTracks = allTracks,
-                                    onDeleteTrackArtwork = { viewModel.deleteTrackArtwork(it) },
-                                    onDeleteTrackVideo = { viewModel.deleteTrackVideo(it) },
-                                    streamingCacheConfig = viewModel.streamingCacheConfig.collectAsStateWithLifecycle().value,
-                                    onSelectStreamingVideoPolicy = { viewModel.setStreamingVideoNetworkPolicy(it) },
-                                    onChangeStreamingCacheMaxMb = { viewModel.setStreamingCacheMaxSizeMb(it) },
-                                    onClearStreamingCache = { viewModel.clearStreamingCache() }
-                                )
-                            }
-                        }
-                    }
+                    AppScreensHost(
+                        viewModel = viewModel,
+                        currentScreen = currentScreen,
+                        effectiveTrack = effectiveTrack,
+                        animatedMiniPrimary = animatedMiniPrimary,
+                        animatedMiniSecondary = animatedMiniSecondary
+                    )
                 }
             }
         }
 
         // Pantalla Now Playing con deslizamiento suave sin capas negras residuales
-        AnimatedVisibility(
-            visible = isNowPlayingExpanded && currentTrack != null,
-            enter = slideInVertically(
-                initialOffsetY = { it },
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioNoBouncy,
-                    stiffness = Spring.StiffnessMedium
-                )
-            ),
-            exit = slideOutVertically(
-                targetOffsetY = { it },
-                animationSpec = tween(durationMillis = 220)
-            ),
-            modifier = Modifier.fillMaxSize()
-        ) {
-            NowPlayingScreen(
-                currentTrack = effectiveTrack,
-                isPlaying = isPlaying,
-                currentPositionFlow = viewModel.currentPosition,
-                durationMs = duration,
-                shuffleEnabled = shuffleEnabled,
-                repeatMode = repeatMode,
-                queue = queue,
-                currentIndex = currentIndex,
-                onTogglePlayPause = { viewModel.togglePlayPause() },
-                onSeekTo = { viewModel.seekTo(it) },
-                onPlayNext = { viewModel.playNext() },
-                onPlayPrevious = { viewModel.playPrevious() },
-                onToggleShuffle = { viewModel.toggleShuffle() },
-                onCycleRepeat = { viewModel.cycleRepeatMode() },
-                onToggleFavorite = { viewModel.toggleFavorite(it) },
-                onTrackSelectFromQueue = { index ->
-                    queue.getOrNull(index)?.let { viewModel.playTrack(it, queue) }
-                },
-                onOpenEqualizer = {
-                    initialAudioEffectsTab = 0
-                    showGlobalAudioEffectsSheet = true
-                },
-                onCollapse = { viewModel.setNowPlayingExpanded(false) },
-                onEditTrack = { id, t, a, al -> viewModel.updateTrackInfo(id, t, a, al) },
-                onEditTrackDetails = { id, t, a, al, art, removeArt ->
-                    viewModel.updateTrackDetails(id, t, a, al, art, removeArt)
-                },
-                onEditTrackDetailsWithVideo = { id, t, a, al, art, removeArt, video, removeVideo, forceLoop ->
-                    viewModel.updateTrackDetails(id, t, a, al, art, removeArt, video, removeVideo, forceLoop)
-                },
-                onEditTrackDetailsWithLoopStyle = { id, t, a, al, art, removeArt, video, removeVideo, forceLoop, loopStyle ->
-                    viewModel.updateTrackDetails(id, t, a, al, art, removeArt, video, removeVideo, forceLoop, loopStyle)
-                },
-                isVideoCanvasActive = isVideoCanvasActive,
-                videoDisplayMode = videoDisplayMode,
-                nowPlayingDesignMode = nowPlayingDesignMode,
-                onSetNowPlayingDesignMode = { viewModel.setNowPlayingDesignMode(it) },
-                collectionContextTitle = selectedPlaylist?.name ?: currentTrack?.album ?: "Tu Biblioteca",
-                onDownloadStreamingTrack = { track -> viewModel.downloadCurrentStreamingTrackPermanently(track) },
-                isStreamingTrackDownloading = effectiveTrack?.streamingVideoId?.let { vid -> downloadingStreamingIds.contains(vid) } == true,
-                isStreamingTrackDownloaded = effectiveTrack?.let { trk ->
-                    val vid = trk.streamingVideoId
-                    (!vid.isNullOrBlank() && downloadedStreamingIds.contains(vid)) ||
-                        allTracks.any { local ->
-                            (!vid.isNullOrBlank() && local.streamingVideoId == vid) ||
-                                (local.title.equals(trk.title, ignoreCase = true) &&
-                                    local.artist.equals(trk.artist, ignoreCase = true))
-                        }
-                } == true,
-                isLoadingOrBuffering = effectiveTrack?.isStreamingTrack == true && (isAudioBuffering || isResolvingStreamGlobal),
-                isWaitingForNetwork = effectiveTrack?.isStreamingTrack == true && isNetworkStalled,
-                isDynamicArtworkColorEnabled = isDynamicArtworkColorEnabled,
-                onToggleVideoCanvas = { viewModel.toggleVideoCanvas() },
-                onSetVideoDisplayMode = { viewModel.setVideoDisplayMode(it) },
-                onCycleVideoDisplayMode = { viewModel.cycleVideoDisplayMode() },
-                sleepTimerState = sleepTimerState,
-                onStartSleepTimer = { viewModel.startSleepTimer(it) },
-                onCancelSleepTimer = { viewModel.cancelSleepTimer() },
-                onAddSleepTimerMinutes = { viewModel.addSleepTimerMinutes(it) },
-                spatial8DConfig = spatial8DConfig,
-                onSet8DEnabled = { viewModel.set8DEnabled(it) },
-                onSet8DMode16D = { viewModel.set8DMode16D(it) },
-                onSet8DOrbitSpeed = { viewModel.set8DOrbitSpeed(it) },
-                onSet8DSpatialIntensity = { viewModel.set8DSpatialIntensity(it) },
-                onSet8DRoomDepth = { viewModel.set8DRoomDepth(it) },
-                vocalClarityConfig = vocalClarityConfig,
-                onSetVocalClarityEnabled = { viewModel.setVocalClarityEnabled(it) },
-                onSetVocalClarityStrength = { viewModel.setVocalClarityStrength(it) },
-                reverbConfig = reverbConfig,
-                onSetReverbEnabled = { viewModel.setReverbEnabled(it) },
-                onSetReverbPreset = { viewModel.setReverbPreset(it) },
-                onSetReverbCustomParameters = { roomSize, decayMs, levelDb ->
-                    viewModel.setReverbCustomParameters(roomSize, decayMs, levelDb)
-                },
-                playbackSpeed = playbackSpeed,
-                onSetPlaybackSpeed = { viewModel.setPlaybackSpeed(it) },
-                playbackPitch = playbackPitch,
-                onSetPlaybackPitch = { viewModel.setPlaybackPitch(it) },
-                onResetSpeedAndPitch = { viewModel.resetSpeedAndPitch() },
-                crossfadeSeconds = crossfadeSeconds,
-                onSetCrossfadeSeconds = { viewModel.setCrossfadeSeconds(it) },
-                isGaplessEnabled = isGaplessEnabled,
-                onSetGaplessEnabled = { viewModel.setGaplessEnabled(it) },
-                isDjAutomixEnabled = isDjAutomixEnabled,
-                onSetDjAutomixEnabled = { viewModel.setDjAutomixEnabled(it) },
-                isDjEqCurveEnabled = isDjEqCurveEnabled,
-                onSetDjEqCurveEnabled = { viewModel.setDjEqCurveEnabled(it) },
-                volumeNormalizationConfig = volumeNormalizationConfig,
-                onSetVolumeNormalizationEnabled = { viewModel.setVolumeNormalizationEnabled(it) },
-                onSetVolumeNormalizationMode = { viewModel.setVolumeNormalizationMode(it) },
-                abLoopState = abLoopState,
-                onMarkABPointA = { viewModel.markABPointA() },
-                onMarkABPointB = { viewModel.markABPointB() },
-                onToggleABLoopEnabled = { viewModel.toggleABLoopEnabled(it) },
-                onAdjustABPointA = { viewModel.adjustABPointA(it) },
-                onAdjustABPointB = { viewModel.adjustABPointB(it) },
-                onClearABLoop = { viewModel.clearABLoop() },
-                isEqEnabled = isEqEnabled,
-                eqScopeMode = eqScopeMode,
-                onSetEqScopeMode = { viewModel.setEqScopeMode(it) },
-                eqBands = eqBands,
-                bassBoostLevel = bassBoostLevel,
-                currentPreset = currentPreset,
-                onToggleEqEnabled = { viewModel.setEqEnabled(it) },
-                onBandLevelChange = { index, level -> viewModel.setBandLevel(index, level) },
-                onBassBoostChange = { viewModel.setBassBoost(it) },
-                onPresetSelect = { viewModel.applyPreset(it) },
-                headphoneConfig = headphoneConfig,
-                onSetCrossfeedEnabled = { viewModel.setCrossfeedEnabled(it) },
-                onSetCrossfeedStrength = { viewModel.setCrossfeedStrength(it) },
-                onSetBalanceControlEnabled = { viewModel.setBalanceControlEnabled(it) },
-                onSetStereoBalance = { viewModel.setStereoBalance(it) },
-                visualizerBandsFlow = viewModel.visualizerBands,
-                audioIntensityFlow = viewModel.audioIntensity,
-                lyricsState = lyricsState,
-                isSearchLyricsDialogOpen = isSearchLyricsDialogOpen,
-                isSearchingLyrics = isSearchingLyrics,
-                lyricsSearchResults = lyricsSearchResults,
-                searchLyricsError = searchLyricsError,
-                onFetchOnlineLyrics = { viewModel.fetchOnlineLyrics() },
-                onSaveCustomLyrics = { viewModel.saveCustomLyrics(it) },
-                onImportLyricsUri = { viewModel.importLyricsFromUri(it) },
-                onOpenSearchLyrics = { viewModel.openSearchLyricsDialog() },
-                onCloseSearchLyrics = { viewModel.closeSearchLyricsDialog() },
-                onSearchLyrics = { title, artist -> viewModel.searchLyricsOptions(title, artist) },
-                onSelectLyricSearchResult = { viewModel.selectLyricSearchResult(it) },
-                activeMixtapeChapter = activeMixtapeChapter,
-                mixtapeChapterIndex = activeMixtapeMetadata?.chapters?.indexOfFirst { it.startMs == activeMixtapeChapter?.startMs } ?: -1,
-                mixtapeTotalChapters = activeMixtapeMetadata?.chapters?.size ?: 0
-            )
-        }
+        AppNowPlayingHost(
+            viewModel = viewModel,
+            effectiveTrack = effectiveTrack,
+            isNowPlayingExpanded = isNowPlayingExpanded,
+            onOpenGlobalEffects = {
+                initialAudioEffectsTab = it
+                showGlobalAudioEffectsSheet = true
+            }
+        )
 
         // Hospedador de diálogos emergentes y hojas modulares
         GlobalDialogsHost(
