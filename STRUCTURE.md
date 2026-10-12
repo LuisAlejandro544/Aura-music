@@ -124,7 +124,10 @@ app/
     │       │   │   │   │   └── LyricsManager.kt # Búsqueda y descarga de letras sincronizadas LRCLIB con versión oficial #1
     │       │   │   │   ├── mixtape/            # Fusión Continua y Auto-Remix / Mashup de 2 Canciones Locales
     │       │   │   │   │   ├── MixtapeEngine.kt        # Fusión FFmpeg acrossfade, collage WebP y capítulos reactivos
-    │       │   │   │   │   └── SmartAutoRemixEngine.kt # Auto-Remix de 2 pistas (Mashup Voz A + Base B / Remix DJ) y Auto-Match
+    │       │   │   │   │   ├── SmartAutoRemixEngine.kt # Fachada que delega en AutoRemixMatcher, AutoRemixPlanner y AutoRemixPostProcessor
+    │       │   │   │   ├── AutoRemixMatcher.kt       # Selección del mejor par y validación de archivos
+    │       │   │   │   ├── AutoRemixPlanner.kt       # Grafos FFmpeg Mashup/DJ y ejecución con progreso
+    │       │   │   │   └── AutoRemixPostProcessor.kt # Collage WebP, LRC continuo y metadatos
     │       │   │   │   ├── playlist/           # Importador Universal de Playlists Públicas
     │       │   │   │   │   └── ExternalPlaylistImporter.kt # Fachada que delega en SpotifyPlaylistExtractor y YouTubePlaylistExtractor
    │       │   │   │   ├── PlaylistHttpClient.kt         # Cliente HTTP/JSON interno (GET/POST, redirects, unescape)
@@ -199,10 +202,18 @@ app/
     │       │   │       ├── PlaylistDialogs.kt            # Diálogos de creación, edición y adición de pistas a Playlists
     │       │   │       └── PlaylistRowItem.kt            # Fila interactiva de Playlist con collage dinámico 1-4 fotos o WebP
     │       │   ├── nowplaying/
-    │       │   │   ├── NowPlayingScreen.kt     # Orquestador del reproductor a pantalla completa (Clásico / Cinemático / Auto)
+    │       │   │   ├── NowPlayingScreen.kt     # Fachada delgada (estado visual, atajos, diálogos y ramas)
+    │       │   │   ├── NowPlayingVisualState.kt  # Colores dinámicos cada 1s y banderas de video
+    │       │   │   ├── NowPlayingShortcutRow.kt  # Atajos EQ FX, Letras/Carátula y Cola
+    │       │   │   └── NowPlayingDialogsHost.kt  # Los 8 diálogos y hojas modales
     │       │   │   └── components/
     │       │   │       ├── FullScreenLyricsScreen.kt       # Modo Karaoke Inmersivo a Pantalla Completa estilo Apple Music Sing
-    │       │   │       ├── NowPlayingCinematicLayout.kt    # Diseño Cinemático Canvas (Estilo Spotify) con viñeta reactiva a 1s
+    │       │   │       ├── NowPlayingCinematicLayout.kt    # Fachada que delega en secciones Top/Bottom
+    │       │   │       ├── CinematicTopSection.kt          # Barra superior y fila de pista
+    │       │   │       ├── CinematicBottomSection.kt       # Controles, utilidades y vista previa karaoke
+    │       │   │       ├── NowPlayingClassicLayout.kt      # Rama clásica completa
+    │       │   │       ├── NowPlayingFullscreenBackground.kt # Video fullscreen con velo
+    │       │   │       └── NowPlayingCinematicHost.kt      # Envoltorio de la rama cinemática
     │       │   │       ├── NowPlayingDesignSelectorDialog.kt # Selector modal de modo de diseño del reproductor
     │       │   │       ├── NowPlayingArtworkCard.kt        # Tarjeta de carátula 1:1 y lienzo de video despejado
     │       │   │       ├── NowPlayingLyricsCard.kt         # Tarjeta sincronizada de letras Karaoke 1:1 con auto-scroll
@@ -253,7 +264,11 @@ app/
     │       │               └── StoredMediaDeleteDialogs.kt # Diálogos de confirmación para liberar almacenamiento
     │       │
     │       ├── ui/                             # Orquestador UI Global, Componentes Compartidos, Navegación y Tema M3
-    │       │   ├── AuraMusicAppContent.kt      # Scaffold principal, fondo personalizado, MiniPlayer y transiciones
+    │       │   ├── AuraMusicAppContent.kt      # Fachada que delega en 4 hosts
+    │       │   ├── MiniPlayerColorsState.kt    # Colores dinámicos del MiniPlayer cada 1s
+    │       │   ├── AppBottomBarHost.kt         # MiniPlayer flotante y navegación inferior
+    │       │   ├── AppScreensHost.kt           # Las 7 pantallas con transiciones
+    │       │   └── AppNowPlayingHost.kt        # Overlay de Now Playing cableado
     │       │   ├── GlobalDialogsHost.kt        # Contenedor centralizado de diálogos y hojas modales globales
     │       │   ├── navigation/
     │       │   │   └── NavScreen.kt            # Definición de rutas principales y pestañas de biblioteca
