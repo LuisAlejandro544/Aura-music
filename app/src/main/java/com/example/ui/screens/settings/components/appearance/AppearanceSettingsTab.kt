@@ -1,4 +1,4 @@
-package com.example.ui.screens.settings.components
+package com.example.feature.settings.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -36,7 +36,7 @@ import com.example.core.model.AuraTheme
 import com.example.core.model.NowPlayingDesignMode
 import com.example.core.model.WallpaperScreenScope
 import com.example.core.model.WidgetConfig
-import com.example.ui.screens.settings.components.appearance.appWallpaperSettingsSection
+import com.example.feature.settings.components.appearance.appWallpaperSettingsSection
 import com.example.ui.theme.CardBorder
 import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.TextPrimary
@@ -514,7 +514,7 @@ fun LazyListScope.visualCustomizationSettingsContent(
     onClearStreamingCache: () -> Unit = {}
 ) {
     item {
-        com.example.ui.screens.settings.components.appearance.StreamingCacheAndVideoSettingsCard(
+        com.example.feature.settings.components.appearance.StreamingCacheAndVideoSettingsCard(
             cacheConfig = streamingCacheConfig,
             onSelectVideoPolicy = onSelectStreamingVideoPolicy,
             onChangeMaxCacheMb = onChangeStreamingCacheMaxMb,

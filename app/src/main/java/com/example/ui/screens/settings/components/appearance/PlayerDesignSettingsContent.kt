@@ -1,4 +1,4 @@
-package com.example.ui.screens.settings.components
+package com.example.feature.settings.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable

@@ -1,4 +1,4 @@
-package com.example.ui.screens.settings.components.media
+package com.example.feature.settings.components.media
 
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons

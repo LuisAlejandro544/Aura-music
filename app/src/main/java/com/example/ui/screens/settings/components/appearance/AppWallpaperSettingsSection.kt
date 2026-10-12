@@ -1,4 +1,4 @@
-package com.example.ui.screens.settings.components.appearance
+package com.example.feature.settings.components.appearance
 
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult

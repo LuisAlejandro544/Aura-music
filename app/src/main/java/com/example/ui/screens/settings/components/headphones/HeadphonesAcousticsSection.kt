@@ -1,4 +1,4 @@
-package com.example.ui.screens.settings.components
+package com.example.feature.settings.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke

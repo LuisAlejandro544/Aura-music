@@ -1,4 +1,4 @@
-package com.example.ui.screens.settings
+package com.example.feature.settings
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Spring
@@ -33,10 +33,10 @@ import com.example.core.model.Track
 import com.example.core.model.WallpaperScreenScope
 import com.example.core.model.WidgetConfig
 import com.example.core.model.WidgetGridContentMode
-import com.example.ui.screens.settings.components.*
-import com.example.ui.screens.settings.components.about.behindTheProjectSettingsContent
-import com.example.ui.screens.settings.components.appearance.appWallpaperSettingsSection
-import com.example.ui.screens.settings.components.widgets.widgetSettingsContent
+import com.example.feature.settings.components.*
+import com.example.feature.settings.components.about.behindTheProjectSettingsContent
+import com.example.feature.settings.components.appearance.appWallpaperSettingsSection
+import com.example.feature.settings.components.widgets.widgetSettingsContent
 import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
@@ -285,7 +285,7 @@ fun SettingsScreen(
                     testTag = "subscreen_visual_streaming_cache"
                 ) {
                     item {
-                        com.example.ui.screens.settings.components.appearance.StreamingCacheAndVideoSettingsCard(
+                        com.example.feature.settings.components.appearance.StreamingCacheAndVideoSettingsCard(
                             cacheConfig = streamingCacheConfig,
                             onSelectVideoPolicy = onSelectStreamingVideoPolicy,
                             onChangeMaxCacheMb = onChangeStreamingCacheMaxMb,

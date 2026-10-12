@@ -1,4 +1,4 @@
-package com.example.ui.screens.settings.components
+package com.example.feature.settings.components
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke

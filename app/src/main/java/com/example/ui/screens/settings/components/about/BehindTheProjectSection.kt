@@ -1,4 +1,4 @@
-package com.example.ui.screens.settings.components.about
+package com.example.feature.settings.components.about
 
 import android.content.ClipData
 import android.content.ClipboardManager

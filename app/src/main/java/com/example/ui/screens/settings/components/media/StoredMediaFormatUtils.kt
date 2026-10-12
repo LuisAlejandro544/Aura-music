@@ -1,4 +1,4 @@
-package com.example.ui.screens.settings.components.media
+package com.example.feature.settings.components.media
 
 /**
  * Utilidades de formato de almacenamiento para medios de Aura Music.

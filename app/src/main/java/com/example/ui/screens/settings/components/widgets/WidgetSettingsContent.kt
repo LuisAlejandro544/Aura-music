@@ -1,4 +1,4 @@
-package com.example.ui.screens.settings.components.widgets
+package com.example.feature.settings.components.widgets
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background

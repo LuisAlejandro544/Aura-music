@@ -29,7 +29,7 @@ import com.example.feature.library.LibraryScreen
 import com.example.feature.nowplaying.NowPlayingScreen
 import com.example.feature.onboarding.OnboardingScreen
 import com.example.feature.playlist.PlaylistDetailScreen
-import com.example.ui.screens.settings.SettingsScreen
+import com.example.feature.settings.SettingsScreen
 import com.example.ui.theme.ArtworkColorExtractor
 import com.example.ui.theme.BackgroundDark
 import com.example.ui.theme.ExtractedArtworkColors

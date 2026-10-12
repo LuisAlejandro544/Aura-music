@@ -1,4 +1,4 @@
-package com.example.ui.screens.settings.components
+package com.example.feature.settings.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row

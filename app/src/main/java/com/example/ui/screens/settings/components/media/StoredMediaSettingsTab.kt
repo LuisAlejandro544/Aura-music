@@ -1,4 +1,4 @@
-package com.example.ui.screens.settings.components
+package com.example.feature.settings.components
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -23,10 +23,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.storage.UserPublicMediaExporter
 import com.example.core.model.Track
-import com.example.ui.screens.settings.components.media.StoredMediaDeleteDialogs
-import com.example.ui.screens.settings.components.media.StoredMediaSummaryHeader
-import com.example.ui.screens.settings.components.media.StoredMediaTrackCard
-import com.example.ui.screens.settings.components.media.UserPublicFolderCard
+import com.example.feature.settings.components.media.StoredMediaDeleteDialogs
+import com.example.feature.settings.components.media.StoredMediaSummaryHeader
+import com.example.feature.settings.components.media.StoredMediaTrackCard
+import com.example.feature.settings.components.media.UserPublicFolderCard
 import com.example.ui.theme.CardBorder
 import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.TextPrimary
