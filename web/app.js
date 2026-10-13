@@ -12,29 +12,15 @@
     return (bytes / 1048576).toFixed(1) + " MB";
   }
 
-  function fetchTimeout(url, ms, asJson) {
-    var ctrl = ("AbortController" in window) ? new AbortController() : null;
-    var timer = null;
-    if (ctrl) {
-      timer = setTimeout(function () { ctrl.abort(); }, ms || 10000);
-    }
-    var opts = ctrl ? { signal: ctrl.signal } : {};
-    return fetch(url, opts).then(function (r) {
-      if (timer) clearTimeout(timer);
-      if (!r.ok) throw new Error("HTTP " + r.status);
-      return asJson ? r.json() : r.text();
-    }, function (err) {
-      if (timer) clearTimeout(timer);
-      throw err;
-    });
-  }
-
   // 1. Último Pre-Release "-beta": enlaza los 3 APKs + SHA256SUMS.
   function wireDownloads() {
     var pill = document.getElementById("versionPill");
     var meta = document.getElementById("releaseMeta");
     var heroBtn = document.getElementById("heroDownloadBtn");
-    fetchTimeout(API, 10000, true).then(function (list) {
+    fetch(API).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    }).then(function (list) {
       var rel = (list || []).find(function (x) {
         return x.prerelease === true && String(x.tag_name || "").indexOf("-beta") !== -1;
       }) || (list || [])[0];
@@ -76,7 +62,10 @@
   function renderMd(url, elId, sliceLines) {
     var box = document.getElementById(elId);
     if (!box) return;
-    fetchTimeout(url, 10000, false).then(function (md) {
+    fetch(url).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.text();
+    }).then(function (md) {
       if (sliceLines) md = md.split("\n").slice(0, sliceLines).join("\n");
       if (window.marked) box.innerHTML = window.marked.parse(md);
       else box.textContent = md;

@@ -1,44 +1,19 @@
 <!DOCTYPE html>
-<!-- Página oficial de descarga de Aura Music (Aura Beta • Nebula). -->
-<!-- Landing estática para Cloudflare Pages: lee versión y APKs desde GitHub Releases y muestra README + chanelog-beta sin duplicarlos. Sin build, sin framework. -->
+<!-- Página de descarga de Aura Music (Aura Beta • Nebula). -->
+<!-- Rol: landing estática para Cloudflare Pages. Lee versión y APKs desde GitHub Releases y muestra README + chanelog-beta sin duplicarlos. -->
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Aura Music • Descarga oficial (Aura Beta Nebula)</title>
   <meta name="description" content="Descarga oficial de Aura Music (Aura Beta Nebula): elige tu APK según tu arquitectura arm64-v8a, armeabi-v7a o universal. Sin anuncios, con Video Canvas y DSP C++20." />
-  <link rel="canonical" href="https://github.com/LuisAlejandro544/Aura-music/releases" />
-  <meta name="theme-color" content="#000000" />
-  <meta property="og:type" content="website" />
-  <meta property="og:locale" content="es_ES" />
-  <meta property="og:title" content="Aura Music • Descarga oficial" />
-  <meta property="og:description" content="Tu estudio audiófilo en tu bolsillo: DSP C++20, Video Canvas, karaoke y descargas. 100% libre de anuncios." />
-  <meta name="twitter:card" content="summary" />
-  <meta name="twitter:title" content="Aura Music • Descarga oficial" />
-  <meta name="twitter:description" content="Elige tu APK (arm64-v8a, armeabi-v7a o universal). Sin anuncios, sin suscripciones." />
-  <link rel="stylesheet" href="./assets/css/styles.css" />
+  <link rel="stylesheet" href="./styles.css" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌌</text></svg>" />
-  <script type="application/ld+json">
-  {"@context":"https://schema.org","@type":"SoftwareApplication","name":"Aura Music","applicationCategory":"MultimediaApplication","operatingSystem":"Android 8.0+","offers":{"@type":"Offer","price":"0"},"author":{"@type":"Person","name":"Luis Alejandro Sosa Camacho"}}
-  </script>
 </head>
 <body>
-  <a class="skip" href="#apks">Saltar a la descarga</a>
-
-  <nav class="topnav" aria-label="Navegación principal">
-    <a class="brand" href="#inicio">🌌 Aura Music</a>
-    <div class="links">
-      <a href="#apks">Descargar</a>
-      <a href="#funciones">Funciones</a>
-      <a href="#instalar">Instalar</a>
-      <a href="#novedades">Novedades</a>
-      <a href="#faq">FAQ</a>
-    </div>
-  </nav>
-
-  <header class="hero" id="inicio">
-    <p class="pill" id="versionPill" role="status">🔍 Buscando última versión Beta…</p>
-    <h1>Aura Music <span class="beta">Aura Beta • Nebula</span></h1>
+  <header class="hero">
+    <p class="pill" id="versionPill">🔍 Buscando última versión Beta…</p>
+    <h1>🌌 Aura Music <span class="beta">Aura Beta • Nebula</span></h1>
     <p class="subtitle">Tu estudio audiófilo, centro de descargas y Video Canvas en tu bolsillo.<br /><strong>100% libre de anuncios y sin suscripciones.</strong></p>
     <div class="badges">
       <span class="badge violet">Android 8.0+ (API 26–36)</span>
@@ -55,8 +30,8 @@
 
   <main>
     <!-- 3 arquitecturas: misma tabla que README.md, sin duplicar binarios (enlazan a Releases). -->
-    <section id="apks" aria-labelledby="apks-title">
-      <h2 id="apks-title">📲 Elige tu APK (3 arquitecturas móviles)</h2>
+    <section id="apks">
+      <h2>📲 Elige tu APK (3 arquitecturas móviles)</h2>
       <p class="hint">Los botones se activan solos al detectar el último Pre-Release <code>-beta</code>. Si la API de GitHub falla, usan el enlace general a Releases.</p>
       <div class="cards">
         <article class="card recommended">
@@ -96,20 +71,8 @@
       <p class="sha">🔐 Verifica tu APK con <a id="shaLink" href="https://github.com/LuisAlejandro544/Aura-music/releases" target="_blank" rel="noopener">SHA256SUMS.txt</a> del mismo Pre-Release (lo usa el actualizador OTA interno).</p>
     </section>
 
-    <section id="funciones" aria-labelledby="funciones-title">
-      <h2 id="funciones-title">✨ Lo que trae Aura Music</h2>
-      <div class="cards features">
-        <article class="card"><h3>🎛️ DSP C++20 real</h3><p>Ecualizador de 10 bandas, audio 8D/16D, reverb, crossfeed y salida Bit-Perfect con AAudio de baja latencia.</p></article>
-        <article class="card"><h3>🎬 Video Canvas</h3><p>Fondo de video con loops continuos y modo boomerang, armonización cromática y encuadre anti-recorte.</p></article>
-        <article class="card"><h3>🎤 Karaoke .LRC</h3><p>Letras sincronizadas con descarga libre, auto-scroll y modo pantalla completa inmersiva.</p></article>
-        <article class="card"><h3>⬇️ Descargas de verdad</h3><p>YouTube, TikTok y enlaces web con acelerador por bloques, carátula WebP y reanudación en segundo plano.</p></article>
-        <article class="card"><h3>📻 Modo streaming</h3><p>Explora y escucha al instante con caché inteligente y Videos Canvas solo con Wi-Fi si quieres.</p></article>
-        <article class="card"><h3>🔒 Privado por diseño</h3><p>Todo queda en tu carpeta privada. Sin cuentas, sin anuncios, sin rastreadores.</p></article>
-      </div>
-    </section>
-
-    <section id="como-saber" aria-labelledby="como-saber-title">
-      <h2 id="como-saber-title">🔍 ¿Cómo sé cuál es mi arquitectura?</h2>
+    <section id="como-saber">
+      <h2>🔍 ¿Cómo sé cuál es mi arquitectura?</h2>
       <ol>
         <li><strong>Opción fácil:</strong> descarga el <strong>universal</strong>; funciona siempre.</li>
         <li><strong>En tu móvil:</strong> Ajustes → Acerca del teléfono → Procesador. Si ves “64 bits / octa-core moderno”, usa <strong>arm64-v8a</strong>.</li>
@@ -117,8 +80,8 @@
       </ol>
     </section>
 
-    <section id="instalar" aria-labelledby="instalar-title">
-      <h2 id="instalar-title">⚙️ Instalación en 3 pasos</h2>
+    <section id="instalar">
+      <h2>⚙️ Instalación en 3 pasos</h2>
       <ol>
         <li>Descarga el <code>.apk</code> de arriba (recomendado: <strong>arm64-v8a</strong>).</li>
         <li>Ábrelo desde Descargas y autoriza “Instalar apps desconocidas” si Android lo pide.</li>
@@ -127,47 +90,27 @@
     </section>
 
     <!-- Conexión viva con chanelog-beta.md y README.md vía fetch (sin copiar el texto a mano). -->
-    <section id="novedades" aria-labelledby="novedades-title">
-      <h2 id="novedades-title">🚀 Novedades de esta Beta <span class="live">● en vivo desde chanelog-beta.md</span></h2>
+    <section id="novedades">
+      <h2>🚀 Novedades de esta Beta <span class="live">● en vivo desde chanelog-beta.md</span></h2>
       <p class="hint">Texto cargado directo del archivo <code>chanelog-beta.md</code> del repositorio. Si estás offline, abre el <a href="https://github.com/LuisAlejandro544/Aura-music/blob/main/chanelog-beta.md" target="_blank" rel="noopener">changelog en GitHub</a>.</p>
-      <article id="changelogBox" class="md-box" aria-live="polite">Cargando novedades…</article>
+      <article id="changelogBox" class="md-box">Cargando novedades…</article>
     </section>
 
-    <section id="porque" aria-labelledby="porque-title">
-      <h2 id="porque-title">🌟 ¿Por qué Aura Music? <span class="live">● resumen del README.md</span></h2>
-      <article id="readmeBox" class="md-box" aria-live="polite">Cargando resumen…</article>
+    <section id="porque">
+      <h2>🌟 ¿Por qué Aura Music? <span class="live">● resumen del README.md</span></h2>
+      <article id="readmeBox" class="md-box">Cargando resumen…</article>
       <p class="hint">Documentación completa en <a href="https://github.com/LuisAlejandro544/Aura-music/blob/main/README.md" target="_blank" rel="noopener">README.md</a> y <a href="https://github.com/LuisAlejandro544/Aura-music/blob/main/READMEAI.md" target="_blank" rel="noopener">READMEAI.md</a>.</p>
-    </section>
-
-    <section id="faq" aria-labelledby="faq-title">
-      <h2 id="faq-title">❓ Preguntas frecuentes</h2>
-      <details>
-        <summary>¿Es gratis? ¿Hay anuncios o suscripciones?</summary>
-        <p>No hay anuncios ni suscripciones. La Beta es gratuita y todo tu contenido queda en tu dispositivo.</p>
-      </details>
-      <details>
-        <summary>¿Pierdo mi música al actualizar?</summary>
-        <p>No. Actualiza desde la app (Ajustes → Motores Nativos &amp; Diagnóstico) o instalando el APK encima: tu carpeta de música se conserva.</p>
-      </details>
-      <details>
-        <summary>Android bloquea la instalación, ¿qué hago?</summary>
-        <p>Es normal fuera de Play Store: autoriza “Instalar apps desconocidas” solo para tu navegador o gestor de archivos y continúa.</p>
-      </details>
-      <details>
-        <summary>¿Cómo verifico que el APK es auténtico?</summary>
-        <p>Compara su SHA-256 con el <code>SHA256SUMS.txt</code> del mismo Pre-Release. La app lo verifica sola en cada actualización OTA.</p>
-      </details>
     </section>
   </main>
 
   <footer>
-    <p>🌌 <strong>Aura Music</strong> • 🌟 Creador: <a href="https://github.com/LuisAlejandro544" target="_blank" rel="noopener">Luis Alejandro Sosa Camacho</a> • 🤝 Contribuidor: <a href="https://github.com/thelandy03-boop" target="_blank" rel="noopener">@thelandy03-boop</a></p>
+    <p>🌟 Creador: <a href="https://github.com/LuisAlejandro544" target="_blank" rel="noopener">Luis Alejandro Sosa Camacho</a> • 🤝 Contribuidor: <a href="https://github.com/thelandy03-boop" target="_blank" rel="noopener">@thelandy03-boop</a></p>
     <p>© 2026 Luis Alejandro Sosa Camacho • Licencia propietaria de código visible (ver <a href="https://github.com/LuisAlejandro544/Aura-music/blob/main/LICENSE" target="_blank" rel="noopener">LICENSE</a>)</p>
     <p><a href="https://github.com/LuisAlejandro544/Aura-music/releases" target="_blank" rel="noopener">Releases oficiales</a> • <a href="https://github.com/LuisAlejandro544/Aura-music" target="_blank" rel="noopener">Repositorio</a></p>
   </footer>
 
   <!-- Sin framework: JS vanilla para que Cloudflare Pages la sirva sin build. -->
   <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
-  <script src="./assets/js/app.js"></script>
+  <script src="./app.js"></script>
 </body>
 </html>

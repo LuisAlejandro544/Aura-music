@@ -5,9 +5,9 @@ Guía en español para publicar la landing de descarga sin tocar workflows de Gi
 ## 1. Qué contiene `web/`
 
 - `index.html`: landing con las 3 arquitecturas (arm64-v8a, armeabi-v7a, universal) y sus explicaciones.
-- `assets/css/styles.css`: paleta Dark Luxury Neo-Glass OLED (fondo `#000000`, Nebula Violet `#8B5CF6`, Cyan `#00D2FF`, Rosa `#F472B6`).
-- `assets/js/app.js`: JS vanilla que lee el último Pre-Release `-beta` vía API pública de GitHub y renderiza `README.md` + `chanelog-beta.md` en vivo (sin claves, sin build).
-- `_headers`: caché de Cloudflare Pages (debe quedar en la raíz de `web/`).
+- `styles.css`: paleta Dark Luxury Neo-Glass OLED (fondo `#000000`, Nebula Violet `#8B5CF6`, Cyan `#00D2FF`, Rosa `#F472B6`).
+- `app.js`: JS vanilla que lee el último Pre-Release `-beta` vía API pública de GitHub y renderiza `README.md` + `chanelog-beta.md` en vivo (sin claves, sin build).
+- `_headers`: caché de Cloudflare Pages.
 
 ## 2. Publicar (2 opciones, sin workflow)
 
