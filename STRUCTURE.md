@@ -420,7 +420,16 @@ app/
     │               ├── DebugLogDetailDialog.kt           # Visor detallado de stacktrace y copia al portapapeles
     │               ├── DebugSyntheticTestDialog.kt       # Generador de pruebas sintéticas de diagnóstico
     │               ├── HardwareTelemetryCard.kt          # Tarjeta de especificaciones técnicas del dispositivo
-    │               └── PerformanceTelemetryTabContent.kt # Pestaña interactiva de RAM segmentada, CPU e Inspector de Hilos
+    │               ├── PerformanceTelemetryTabContent.kt # Fachada (140): estados + llamadas al LazyColumn
+    │               ├── TelemetryControlBar.kt          # Barra de actualización en vivo
+    │               ├── TelemetryMemoryCard.kt          # Tarjeta de RAM segmentada
+    │               ├── TelemetryCpuCard.kt             # Tarjeta de CPU y estado térmico
+    │               ├── TelemetryThreadHeader.kt        # Cabecera del inspector de hilos
+    │               ├── TelemetryThreadSearch.kt        # Buscador de hilos
+    │               ├── TelemetryCategoryFilters.kt     # Filtros por categoría de hilo
+    │               ├── TelemetryThreadList.kt          # Lista de hilos con trazas
+    │               ├── TelemetryStatComponents.kt      # Átomos de métricas y estadísticas
+    │               └── TelemetryThreadComponents.kt    # Chip de categoría y tarjeta de hilo
     │
     ├── test/                                   # Pruebas Unitarias Locales y Robolectric (JVM)
     │   └── java/com/example/
