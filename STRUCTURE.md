@@ -188,7 +188,7 @@ app/
     │       │   ├── model/                      # Modelos de Dominio y Estado
     │       │   │   ├── Track.kt
     │       │   │   ├── Playlist.kt
-    │       │   │   ├── StreamingModels.kt      # Modelos de búsqueda streaming, importador de playlists y políticas de red
+    │       │   │   ├── StreamingModels.kt      # Modelos de búsqueda streaming, importador de playlists, políticas de red, calidad Opus/M4A (StreamingAudioQuality) y ahorro de datos
     │       │   │   ├── WidgetModels.kt         # Modelos de configuración y estado persistido de los 2 Widgets
     │       │   │   ├── AppUpdateModels.kt      # Modelos de estado y metadatos del actualizador APK
     │       │   │   ├── MixtapeModels.kt        # Modelos de capítulos, metadatos de Mixtape y configuración de Auto-Remix
@@ -335,7 +335,7 @@ app/
     │       │           │   ├── AppearanceGameModeSection.kt       # Modo Juego / Ahorro en 2do plano
     │       │           │   ├── AppearancePaletteSection.kt        # Paleta dinámica y colores del tema
     │       │           │   ├── AppWallpaperSettingsSection.kt       # Controles de fondo de pantalla de galería (WebP/Video, Opacidad y Blur)
-    │       │           │   ├── StreamingCacheAndVideoSettingsCard.kt # Ajustes de caché inteligente (50-500 MB), política de red y Modo Juego
+    │       │           │   ├── StreamingCacheAndVideoSettingsCard.kt # Ajustes de caché (50-500 MB), política de red, calidad Opus/M4A y Modo Ahorro solo-Explorar
     │       │           │   ├── EnginesAndDiagnosticsSection.kt      # Estado de FFmpeg, QuickJS C99 puro, yt-dlp OTA y Aura Monitor
     │       │           │   └── PlayerDesignSettingsContent.kt       # Pantalla dedicada de selección de Diseño del Reproductor
     │       │           ├── headphones/                    # Ajustes de Auriculares, Acústica DSP, Bit-Perfect y Gestos
@@ -450,8 +450,8 @@ app/
     │       │       ├── MixtapeCoordinator.kt           # Coordinador de Mixtapes, Auto-Remix de 2 pistas y capítulos en vivo
     │       │       ├── StreamingModeCoordinator.kt     # Fachada del Modo Streaming (156 líneas, API intacta)
     │       │       ├── StreamingSearchOps.kt           # Búsqueda y tendencias con cancelación de carrera
-    │       │       ├── StreamingPlaybackResolver.kt    # Resolución, transición, recuperación 403 y radio similar
-    │       │       ├── StreamingDownloadOps.kt         # Descarga permanente y ajustes de caché
+    │       │       ├── StreamingPlaybackResolver.kt    # Resolución por calidad, transición, recuperación 403, radio similar y Ahorro (sin video/letras/prefetch)
+    │       │       ├── StreamingDownloadOps.kt         # Descarga permanente con calidad elegida y ajustes de caché/ahorro
     │       │       ├── StreamingTrackBuilders.kt       # Tracks sintéticos y colas desde resultados
     │       │       └── PlaylistImportCoordinator.kt    # Orquestador del Importador de Playlists de Spotify y YouTube Music
     │       │
@@ -557,7 +557,7 @@ Para garantizar estabilidad, mantenibilidad y cumplir con el estándar de desarr
 ### 2. `YtDlpStreamDownloader.kt` (Descarga Directa y Telemetría en Vivo)
 - **Rol**: Ejecución del proceso CLI de `yt-dlp` para descargas directas sin intermediación de clientes HTTP externos.
 - **Responsabilidades clave**:
-  - Descarga nativa de pistas de audio en formato de alta fidelidad (`.m4a` / AAC / Opus) y de Video Canvas sincronizado en resolución 480p (`[height<=480]`).
+  - Descarga nativa de pistas de audio en formato de alta fidelidad (`.m4a` / AAC / Opus según `StreamingAudioQuality`: Ahorro Opus 48k, Estándar M4A 128k, Alta Opus 160k o Auto Hi-Fi) y de Video Canvas sincronizado en resolución 480p (`[height<=480]`).
   - Prevención de bloqueos `HTTP 403 Forbidden` de Google Video al reutilizar la sesión nativa y tokens criptográficos (PO Token y VisitorData) directamente en el proceso CLI de `yt-dlp`.
   - Captura y análisis sintáctico (*parsing*) en tiempo real de la salida estándar (`stdout`) formateada con `--newline`:
     - Porcentaje exacto completado (`45.2%`).

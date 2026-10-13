@@ -34,10 +34,23 @@ internal fun StreamingModeCoordinator.playStreamingItemInternal(
         _resolvingVideoId.value = item.videoId
         try {
             cacheManager.evictExpiredAndOverLimit()
+            // Modo Ahorro de Datos (solo Explorar/streaming): fuerza Opus ahorro, sin video,
+            // sin letras automáticas y sin prefetch/radio. Lo local no se toca (este archivo solo resuelve streaming).
+            val dataSaver = cacheManager.isStreamingDataSaverEnabled()
+            val effectiveQuality = if (dataSaver) {
+                com.example.core.model.StreamingAudioQuality.AHORRO_OPUS_48K
+            } else {
+                cacheManager.getStreamingAudioQuality()
+            }
+            fun loadLyricsIfAllowed(track: Track) {
+                if (!dataSaver && cacheManager.isStreamingLyricsAutoFetchAllowed()) {
+                    onLoadLyricsForTrack(track)
+                }
+            }
 
             // 1. Verificar si ya existe en la caché temporal de 30 minutos
             val cachedAudio = cacheManager.getCachedAudioFile(item.videoId)
-            val cachedVideo = if (cacheManager.isStreamingVideoAllowedByNetwork()) {
+            val cachedVideo = if (!dataSaver && cacheManager.isStreamingVideoAllowedByNetwork()) {
                 cacheManager.getCachedVideoFile(item.videoId)
             } else null
 
@@ -51,14 +64,16 @@ internal fun StreamingModeCoordinator.playStreamingItemInternal(
                 val startIdx = queueTracks.indexOfFirst { it.id == instantTrack.id }.coerceAtLeast(0)
                 withContext(Dispatchers.Main) {
                     audioPlayer.playTrackList(queueTracks, startIdx)
-                    onLoadLyricsForTrack(instantTrack)
+                    loadLyricsIfAllowed(instantTrack)
                 }
-                prefetchNextSimilarTrackForRadioInternal(instantTrack)
+                if (!dataSaver) prefetchNextSimilarTrackForRadioInternal(instantTrack)
                 return@launch
             }
 
             // 2. Resolver con cascada unificada yt-dlp (YT Music y YouTube) + InnerTube multi-cliente
-            val resolvedResult = StreamingApiService.resolvePlayableStreamWithYtDlp(context, item)
+            val resolvedResult = StreamingApiService.resolvePlayableStreamWithYtDlp(
+                context, item, audioQuality = effectiveQuality
+            )
             val resolved = resolvedResult.getOrNull()
             if (resolved == null) {
                 onStatusMessage("No se pudo iniciar el stream de \"${item.title}\". Intenta con otra pista.")
@@ -66,7 +81,7 @@ internal fun StreamingModeCoordinator.playStreamingItemInternal(
             }
 
             val playableAudioUrl = resolved.audioUrl?.takeIf { it.isNotBlank() } ?: resolved.videoUrl
-            val canUseVideoCanvas = cacheManager.isStreamingVideoAllowedByNetwork()
+            val canUseVideoCanvas = !dataSaver && cacheManager.isStreamingVideoAllowedByNetwork()
             val initialVideoUri = if (canUseVideoCanvas) {
                 cacheManager.getCachedVideoFile(item.videoId)?.absolutePath
                     ?: resolved.videoUrl.takeIf { it.isNotBlank() && it != playableAudioUrl }
@@ -86,11 +101,13 @@ internal fun StreamingModeCoordinator.playStreamingItemInternal(
 
             withContext(Dispatchers.Main) {
                 audioPlayer.playTrackList(queueTracks, startIdx)
-                onLoadLyricsForTrack(playingTrack)
+                loadLyricsIfAllowed(playingTrack)
             }
 
+            if (dataSaver) return@launch
             // 3. Pre-descargar de forma escalonada en la caché temporal para no competir con el buffer inicial
             //    ni recrear el decodificador de video/audio en mitad de la canción activa.
+            //    (Omitido por completo con Ahorro de Datos para no gastar MB en 2do plano).
             scope.launch(Dispatchers.IO) {
                 kotlinx.coroutines.delay(3500L)
                 cacheManager.prefetchAudioAheadAsync(
@@ -118,7 +135,7 @@ internal fun StreamingModeCoordinator.playStreamingItemInternal(
                 }
             }
 
-            // 5. Preparar por adelantado una canción similar recomendada
+            // 5. Preparar por adelantado una canción similar recomendada (pausado en ahorro)
             prefetchNextSimilarTrackForRadioInternal(playingTrack)
         } finally {
             _isResolvingStream.value = false
@@ -138,24 +155,28 @@ internal fun StreamingModeCoordinator.handleStreamingTrackTransitionRequestInter
 ): Boolean {
     val videoId = targetTrack.streamingVideoId ?: return false
     val platform = targetTrack.streamingPlatform ?: StreamingSourcePlatform.YT_MUSIC
+    val dataSaverT = cacheManager.isStreamingDataSaverEnabled()
+    val qualityT = if (dataSaverT) {
+        com.example.core.model.StreamingAudioQuality.AHORRO_OPUS_48K
+    } else cacheManager.getStreamingAudioQuality()
 
     // Si el audio ya fue pre-descargado en la caché temporal de 30 minutos, se reproduce al instante
     val cachedAudio = cacheManager.getCachedAudioFile(videoId)
-    val cachedVideo = if (cacheManager.isStreamingVideoAllowedByNetwork()) {
+    val cachedVideo = if (!dataSaverT && cacheManager.isStreamingVideoAllowedByNetwork()) {
         cacheManager.getCachedVideoFile(videoId)
     } else null
 
     if (cachedAudio != null) {
         val readyTrack = targetTrack.copy(
             uriString = cachedAudio.absolutePath,
-            videoUri = cachedVideo?.absolutePath ?: if (cacheManager.isStreamingVideoAllowedByNetwork()) targetTrack.videoUri else null
+            videoUri = cachedVideo?.absolutePath ?: if (!dataSaverT && cacheManager.isStreamingVideoAllowedByNetwork()) targetTrack.videoUri else null
         )
         scope.launch(Dispatchers.Main) {
             audioPlayer.appendOrUpdateStreamingTrack(readyTrack)
             audioPlayer.playTrack(readyTrack, isAutoCrossfadeOverlap = isAutoCrossfade)
-            onLoadLyricsForTrack(readyTrack)
+            if (!dataSaverT) onLoadLyricsForTrack(readyTrack)
         }
-        prefetchNextSimilarTrackForRadioInternal(readyTrack)
+        if (!dataSaverT) prefetchNextSimilarTrackForRadioInternal(readyTrack)
         return true
     }
 
@@ -174,10 +195,12 @@ internal fun StreamingModeCoordinator.handleStreamingTrackTransitionRequestInter
                 thumbnailUrl = targetTrack.albumArtPath ?: "https://i.ytimg.com/vi/$videoId/hqdefault.jpg",
                 platform = platform
             )
-            val resolved = StreamingApiService.resolvePlayableStreamWithYtDlp(context, baseItem).getOrNull()
+            val resolved = StreamingApiService.resolvePlayableStreamWithYtDlp(
+                context, baseItem, audioQuality = qualityT
+            ).getOrNull()
             if (resolved != null) {
                 val playableAudioUrl = resolved.audioUrl?.takeIf { it.isNotBlank() } ?: resolved.videoUrl
-                val allowVideo = cacheManager.isStreamingVideoAllowedByNetwork()
+                val allowVideo = !dataSaverT && cacheManager.isStreamingVideoAllowedByNetwork()
                 val resolvedTrack = targetTrack.copy(
                     uriString = playableAudioUrl,
                     videoUri = if (allowVideo) resolved.videoUrl.takeIf { it.isNotBlank() } else null,
@@ -186,8 +209,9 @@ internal fun StreamingModeCoordinator.handleStreamingTrackTransitionRequestInter
                 withContext(Dispatchers.Main) {
                     audioPlayer.appendOrUpdateStreamingTrack(resolvedTrack)
                     audioPlayer.playTrack(resolvedTrack, isAutoCrossfadeOverlap = isAutoCrossfade)
-                    onLoadLyricsForTrack(resolvedTrack)
+                    if (!dataSaverT) onLoadLyricsForTrack(resolvedTrack)
                 }
+                if (dataSaverT) return@launch
                 scope.launch(Dispatchers.IO) {
                     kotlinx.coroutines.delay(3500L)
                     cacheManager.prefetchAudioAheadAsync(videoId, playableAudioUrl) { file ->
@@ -224,15 +248,16 @@ internal fun StreamingModeCoordinator.handleStreamingHttpErrorRecoveryInternal(
     val videoId = failedTrack.streamingVideoId ?: return false
     val platform = failedTrack.streamingPlatform ?: StreamingSourcePlatform.YT_MUSIC
 
+    val dataSaverR = cacheManager.isStreamingDataSaverEnabled()
     val cachedAudio = cacheManager.getCachedAudioFile(videoId)
-    val cachedVideo = if (cacheManager.isStreamingVideoAllowedByNetwork()) {
+    val cachedVideo = if (!dataSaverR && cacheManager.isStreamingVideoAllowedByNetwork()) {
         cacheManager.getCachedVideoFile(videoId)
     } else null
 
     if (cachedAudio != null) {
         val localReadyTrack = failedTrack.copy(
             uriString = cachedAudio.absolutePath,
-            videoUri = cachedVideo?.absolutePath ?: failedTrack.videoUri
+            videoUri = cachedVideo?.absolutePath ?: if (dataSaverR) null else failedTrack.videoUri
         )
         scope.launch(Dispatchers.Main) {
             audioPlayer.appendOrUpdateStreamingTrack(localReadyTrack)
@@ -261,11 +286,14 @@ internal fun StreamingModeCoordinator.handleStreamingHttpErrorRecoveryInternal(
             val resolved = StreamingApiService.resolvePlayableStreamWithYtDlp(
                 context = context,
                 item = baseItem,
-                forceBypassYtDlp = true
+                forceBypassYtDlp = true,
+                audioQuality = if (dataSaverR) {
+                    com.example.core.model.StreamingAudioQuality.AHORRO_OPUS_48K
+                } else cacheManager.getStreamingAudioQuality()
             ).getOrNull()
             if (resolved != null) {
                 val freshAudioUrl = resolved.audioUrl?.takeIf { it.isNotBlank() } ?: resolved.videoUrl
-                val allowVideo = cacheManager.isStreamingVideoAllowedByNetwork()
+                val allowVideo = !dataSaverR && cacheManager.isStreamingVideoAllowedByNetwork()
                 val recoveredTrack = failedTrack.copy(
                     uriString = freshAudioUrl,
                     videoUri = if (allowVideo) resolved.videoUrl.takeIf { it.isNotBlank() } else null
@@ -303,6 +331,8 @@ internal fun StreamingModeCoordinator.handleStreamingHttpErrorRecoveryInternal(
  * (cascada unificada yt-dlp → InnerTube → Invidious → WebView para YT Music y YouTube) + pre-descarga en caché temporal antes de que termine la pista actual.
  */
 internal fun StreamingModeCoordinator.prefetchNextSimilarTrackForRadioInternal(currentTrack: Track) {
+    // Ahorro de Datos: sin radio similar ni prefetch (solo Explorar; local intacto).
+    if (cacheManager.isStreamingDataSaverEnabled()) return
     val videoId = currentTrack.streamingVideoId ?: return
     val platform = currentTrack.streamingPlatform ?: StreamingSourcePlatform.YT_MUSIC
 
@@ -322,8 +352,9 @@ internal fun StreamingModeCoordinator.prefetchNextSimilarTrackForRadioInternal(c
             _nextSimilarTrackPreview.value = similarItem
 
             // Resolver con cascada unificada (yt-dlp → InnerTube → Invidious → WebView) y pre-almacenar en caché temporal de 30 minutos
-            val resolved = StreamingApiService.resolvePlayableStreamWithYtDlp(context, similarItem).getOrNull()
-                ?: return@launch
+            val resolved = StreamingApiService.resolvePlayableStreamWithYtDlp(
+                context, similarItem, audioQuality = cacheManager.getStreamingAudioQuality()
+            ).getOrNull() ?: return@launch
 
             val playableAudioUrl = resolved.audioUrl?.takeIf { it.isNotBlank() } ?: resolved.videoUrl
             val allowVideo = cacheManager.isStreamingVideoAllowedByNetwork()

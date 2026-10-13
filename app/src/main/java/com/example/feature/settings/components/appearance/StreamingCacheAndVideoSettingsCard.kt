@@ -43,6 +43,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.core.model.StreamingAudioQuality
 import com.example.core.model.StreamingCacheConfig
 import com.example.core.model.StreamingVideoNetworkPolicy
 import com.example.ui.theme.SurfaceCard
@@ -69,7 +70,9 @@ fun StreamingCacheAndVideoSettingsCard(
     onSelectVideoPolicy: (StreamingVideoNetworkPolicy) -> Unit,
     onChangeMaxCacheMb: (Int) -> Unit,
     onClearStreamingCache: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onSelectAudioQuality: (StreamingAudioQuality) -> Unit = {},
+    onToggleDataSaver: (Boolean) -> Unit = {}
 ) {
     Card(
         shape = RoundedCornerShape(20.dp),
@@ -167,6 +170,115 @@ fun StreamingCacheAndVideoSettingsCard(
                         )
                     )
                 }
+            }
+
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 16.dp),
+                color = SurfaceVariantDark
+            )
+
+            // Sección de Calidad de Audio (Opus / M4A): vale para Explorar y para descargas locales con yt-dlp.
+            Text(
+                text = "Calidad de Audio (Local + Streaming)",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Elige Opus (más calidad con menos datos) o M4A clásico. Se aplica al reproducir en Explorar y al descargar con yt-dlp a tu biblioteca.",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            StreamingAudioQuality.values().forEach { quality ->
+                val isSelected = cacheConfig.audioQuality == quality ||
+                    (cacheConfig.dataSaverEnabled && quality == StreamingAudioQuality.AHORRO_OPUS_48K)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(
+                            if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                            else SurfaceVariantDark.copy(alpha = 0.45f)
+                        )
+                        .border(
+                            width = 1.dp,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                            shape = RoundedCornerShape(14.dp)
+                        )
+                        .clickable { onSelectAudioQuality(quality) }
+                        .padding(horizontal = 12.dp, vertical = 10.dp)
+                        .testTag("streaming_audio_quality_${quality.name.lowercase()}"),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = quality.title,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextPrimary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = quality.description,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary
+                        )
+                    }
+                    RadioButton(
+                        selected = isSelected,
+                        onClick = { onSelectAudioQuality(quality) },
+                        colors = RadioButtonDefaults.colors(
+                            selectedColor = MaterialTheme.colorScheme.primary,
+                            unselectedColor = TextMuted
+                        )
+                    )
+                }
+            }
+
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 16.dp),
+                color = SurfaceVariantDark
+            )
+
+            // Modo Ahorro de Datos: exclusivo de Explorar/streaming (video + letras auto + prefetch apagados).
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(
+                        if (cacheConfig.dataSaverEnabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                        else SurfaceVariantDark.copy(alpha = 0.45f)
+                    )
+                    .border(
+                        width = 1.dp,
+                        color = if (cacheConfig.dataSaverEnabled) MaterialTheme.colorScheme.primary else Color.Transparent,
+                        shape = RoundedCornerShape(14.dp)
+                    )
+                    .clickable { onToggleDataSaver(!cacheConfig.dataSaverEnabled) }
+                    .padding(horizontal = 12.dp, vertical = 10.dp)
+                    .testTag("streaming_data_saver_toggle"),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "📶 Modo Ahorro de Datos (solo Explorar)",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextPrimary,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = "En streaming usa Opus ahorro, apaga el video de fondo, no busca letras automáticamente y no pre-descarga nada. Tus canciones locales siguen intactas.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary
+                    )
+                }
+                androidx.compose.material3.Switch(
+                    checked = cacheConfig.dataSaverEnabled,
+                    onCheckedChange = onToggleDataSaver
+                )
             }
 
             HorizontalDivider(

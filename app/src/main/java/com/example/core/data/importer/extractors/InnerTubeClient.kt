@@ -31,10 +31,13 @@ object InnerTubeClient {
 
     /**
      * Resuelve los flujos multimedia probando clientes InnerTube en cascada.
+     * @param audioQuality calidad elegida por el usuario (Opus/M4A); por defecto AUTO_HIFI.
      */
     suspend fun resolve(
         videoId: String,
-        originalUrl: String
+        originalUrl: String,
+        audioQuality: com.example.core.model.StreamingAudioQuality =
+            com.example.core.model.StreamingAudioQuality.AUTO_HIFI
     ): OnlineVideoAudioImporter.ResolvedMediaInfo? = withContext(Dispatchers.IO) {
         // Estrategia 1: ANDROID_VR (Meta Quest / VR). Entrega URLs directas sin signatureCipher ni n-sig.
         val vrResult = queryInnerTube(
@@ -44,7 +47,8 @@ object InnerTubeClient {
             clientName = "ANDROID_VR",
             clientVersion = "1.60.19",
             userAgent = "Mozilla/5.0 (Android; VR; Meta Quest 3) AppleWebKit/537.36",
-            extraClientProps = mapOf("deviceModel" to "Quest 3")
+            extraClientProps = mapOf("deviceModel" to "Quest 3"),
+            audioQuality = audioQuality
         )
         if (vrResult != null) return@withContext vrResult
 
@@ -56,7 +60,8 @@ object InnerTubeClient {
             clientName = "VISIONOS",
             clientVersion = "0.1.0",
             userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15",
-            extraClientProps = emptyMap()
+            extraClientProps = emptyMap(),
+            audioQuality = audioQuality
         )
         if (visionResult != null) return@withContext visionResult
 
@@ -68,7 +73,8 @@ object InnerTubeClient {
             clientName = "ANDROID_MUSIC",
             clientVersion = "6.42.52",
             userAgent = "com.google.android.apps.youtube.music/6.42.52 (Linux; U; Android 14; es_ES) gzip",
-            extraClientProps = mapOf("androidSdkVersion" to 34)
+            extraClientProps = mapOf("androidSdkVersion" to 34),
+            audioQuality = audioQuality
         )
         if (musicResult != null) return@withContext musicResult
 
@@ -80,7 +86,8 @@ object InnerTubeClient {
             clientName = "IOS",
             clientVersion = "19.29.1",
             userAgent = "com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)",
-            extraClientProps = mapOf("deviceModel" to "iPhone16,2", "osVersion" to "17.5.1.21F90")
+            extraClientProps = mapOf("deviceModel" to "iPhone16,2", "osVersion" to "17.5.1.21F90"),
+            audioQuality = audioQuality
         )
         if (iosResult != null) return@withContext iosResult
 
@@ -92,7 +99,8 @@ object InnerTubeClient {
             clientName = "MWEB",
             clientVersion = "2.20240715.01.00",
             userAgent = "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36",
-            extraClientProps = emptyMap()
+            extraClientProps = emptyMap(),
+            audioQuality = audioQuality
         )
         if (mwebResult != null) return@withContext mwebResult
 
@@ -104,7 +112,8 @@ object InnerTubeClient {
             clientName = "TVHTML5_SIMPLY_EMBEDDED_PLAYER",
             clientVersion = "2.0",
             userAgent = "Mozilla/5.0 (SMART-TV; LINUX; Tizen 5.0) AppleWebKit/537.36",
-            extraClientProps = emptyMap()
+            extraClientProps = emptyMap(),
+            audioQuality = audioQuality
         )
         if (tvEmbedResult != null) return@withContext tvEmbedResult
 
@@ -118,7 +127,9 @@ object InnerTubeClient {
         clientName: String,
         clientVersion: String,
         userAgent: String,
-        extraClientProps: Map<String, Any>
+        extraClientProps: Map<String, Any>,
+        audioQuality: com.example.core.model.StreamingAudioQuality =
+            com.example.core.model.StreamingAudioQuality.AUTO_HIFI
     ): OnlineVideoAudioImporter.ResolvedMediaInfo? {
         return try {
             val clientObj = JSONObject().apply {
@@ -177,7 +188,7 @@ object InnerTubeClient {
             val combinedFormats = streamingData.optJSONArray("formats") ?: JSONArray()
 
             var bestAudioUrl: String? = null
-            var maxAudioBitrate = 0
+            var maxAudioScore: Long = Long.MIN_VALUE
 
             var bestVideoUrl: String? = null
             var bestVideoScore = -999999
@@ -191,9 +202,10 @@ object InnerTubeClient {
 
                 if (url.isNotBlank() && !url.contains(".m3u8") && !url.contains(".mpd")) {
                     if (mimeType.contains("audio/")) {
-                        val bonus = if (mimeType.contains("mp4")) 50000 else 0
-                        if (bitrate + bonus >= maxAudioBitrate) {
-                            maxAudioBitrate = bitrate + bonus
+                        val itag = format.optInt("itag", 0)
+                        val score = rankAudioFormat(mimeType, bitrate.toLong(), itag, audioQuality)
+                        if (score >= maxAudioScore) {
+                            maxAudioScore = score
                             bestAudioUrl = url
                         }
                     } else if (mimeType.contains("video/")) {
@@ -254,6 +266,47 @@ object InnerTubeClient {
         } catch (t: Throwable) {
             AuraDebugManager.logWarning("InnerTubeClient", "Excepción consultando ($clientName): ${t.message}")
             null
+        }
+    }
+
+    /**
+     * Puntaje de formato de audio según la calidad elegida (Opus itag 249/250/251 vs M4A itag 140).
+     * Mantiene compatibilidad: AUTO_HIFI prefiere Opus 251 y cae a M4A 140.
+     */
+    internal fun rankAudioFormat(
+        mimeType: String,
+        bitrate: Long,
+        itag: Int,
+        quality: com.example.core.model.StreamingAudioQuality
+    ): Long {
+        val mime = mimeType.lowercase()
+        val isOpus = mime.contains("opus") || mime.contains("webm")
+        val isMp4 = mime.contains("mp4")
+        val itagPriority: Long = when (quality) {
+            com.example.core.model.StreamingAudioQuality.AHORRO_OPUS_48K -> when (itag) {
+                249 -> 400000L; 250 -> 300000L; 251 -> 200000L; 140 -> 100000L; else -> 0L
+            }
+            com.example.core.model.StreamingAudioQuality.ALTA_OPUS_160K -> when (itag) {
+                251 -> 400000L; 140 -> 200000L; 250 -> 150000L; 249 -> 100000L; else -> 0L
+            }
+            com.example.core.model.StreamingAudioQuality.ESTANDAR_M4A_128K -> when (itag) {
+                140 -> 400000L; 251 -> 200000L; 250 -> 100000L; 249 -> 50000L; else -> 0L
+            }
+            com.example.core.model.StreamingAudioQuality.AUTO_HIFI -> when (itag) {
+                251 -> 400000L; 140 -> 300000L; 250 -> 200000L; 249 -> 100000L; else -> 0L
+            }
+        }
+        if (itag != 0) return itagPriority + bitrate
+        // Sin itag: puntaje por mime + bitrate según preferencia.
+        return when (quality) {
+            com.example.core.model.StreamingAudioQuality.AHORRO_OPUS_48K ->
+                (if (isOpus) 100000L else 0L) - bitrate
+            com.example.core.model.StreamingAudioQuality.ALTA_OPUS_160K ->
+                bitrate + (if (isOpus) 50000L else 0L)
+            com.example.core.model.StreamingAudioQuality.ESTANDAR_M4A_128K ->
+                bitrate + (if (isMp4) 50000L else 0L)
+            com.example.core.model.StreamingAudioQuality.AUTO_HIFI ->
+                bitrate + (if (isOpus) 20000L else 0L)
         }
     }
 }

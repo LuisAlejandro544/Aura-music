@@ -82,7 +82,9 @@ object OnlineVideoAudioImporter {
                         suggestedTitle = fileName.substringBeforeLast("."),
                         suggestedArtist = "Descarga Web",
                         videoUrl = cleanUrl,
-                        audioUrl = if (cleanUrl.endsWith(".mp3") || cleanUrl.endsWith(".m4a")) cleanUrl else null,
+                        audioUrl = if (cleanUrl.endsWith(".mp3", ignoreCase = true) || cleanUrl.endsWith(".m4a", ignoreCase = true) ||
+                    cleanUrl.endsWith(".opus", ignoreCase = true) || cleanUrl.endsWith(".ogg", ignoreCase = true) ||
+                    cleanUrl.endsWith(".webm", ignoreCase = true)) cleanUrl else null,
                         coverUrl = null,
                         durationSeconds = 0L
                     )
@@ -124,7 +126,15 @@ object OnlineVideoAudioImporter {
         val finalArtist = customArtist?.trim()?.ifBlank { resolvedInfo.suggestedArtist } ?: resolvedInfo.suggestedArtist
 
         try {
-            val audioFile = File(storageManager.songsDir, "track_online_${timestamp}.m4a")
+            // Formato local según calidad elegida en Ajustes (Opus .opus vs M4A .m4a); vale para local y streaming.
+            val preferredQuality = readPreferredAudioQuality(context)
+            val localExt = if (preferredQuality.prefersOpus && preferredQuality != com.example.core.model.StreamingAudioQuality.AUTO_HIFI) {
+                "opus"
+            } else {
+                // AUTO_HIFI y M4A estándar guardan .m4a para máxima compatibilidad con reproductores externos.
+                "m4a"
+            }
+            val audioFile = File(storageManager.songsDir, "track_online_${timestamp}.$localExt")
             val tempVideoFile = File(storageManager.videosDir, "media_video_${timestamp}.mp4")
             var audioReady = false
             var durationMs = resolvedInfo.durationSeconds * 1000L
@@ -166,7 +176,7 @@ object OnlineVideoAudioImporter {
                         inputFile = sourceVidFile,
                         outputFile = audioFile,
                         audioBitrate = "256k",
-                        targetFormat = "m4a",
+                        targetFormat = if (audioFile.extension.equals("opus", ignoreCase = true)) "opus" else "m4a",
                         totalDurationMs = durationMs
                     )
                     if (ffmpegResult.success && audioFile.exists() && audioFile.length() > 0L) {
@@ -187,7 +197,8 @@ object OnlineVideoAudioImporter {
                     url = resolvedInfo.originalUrl,
                     targetFile = audioFile,
                     isAudioOnly = true,
-                    onProgressUpdate = onProgressUpdate
+                    onProgressUpdate = onProgressUpdate,
+                    audioQuality = preferredQuality
                 )
                 if (directAudioSuccess && audioFile.exists() && audioFile.length() > 0L) {
                     audioReady = true
@@ -307,13 +318,13 @@ object OnlineVideoAudioImporter {
 
                 // Nivel Fallback 1: InnerTube Multi-Cliente (ANDROID_VR -> VISIONOS -> ANDROID_MUSIC -> IOS)
                 if (!audioReady && ytId != null) {
-                    val innerTubeCandidate = InnerTubeClient.resolve(ytId, resolvedInfo.originalUrl)
+                    val innerTubeCandidate = InnerTubeClient.resolve(ytId, resolvedInfo.originalUrl, preferredQuality)
                     audioReady = tryDownloadFromCandidate("InnerTube", innerTubeCandidate)
                 }
 
                 // Nivel Fallback 2: Bypass Invidious API
                 if (!audioReady && ytId != null) {
-                    val invidiousCandidate = InvidiousStreamResolver.resolve(ytId, resolvedInfo.originalUrl)
+                    val invidiousCandidate = InvidiousStreamResolver.resolve(ytId, resolvedInfo.originalUrl, preferredQuality)
                     audioReady = tryDownloadFromCandidate("Invidious", invidiousCandidate)
                 }
 
@@ -338,7 +349,8 @@ object OnlineVideoAudioImporter {
                         context = context,
                         url = resolvedInfo.originalUrl,
                         targetFile = audioFile,
-                        isAudioOnly = true
+                        isAudioOnly = true,
+                        audioQuality = preferredQuality
                     )
                     if (directOk && audioFile.exists() && audioFile.length() > 0L) {
                         audioReady = true
@@ -458,7 +470,7 @@ object OnlineVideoAudioImporter {
                 albumArtPath = artworkPath,
                 videoUri = videoCanvasPath,
                 isVideoLoop = isLoop,
-                mimeType = "audio/mp4",
+                mimeType = if (audioFile.extension.equals("opus", ignoreCase = true)) "audio/opus" else "audio/mp4",
                 dateAdded = System.currentTimeMillis(),
                 isFavorite = false,
                 playCount = 0,
@@ -471,6 +483,24 @@ object OnlineVideoAudioImporter {
         } catch (t: Throwable) {
             onProgressUpdate(DownloadProgress(isDownloading = false))
             Result.failure(if (t is Exception) t else IllegalStateException(t.localizedMessage ?: "Error procesando descarga", t))
+        }
+    }
+
+    /**
+     * Lee la calidad de audio elegida en Ajustes (misma preferencia que usa el streaming).
+     * Vale tanto para canciones locales como para streaming/descargas con yt-dlp.
+     */
+    private fun readPreferredAudioQuality(context: Context): com.example.core.model.StreamingAudioQuality {
+        return try {
+            val prefs = context.getSharedPreferences("aura_streaming_cache_prefs", Context.MODE_PRIVATE)
+            com.example.core.model.StreamingAudioQuality.fromId(
+                prefs.getInt(
+                    "streaming_audio_quality",
+                    com.example.core.model.StreamingAudioQuality.AUTO_HIFI.id
+                )
+            )
+        } catch (_: Throwable) {
+            com.example.core.model.StreamingAudioQuality.AUTO_HIFI
         }
     }
 }

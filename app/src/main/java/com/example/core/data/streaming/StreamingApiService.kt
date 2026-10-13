@@ -156,7 +156,9 @@ object StreamingApiService {
     suspend fun resolvePlayableStreamWithYtDlp(
         context: Context,
         item: StreamingSearchItem,
-        forceBypassYtDlp: Boolean = false
+        forceBypassYtDlp: Boolean = false,
+        audioQuality: com.example.core.model.StreamingAudioQuality =
+            com.example.core.model.StreamingAudioQuality.AUTO_HIFI
     ): Result<OnlineVideoAudioImporter.ResolvedMediaInfo> = withContext(Dispatchers.IO) {
         val watchUrl = item.canonicalWatchUrl
 
@@ -199,7 +201,7 @@ object StreamingApiService {
         // Niveles: 1) yt-dlp → 2) InnerTube multi-cliente → 3) Invidious → 4) WebView.
         val platformLabel = if (item.platform == StreamingSourcePlatform.YOUTUBE) "YouTube" else "YT Music"
         if (!forceBypassYtDlp && !YtDlpAutoUpdaterIsBlockedSafe()) {
-            val ytdlpResult = YtDlpNativeEngine.resolveStream(context, watchUrl)
+            val ytdlpResult = YtDlpNativeEngine.resolveStream(context, watchUrl, audioQuality)
             val info = ytdlpResult.getOrNull()
             if (info != null && (!info.audioUrl.isNullOrBlank() || info.videoUrl.isNotBlank())) {
                 return@withContext enrichAndRegister(info)
@@ -211,7 +213,8 @@ object StreamingApiService {
         // Respaldo automático si el stream tiene bloqueo en yt-dlp o recibió HTTP 403
         val innerTubeFallback = InnerTubeClient.resolve(
             videoId = item.videoId,
-            originalUrl = watchUrl
+            originalUrl = watchUrl,
+            audioQuality = audioQuality
         )
         if (innerTubeFallback != null && (!innerTubeFallback.audioUrl.isNullOrBlank() || innerTubeFallback.videoUrl.isNotBlank())) {
             return@withContext enrichAndRegister(innerTubeFallback)
@@ -219,7 +222,8 @@ object StreamingApiService {
 
         val invidiousFallback = com.example.core.data.importer.InvidiousStreamResolver.resolve(
             videoId = item.videoId,
-            originalUrl = watchUrl
+            originalUrl = watchUrl,
+            audioQuality = audioQuality
         )
         if (invidiousFallback != null && (!invidiousFallback.audioUrl.isNullOrBlank() || invidiousFallback.videoUrl.isNotBlank())) {
             return@withContext enrichAndRegister(invidiousFallback)

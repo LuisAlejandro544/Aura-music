@@ -28,4 +28,14 @@ internal class StreamingCacheConfigOps(
         s.prefs.edit().putInt(StreamingCacheState.KEY_VIDEO_NETWORK_POLICY, policy.id).apply()
         s.config.value = s.config.value.copy(videoNetworkPolicy = policy)
     }
+
+    fun setAudioQuality(quality: com.example.core.model.StreamingAudioQuality) {
+        s.prefs.edit().putInt(StreamingCacheState.KEY_AUDIO_QUALITY, quality.id).apply()
+        s.config.value = s.config.value.copy(audioQuality = quality)
+    }
+
+    fun setDataSaverEnabled(enabled: Boolean) {
+        s.prefs.edit().putBoolean(StreamingCacheState.KEY_DATA_SAVER, enabled).apply()
+        s.config.value = s.config.value.copy(dataSaverEnabled = enabled)
+    }
 }

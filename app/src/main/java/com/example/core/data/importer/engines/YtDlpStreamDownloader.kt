@@ -34,7 +34,9 @@ object YtDlpStreamDownloader {
         url: String,
         targetFile: File,
         isAudioOnly: Boolean,
-        onProgressUpdate: (DownloadProgress) -> Unit = {}
+        onProgressUpdate: (DownloadProgress) -> Unit = {},
+        audioQuality: com.example.core.model.StreamingAudioQuality =
+            com.example.core.model.StreamingAudioQuality.AUTO_HIFI
     ): Boolean = withContext(Dispatchers.IO) {
         try {
             if (YtDlpAutoUpdater.isYtDlpTemporarilyBlocked()) {
@@ -69,7 +71,16 @@ object YtDlpStreamDownloader {
             targetFile.parentFile?.mkdirs()
 
             val formatSelector = if (isAudioOnly) {
-                "bestaudio[ext=m4a]/bestaudio/best[ext=mp4]/best"
+                when (audioQuality) {
+                    com.example.core.model.StreamingAudioQuality.AHORRO_OPUS_48K ->
+                        "bestaudio[ext=webm][acodec=opus]/bestaudio[ext=webm]/bestaudio/best"
+                    com.example.core.model.StreamingAudioQuality.ALTA_OPUS_160K ->
+                        "bestaudio[ext=webm]/bestaudio[acodec=opus]/bestaudio/best"
+                    com.example.core.model.StreamingAudioQuality.ESTANDAR_M4A_128K ->
+                        "bestaudio[ext=m4a]/bestaudio/best[ext=mp4]/best"
+                    com.example.core.model.StreamingAudioQuality.AUTO_HIFI ->
+                        "bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio/best"
+                }
             } else {
                 "bestvideo[height<=480][ext=mp4]/bestvideo[height<=480]/best[height<=480][ext=mp4]/best[height<=480]/best"
             }

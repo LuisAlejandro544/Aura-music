@@ -45,10 +45,16 @@ internal class StreamingCacheState(val context: Context) {
 
         val policyId = prefs.getInt(KEY_VIDEO_NETWORK_POLICY, StreamingVideoNetworkPolicy.WIFI_ONLY.id)
         val policy = StreamingVideoNetworkPolicy.fromId(policyId)
+        val quality = com.example.core.model.StreamingAudioQuality.fromId(
+            prefs.getInt(KEY_AUDIO_QUALITY, com.example.core.model.StreamingAudioQuality.AUTO_HIFI.id)
+        )
+        val dataSaver = prefs.getBoolean(KEY_DATA_SAVER, false)
 
         return StreamingCacheConfig(
             maxCacheSizeMb = maxMb,
-            videoNetworkPolicy = policy
+            videoNetworkPolicy = policy,
+            audioQuality = quality,
+            dataSaverEnabled = dataSaver
         )
     }
 
@@ -77,6 +83,8 @@ internal class StreamingCacheState(val context: Context) {
         const val PREFS_NAME = "aura_streaming_cache_prefs"
         const val KEY_MAX_CACHE_MB = "max_cache_size_mb"
         const val KEY_VIDEO_NETWORK_POLICY = "streaming_video_network_policy"
+        const val KEY_AUDIO_QUALITY = "streaming_audio_quality"
+        const val KEY_DATA_SAVER = "streaming_data_saver_enabled"
 
         const val MIN_VALID_AUDIO_BYTES = 16 * 1024L
         const val MIN_VALID_VIDEO_BYTES = 32 * 1024L
