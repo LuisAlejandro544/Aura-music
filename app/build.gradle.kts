@@ -502,13 +502,21 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
     }
 
     // -------------------------------------------------------------------------
-    // 2. Compilación de QuickJS C99 100% Puro y Real (Fabrice Bellard — Cero Wrappers / Cero Stubs)
+    // 2. Compilación de QuickJS C99 100% Puro y Real (Fabrice Bellard — Cero Wrappers)
     //    - Fuente Oficial 1: https://bellard.org/quickjs/quickjs-2024-01-13.tar.xz (SHA-256 verificado)
-    //    - Fuente Oficial 2 (Respaldo): https://github.com/bellard/quickjs/archive/refs/heads/master.tar.gz
-    //    - Incluye definición C99 pura de qjsc_repl / qjsc_qjscalc requeridos por qjs.c
+    //    - Fuente Oficial 2 (Respaldo sin pin): https://github.com/bellard/quickjs/archive/refs/heads/master.tar.gz
+    //      (ADVERTENCIA: rama móvil sin SHA; solo se acepta si la estructura de fuentes coincide
+    //      exactamente con la lista fijada por versión; de lo contrario se aborta).
+    //    - Salida: ejecutable PIE `libqjs.so` usado EXCLUSIVAMENTE como CLI externo vía
+    //      `--js-runtimes quickjs:<ruta>` de yt-dlp (nunca JNI / loadLibrary). En runtime se
+    //      normaliza a `files/bin/qjs` con chmod 0700 (ver YtDlpEnvironmentSetup).
     // -------------------------------------------------------------------------
     val qjsSrcDir = File(tempBuildDir, "qjs_real_src")
-    var qjsSourcesReady = File(qjsSrcDir, "quickjs.c").exists() && File(qjsSrcDir, "qjs.c").exists()
+    // Lista estricta de fuentes fijada por versión 2024-01-13: si el respaldo `master`
+    // mutó su estructura (renombres quickjs-ng, etc.), la validación falla a propósito.
+    val qjsRequiredSources = listOf("qjs.c", "quickjs.c", "quickjs.h", "quickjs-libc.c", "cutils.c", "libregexp.c", "libunicode.c")
+    fun qjsSourcesValid(dir: File): Boolean = qjsRequiredSources.all { File(dir, it).exists() }
+    var qjsSourcesReady = qjsSourcesValid(qjsSrcDir)
     if (!qjsSourcesReady) {
       qjsSrcDir.deleteRecursively()
       qjsSrcDir.mkdirs()
@@ -523,44 +531,97 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
         if (actualSha == expectedQjsSha256) {
           ProcessBuilder("tar", "-xJf", qjsOfficialTarXz.absolutePath, "-C", qjsSrcDir.absolutePath, "--strip-components=1")
             .start().waitFor()
-          qjsSourcesReady = File(qjsSrcDir, "quickjs.c").exists() && File(qjsSrcDir, "qjs.c").exists()
+          qjsSourcesReady = qjsSourcesValid(qjsSrcDir)
           if (qjsSourcesReady) {
             logger.lifecycle("🔒 [Aura Gradle] Fuentes oficiales QuickJS C99 (bellard.org 2024-01-13) verificadas con SHA-256 ($actualSha).")
           }
+        } else {
+          logger.warn("⚠️ [Aura Gradle] SHA-256 de QuickJS oficial no coincide (esperado $expectedQjsSha256, obtenido $actualSha). Se intentará respaldo.")
         }
       }
 
-      // Intento 2 (Respaldo Oficial GitHub): Repositorio oficial bellard/quickjs
+      // Intento 2 (Respaldo Oficial GitHub SIN PIN): solo se acepta si la estructura coincide.
       if (!qjsSourcesReady) {
         val qjsGithubTarGz = File(tempBuildDir, "quickjs-github-master.tar.gz")
         val qjsGithubUrl = "https://github.com/bellard/quickjs/archive/refs/heads/master.tar.gz"
         if (downloadUrlToFile(qjsGithubUrl, qjsGithubTarGz)) {
           ProcessBuilder("tar", "-xzf", qjsGithubTarGz.absolutePath, "-C", qjsSrcDir.absolutePath, "--strip-components=1")
             .start().waitFor()
-          qjsSourcesReady = File(qjsSrcDir, "quickjs.c").exists() && File(qjsSrcDir, "qjs.c").exists()
+          qjsSourcesReady = qjsSourcesValid(qjsSrcDir)
           if (qjsSourcesReady) {
-            logger.lifecycle("✅ [Aura Gradle] Fuentes oficiales QuickJS C99 descargadas desde github.com/bellard/quickjs.")
+            logger.warn("⚠️ [Aura Gradle] QuickJS desde rama móvil `master` SIN verificación SHA (no reproducible). Fije una etiqueta/commit con SHA aspen cuanto antes.")
+          } else {
+            logger.warn("⚠️ [Aura Gradle] Respaldo `master` de QuickJS rechazado: estructura de fuentes incompatible (se esperaba 2024-01-13).")
           }
         }
       }
     }
 
     if (!qjsSourcesReady) {
-      throw GradleException("No se pudieron descargar las fuentes C99 oficiales de QuickJS (bellard.org / github.com/bellard/quickjs).")
+      throw GradleException("No se pudieron descargar las fuentes C99 oficiales de QuickJS (bellard.org / github.com/bellard/quickjs) con estructura válida: $qjsRequiredSources.")
     }
 
-    // Generar el módulo C99 con los símbolos de tabla de bytecode requeridos por el enlazador de qjs.c
-    // cuando se realiza compilación cruzada directa sin ejecutar qjsc en el host.
+    // Símbolos de bytecode REPL: se intenta generar el bytecode REAL con qjsc del host
+    // (repl.js -> C). Si el host no tiene gcc/cc, se usa stub vacío documentado como
+    // degradado: `qjs -e` (vía usada por yt-dlp para base.js) sigue funcionando porque
+    // evalúa por JS_Eval, pero el REPL interactivo queda vacío. El self-test en runtime
+    // (`qjs -e 'print(...)'`) detectará si el binario quedó roto.
     val qjsBytecodeSymbolsC = File(qjsSrcDir, "qjs_bytecode_symbols.c")
-    qjsBytecodeSymbolsC.writeText(
-      """
-      #include <stdint.h>
-      const uint8_t qjsc_repl[] = { 0 };
-      const uint32_t qjsc_repl_size = 0;
-      const uint8_t qjsc_qjscalc[] = { 0 };
-      const uint32_t qjsc_qjscalc_size = 0;
-      """.trimIndent() + "\n"
-    )
+    var qjsBytecodeReal = false
+    try {
+      val hostCc = listOf("cc", "gcc", "clang").firstOrNull {
+        try {
+          ProcessBuilder(it, "--version").redirectErrorStream(true).start().waitFor() == 0
+        } catch (_: Throwable) {
+          false
+        }
+      }
+      val replJs = File(qjsSrcDir, "repl.js")
+      if (hostCc != null && replJs.exists()) {
+        val hostQjsc = File(tempBuildDir, "qjsc-host")
+        val hostSources = buildList {
+          add(File(qjsSrcDir, "qjsc.c").absolutePath)
+          add(File(qjsSrcDir, "quickjs.c").absolutePath)
+          add(File(qjsSrcDir, "quickjs-libc.c").absolutePath)
+          add(File(qjsSrcDir, "cutils.c").absolutePath)
+          add(File(qjsSrcDir, "libregexp.c").absolutePath)
+          add(File(qjsSrcDir, "libunicode.c").absolutePath)
+          if (File(qjsSrcDir, "libunicode-extra.c").exists()) add(File(qjsSrcDir, "libunicode-extra.c").absolutePath)
+          if (File(qjsSrcDir, "libbf.c").exists()) add(File(qjsSrcDir, "libbf.c").absolutePath)
+        }
+        val buildCode = ProcessBuilder(listOf(hostCc, "-O2") + hostSources + listOf("-lm", "-ldl", "-o", hostQjsc.absolutePath))
+          .directory(qjsSrcDir).redirectErrorStream(true).start().waitFor()
+        if (buildCode == 0 && hostQjsc.canExecute()) {
+          val genOut = File(qjsSrcDir, "qjs_bytecode_symbols.gen.c")
+          val genProc = ProcessBuilder(hostQjsc.absolutePath, "-e", "-o", genOut.absolutePath, replJs.absolutePath)
+            .directory(qjsSrcDir).redirectErrorStream(true).start()
+          val genLog = genProc.inputStream.bufferedReader().readText()
+          val genCode = genProc.waitFor()
+          if (genCode == 0 && genOut.exists() && genOut.length() > 512L) {
+            genOut.copyTo(qjsBytecodeSymbolsC, overwrite = true)
+            qjsBytecodeReal = true
+            logger.lifecycle("✅ [Aura Gradle] Bytecode REPL real de QuickJS generado con qjsc del host (${genOut.length()} bytes).")
+          } else {
+            logger.warn("⚠️ [Aura Gradle] qjsc del host no generó bytecode REPL ($genCode): $genLog. Se usará stub vacío (solo `qjs -e`).")
+          }
+        }
+      }
+    } catch (t: Throwable) {
+      logger.warn("⚠️ [Aura Gradle] No se pudo generar bytecode REPL real: ${t.message}. Se usará stub vacío.")
+    }
+    if (!qjsBytecodeReal) {
+      qjsBytecodeSymbolsC.writeText(
+        """
+        #include <stdint.h>
+        // STUB degradado: permite enlazar qjs.c en compilación cruzada sin qjsc del target.
+        // `qjs -e` (vía usada por yt-dlp) funciona; el REPL interactivo queda vacío.
+        const uint8_t qjsc_repl[] = { 0 };
+        const uint32_t qjsc_repl_size = 0;
+        const uint8_t qjsc_qjscalc[] = { 0 };
+        const uint32_t qjsc_qjscalc_size = 0;
+        """.trimIndent() + "\n"
+      )
+    }
 
     val qjsVersionStr = File(qjsSrcDir, "VERSION").takeIf { it.exists() }?.readText()?.trim()?.takeIf { it.isNotEmpty() } ?: "2024-01-13"
     val hasLibBf = File(qjsSrcDir, "libbf.c").exists()
@@ -581,7 +642,15 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
     val sizeOptFlags = listOf(
       "-Oz", "-flto", "-fvisibility=hidden", "-ffunction-sections", "-fdata-sections",
       "-fno-unwind-tables", "-fno-asynchronous-unwind-tables",
-      "-Wl,--gc-sections", "-Wl,--icf=all", "-Wl,--exclude-libs,ALL", "-Wl,-s"
+      "-Wl,--gc-sections", "-Wl,--icf=all", "-Wl,--exclude-libs,ALL", "-Wl,-s", "-Wl,--no-undefined"
+    )
+
+    // Máquina ELF esperada por ABI para validación post-compilación con llvm-readelf.
+    val qjsExpectedMachine = mapOf(
+      "arm64-v8a" to "AArch64",
+      "armeabi-v7a" to "ARM",
+      "x86_64" to "X86-64",
+      "x86" to "80386"
     )
 
     for (abi in abis) {
@@ -613,13 +682,33 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
         }
 
         val cmd = mutableListOf(clangBin, "-pie", "-fPIE") + sizeOptFlags + archFlags + qjsDefines +
-          qjsCFiles.map { File(qjsSrcDir, it).absolutePath } + listOf("-lm", "-ldl", "-pthread", "-o", qjsSo.absolutePath)
+          qjsCFiles.map { File(qjsSrcDir, it).absolutePath } + listOf("-lm", "-ldl", "-o", qjsSo.absolutePath)
 
         val proc = ProcessBuilder(cmd).directory(qjsSrcDir).redirectErrorStream(true).start()
         val buildOutput = proc.inputStream.bufferedReader().readText()
         val code = proc.waitFor()
         if (code != 0 || !qjsSo.exists() || qjsSo.length() < 250_000L) {
           throw GradleException("Error al compilar QuickJS C99 puro para $abi (código $code): $buildOutput")
+        }
+        // Validación post-compilación: cabecera ELF PIE + máquina esperada por ABI.
+        try {
+          val readelfBin = toolchainBin?.let { File(it, "llvm-readelf") }?.takeIf { it.canExecute() }?.absolutePath
+          if (readelfBin != null) {
+            val elfProc = ProcessBuilder(readelfBin, "-h", qjsSo.absolutePath).redirectErrorStream(true).start()
+            val elfHeader = elfProc.inputStream.bufferedReader().readText()
+            elfProc.waitFor()
+            val expectedMachine = qjsExpectedMachine[abi]
+            if (expectedMachine != null && !elfHeader.contains(expectedMachine)) {
+              throw GradleException("QuickJS para $abi con máquina ELF inesperada (se esperaba $expectedMachine): $elfHeader")
+            }
+            if (!elfHeader.contains("DYN") && !elfHeader.contains("EXEC")) {
+              logger.warn("⚠️ [Aura Gradle] QuickJS $abi con tipo ELF inesperado: $elfHeader")
+            }
+          }
+        } catch (e: GradleException) {
+          throw e
+        } catch (t: Throwable) {
+          logger.warn("⚠️ [Aura Gradle] No se pudo validar ELF de QuickJS $abi: ${t.message}")
         }
         qjsSo.setExecutable(true, false)
         logger.lifecycle("✅ [Aura Gradle] QuickJS C99 puro ($qjsVersionStr) compilado para $abi: ${qjsSo.length() / 1024} KB.")

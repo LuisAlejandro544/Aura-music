@@ -60,7 +60,7 @@ object YtDlpStreamDownloader {
 
             val pythonEnvDir = File(context.filesDir, "env/python")
             YtDlpEnvironmentSetup.ensureTlsCertificates(pythonEnvDir)
-            val qjsBin = YtDlpEnvironmentSetup.getQuickJsExecutable(context)
+            val jsRuntimeArgs = YtDlpEnvironmentSetup.buildJsRuntimeArgs(context)
             val ffmpegBin = FFmpegNativeEngine.getBinaryFile(context)
 
             if (targetFile.exists()) {
@@ -94,10 +94,7 @@ object YtDlpStreamDownloader {
                     add("--cookies")
                     add(activeCookies.absolutePath)
                 }
-                if (qjsBin != null && qjsBin.exists()) {
-                    add("--js-runtimes")
-                    add("quickjs:${qjsBin.absolutePath}")
-                }
+                addAll(jsRuntimeArgs)
                 if (ffmpegBin != null && ffmpegBin.exists()) {
                     add("--ffmpeg-location")
                     add(ffmpegBin.absolutePath)
@@ -155,7 +152,8 @@ object YtDlpStreamDownloader {
                     )
                 )
             } else {
-                AuraDebugManager.logWarning(TAG, "Descarga directa con yt-dlp finalizó con código $exitCode.")
+                val jsHint = if (jsRuntimeArgs.isEmpty()) " (sin motor JS: QuickJS ${YtDlpNativeEngine.getQuickJsStatusSummary(context)})" else ""
+                AuraDebugManager.logWarning(TAG, "Descarga directa con yt-dlp finalizó con código $exitCode$jsHint.")
                 // No dejar parciales corruptos ocupando disco; el próximo intento parte limpio.
                 runCatching { if (targetFile.exists()) targetFile.delete() }
             }

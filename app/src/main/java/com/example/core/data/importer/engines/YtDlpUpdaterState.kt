@@ -19,8 +19,10 @@ import java.util.concurrent.TimeUnit
  */
 internal const val YTDLP_UPDATER_TAG = "YtDlpAutoUpdater"
 internal const val YTDLP_GITHUB_RELEASES_API = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest"
-/** Tamaño mínimo para considerar válido un binario/paquete yt-dlp o QuickJS. */
+/** Tamaño mínimo para considerar válido un binario/paquete yt-dlp. */
 internal const val YTDLP_MIN_PACKAGE_BYTES = 50_000L
+/** Tamaño mínimo unificado para considerar válido el binario QuickJS C99 real (450-700 KB, nunca < 250 KB). */
+internal const val QUICKJS_MIN_PACKAGE_BYTES = 250_000L
 
 internal object YtDlpUpdaterState {
     val updaterScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
