@@ -44,42 +44,7 @@ import kotlinx.coroutines.isActive
 import java.io.File
 import kotlin.math.abs
 
-/**
- * Busca recursivamente el [TextureView] interno dentro de la jerarquía de [PlayerView].
- */
-private fun findInternalTextureView(view: View?): TextureView? {
-    if (view == null) return null
-    if (view is TextureView) return view
-    if (view is ViewGroup) {
-        for (i in 0 until view.childCount) {
-            val found = findInternalTextureView(view.getChildAt(i))
-            if (found != null) return found
-        }
-    }
-    return null
-}
 
-/**
- * Estado reactivo compartido del reproductor de Video Canvas para indicar en Now Playing y MiniPlayer
- * cuando el video de fondo está cargando buffer o esperando conexión a internet.
- */
-object BackgroundVideoLoadingState {
-    private val _isVideoBufferingFlow = kotlinx.coroutines.flow.MutableStateFlow(false)
-    val isVideoBufferingFlow: kotlinx.coroutines.flow.StateFlow<Boolean> = _isVideoBufferingFlow
-
-    private val _isVideoNetworkStalledFlow = kotlinx.coroutines.flow.MutableStateFlow(false)
-    val isVideoNetworkStalledFlow: kotlinx.coroutines.flow.StateFlow<Boolean> = _isVideoNetworkStalledFlow
-
-    fun update(isBuffering: Boolean, isNetworkStalled: Boolean) {
-        _isVideoBufferingFlow.value = isBuffering
-        _isVideoNetworkStalledFlow.value = isNetworkStalled
-    }
-
-    fun reset() {
-        _isVideoBufferingFlow.value = false
-        _isVideoNetworkStalledFlow.value = false
-    }
-}
 
 /**
  * Componente de reproducción de Video de Fondo (Canvas / Video Sincronizado) con aceleración GPU sin colisiones
@@ -409,72 +374,15 @@ fun BackgroundVideoPlayer(
         label = "VideoFadeInAlpha"
     )
 
-    Box(
+    BackgroundVideoLayers(
+        videoPlayer = videoPlayer,
+        videoAlpha = videoAlpha,
+        placeholderTrack = placeholderTrack,
+        cornerRadius = cornerRadius,
+        isHorizontalVideo = isHorizontalVideo,
+        fitHorizontalInFullscreen = fitHorizontalInFullscreen,
+        targetResizeMode = targetResizeMode,
+        onPlayerView = { playerViewRef = it },
         modifier = modifier
-            .clip(RoundedCornerShape(cornerRadius))
-            .border(if (cornerRadius > 0.dp) 1.dp else 0.dp, CardBorder, RoundedCornerShape(cornerRadius)),
-        contentAlignment = Alignment.Center
-    ) {
-        // Capa 1: Carátula que se muestra únicamente mientras el decodificador prepara el primer cuadro
-        // (desaparece suavemente al renderizar el video para no generar cortes horizontales detrás del video)
-        if (placeholderTrack != null && videoAlpha < 0.99f) {
-            ArtworkImage(
-                track = placeholderTrack,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer { alpha = (1f - videoAlpha).coerceIn(0f, 1f) },
-                cornerRadius = cornerRadius
-            )
-        } else if (placeholderTrack == null && videoAlpha < 0.99f) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color(0xFF0F0F16))
-            )
-        }
-
-        // Capa 2: Reproductor de video sobre TextureView acelerado por GPU, sin perforar SurfaceFlinger
-        AndroidView(
-            factory = { ctx ->
-                (LayoutInflater.from(ctx).inflate(R.layout.aura_background_video_player, null, false) as PlayerView).apply {
-                    playerViewRef = this
-                    player = videoPlayer
-                    useController = false
-                    resizeMode = targetResizeMode
-                    setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
-                    layoutParams = FrameLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT
-                    )
-                }
-            },
-            update = { playerView ->
-                playerViewRef = playerView
-                if (playerView.player != videoPlayer) {
-                    playerView.player = videoPlayer
-                }
-                if (playerView.resizeMode != targetResizeMode) {
-                    playerView.resizeMode = targetResizeMode
-                }
-            },
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer { alpha = videoAlpha }
-        )
-
-        // Capa 3: Degradado sutil oscuro para garantizar contraste con controles flotantes
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Black.copy(alpha = if (cornerRadius == 0.dp && isHorizontalVideo && fitHorizontalInFullscreen) 0.45f else 0.25f),
-                            Color.Transparent,
-                            Color.Black.copy(alpha = if (cornerRadius == 0.dp) 0.65f else 0.45f)
-                        )
-                    )
-                )
-        )
-    }
+    )
 }

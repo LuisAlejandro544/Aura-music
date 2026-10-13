@@ -83,369 +83,49 @@ fun HomeScreen(
         contentPadding = PaddingValues(bottom = 120.dp)
     ) {
         // Encabezado con Saludo Principal
-        item {
-            Spacer(modifier = Modifier.height(16.dp))
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = greeting,
-                    style = MaterialTheme.typography.headlineMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
-                    )
-                )
-                Text(
-                    text = "Tu música local, sin conexión",
-                    style = MaterialTheme.typography.bodyMedium.copy(color = TextSecondary)
-                )
-            }
-            Spacer(modifier = Modifier.height(20.dp))
-        }
+        homeGreetingHeader(greeting = greeting)
 
         // Si la biblioteca está vacía, mostrar tarjeta de bienvenida centrada y optimizada para pantallas anchas
         if (allTracks.isEmpty()) {
-            item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 24.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .widthIn(max = 520.dp), // Limitamos el ancho para que no se deforme en pantallas anchas
-                        shape = RoundedCornerShape(24.dp),
-                        colors = CardDefaults.cardColors(containerColor = SurfaceCard),
-                        border = CardBorder.let { androidx.compose.foundation.BorderStroke(1.dp, it) }
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(28.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Surface(
-                                shape = CircleShape,
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                                modifier = Modifier.size(72.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        imageVector = Icons.Default.LibraryMusic,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(36.dp)
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(18.dp))
-                            Text(
-                                text = "Tu biblioteca está vacía",
-                                style = MaterialTheme.typography.titleLarge.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = TextPrimary
-                                )
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = if (com.example.BuildConfig.ENABLE_DEMO_TRACKS) {
-                                    "Aura Music respeta tu privacidad: no escanea tu teléfono automáticamente. Importa tus archivos o prueba con canciones demo."
-                                } else {
-                                    "Aura Music respeta tu privacidad: no escanea tu teléfono automáticamente. Importa tus archivos o descarga tu música favorita para empezar."
-                                },
-                                style = MaterialTheme.typography.bodyMedium.copy(color = TextSecondary),
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                modifier = Modifier.padding(horizontal = 8.dp)
-                            )
-                            Spacer(modifier = Modifier.height(22.dp))
-                            Button(
-                                onClick = { onNavigate(NavScreen.Import) },
-                                shape = RoundedCornerShape(24.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                                modifier = Modifier
-                                    .height(48.dp)
-                                    .testTag("home_import_cta")
-                            ) {
-                                Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(20.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Importar mi Música", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                            }
-                        }
-                    }
-                }
-            }
+            homeWelcomeEmpty(onNavigateImport = { onNavigate(NavScreen.Import) })
         } else {
             // Cuadrícula de accesos directos con gradientes modernos
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    HomeQuickTile(
-                        title = "Canciones Favoritas",
-                        subtitle = "${favoriteTracks.size} pistas",
-                        icon = Icons.Default.Favorite,
-                        gradient = Brush.linearGradient(
-                            listOf(Color(0xFFEC4899), Color(0xFF8B5CF6))
-                        ),
-                        onClick = {
-                            onSelectLibraryTab(LibraryTab.FAVORITES)
-                            onNavigate(NavScreen.Library)
-                        },
-                        modifier = Modifier.weight(1f)
-                    )
-                    HomeQuickTile(
-                        title = "Añadidas Recientes",
-                        subtitle = "${recentlyAddedTracks.size} pistas",
-                        icon = Icons.Default.History,
-                        gradient = Brush.linearGradient(
-                            listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)
-                        ),
-                        onClick = {
-                            onSelectLibraryTab(LibraryTab.SONGS)
-                            onNavigate(NavScreen.Library)
-                        },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    HomeQuickTile(
-                        title = "Más Escuchadas",
-                        subtitle = "${topPlayedTracks.size} pistas",
-                        icon = Icons.Default.TrendingUp,
-                        gradient = Brush.linearGradient(
-                            listOf(Color(0xFFF97316), Color(0xFFF43F5E))
-                        ),
-                        onClick = {
-                            if (topPlayedTracks.isNotEmpty()) {
-                                onTrackClick(topPlayedTracks.first(), topPlayedTracks)
-                            } else {
-                                onNavigate(NavScreen.Library)
-                            }
-                        },
-                        modifier = Modifier.weight(1f)
-                    )
-                    HomeQuickTile(
-                        title = mostPlayedPlaylist?.name ?: "Playlists",
-                        subtitle = when {
-                            mostPlayedPlaylist != null && mostPlayedPlaylist.totalPlays > 0 ->
-                                "${mostPlayedPlaylist.trackCount} pistas • ${mostPlayedPlaylist.totalPlays} reprod."
-                            mostPlayedPlaylist != null ->
-                                "${mostPlayedPlaylist.trackCount} pistas"
-                            else -> "Crear lista"
-                        },
-                        icon = Icons.Default.QueueMusic,
-                        gradient = Brush.linearGradient(
-                            listOf(Color(0xFF10B981), Color(0xFF06B6D4))
-                        ),
-                        onClick = {
-                            if (mostPlayedPlaylist != null) {
-                                onOpenPlaylist(mostPlayedPlaylist)
-                            } else {
-                                onSelectLibraryTab(LibraryTab.PLAYLISTS)
-                                onNavigate(NavScreen.Library)
-                            }
-                        },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                Spacer(modifier = Modifier.height(28.dp))
-            }
+            homeQuickTiles(
+                mostPlayedPlaylist = mostPlayedPlaylist,
+                favoriteCount = favoriteTracks.size,
+                recentCount = recentlyAddedTracks.size,
+                topPlayedTracks = topPlayedTracks,
+                onTrackClick = onTrackClick,
+                onNavigate = onNavigate,
+                onSelectLibraryTab = onSelectLibraryTab,
+                onOpenPlaylist = onOpenPlaylist
+            )
 
             // Sección: Escuchado recientemente (Carrusel Horizontal)
             if (recentlyAddedTracks.isNotEmpty()) {
-                item {
-                    Text(
-                        text = "Recientes para ti",
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = TextPrimary
-                        )
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        items(recentlyAddedTracks.take(8), key = { it.id }) { track ->
-                            HomeAlbumCard(
-                                track = track,
-                                isPlaying = isPlaying && currentTrack?.id == track.id,
-                                onClick = { onTrackClick(track, recentlyAddedTracks) }
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(28.dp))
-                }
+                homeRecentCarousel(
+                    recentTracks = recentlyAddedTracks,
+                    currentTrack = currentTrack,
+                    isPlaying = isPlaying,
+                    onTrackClick = onTrackClick
+                )
             }
 
             // Sección principal de canciones: Populares en tu biblioteca (o todas las pistas de la biblioteca)
-            val popularTracks = if (topPlayedTracks.isNotEmpty()) topPlayedTracks else allTracks
-            val sectionTitle = "Populares en tu biblioteca"
-
-            if (popularTracks.isNotEmpty()) {
-                item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = sectionTitle,
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = TextPrimary
-                            )
-                        )
-                        TextButton(onClick = { onNavigate(NavScreen.Library) }) {
-                            Text("Ver todas", color = MaterialTheme.colorScheme.primary)
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-
-                items(popularTracks.take(8), key = { it.id }) { track ->
-                    TrackListItem(
-                        track = track,
-                        isCurrentTrack = currentTrack?.id == track.id,
-                        isPlaying = isPlaying,
-                        onTrackClick = { onTrackClick(track, popularTracks) },
-                        onFavoriteToggle = { onFavoriteToggle(track) },
-                        onDeleteTrack = { onDeleteTrack(track.id) },
-                        playlists = playlists,
-                        onAddToPlaylist = { playlistId -> onAddToPlaylist(playlistId, track.id) },
-                        onEditTrack = { id, t, a, al -> onEditTrack(id, t, a, al) },
-                        onEditTrackDetails = onEditTrackDetails,
-                        modifier = Modifier.padding(vertical = 4.dp)
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun HomeQuickTile(
-    title: String,
-    subtitle: String,
-    icon: ImageVector,
-    gradient: Brush,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick),
-        color = SurfaceCard,
-        border = CardBorder.let { androidx.compose.foundation.BorderStroke(1.dp, it) }
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(42.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(gradient),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(22.dp)
-                )
-            }
-            Spacer(modifier = Modifier.width(10.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
-                    ),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary, fontSize = 11.sp),
-                    maxLines = 1
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun HomeAlbumCard(
-    track: Track,
-    isPlaying: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier
-            .width(136.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .clickable(onClick = onClick)
-            .padding(4.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(128.dp)
-                .clip(RoundedCornerShape(12.dp))
-        ) {
-            ArtworkImage(
-                track = track,
-                modifier = Modifier.fillMaxSize(),
-                cornerRadius = 12.dp
+            homePopularSection(
+                popularTracks = if (topPlayedTracks.isNotEmpty()) topPlayedTracks else allTracks,
+                sectionTitle = "Populares en tu biblioteca",
+                onNavigate = onNavigate,
+                currentTrack = currentTrack,
+                isPlaying = isPlaying,
+                playlists = playlists,
+                onTrackClick = onTrackClick,
+                onFavoriteToggle = onFavoriteToggle,
+                onDeleteTrack = onDeleteTrack,
+                onAddToPlaylist = onAddToPlaylist,
+                onEditTrack = onEditTrack,
+                onEditTrackDetails = onEditTrackDetails
             )
-            // Botón flotante de reproducción en esquina
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.primary,
-                shadowElevation = 6.dp,
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(8.dp)
-                    .size(34.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = track.title,
-            style = MaterialTheme.typography.bodyMedium.copy(
-                fontWeight = FontWeight.SemiBold,
-                color = TextPrimary
-            ),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        Text(
-            text = track.artist,
-            style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
     }
+}
 }

@@ -104,7 +104,10 @@ app/
     │       │   │   │   │   ├── FFmpegNativeEngine.kt     # Fachada de audio/video que delega en FFmpegAudioOperations y FFmpegCanvasOperations
    │       │   │   │   ├── FFmpegCommandExecutor.kt      # Ejecutor interno de procesos nativos y extracción ZIP segura
    │       │   │   │   ├── FFmpegAudioOperations.kt      # Extracción, fusión y recorte de audio
-   │       │   │   │   ├── FFmpegCanvasOperations.kt     # Loops xfade/Boomerang, lienzo 9:16, GOP corto y probe de dimensiones
+   │       │   │   │   ├── FFmpegCanvasOperations.kt # Fachada (70) que delega en 3 piezas
+   │       │   │   │   │   ├── CanvasLoopEffects.kt # Loops Boomerang y Seamless xfade
+   │       │   │   │   │   ├── CanvasSyncProbe.kt # GOP corto y probe de dimensiones
+   │       │   │   │   │   └── CanvasFormatOps.kt # Lienzo 9:16, poda y pipeline Canvas
     │       │   │   │   │   ├── YtDlpNativeEngine.kt      # Fachada modular nativa yt-dlp, inspección y flat-playlists (< 500 líneas)
     │       │   │   │   │   ├── YtDlpEnvironmentSetup.kt  # Detección de binarios, symlinks CPython 0 bytes y certificados TLS Android 14+
     │       │   │   │   │   ├── YtDlpStreamDownloader.kt  # Descarga directa nativa con captura y parseo de progreso en vivo (DownloadProgress)
@@ -118,7 +121,9 @@ app/
     │       │   │   │   │   ├── YtDlpCookieManager.kt     # Gestor opcional de cookies (cookies.txt formato Netscape estilo YTDLnis)
     │       │   │   │   │   └── PoTokenGenerator.kt       # Generador ligero de PO Token Web vinculado a Visitor Data para YouTube/GVS
     │       │   │   │   ├── extractors/         # Extractores de Video y Audio Web
-    │       │   │   │   │   ├── OnlineVideoAudioImporter.kt # Orquestador de importación web con cascada anti-HTTP 403 de 5 niveles
+    │       │   │   │   │   ├── OnlineVideoAudioImporter.kt # Fachada (70) que delega en 2 piezas
+    │       │   │   │   │   │   ├── OnlineLinkResolver.kt # Resolución YouTube/TikTok/web
+    │       │   │   │   │   │   └── OnlineTrackImporter.kt # Descarga, anti-403, carátula y Canvas
     │       │   │   │   │   ├── InnerTubeClient.kt          # Cliente directo YouTube InnerTube multi-perfil (<300ms)
     │       │   │   │   │   ├── InvidiousStreamResolver.kt  # Bypass de streams mediante instancias Invidious
     │       │   │   │   │   ├── HeadlessWebViewExtractor.kt # Extractor WebView móvil en sandbox con cascada de portadas
@@ -166,7 +171,11 @@ app/
    │       │   │   │   ├── SpotifyPlaylistExtractor.kt   # Embed/oEmbed + WebView sin login ni API keys
    │       │   │   │   └── YouTubePlaylistExtractor.kt   # InnerTube browse + respaldo yt-dlp --flat-playlist
     │       │   │   │   ├── download/           # Acelerador de Descargas HTTP Range
-    │       │   │   │   │   └── ChunkedStreamDownloader.kt # Descarga acelerada HTTP Range multi-bloque con guardia anti-SSRF
+    │       │   │   │   │   └── ChunkedStreamDownloader.kt # Fachada (73) que delega en 4 piezas
+    │       │   │   │   │       ├── ChunkedUrlGuards.kt # Anti-SSRF y dominios confiables
+    │       │   │   │   │       ├── ChunkedDownloadRouter.kt # Puerta lineal vs fragmentada
+    │       │   │   │   │       ├── ChunkedSingleDownload.kt # Descarga lineal con reintentos
+    │       │   │   │   │       └── ChunkedParallelDownload.kt # Fragmentada HTTP Range en paralelo
     │       │   │   │   └── tiktok/             # Resolución Directa de TikTok
     │       │   │   │       └── TikTokMediaResolver.kt # Extracción libre de audio/video de TikTok sin marcas de agua
     │       │   │   │
@@ -175,7 +184,10 @@ app/
     │       │   │       ├── YouTubeMusicSearchEngine.kt      # Búsqueda YT Music (WEB_REMIX) y parseo
     │       │   │       ├── YouTubeSearchEngine.kt           # Búsqueda YouTube (WEB), Watch Next y recomendaciones
     │       │   │       ├── StreamingSearchUtils.kt          # Parseo JSON, intercalado tri-plataforma y POST HTTP
-    │       │   │       ├── SoundCloudApiClient.kt           # Cliente modular de SoundCloud (hidratación client_id v2 y streams)
+    │       │   │       ├── SoundCloudApiClient.kt # Fachada (70) que delega en 3 piezas
+    │       │   │       │   ├── SoundCloudHttp.kt # client_id, GET y carátulas Hi-Res
+    │       │   │       │   ├── SoundCloudSearch.kt # API v2, web e yt-dlp
+    │       │   │       │   └── SoundCloudStreamResolver.kt # Streams MP3/Opus para ExoPlayer
     │       │   │       ├── StreamingCacheManager.kt         # Fachada (97) que delega en 6 piezas
     │       │   │       ├── StreamingCacheState.kt             # Estado compartido interno
     │       │   │       ├── StreamingCacheConfigOps.kt         # Límite y política de red
@@ -222,7 +234,11 @@ app/
    │       │       ├── StreamingUrlPolicy.kt         # Detección de URLs de streaming sin resolver
     │       │       ├── AuraMediaPlaybackService.kt # MediaSessionService para System Media Controls y Android Auto
     │       │       ├── AuraDownloadService.kt      # Servicio en primer plano para descargas web y lotes de Playlists
-    │       │       ├── AudioEffectManager.kt       # Gestión de ecualizador y efectos nativos C++20
+    │       │       ├── AudioEffectManager.kt # Fachada (71) que delega en 4 piezas
+    │       │       │   ├── AudioEffectState.kt # Estado compartido interno
+    │       │       │   ├── EqualizerControls.kt # EQ 10 bandas y alcance
+    │       │       │   ├── SpatialVocalControls.kt # 8D/16D y voces HD
+    │       │       │   └── ReverbCrossfeedControls.kt # Reverb, crossfeed y balance
     │       │       ├── HeadphoneController.kt      # BroadcastReceiver para audífonos, Becoming Noisy y botones físicos
     │       │       ├── NativeAudioEngine.kt        # Puente JNI hacia el motor DSP en ISO C++20 y AAudio
     │       │       ├── NativeAudioProcessor.kt     # AudioProcessor de ExoPlayer hacia el motor C++20 con Buffer Flushing
@@ -234,7 +250,14 @@ app/
     │       │
     │       ├── feature/                        # Pantallas Modulares por Funcionalidad (Feature Layer)
     │       │   ├── home/
-    │       │   │   └── HomeScreen.kt           # Pantalla de Inicio con acceso rápido, populares y recientes
+    │       │   │   └── HomeScreen.kt # Fachada (131) que delega en 7 piezas
+    │       │   │       ├── HomeGreetingHeader.kt # Saludo por hora
+    │       │   │       ├── HomeWelcomeEmpty.kt # Bienvenida e importación
+    │       │   │       ├── HomeQuickTiles.kt # Accesos con gradientes
+    │       │   │       ├── HomeRecentCarousel.kt # Carrusel recientes
+    │       │   │       ├── HomePopularSection.kt # Populares en tu biblioteca
+    │       │   │       ├── HomeQuickTile.kt # Mosaico de acceso
+    │       │   │       └── HomeAlbumCard.kt # Tarjeta de álbum
     │       │   ├── streaming/                    # Pestaña Explorar / Streaming Tri-Plataforma
     │       │   │   ├── StreamingExploreScreen.kt     # Fachada (169 líneas, API intacta)
     │       │   │   ├── StreamingExploreHeader.kt     # Título y estado de caché
@@ -265,7 +288,10 @@ app/
     │       │   │   └── NowPlayingDialogsHost.kt  # Los 8 diálogos y hojas modales
     │       │   │   └── components/
     │       │   │       ├── FullScreenLyricsScreen.kt       # Modo Karaoke Inmersivo a Pantalla Completa estilo Apple Music Sing
-    │       │   │       ├── NowPlayingCinematicLayout.kt    # Fachada que delega en secciones Top/Bottom
+    │       │   │       ├── NowPlayingCinematicLayout.kt # Fachada (223) + Top/Bottom y 3 piezas
+    │       │   │       │   ├── CinematicReactiveVignette.kt # Viñeta reactiva al audio
+    │       │   │       │   ├── CinematicFloatingLyricPill.kt # Frase lírica flotante
+    │       │   │       │   └── CinematicSeekBarSection.kt # Seekbar cinemática y A-B
     │       │   │       ├── CinematicTopSection.kt          # Barra superior y fila de pista
     │       │   │       ├── CinematicBottomSection.kt       # Controles, utilidades y vista previa karaoke
     │       │   │       ├── NowPlayingClassicLayout.kt      # Rama clásica completa
@@ -303,7 +329,11 @@ app/
     │       │   │   └── ImportClearConfirmDialog.kt # Confirmación destructiva de limpieza
     │       │   ├── onboarding/
     │       │   │   ├── OnboardingScreen.kt         # Flujo de bienvenida e inducción en 3 etapas
-    │       │   │   └── OnboardingStepComponents.kt # Tarjetas modulares de propuesta de valor y disclaimer de almacenamiento
+    │       │   │   ├── OnboardingWelcomeStep.kt    # Paso 1: bienvenida
+    │       │   │   ├── OnboardingFeaturesStep.kt   # Paso 2: características
+    │       │   │   ├── OnboardingStorageDisclaimerStep.kt # Paso 3: almacenamiento
+    │       │   │   ├── WelcomePillCard.kt          # Píldora de bienvenida
+    │       │   │   └── FeatureDetailCard.kt        # Detalle de característica
     │       │   └── settings/
     │       │       ├── SettingsScreen.kt              # Fachada: firma, enum y navegación (386 líneas)
     │       │       ├── SettingsMainMenuScreen.kt        # Menú principal con cabecera
@@ -355,7 +385,10 @@ app/
     │       │               ├── SavedMediaTrackCard.kt       # Tarjeta individual con borrado selectivo
     │       │               ├── StoredMediaFormatUtils.kt   # Utilidades de formato de pesos KB/MB y relaciones de aspecto
     │       │               ├── StoredMediaSummaryHeader.kt # Cabecera estadística de portadas WebP y videos MP4
-    │       │               ├── StoredMediaTrackCard.kt     # Tarjeta individual de pista con inspección y borrado selectivo
+    │       │               ├── StoredMediaTrackCard.kt # Fachada (132) que delega en 3 piezas
+    │       │               │   ├── StoredMediaTrackHeader.kt # Carátula, título y artista
+    │       │               │   ├── StoredMediaArtworkRow.kt # WebP y borrado
+    │       │               │   └── StoredMediaVideoRow.kt # Canvas, aspecto y exportación
     │       │               └── StoredMediaDeleteDialogs.kt # Diálogos de confirmación para liberar almacenamiento
     │       │
     │       ├── ui/                             # Orquestador UI Global, Componentes Compartidos, Navegación y Tema M3
@@ -364,7 +397,15 @@ app/
     │       │   ├── AppBottomBarHost.kt         # MiniPlayer flotante y navegación inferior
     │       │   ├── AppScreensHost.kt           # Las 7 pantallas con transiciones
     │       │   └── AppNowPlayingHost.kt        # Overlay de Now Playing cableado
-    │       │   ├── GlobalDialogsHost.kt        # Contenedor centralizado de diálogos y hojas modales globales
+    │       │   ├── GlobalDialogsHost.kt # Fachada (128) que delega en 8 anfitriones
+    │       │   │   ├── GlobalAppUpdateDialog.kt # Actualización APK
+    │       │   │   ├── GlobalLyricsDialog.kt # Letras LRCLIB
+    │       │   │   ├── GlobalAudioEffectsSheet.kt # Hoja de efectos
+    │       │   │   ├── GlobalIncomingAudioDialog.kt # Audio entrante
+    │       │   │   ├── GlobalIncomingVideoDialog.kt # Video entrante
+    │       │   │   ├── GlobalWebLinkDialog.kt # Enlace web entrante
+    │       │   │   ├── GlobalDownloadProgressCard.kt # Progreso en 2do plano
+    │       │   │   └── GlobalPlaylistImportDialog.kt # Importador de playlists
     │       │   ├── navigation/
     │       │   │   └── NavScreen.kt            # Definición de rutas principales y pestañas de biblioteca
     │       │   ├── theme/                      # Sistema de Diseño Dark Luxury Neo-Glass OLED y Extracción Cromática
@@ -386,10 +427,18 @@ app/
     │       │       │   ├── AppWallpaperBackground.kt # Renderizador global de fondo personalizado (Imagen WebP o Video corto)
     │       │       │   ├── PlaylistCoverCollage.kt   # Collage adaptativo automático de 1, 2, 3 o 4 portadas
     │       │       │   ├── ProceduralArtwork.kt      # Generador Canvas vectorial para canciones sin carátula
-    │       │       │   ├── BackgroundVideoPlayer.kt  # Reproductor Video Canvas sin pantallas negras y muestreo GPU a 1s
+    │       │       │   ├── BackgroundVideoPlayer.kt # Fachada (388) + finder, estado y capas
+    │       │       │   │   ├── BackgroundTextureViewFinder.kt # TextureView interno
+    │       │       │   │   ├── BackgroundVideoLoadingState.kt # Buffering reactivo
+    │       │       │   │   └── BackgroundVideoLayers.kt # Carátula, GPU y degradado
     │       │       │   └── AudioVisualizer.kt        # Visualizador espectral de 28 bandas impulsado por C++20
     │       │       ├── audioeffects/           # Pestañas Modulares de la Hoja de Efectos de Audio
-    │       │       │   ├── EqualizerTabContent.kt          # Pestaña del Ecualizador ISO de 10 bandas, Bass Boost y Voces HD
+    │       │       │   ├── EqualizerTabContent.kt # Fachada (103) que delega en 5 piezas
+    │       │       │   │   ├── EqualizerMasterSwitch.kt # Switch maestro y alcance
+    │       │       │   │   ├── EqualizerPresetsRow.kt # Presets acústicos
+    │       │       │   │   ├── EqualizerBassBoost.kt # Graves a 60 Hz
+    │       │       │   │   ├── VocalClarityControl.kt # Voces HD Mid-Side
+    │       │       │   │   └── EqualizerBandsGrid.kt # 10 bandas ISO
     │       │       │   ├── Spatial8DTabContent.kt          # Pestaña de Audio Espacial 8D Clásico y 16D Multi-Órbita
     │       │       │   ├── ReverbTabContent.kt             # Pestaña de Reverb C++20 y espacios acústicos
     │       │       │   ├── PlaybackParametersTabContent.kt # Pestaña de Velocidad/Tono (0.5x-2.0x), Voces HD y Normalizador LUFS
@@ -403,7 +452,12 @@ app/
     │       │       │   ├── PackageUpdateBanner.kt     # Banner de verificación y actualización OTA de yt-dlp
     │       │       │   └── SettingsDiscoveryBanner.kt # Aviso interactivo para descubrir Ajustes en el primer uso
     │       │       ├── dialogs/                # Diálogos Modales Globales
-    │       │       │   ├── AppUpdateDialog.kt              # Modal de descarga e instalación de actualización APK
+    │       │       │   ├── AppUpdateDialog.kt # Fachada (117) que delega en 5 piezas
+    │       │       │   │   ├── AppUpdateHeader.kt # Insignia Nebula y canal
+    │       │       │   │   ├── AppUpdateChips.kt # Arquitectura y tamaño
+    │       │       │   │   ├── AppUpdateDataNotice.kt # Preservación de datos
+    │       │       │   │   ├── AppUpdateChangelog.kt # Notas del Pre-Release
+    │       │       │   │   └── AppUpdateStatus.kt # Descargando o listo
     │       │       │   ├── CreateMixtapeDialog.kt          # Fachada del modal (241 líneas, estado + llamadas)
     │       │       │   ├── MixtapeDialogHeader.kt          # Encabezado con icono según modo
     │       │       │   ├── MixtapeModeSelector.kt          # Pestañas Mixtape Lista vs Auto-Remix
@@ -431,7 +485,10 @@ app/
     │       │       │   ├── SearchLyricsSubmitButton.kt       # Botón de búsqueda
     │       │       │   ├── SearchLyricsResultsContent.kt     # Carga, error, vacío o lista
     │       │       │   └── LyricResultItemCard.kt            # Tarjeta con insignia oficial
-    │       │       │   └── VideoToMusicDialog.kt           # Conversor 3 en 1 de Video a Música (.m4a + WebP + Canvas)
+    │       │       │   └── VideoToMusicDialog.kt # Fachada (220) que delega en 3 secciones
+    │       │       │       ├── VideoPreviewSection.kt # Fotograma y duración
+    │       │       │       ├── VideoMetadataFields.kt # Título, artista y álbum
+    │       │       │       └── VideoCanvasOptions.kt # Canvas, loop y silencios
     │       │       └── download/               # Subcomponentes del Modal de Descargas Web
     │       │           ├── DownloadProgressStatusCard.kt      # Tarjeta de progreso en vivo (MB/s, porcentaje y 2do plano)
     │       │           ├── DownloadSourceAndEngineSelector.kt # Selector interactivo de motor (yt-dlp, InnerTube, WebView)
@@ -453,7 +510,10 @@ app/
     │       │       ├── StreamingPlaybackResolver.kt    # Resolución por calidad, transición, recuperación 403, radio similar y Ahorro (sin video/letras/prefetch)
     │       │       ├── StreamingDownloadOps.kt         # Descarga permanente con calidad elegida y ajustes de caché/ahorro
     │       │       ├── StreamingTrackBuilders.kt       # Tracks sintéticos y colas desde resultados
-    │       │       └── PlaylistImportCoordinator.kt    # Orquestador del Importador de Playlists de Spotify y YouTube Music
+    │       │       └── PlaylistImportCoordinator.kt # Fachada (141) que delega en 3 piezas
+    │       │           ├── PlaylistImportState.kt # Estado reactivo compartido
+    │       │           ├── PlaylistImportAnalyzer.kt # Análisis de URL con preview
+    │       │           └── PlaylistImportRunner.kt # Importación y portada WebP
     │       │
     │       ├── widget/                         # Sistema de 2 Widgets Interactivos para Pantalla de Inicio
     │       │   ├── AuraMusicWidgetProvider.kt        # Widget 1: Reproductor adaptativo (4x1, 4x2, 4x3) con color de carátula
