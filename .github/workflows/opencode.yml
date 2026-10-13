@@ -54,9 +54,7 @@ jobs:
           if [ "$EVENT_NAME" = "issues" ]; then
             COMBINED_PROMPT="$ISSUE_TITLE"
             if [ -n "$ISSUE_BODY" ]; then
-              COMBINED_PROMPT="$COMBINED_PROMPT
-
-$ISSUE_BODY"
+              COMBINED_PROMPT="${COMBINED_PROMPT}"$'\n\n'"${ISSUE_BODY}"
             fi
             if [ -z "$COMBINED_PROMPT" ]; then
               COMBINED_PROMPT="Revisa y resuelve el issue solicitado."
