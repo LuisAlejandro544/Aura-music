@@ -32,10 +32,11 @@ import java.net.URL
  * 2. Recomendación de Canción Similar (Radio / Autoplay antes de terminar la canción):
  *    Consulta el endpoint `/youtubei/v1/next` (Automix / Watch Next) para obtener la siguiente
  *    pista similar recomendada antes de que finalice la pista actual.
- * 3. Resolución de Reproducción con `yt-dlp`:
+ * 3. Resolución de Reproducción con `yt-dlp` (cascada unificada de 4 niveles):
  *    Una vez elegida la canción o la recomendación similar, normaliza enlaces de `music.youtube.com`
- *    y utiliza `YtDlpNativeEngine` (con respaldo `InnerTubeClient`) para obtener las URLs reales
- *    de audio y Video Canvas para reproducir y pre-cargar en caché.
+ *    y utiliza `YtDlpNativeEngine` en primer lugar TANTO para `YOUTUBE` como para `YT MUSIC`
+ *    (con respaldo `InnerTubeClient` multi-cliente → `Invidious` → `HeadlessWebView`)
+ *    para obtener las URLs reales de audio y Video Canvas.
  */
 object StreamingApiService {
 
@@ -188,76 +189,54 @@ object StreamingApiService {
             )
         }
 
-        if (item.platform == StreamingSourcePlatform.YOUTUBE) {
-            // === PLATAFORMA YOUTUBE: Usar yt-dlp en primer lugar ===
-            if (!forceBypassYtDlp && !YtDlpAutoUpdaterIsBlockedSafe()) {
-                val ytdlpResult = YtDlpNativeEngine.resolveStream(context, watchUrl)
-                val info = ytdlpResult.getOrNull()
-                if (info != null && (!info.audioUrl.isNullOrBlank() || info.videoUrl.isNotBlank())) {
-                    return@withContext enrichAndRegister(info)
-                }
+        // === CASCADA UNIFICADA YOUTUBE + YT MUSIC ===
+        // Ambas plataformas usan la misma lógica: yt-dlp primero (con normalización
+        // music.youtube.com → youtube.com/watch?v= ya integrada en YtDlpNativeEngine),
+        // porque InnerTube directo falla en pistas oficiales/Topic con LOGIN_REQUIRED,
+        // restricción por edad/derechos o solo-HLS (streamingData nulo). yt-dlp resuelve
+        // esos casos con descifrado n-sig/cipher (CPython+QuickJS), extractor-args
+        // youtube:player_client + po_token, cookies y selección bestaudio/bestvideo 480p.
+        // Niveles: 1) yt-dlp → 2) InnerTube multi-cliente → 3) Invidious → 4) WebView.
+        val platformLabel = if (item.platform == StreamingSourcePlatform.YOUTUBE) "YouTube" else "YT Music"
+        if (!forceBypassYtDlp && !YtDlpAutoUpdaterIsBlockedSafe()) {
+            val ytdlpResult = YtDlpNativeEngine.resolveStream(context, watchUrl)
+            val info = ytdlpResult.getOrNull()
+            if (info != null && (!info.audioUrl.isNullOrBlank() || info.videoUrl.isNotBlank())) {
+                return@withContext enrichAndRegister(info)
+            } else {
+                AuraDebugManager.logWarning(TAG, "yt-dlp no resolvió $platformLabel \"${item.title}\". Continuando con InnerTube...")
             }
-
-            // Respaldo automático si el video de YouTube tiene bloqueo en yt-dlp o recibió HTTP 403
-            val innerTubeFallback = InnerTubeClient.resolve(
-                videoId = item.videoId,
-                originalUrl = watchUrl
-            )
-            if (innerTubeFallback != null && (!innerTubeFallback.audioUrl.isNullOrBlank() || innerTubeFallback.videoUrl.isNotBlank())) {
-                return@withContext enrichAndRegister(innerTubeFallback)
-            }
-
-            val invidiousFallback = com.example.core.data.importer.InvidiousStreamResolver.resolve(
-                videoId = item.videoId,
-                originalUrl = watchUrl
-            )
-            if (invidiousFallback != null && (!invidiousFallback.audioUrl.isNullOrBlank() || invidiousFallback.videoUrl.isNotBlank())) {
-                return@withContext enrichAndRegister(invidiousFallback)
-            }
-
-            val webFallback = com.example.core.data.importer.HeadlessWebViewExtractor.resolve(
-                context = context,
-                videoId = item.videoId,
-                originalUrl = watchUrl
-            )
-            if (webFallback != null) {
-                return@withContext enrichAndRegister(webFallback)
-            }
-
-            return@withContext Result.failure(
-                IllegalStateException("No se pudo resolver la pista de YouTube \"${item.title}\".")
-            )
-        } else {
-            // === PLATAFORMA YT MUSIC: Resolución directa sin usar yt-dlp ===
-            val innerTubeInfo = InnerTubeClient.resolve(
-                videoId = item.videoId,
-                originalUrl = watchUrl
-            )
-            if (innerTubeInfo != null && (!innerTubeInfo.audioUrl.isNullOrBlank() || innerTubeInfo.videoUrl.isNotBlank())) {
-                return@withContext enrichAndRegister(innerTubeInfo)
-            }
-
-            val invidiousInfo = com.example.core.data.importer.InvidiousStreamResolver.resolve(
-                videoId = item.videoId,
-                originalUrl = watchUrl
-            )
-            if (invidiousInfo != null && (!invidiousInfo.audioUrl.isNullOrBlank() || invidiousInfo.videoUrl.isNotBlank())) {
-                return@withContext enrichAndRegister(invidiousInfo)
-            }
-
-            val webFallback = com.example.core.data.importer.HeadlessWebViewExtractor.resolve(
-                context = context,
-                videoId = item.videoId,
-                originalUrl = watchUrl
-            )
-            if (webFallback != null) {
-                return@withContext enrichAndRegister(webFallback)
-            }
-
-            return@withContext Result.failure(
-                IllegalStateException("No se pudo resolver la pista de YT Music \"${item.title}\".")
-            )
         }
+
+        // Respaldo automático si el stream tiene bloqueo en yt-dlp o recibió HTTP 403
+        val innerTubeFallback = InnerTubeClient.resolve(
+            videoId = item.videoId,
+            originalUrl = watchUrl
+        )
+        if (innerTubeFallback != null && (!innerTubeFallback.audioUrl.isNullOrBlank() || innerTubeFallback.videoUrl.isNotBlank())) {
+            return@withContext enrichAndRegister(innerTubeFallback)
+        }
+
+        val invidiousFallback = com.example.core.data.importer.InvidiousStreamResolver.resolve(
+            videoId = item.videoId,
+            originalUrl = watchUrl
+        )
+        if (invidiousFallback != null && (!invidiousFallback.audioUrl.isNullOrBlank() || invidiousFallback.videoUrl.isNotBlank())) {
+            return@withContext enrichAndRegister(invidiousFallback)
+        }
+
+        val webFallback = com.example.core.data.importer.HeadlessWebViewExtractor.resolve(
+            context = context,
+            videoId = item.videoId,
+            originalUrl = watchUrl
+        )
+        if (webFallback != null) {
+            return@withContext enrichAndRegister(webFallback)
+        }
+
+        return@withContext Result.failure(
+            IllegalStateException("No se pudo resolver la pista de $platformLabel \"${item.title}\".")
+        )
     }
 
     private fun YtDlpAutoUpdaterIsBlockedSafe(): Boolean {

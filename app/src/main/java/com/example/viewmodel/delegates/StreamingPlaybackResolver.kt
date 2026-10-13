@@ -57,7 +57,7 @@ internal fun StreamingModeCoordinator.playStreamingItemInternal(
                 return@launch
             }
 
-            // 2. Resolver con yt-dlp (normalizado para YT y YT Music) + InnerTube
+            // 2. Resolver con cascada unificada yt-dlp (YT Music y YouTube) + InnerTube multi-cliente
             val resolvedResult = StreamingApiService.resolvePlayableStreamWithYtDlp(context, item)
             val resolved = resolvedResult.getOrNull()
             if (resolved == null) {
@@ -159,7 +159,7 @@ internal fun StreamingModeCoordinator.handleStreamingTrackTransitionRequestInter
         return true
     }
 
-    // Si aún no tiene archivo en caché o su URL era un marcador pendiente, consultamos la API y yt-dlp (solo para YouTube)
+    // Si aún no tiene archivo en caché o su URL era un marcador pendiente, consultamos la API con cascada unificada yt-dlp (YT Music y YouTube)
     playResolutionJob?.cancel()
     playResolutionJob = scope.launch {
         _isResolvingStream.value = true
@@ -300,7 +300,7 @@ internal fun StreamingModeCoordinator.handleStreamingHttpErrorRecoveryInternal(
 
 /**
  * Consulta automáticamente a la API por una canción similar y resuelve su stream
- * (`yt-dlp` para YouTube, `InnerTube` para YT Music) + pre-descarga en caché temporal antes de que termine la pista actual.
+ * (cascada unificada yt-dlp → InnerTube → Invidious → WebView para YT Music y YouTube) + pre-descarga en caché temporal antes de que termine la pista actual.
  */
 internal fun StreamingModeCoordinator.prefetchNextSimilarTrackForRadioInternal(currentTrack: Track) {
     val videoId = currentTrack.streamingVideoId ?: return
@@ -321,7 +321,7 @@ internal fun StreamingModeCoordinator.prefetchNextSimilarTrackForRadioInternal(c
             itemRegistry[similarItem.videoId] = similarItem
             _nextSimilarTrackPreview.value = similarItem
 
-            // Resolver según plataforma (yt-dlp para YouTube, InnerTube para YT Music) y pre-almacenar en caché temporal de 30 minutos
+            // Resolver con cascada unificada (yt-dlp → InnerTube → Invidious → WebView) y pre-almacenar en caché temporal de 30 minutos
             val resolved = StreamingApiService.resolvePlayableStreamWithYtDlp(context, similarItem).getOrNull()
                 ?: return@launch
 
