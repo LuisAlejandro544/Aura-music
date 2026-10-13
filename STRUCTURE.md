@@ -318,7 +318,10 @@ app/
     │       │   ├── navigation/
     │       │   │   └── NavScreen.kt            # Definición de rutas principales y pestañas de biblioteca
     │       │   ├── theme/                      # Sistema de Diseño Dark Luxury Neo-Glass OLED y Extracción Cromática
-    │       │   │   ├── ArtworkColorExtractor.kt # Extracción dinámica de color cada 1s (local, URLs https:// y GPU TextureView)
+    │       │   │   ├── ArtworkColorExtractor.kt # Fachada (135 líneas, API intacta)
+    │       │   │   ├── ArtworkSamplingState.kt   # Intervalo por batería y color en vivo
+    │       │   │   ├── VideoFrameColorExtractor.kt # Fotogramas, retriever y arte remoto
+    │       │   │   └── ArtworkPaletteExtractor.kt  # Carátula/video, fallback y paleta armónica
     │       │   │   ├── Color.kt                 # Paletas de color neón y superficies OLED 100% opacas
     │       │   │   ├── Theme.kt                 # Configuración MaterialTheme, Material You y blindaje fontScale = 1.0f
     │       │   │   └── Type.kt                  #Jerarquía tipográfica de Aura Music
