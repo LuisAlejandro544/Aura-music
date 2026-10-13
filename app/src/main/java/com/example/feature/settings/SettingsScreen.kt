@@ -141,10 +141,6 @@ fun SettingsScreen(
     var activeSubScreen by remember { mutableStateOf(SettingsSubScreen.MAIN_MENU) }
     var editingClickType by remember { mutableStateOf<Int?>(null) }
 
-    val mediaCount = remember(allTracks) {
-        allTracks.count { !it.albumArtPath.isNullOrBlank() || !it.videoUri.isNullOrBlank() }
-    }
-
     AnimatedContent(
         targetState = activeSubScreen,
         transitionSpec = {
@@ -186,358 +182,193 @@ fun SettingsScreen(
     ) { subScreen ->
         when (subScreen) {
             SettingsSubScreen.MAIN_MENU -> {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 16.dp),
-                    contentPadding = PaddingValues(bottom = 120.dp)
-                ) {
-                    // Cabecera Principal Directa (Sin barra de pestañas superior redundante)
-                    item {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "Configuración & Ajustes",
-                            style = MaterialTheme.typography.headlineMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = TextPrimary
-                            )
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Personaliza el reproductor, temas visuales, acústica DSP y medios guardados.",
-                            style = MaterialTheme.typography.bodyMedium.copy(color = TextSecondary)
-                        )
-                        Spacer(modifier = Modifier.height(20.dp))
-                    }
-
-                    // Menú Principal de Navegación por Pantallas Independientes
-                    mainSettingsMenuContent(
-                        currentTheme = currentTheme,
-                        isDynamicArtworkColorEnabled = isDynamicArtworkColorEnabled,
-                        isMiniPlayerVideoEnabled = isMiniPlayerVideoEnabled,
-                        isBackgroundGameModeEnabled = isBackgroundGameModeEnabled,
-                        appWallpaperConfig = appWallpaperConfig,
-                        nowPlayingDesignMode = nowPlayingDesignMode,
-                        isHeadphoneConnected = headphoneConfig.isHeadphoneConnected,
-                        connectedDeviceName = headphoneConfig.connectedDeviceName,
-                        mediaCount = mediaCount,
-                        widgetConfig = widgetConfig,
-                        onOpenPlayerDesign = { activeSubScreen = SettingsSubScreen.PLAYER_DESIGN },
-                        onOpenVisualBehavior = { activeSubScreen = SettingsSubScreen.VISUAL_BEHAVIOR },
-                        onOpenThemePalettes = { activeSubScreen = SettingsSubScreen.THEME_PALETTES },
-                        onOpenWidgets = { activeSubScreen = SettingsSubScreen.WIDGETS },
-                        onOpenHeadphones = { activeSubScreen = SettingsSubScreen.HEADPHONES },
-                        onOpenStoredMedia = { activeSubScreen = SettingsSubScreen.STORED_MEDIA },
-                        onOpenEnginesAndDiagnostics = { activeSubScreen = SettingsSubScreen.ENGINES_AND_DIAGNOSTICS },
-                        onOpenDownloadsAndCookies = { activeSubScreen = SettingsSubScreen.DOWNLOADS_AND_COOKIES },
-                        onOpenBehindTheProject = { activeSubScreen = SettingsSubScreen.BEHIND_THE_PROJECT },
-                        onOpenOnboarding = onOpenOnboarding
-                    )
-                }
+                SettingsMainMenuScreen(
+                currentTheme = currentTheme,
+                isDynamicArtworkColorEnabled = isDynamicArtworkColorEnabled,
+                isMiniPlayerVideoEnabled = isMiniPlayerVideoEnabled,
+                isBackgroundGameModeEnabled = isBackgroundGameModeEnabled,
+                appWallpaperConfig = appWallpaperConfig,
+                nowPlayingDesignMode = nowPlayingDesignMode,
+                headphoneConfig = headphoneConfig,
+                widgetConfig = widgetConfig,
+                allTracks = allTracks,
+                onNavigate = { activeSubScreen = it },
+                onOpenOnboarding = onOpenOnboarding
+                )
             }
 
             // PANTALLA INDEPENDIENTE 1: DISEÑO DEL REPRODUCTOR
             SettingsSubScreen.PLAYER_DESIGN -> {
-                SettingsSubMenuScreen(
-                    title = "Diseño del Reproductor",
-                    subtitle = "Elige el estilo visual de la pantalla completa Now Playing",
-                    icon = Icons.Default.DashboardCustomize,
-                    iconTint = MaterialTheme.colorScheme.primary,
-                    onBack = { activeSubScreen = SettingsSubScreen.MAIN_MENU },
-                    testTag = "subscreen_player_design"
-                ) {
-                    playerDesignSettingsContent(
-                        currentDesignMode = nowPlayingDesignMode,
-                        onSetDesignMode = onSetNowPlayingDesignMode
-                    )
-                }
+                SettingsPlayerDesignScreen(
+                nowPlayingDesignMode = nowPlayingDesignMode,
+                onSetNowPlayingDesignMode = onSetNowPlayingDesignMode,
+                onBack = { activeSubScreen = SettingsSubScreen.MAIN_MENU }
+                )
             }
 
             // PANTALLA INDEPENDIENTE 2: AURA DINÁMICA, STREAMING & MODO JUEGO (MENÚ DE 4 TARJETAS)
             SettingsSubScreen.VISUAL_BEHAVIOR -> {
-                SettingsSubMenuScreen(
-                    title = "Aura Dinámica, Streaming & Modo Juego",
-                    subtitle = "Elige una categoría para configurar el streaming, colores dinámicos, modo juego o fondo",
-                    icon = Icons.Default.Videocam,
-                    iconTint = MaterialTheme.colorScheme.secondary,
-                    onBack = { activeSubScreen = SettingsSubScreen.MAIN_MENU },
-                    testTag = "subscreen_visual_behavior"
-                ) {
-                    visualBehaviorMenuSection(
-                        isDynamicArtworkColorEnabled = isDynamicArtworkColorEnabled,
-                        isMiniPlayerVideoEnabled = isMiniPlayerVideoEnabled,
-                        isBackgroundGameModeEnabled = isBackgroundGameModeEnabled,
-                        appWallpaperConfig = appWallpaperConfig,
-                        streamingCacheConfig = streamingCacheConfig,
-                        onOpenStreamingAndCache = { activeSubScreen = SettingsSubScreen.VISUAL_STREAMING_AND_CACHE },
-                        onOpenAuraAndMiniPlayer = { activeSubScreen = SettingsSubScreen.VISUAL_AURA_AND_MINIPLAYER },
-                        onOpenGameMode = { activeSubScreen = SettingsSubScreen.VISUAL_GAME_MODE },
-                        onOpenGalleryWallpaper = { activeSubScreen = SettingsSubScreen.VISUAL_GALLERY_WALLPAPER }
-                    )
-                }
+                SettingsVisualBehaviorMenuScreen(
+                isDynamicArtworkColorEnabled = isDynamicArtworkColorEnabled,
+                isMiniPlayerVideoEnabled = isMiniPlayerVideoEnabled,
+                isBackgroundGameModeEnabled = isBackgroundGameModeEnabled,
+                appWallpaperConfig = appWallpaperConfig,
+                streamingCacheConfig = streamingCacheConfig,
+                onNavigate = { activeSubScreen = it },
+                onBack = { activeSubScreen = SettingsSubScreen.MAIN_MENU }
+                )
             }
 
             // SUB-PANTALLA 2.1: STREAMING & CACHÉ INTELIGENTE
             SettingsSubScreen.VISUAL_STREAMING_AND_CACHE -> {
-                SettingsSubMenuScreen(
-                    title = "Streaming & Caché Inteligente",
-                    subtitle = "Videos Canvas en Streaming (Wi-Fi/Datos) y caché temporal de 50 a 500 MB",
-                    icon = Icons.Default.CloudQueue,
-                    iconTint = MaterialTheme.colorScheme.primary,
-                    onBack = { activeSubScreen = SettingsSubScreen.VISUAL_BEHAVIOR },
-                    testTag = "subscreen_visual_streaming_cache"
-                ) {
-                    item {
-                        com.example.feature.settings.components.appearance.StreamingCacheAndVideoSettingsCard(
-                            cacheConfig = streamingCacheConfig,
-                            onSelectVideoPolicy = onSelectStreamingVideoPolicy,
-                            onChangeMaxCacheMb = onChangeStreamingCacheMaxMb,
-                            onClearStreamingCache = onClearStreamingCache
-                        )
-                    }
-                }
+                SettingsStreamingCacheScreen(
+                streamingCacheConfig = streamingCacheConfig,
+                onSelectStreamingVideoPolicy = onSelectStreamingVideoPolicy,
+                onChangeStreamingCacheMaxMb = onChangeStreamingCacheMaxMb,
+                onClearStreamingCache = onClearStreamingCache,
+                onBack = { activeSubScreen = SettingsSubScreen.VISUAL_BEHAVIOR }
+                )
             }
 
             // SUB-PANTALLA 2.2: AURA DINÁMICA (1S) & MINI REPRODUCTOR
             SettingsSubScreen.VISUAL_AURA_AND_MINIPLAYER -> {
-                SettingsSubMenuScreen(
-                    title = "Aura Dinámica & Mini Reproductor",
-                    subtitle = "Armonización de color cada 1 segundo y Video Canvas en el Mini Reproductor",
-                    icon = Icons.Default.Palette,
-                    iconTint = MaterialTheme.colorScheme.secondary,
-                    onBack = { activeSubScreen = SettingsSubScreen.VISUAL_BEHAVIOR },
-                    testTag = "subscreen_visual_aura_miniplayer"
-                ) {
-                    auraAndMiniPlayerSettingsSection(
-                        isDynamicArtworkColorEnabled = isDynamicArtworkColorEnabled,
-                        onToggleDynamicArtworkColor = onToggleDynamicArtworkColor,
-                        isMiniPlayerVideoEnabled = isMiniPlayerVideoEnabled,
-                        onToggleMiniPlayerVideo = onToggleMiniPlayerVideo
-                    )
-                }
+                SettingsAuraMiniPlayerScreen(
+                isDynamicArtworkColorEnabled = isDynamicArtworkColorEnabled,
+                onToggleDynamicArtworkColor = onToggleDynamicArtworkColor,
+                isMiniPlayerVideoEnabled = isMiniPlayerVideoEnabled,
+                onToggleMiniPlayerVideo = onToggleMiniPlayerVideo,
+                onBack = { activeSubScreen = SettingsSubScreen.VISUAL_BEHAVIOR }
+                )
             }
 
             // SUB-PANTALLA 2.3: MODO JUEGO / AHORRO EN 2DO PLANO
             SettingsSubScreen.VISUAL_GAME_MODE -> {
-                SettingsSubMenuScreen(
-                    title = "Modo Juego / Ahorro en 2do Plano",
-                    subtitle = "Libera GPU, texturas y visualizador al minimizar la app mientras juegas",
-                    icon = Icons.Default.SportsEsports,
-                    iconTint = MaterialTheme.colorScheme.primary,
-                    onBack = { activeSubScreen = SettingsSubScreen.VISUAL_BEHAVIOR },
-                    testTag = "subscreen_visual_game_mode"
-                ) {
-                    backgroundGameModeSettingsSection(
-                        isBackgroundGameModeEnabled = isBackgroundGameModeEnabled,
-                        onToggleBackgroundGameMode = onToggleBackgroundGameMode
-                    )
-                }
+                SettingsGameModeScreen(
+                isBackgroundGameModeEnabled = isBackgroundGameModeEnabled,
+                onToggleBackgroundGameMode = onToggleBackgroundGameMode,
+                onBack = { activeSubScreen = SettingsSubScreen.VISUAL_BEHAVIOR }
+                )
             }
 
             // SUB-PANTALLA 2.4: FONDO DE PANTALLA DE GALERÍA (IMAGEN WEBP O VIDEO CORTO MP4)
             SettingsSubScreen.VISUAL_GALLERY_WALLPAPER -> {
-                SettingsSubMenuScreen(
-                    title = "Fondo de Pantalla de Galería",
-                    subtitle = "Personaliza el fondo con una foto (WebP) o video corto (MP4), opacidad y blur",
-                    icon = Icons.Default.PermMedia,
-                    iconTint = MaterialTheme.colorScheme.secondary,
-                    onBack = { activeSubScreen = SettingsSubScreen.VISUAL_BEHAVIOR },
-                    testTag = "subscreen_visual_gallery_wallpaper"
-                ) {
-                    appWallpaperSettingsSection(
-                        wallpaperConfig = appWallpaperConfig,
-                        onToggleWallpaperEnabled = onToggleWallpaperEnabled,
-                        onSelectWallpaperImage = onSelectWallpaperImage,
-                        onSelectWallpaperVideo = onSelectWallpaperVideo,
-                        onClearWallpaper = onClearWallpaper,
-                        onSelectWallpaperScope = onSelectWallpaperScope,
-                        onChangeDimAlpha = onChangeWallpaperDimAlpha,
-                        onChangeBlurDp = onChangeWallpaperBlurDp
-                    )
-                }
+                SettingsGalleryWallpaperScreen(
+                appWallpaperConfig = appWallpaperConfig,
+                onToggleWallpaperEnabled = onToggleWallpaperEnabled,
+                onSelectWallpaperImage = onSelectWallpaperImage,
+                onSelectWallpaperVideo = onSelectWallpaperVideo,
+                onClearWallpaper = onClearWallpaper,
+                onSelectWallpaperScope = onSelectWallpaperScope,
+                onChangeDimAlpha = onChangeWallpaperDimAlpha,
+                onChangeBlurDp = onChangeWallpaperBlurDp,
+                onBack = { activeSubScreen = SettingsSubScreen.VISUAL_BEHAVIOR }
+                )
             }
 
             // PANTALLA INDEPENDIENTE 3: PALETA BASE PREDETERMINADA & TEMAS
             SettingsSubScreen.THEME_PALETTES -> {
-                SettingsSubMenuScreen(
-                    title = "Paleta Base Predeterminada",
-                    subtitle = "Colores de acento OLED y sincronización con Material You",
-                    icon = Icons.Default.Palette,
-                    iconTint = MaterialTheme.colorScheme.primary,
-                    onBack = { activeSubScreen = SettingsSubScreen.MAIN_MENU },
-                    testTag = "subscreen_theme_palettes"
-                ) {
-                    themePaletteSettingsContent(
-                        currentTheme = currentTheme,
-                        onSelectTheme = onSelectTheme
-                    )
-                }
+                SettingsThemePalettesScreen(
+                currentTheme = currentTheme,
+                onSelectTheme = onSelectTheme,
+                onBack = { activeSubScreen = SettingsSubScreen.MAIN_MENU }
+                )
             }
 
             // PANTALLA INDEPENDIENTE 4: WIDGET (COLOR DE IMAGEN, ESTIRAMIENTO Y TOP 4 / PLAYLISTS)
             SettingsSubScreen.WIDGETS -> {
-                SettingsSubMenuScreen(
-                    title = "Widget",
-                    subtitle = "Color dinámico de carátula, adaptación al estirar y 4 Canciones / 4 Playlists",
-                    icon = Icons.Default.Widgets,
-                    iconTint = MaterialTheme.colorScheme.secondary,
-                    onBack = { activeSubScreen = SettingsSubScreen.MAIN_MENU },
-                    testTag = "subscreen_widgets"
-                ) {
-                    widgetSettingsContent(
-                        widgetConfig = widgetConfig,
-                        currentTrack = currentTrack,
-                        topTracks = topPlayedTracks.ifEmpty { allTracks },
-                        playlists = playlists,
-                        dynamicPrimaryColor = dynamicPrimaryColor,
-                        dynamicSecondaryColor = dynamicSecondaryColor,
-                        onSetDynamicColorEnabled = onSetWidgetDynamicColorEnabled,
-                        onSetGridContentMode = onSetWidgetGridContentMode,
-                        onSetShowProgressInWidget = onSetWidgetShowProgress,
-                        onSetColorIntensityPercent = onSetWidgetColorIntensityPercent,
-                        onForceSyncWidgets = onForceSyncWidgets
-                    )
-                }
+                SettingsWidgetScreen(
+                widgetConfig = widgetConfig,
+                currentTrack = currentTrack,
+                topPlayedTracks = topPlayedTracks,
+                allTracks = allTracks,
+                playlists = playlists,
+                dynamicPrimaryColor = dynamicPrimaryColor,
+                dynamicSecondaryColor = dynamicSecondaryColor,
+                onSetWidgetDynamicColorEnabled = onSetWidgetDynamicColorEnabled,
+                onSetWidgetGridContentMode = onSetWidgetGridContentMode,
+                onSetWidgetShowProgress = onSetWidgetShowProgress,
+                onSetWidgetColorIntensityPercent = onSetWidgetColorIntensityPercent,
+                onForceSyncWidgets = onForceSyncWidgets,
+                onBack = { activeSubScreen = SettingsSubScreen.MAIN_MENU }
+                )
             }
 
             // PANTALLA INDEPENDIENTE 4: AURICULARES & ACÚSTICA DSP (MENÚ DE TARJETAS SIN BARRA DE PESTAÑAS)
             SettingsSubScreen.HEADPHONES -> {
-                SettingsSubMenuScreen(
-                    title = "Auriculares & Acústica DSP",
-                    subtitle = "Crossfeed C++20, Balance Estéreo L/R, Seguridad y Gestos",
-                    icon = Icons.Default.Headphones,
-                    iconTint = MaterialTheme.colorScheme.secondary,
-                    onBack = { activeSubScreen = SettingsSubScreen.MAIN_MENU },
-                    testTag = "subscreen_headphones"
-                ) {
-                    headphonesMenuSection(
-                        headphoneConfig = headphoneConfig,
-                        onOpenAcousticsDsp = { activeSubScreen = SettingsSubScreen.HEADPHONES_DSP },
-                        onOpenSecurity = { activeSubScreen = SettingsSubScreen.HEADPHONES_SECURITY },
-                        onOpenGestures = { activeSubScreen = SettingsSubScreen.HEADPHONES_GESTURES }
-                    )
-                }
+                SettingsHeadphonesMenuScreen(
+                headphoneConfig = headphoneConfig,
+                onNavigate = { activeSubScreen = it },
+                onBack = { activeSubScreen = SettingsSubScreen.MAIN_MENU }
+                )
             }
 
             // SUB-PANTALLA 4.1: ACÚSTICA & DSP
             SettingsSubScreen.HEADPHONES_DSP -> {
-                SettingsSubMenuScreen(
-                    title = "Acústica & DSP",
-                    subtitle = "Modo Bit-Perfect 1:1, Crossfeed C++20 y Balance Estéreo L/R",
-                    icon = Icons.Default.GraphicEq,
-                    iconTint = MaterialTheme.colorScheme.primary,
-                    onBack = { activeSubScreen = SettingsSubScreen.HEADPHONES },
-                    testTag = "subscreen_headphones_dsp"
-                ) {
-                    headphonesAcousticsSection(
-                        headphoneConfig = headphoneConfig,
-                        onSetCrossfeedEnabled = onSetCrossfeedEnabled,
-                        onSetCrossfeedStrength = onSetCrossfeedStrength,
-                        onSetBalanceControlEnabled = onSetBalanceControlEnabled,
-                        onSetStereoBalance = onSetStereoBalance,
-                        onSetBitPerfectEnabled = onSetBitPerfectEnabled,
-                        onSetLowLatencyEnabled = onSetLowLatencyEnabled,
-                        onSetUsbDacExclusiveEnabled = onSetUsbDacExclusiveEnabled,
-                        onSetHiResTargetMode = onSetHiResTargetMode
-                    )
-                }
+                SettingsHeadphoneDspScreen(
+                headphoneConfig = headphoneConfig,
+                onSetCrossfeedEnabled = onSetCrossfeedEnabled,
+                onSetCrossfeedStrength = onSetCrossfeedStrength,
+                onSetBalanceControlEnabled = onSetBalanceControlEnabled,
+                onSetStereoBalance = onSetStereoBalance,
+                onSetBitPerfectEnabled = onSetBitPerfectEnabled,
+                onSetLowLatencyEnabled = onSetLowLatencyEnabled,
+                onSetUsbDacExclusiveEnabled = onSetUsbDacExclusiveEnabled,
+                onSetHiResTargetMode = onSetHiResTargetMode,
+                onBack = { activeSubScreen = SettingsSubScreen.HEADPHONES }
+                )
             }
 
             // SUB-PANTALLA 4.2: SEGURIDAD & CONEXIÓN
             SettingsSubScreen.HEADPHONES_SECURITY -> {
-                SettingsSubMenuScreen(
-                    title = "Seguridad & Conexión",
-                    subtitle = "Protección contra desconexiones, Fade-In y Memoria de Volumen",
-                    icon = Icons.Default.Security,
-                    iconTint = MaterialTheme.colorScheme.secondary,
-                    onBack = { activeSubScreen = SettingsSubScreen.HEADPHONES },
-                    testTag = "subscreen_headphones_security"
-                ) {
-                    headphonesSecuritySection(
-                        headphoneConfig = headphoneConfig,
-                        onSetBecomingNoisyGuardEnabled = onSetBecomingNoisyGuardEnabled,
-                        onSetFadeInOnResumeEnabled = onSetFadeInOnResumeEnabled,
-                        onSetDedicatedVolumeMemoryEnabled = onSetDedicatedVolumeMemoryEnabled
-                    )
-                }
+                SettingsHeadphoneSecurityScreen(
+                headphoneConfig = headphoneConfig,
+                onSetBecomingNoisyGuardEnabled = onSetBecomingNoisyGuardEnabled,
+                onSetFadeInOnResumeEnabled = onSetFadeInOnResumeEnabled,
+                onSetDedicatedVolumeMemoryEnabled = onSetDedicatedVolumeMemoryEnabled,
+                onBack = { activeSubScreen = SettingsSubScreen.HEADPHONES }
+                )
             }
 
             // SUB-PANTALLA 4.3: BOTONES Y GESTOS
             SettingsSubScreen.HEADPHONES_GESTURES -> {
-                SettingsSubMenuScreen(
-                    title = "Botones y Gestos",
-                    subtitle = "Personaliza las pulsaciones simples, dobles, triples y prolongadas",
-                    icon = Icons.Default.TouchApp,
-                    iconTint = MaterialTheme.colorScheme.primary,
-                    onBack = { activeSubScreen = SettingsSubScreen.HEADPHONES },
-                    testTag = "subscreen_headphones_gestures"
-                ) {
-                    headphonesGesturesSection(
-                        headphoneConfig = headphoneConfig,
-                        onSetHeadsetControlsEnabled = onSetHeadsetControlsEnabled,
-                        onOpenEditClickType = { editingClickType = it }
-                    )
-                }
+                SettingsHeadphoneGesturesScreen(
+                headphoneConfig = headphoneConfig,
+                onSetHeadsetControlsEnabled = onSetHeadsetControlsEnabled,
+                onEditClickType = { editingClickType = it },
+                onBack = { activeSubScreen = SettingsSubScreen.HEADPHONES }
+                )
             }
 
             // PANTALLA INDEPENDIENTE 5: MEDIOS & ALMACENAMIENTO
             SettingsSubScreen.STORED_MEDIA -> {
-                SettingsSubMenuScreen(
-                    title = "Medios & Almacenamiento",
-                    subtitle = "Gestión transparente de carátulas WebP y videos MP4 guardados",
-                    icon = Icons.Default.PermMedia,
-                    iconTint = MaterialTheme.colorScheme.primary,
-                    onBack = { activeSubScreen = SettingsSubScreen.MAIN_MENU },
-                    testTag = "subscreen_stored_media"
-                ) {
-                    storedMediaSettingsTab(
-                        allTracks = allTracks,
-                        onDeleteTrackArtwork = onDeleteTrackArtwork,
-                        onDeleteTrackVideo = onDeleteTrackVideo
-                    )
-                }
+                SettingsStoredMediaScreen(
+                allTracks = allTracks,
+                onDeleteTrackArtwork = onDeleteTrackArtwork,
+                onDeleteTrackVideo = onDeleteTrackVideo,
+                onBack = { activeSubScreen = SettingsSubScreen.MAIN_MENU }
+                )
             }
 
             // PANTALLA INDEPENDIENTE 6: MOTORES NATIVOS, YT-DLP OTA & DIAGNÓSTICO
             SettingsSubScreen.ENGINES_AND_DIAGNOSTICS -> {
-                SettingsSubMenuScreen(
-                    title = "Motores Nativos & Diagnóstico",
-                    subtitle = "Arquitectura C++20, FFmpeg puro, yt-dlp OTA y Aura Monitor",
-                    icon = Icons.Default.Build,
-                    iconTint = MaterialTheme.colorScheme.secondary,
-                    onBack = { activeSubScreen = SettingsSubScreen.MAIN_MENU },
-                    testTag = "subscreen_engines_diagnostics"
-                ) {
-                    enginesAndDiagnosticsSettingsContent(onOpenOnboarding = onOpenOnboarding)
-                }
+                SettingsEnginesScreen(
+                onOpenOnboarding = onOpenOnboarding,
+                onBack = { activeSubScreen = SettingsSubScreen.MAIN_MENU }
+                )
             }
 
             // PANTALLA INDEPENDIENTE: DESCARGAS, COOKIES (ESTILO YTDLNIS) & PO TOKEN WEB
             SettingsSubScreen.DOWNLOADS_AND_COOKIES -> {
-                SettingsSubMenuScreen(
-                    title = "Descargas & Cookies (YTDLnis)",
-                    subtitle = "Estrategia yt-dlp natural, Cookies.txt opcionales, PO Token Web y OTA",
-                    icon = Icons.Default.CloudDownload,
-                    iconTint = MaterialTheme.colorScheme.secondary,
-                    onBack = { activeSubScreen = SettingsSubScreen.MAIN_MENU },
-                    testTag = "subscreen_downloads_and_cookies"
-                ) {
-                    ytDlpCookiesAndPoTokenSettingsContent()
-                }
+                SettingsDownloadsScreen(
+                onBack = { activeSubScreen = SettingsSubScreen.MAIN_MENU }
+                )
             }
 
             // PANTALLA INDEPENDIENTE 7: DETRÁS DEL PROYECTO (CREADOR & CONTRIBUIDORES)
             SettingsSubScreen.BEHIND_THE_PROJECT -> {
-                SettingsSubMenuScreen(
-                    title = "Detrás del Proyecto",
-                    subtitle = "Creador oficial, contribuidores y perfiles de GitHub",
-                    icon = Icons.Default.Groups,
-                    iconTint = MaterialTheme.colorScheme.primary,
-                    onBack = { activeSubScreen = SettingsSubScreen.MAIN_MENU },
-                    testTag = "subscreen_behind_project"
-                ) {
-                    behindTheProjectSettingsContent()
-                }
+                SettingsBehindProjectScreen(
+                onBack = { activeSubScreen = SettingsSubScreen.MAIN_MENU }
+                )
             }
         }
     }
@@ -553,71 +384,3 @@ fun SettingsScreen(
     }
 }
 
-private fun androidx.compose.foundation.lazy.LazyListScope.headphonesMenuSection(
-    headphoneConfig: HeadphoneConfig,
-    onOpenAcousticsDsp: () -> Unit,
-    onOpenSecurity: () -> Unit,
-    onOpenGestures: () -> Unit
-) {
-    item {
-        HeadphoneStatusCard(headphoneConfig = headphoneConfig)
-        Spacer(modifier = Modifier.height(16.dp))
-    }
-
-    item {
-        val dspStatus = buildList {
-            if (headphoneConfig.isBitPerfectEnabled) add("Bit-Perfect 1:1")
-            if (headphoneConfig.isCrossfeedEnabled) add("Crossfeed activo")
-            if (headphoneConfig.isBalanceControlEnabled) add("Balance ${headphoneConfig.formattedBalance}")
-        }.joinToString(" • ").ifEmpty { "Modo Bit-Perfect, Crossfeed Bauer/Chu Moy C++20 y Balance Estéreo L/R" }
-
-        SettingsNavigationCard(
-            icon = Icons.Default.GraphicEq,
-            title = "Acústica & DSP",
-            subtitle = dspStatus,
-            iconTint = MaterialTheme.colorScheme.primary,
-            badgeText = if (headphoneConfig.isBitPerfectEnabled || headphoneConfig.isCrossfeedEnabled) "ACTIVO" else null,
-            badgeColor = MaterialTheme.colorScheme.primary,
-            onClick = onOpenAcousticsDsp,
-            testTag = "headphone_subtab_dsp"
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-    }
-
-    item {
-        val activeGuards = listOf(
-            headphoneConfig.isBecomingNoisyGuardEnabled,
-            headphoneConfig.isFadeInOnResumeEnabled,
-            headphoneConfig.isDedicatedVolumeMemoryEnabled
-        ).count { it }
-
-        SettingsNavigationCard(
-            icon = Icons.Default.Security,
-            title = "Seguridad & Conexión",
-            subtitle = "Protección contra desconexiones, Fade-In suave al reanudar y Memoria de Volumen",
-            iconTint = MaterialTheme.colorScheme.secondary,
-            badgeText = if (activeGuards > 0) "$activeGuards/3" else null,
-            badgeColor = MaterialTheme.colorScheme.secondary,
-            onClick = onOpenSecurity,
-            testTag = "headphone_subtab_safety"
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-    }
-
-    item {
-        SettingsNavigationCard(
-            icon = Icons.Default.TouchApp,
-            title = "Botones y Gestos",
-            subtitle = if (headphoneConfig.isHeadsetControlsEnabled) {
-                "Controles físicos activos • 1x: ${headphoneConfig.singleClickAction.label}, 2x: ${headphoneConfig.doubleClickAction.label}"
-            } else {
-                "Personaliza las pulsaciones simples, dobles, triples y prolongadas de tus audífonos"
-            },
-            iconTint = MaterialTheme.colorScheme.primary,
-            badgeText = if (headphoneConfig.isHeadsetControlsEnabled) "ON" else null,
-            badgeColor = MaterialTheme.colorScheme.primary,
-            onClick = onOpenGestures,
-            testTag = "headphone_subtab_gestures"
-        )
-    }
-}

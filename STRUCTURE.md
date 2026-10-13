@@ -257,7 +257,13 @@ app/
     │       │   │   ├── OnboardingScreen.kt         # Flujo de bienvenida e inducción en 3 etapas
     │       │   │   └── OnboardingStepComponents.kt # Tarjetas modulares de propuesta de valor y disclaimer de almacenamiento
     │       │   └── settings/
-    │       │       ├── SettingsScreen.kt       # Orquestador de Ajustes y navegación a sub-menús de pantalla completa
+    │       │       ├── SettingsScreen.kt              # Fachada: firma, enum y navegación (386 líneas)
+    │       │       ├── SettingsMainMenuScreen.kt        # Menú principal con cabecera
+    │       │       ├── SettingsPlayerScreens.kt         # Diseño del reproductor y paletas
+    │       │       ├── SettingsVisualScreens.kt         # Menú visual + 4 sub-pantallas y galería
+    │       │       ├── SettingsWidgetScreen.kt          # Pantalla Widget
+    │       │       ├── SettingsHeadphoneScreens.kt      # Menú + DSP, seguridad, gestos y diálogo
+    │       │       └── SettingsSystemScreens.kt         # Medios, motores, descargas y proyecto
     │       │       └── components/
     │       │           ├── SettingDetailRow.kt            # Fila reutilizable de información clave-valor
     │       │           ├── SettingsSubScreenComponents.kt # Tarjetas navegables y contenedor SettingsSubMenuScreen
