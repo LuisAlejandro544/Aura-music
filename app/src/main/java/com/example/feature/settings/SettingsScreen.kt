@@ -98,6 +98,8 @@ fun SettingsScreen(
     onSelectWallpaperScope: (WallpaperScreenScope) -> Unit = {},
     onChangeWallpaperDimAlpha: (Float) -> Unit = {},
     onChangeWallpaperBlurDp: (Int) -> Unit = {},
+    isWallpaperProcessing: Boolean = false,
+    wallpaperProcessingLabel: String = "",
     nowPlayingDesignMode: NowPlayingDesignMode = NowPlayingDesignMode.AUTO,
     onSetNowPlayingDesignMode: (NowPlayingDesignMode) -> Unit = {},
     // Configuración de Widgets de Escritorio
@@ -287,6 +289,8 @@ fun SettingsScreen(
                 onSelectWallpaperScope = onSelectWallpaperScope,
                 onChangeDimAlpha = onChangeWallpaperDimAlpha,
                 onChangeBlurDp = onChangeWallpaperBlurDp,
+                isProcessing = isWallpaperProcessing,
+                processingLabel = wallpaperProcessingLabel,
                 onBack = { activeSubScreen = SettingsSubScreen.VISUAL_BEHAVIOR }
                 )
             }

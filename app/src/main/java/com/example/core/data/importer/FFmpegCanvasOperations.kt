@@ -59,6 +59,14 @@ internal object FFmpegCanvasOperations {
         outputFile: java.io.File
     ) = CanvasFormatOps.strip(context, inputFile, outputFile)
 
+    suspend fun optimizeWallpaperVideo(
+        context: android.content.Context,
+        inputFile: java.io.File,
+        outputFile: java.io.File,
+        minShortSidePx: Int = 720,
+        targetFps: Int = 30
+    ) = CanvasFormatOps.optimizeWallpaper(context, inputFile, outputFile, minShortSidePx, targetFps)
+
     suspend fun processVideoForCanvas(
         context: android.content.Context,
         inputFile: java.io.File,

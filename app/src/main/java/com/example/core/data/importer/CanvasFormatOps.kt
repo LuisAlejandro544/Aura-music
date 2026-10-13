@@ -99,6 +99,77 @@ suspend fun strip(
     FFmpegCommandExecutor.executeCommand(context, args, 0L, null)
 }
 
+/**
+ * Optimización dedicada al fondo de pantalla de galería (video corto de fondo).
+ * - Formato de salida comprimido (MP4 + mpeg4, sin audio ni metadatos, faststart).
+ * - Baja la resolución solo si supera el mínimo aceptable (lado corto > 720px):
+ *   escala el lado corto a 720px preservando aspecto y paridad H.264 (-2).
+ * - Si el video ya está por debajo del mínimo (lado corto <= 720px), se deja
+ *   como está en resolución y solo se re-contiene/re-codifica al formato
+ *   comprimido para ahorrar almacenamiento sin perder nitidez.
+ * - Calidad q:v 3 (alta pero comprimida) + 30fps + GOP corto para seek fluido.
+ */
+suspend fun optimizeWallpaper(
+    context: Context,
+    inputFile: File,
+    outputFile: File,
+    minShortSidePx: Int = 720,
+    targetFps: Int = 30
+): ExecutionResult = withContext(Dispatchers.IO) {
+    FFmpegNativeEngine.init(context)
+    val ffmpegBin = FFmpegNativeEngine.getBinaryFile(context)
+    if (ffmpegBin == null) {
+        return@withContext ExecutionResult(false, -1, "FFmpeg no disponible", null)
+    }
+    if (outputFile.exists()) outputFile.delete()
+    val safeInput = FFmpegNativeEngine.sanitizeFilePath(inputFile)
+    val safeOutput = FFmpegNativeEngine.sanitizeFilePath(outputFile)
+
+    val dimensions = CanvasSyncProbe.probe(inputFile)
+    val shortSide = if (dimensions != null && dimensions.first > 0 && dimensions.second > 0) {
+        minOf(dimensions.first, dimensions.second)
+    } else {
+        // Sin dimensiones fiables: asumir que necesita escalado seguro a 720px.
+        minShortSidePx + 1
+    }
+    // Si ya está por debajo del mínimo aceptado, no se toca la resolución:
+    // solo se re-codifica al formato comprimido (-c:v mpeg4) sin filtro -vf.
+    val videoArgs: Array<String> = if (shortSide <= minShortSidePx) {
+        AuraDebugManager.logInfo(TAG, "Fondo video ${dimensions?.first}x${dimensions?.second}: bajo el mínimo (${minShortSidePx}px), solo se convierte al formato comprimido sin reescalar.")
+        arrayOf(
+            ffmpegBin.absolutePath,
+            "-y",
+            "-i", safeInput,
+            "-c:v", "mpeg4",
+            "-q:v", "3",
+            "-r", targetFps.toString(),
+            "-g", targetFps.toString(),
+            "-an",
+            "-map_metadata", "-1",
+            "-movflags", "+faststart",
+            safeOutput
+        )
+    } else {
+        AuraDebugManager.logInfo(TAG, "Fondo video ${dimensions?.first}x${dimensions?.second}: supera el mínimo, se reduce el lado corto a ${minShortSidePx}px para ahorrar almacenamiento.")
+        val scaleFilter = "scale='if(gt(iw,ih),-2,${minShortSidePx})':'if(gt(iw,ih),${minShortSidePx},-2)'"
+        arrayOf(
+            ffmpegBin.absolutePath,
+            "-y",
+            "-i", safeInput,
+            "-vf", scaleFilter,
+            "-c:v", "mpeg4",
+            "-q:v", "3",
+            "-r", targetFps.toString(),
+            "-g", targetFps.toString(),
+            "-an",
+            "-map_metadata", "-1",
+            "-movflags", "+faststart",
+            safeOutput
+        )
+    }
+    FFmpegCommandExecutor.executeCommand(context, videoArgs, 0L, null)
+}
+
 suspend fun process(
     context: Context,
     inputFile: File,

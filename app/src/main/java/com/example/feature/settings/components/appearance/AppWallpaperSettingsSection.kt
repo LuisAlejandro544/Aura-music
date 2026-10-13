@@ -52,7 +52,9 @@ fun LazyListScope.appWallpaperSettingsSection(
     onClearWallpaper: () -> Unit,
     onSelectWallpaperScope: (WallpaperScreenScope) -> Unit,
     onChangeDimAlpha: (Float) -> Unit,
-    onChangeBlurDp: (Int) -> Unit
+    onChangeBlurDp: (Int) -> Unit,
+    isProcessing: Boolean = false,
+    processingLabel: String = ""
 ) {
     item {
         Spacer(modifier = Modifier.height(14.dp))
@@ -64,7 +66,9 @@ fun LazyListScope.appWallpaperSettingsSection(
             onClearWallpaper = onClearWallpaper,
             onSelectWallpaperScope = onSelectWallpaperScope,
             onChangeDimAlpha = onChangeDimAlpha,
-            onChangeBlurDp = onChangeBlurDp
+            onChangeBlurDp = onChangeBlurDp,
+            isProcessing = isProcessing,
+            processingLabel = processingLabel
         )
     }
 }
@@ -78,7 +82,9 @@ fun AppWallpaperCustomizationCard(
     onClearWallpaper: () -> Unit,
     onSelectWallpaperScope: (WallpaperScreenScope) -> Unit,
     onChangeDimAlpha: (Float) -> Unit,
-    onChangeBlurDp: (Int) -> Unit
+    onChangeBlurDp: (Int) -> Unit,
+    isProcessing: Boolean = false,
+    processingLabel: String = ""
 ) {
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -159,6 +165,42 @@ fun AppWallpaperCustomizationCard(
 
             Spacer(modifier = Modifier.height(14.dp))
 
+            // Indicador de carga mientras se convierte a WebP (máxima compresión)
+            // u optimiza el video (formato comprimido + bajada a 720px mínimo).
+            if (isProcessing) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+                        .padding(horizontal = 12.dp, vertical = 10.dp)
+                        .testTag("wallpaper_processing_indicator"),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(22.dp),
+                        strokeWidth = 2.5.dp
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = processingLabel.ifBlank { "Procesando fondo…" },
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            ),
+                            maxLines = 2,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        LinearProgressIndicator(
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
             // Botones para elegir Imagen o Video de la Galería
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -166,10 +208,13 @@ fun AppWallpaperCustomizationCard(
             ) {
                 FilledTonalButton(
                     onClick = {
-                        imagePickerLauncher.launch(
-                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                        )
+                        if (!isProcessing) {
+                            imagePickerLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
+                        }
                     },
+                    enabled = !isProcessing,
                     shape = RoundedCornerShape(12.dp),
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 10.dp),
                     modifier = Modifier
@@ -193,10 +238,13 @@ fun AppWallpaperCustomizationCard(
 
                 FilledTonalButton(
                     onClick = {
-                        videoPickerLauncher.launch(
-                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)
-                        )
+                        if (!isProcessing) {
+                            videoPickerLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)
+                            )
+                        }
                     },
+                    enabled = !isProcessing,
                     shape = RoundedCornerShape(12.dp),
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 10.dp),
                     modifier = Modifier
