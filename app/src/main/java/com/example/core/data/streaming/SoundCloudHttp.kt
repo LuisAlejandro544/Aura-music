@@ -39,12 +39,19 @@ internal object SoundCloudHttp {
         "2t9loNQH90kzJcsFCODdigxfp325aq4z"
     )
 
+    @Volatile
+    private var lastFailMs: Long = 0L
+
     fun invalidate() { clientIdCache = null }
 
     fun clientId(forceRefresh: Boolean = false): String? {
         val now = System.currentTimeMillis()
         if (!forceRefresh && !clientIdCache.isNullOrBlank() && (now - lastFetchMs) < 3_600_000L) {
             return clientIdCache
+        }
+        // Caché negativa: si falló hace menos de 5 min, no golpear la red otra vez.
+        if (!forceRefresh && (now - lastFailMs) < 300_000L) {
+            return clientIdCache ?: fallbackIds.firstOrNull()
         }
 
         try {
@@ -80,6 +87,7 @@ internal object SoundCloudHttp {
                 return candidate
             }
         }
+        lastFailMs = now
         return clientIdCache ?: fallbackIds.firstOrNull()
     }
 

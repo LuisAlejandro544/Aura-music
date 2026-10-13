@@ -24,6 +24,9 @@ object InnerTubeClient {
     private val httpClient = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
+        .callTimeout(25, TimeUnit.SECONDS)
+        .connectionPool(com.example.core.data.importer.SharedHttpClients.pool)
+        .dispatcher(com.example.core.data.importer.SharedHttpClients.dispatcher)
         .followRedirects(true)
         .build()
 

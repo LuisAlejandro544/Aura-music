@@ -169,14 +169,9 @@ object StreamingHttpDataSourceConfig {
                 if (!result.keys.any { it.equals("Referer", ignoreCase = true) }) {
                     result["Referer"] = "https://www.youtube.com/"
                 }
-                if (!result.keys.any { it.equals("Cookie", ignoreCase = true) }) {
-                    try {
-                        val cookies = CookieManager.getInstance().getCookie("https://m.youtube.com")
-                        if (!cookies.isNullOrBlank()) {
-                            result["Cookie"] = cookies
-                        }
-                    } catch (_: Throwable) {}
-                }
+                // No propagar Cookie de m.youtube.com a googlevideo.com (cross-host):
+                // la sesión web no es válida allí y provoca 403 además de filtrar sesión.
+                result.keys.filter { it.equals("Cookie", ignoreCase = true) }.forEach { result.remove(it) }
             } else {
                 // Para clientes nativos (IOS, ANDROID_VR, ANDROID_MUSIC, ANDROID, VISIONOS),
                 // eliminar Origin/Referer/Cookie de navegador web que provocan rechazo 403 inmediato en googlevideo.com

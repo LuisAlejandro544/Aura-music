@@ -51,6 +51,8 @@ object ChunkedStreamDownloader {
     val defaultHttpClient: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
+        .connectionPool(com.example.core.data.importer.SharedHttpClients.pool)
+        .dispatcher(com.example.core.data.importer.SharedHttpClients.dispatcher)
         .followRedirects(true)
         .followSslRedirects(true)
         .addInterceptor(ssrfGuardInterceptor)

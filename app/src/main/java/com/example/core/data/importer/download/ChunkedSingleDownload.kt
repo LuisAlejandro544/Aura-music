@@ -64,7 +64,8 @@ internal object ChunkedSingleDownload {
                 }
             }
 
-            var response = httpClient.newCall(reqBuilder.build()).execute()
+            var response = executeWithBackoff(httpClient, reqBuilder.build())
+                ?: return false
 
             // Si devuelve 403, reintentar con fallbacks de autenticación de cliente y bypass de IP-binding
             if (response.code == 403) {
@@ -205,5 +206,29 @@ internal object ChunkedSingleDownload {
             AuraDebugManager.logWarning("Downloader", "Fallo en descarga: ${e.message}")
             false
         }
+    }
+
+    /**
+     * Ejecuta una petición con reintentos y backoff (500ms, 1s) solo ante fallos
+     * transitorios de E/S. Un 403 NO se reintenta aquí: lo gestiona la rotación
+     * de URLs/cabeceras del llamante.
+     */
+    private fun executeWithBackoff(
+        httpClient: OkHttpClient,
+        request: okhttp3.Request
+    ): okhttp3.Response? {
+        var lastError: Exception? = null
+        for (attempt in 0..2) {
+            try {
+                return httpClient.newCall(request).execute()
+            } catch (e: java.io.IOException) {
+                lastError = e
+                if (attempt < 2) {
+                    try { Thread.sleep(500L shl attempt) } catch (_: InterruptedException) { return null }
+                }
+            }
+        }
+        AuraDebugManager.logWarning("Downloader", "GET agotado tras 3 intentos: ${lastError?.message}")
+        return null
     }
 }

@@ -23,6 +23,9 @@ object InvidiousStreamResolver {
     private val httpClient = OkHttpClient.Builder()
         .connectTimeout(4, TimeUnit.SECONDS)
         .readTimeout(8, TimeUnit.SECONDS)
+        .callTimeout(15, TimeUnit.SECONDS)
+        .connectionPool(com.example.core.data.importer.SharedHttpClients.pool)
+        .dispatcher(com.example.core.data.importer.SharedHttpClients.dispatcher)
         .followRedirects(true)
         .build()
 
