@@ -348,7 +348,11 @@ app/
     │       │       ├── IncomingMediaCoordinator.kt     # Recepción de Intents externos (audios, videos, URLs y Playlists)
     │       │       ├── HeadphoneSettingsCoordinator.kt # Ajustes de auriculares, Crossfeed, Bit-Perfect y AAudio
     │       │       ├── MixtapeCoordinator.kt           # Coordinador de Mixtapes, Auto-Remix de 2 pistas y capítulos en vivo
-    │       │       ├── StreamingModeCoordinator.kt     # Orquestador del Modo Streaming (YT Music, YouTube, SoundCloud y Caché)
+    │       │       ├── StreamingModeCoordinator.kt     # Fachada del Modo Streaming (156 líneas, API intacta)
+    │       │       ├── StreamingSearchOps.kt           # Búsqueda y tendencias con cancelación de carrera
+    │       │       ├── StreamingPlaybackResolver.kt    # Resolución, transición, recuperación 403 y radio similar
+    │       │       ├── StreamingDownloadOps.kt         # Descarga permanente y ajustes de caché
+    │       │       ├── StreamingTrackBuilders.kt       # Tracks sintéticos y colas desde resultados
     │       │       └── PlaylistImportCoordinator.kt    # Orquestador del Importador de Playlists de Spotify y YouTube Music
     │       │
     │       ├── widget/                         # Sistema de 2 Widgets Interactivos para Pantalla de Inicio
