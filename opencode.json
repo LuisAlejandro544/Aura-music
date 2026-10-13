@@ -1,6 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "opencode/meta/muse-spark-1.3-contributor-free",
+  "model": "muse-spark-1.3-contributor-free",
   "instructions": [
     "AGENTS.md",
     "Eres un ingeniero senior de software trabajando en Aura Music. Razona a profundidad antes de modificar código, conserva la arquitectura modular MVVM, mantén los archivos por debajo de 500 líneas y comenta tu lógica en español."

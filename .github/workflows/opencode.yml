@@ -81,7 +81,7 @@ jobs:
         uses: anomalyco/opencode/github@latest
         with:
           use_github_token: true
-          model: "opencode/meta/muse-spark-1.3-contributor-free"
+          model: "muse-spark-1.3-contributor-free"
           prompt: ${{ steps.prompt_resolver.outputs.resolved_prompt }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
