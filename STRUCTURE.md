@@ -260,7 +260,12 @@ app/
     │       │           │   ├── WidgetDynamicColorSection.kt  # Color de imagen e intensidad
     │       │           │   └── WidgetProgressSection.kt       # Barra de progreso y sincronización
     │       │           ├── about/                         # Detrás del Proyecto (Creador & Contribuidores)
-    │       │           │   └── BehindTheProjectSection.kt # Perfiles de GitHub con caché permanente de avatares en WebP
+    │       │           │   ├── BehindTheProjectSection.kt      # Fachada del apartado (111 líneas)
+    │       │           │   ├── ProjectMemberProfiles.kt         # Datos de creador y contribuidores
+    │       │           │   ├── GithubAvatarStore.kt             # Caché permanente de avatares en WebP
+    │       │           │   ├── ProjectHeaderCards.kt            # Cabeceras e identidad del proyecto
+    │       │           │   ├── DeveloperProfileCard.kt          # Tarjeta de perfil con avatar y acciones
+    │       │           │   └── ProjectLicenseCard.kt            # Licencia y acciones externas
     │       │           ├── appearance/                    # Ajustes de Apariencia, Streaming, Modo Juego, Fondo y Motores
     │       │           │   ├── AppearanceMainMenu.kt              # Menú principal de categorías de Ajustes
     │       │           │   ├── AppearanceBehaviorSection.kt       # Comportamiento y descubrimiento de ajustes
