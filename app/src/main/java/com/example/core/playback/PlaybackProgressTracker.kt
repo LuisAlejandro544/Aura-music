@@ -107,12 +107,14 @@ internal class PlaybackProgressTracker(
                         val curTrackId = curTrack?.id ?: -1L
                         val crossfadeMs = (effectiveCrossfadeSecs * 1000L).coerceIn(0L, 12000L)
 
-                        // Si es una pista en modo Streaming y le quedan menos de 35 segundos (o superó el 65%),
-                        // notificamos una sola vez al coordinador para que consulte a la API una canción similar
-                        // y la resuelva con yt-dlp antes de terminar la canción actual.
+                        // Si es una pista en modo Streaming y supera el 50% (o le quedan 20s),
+                        // se avisa una sola vez al coordinador para calentar el vecino de la cola
+                        // (capas A+B+C Head-Start) + consultar la canción similar de radio.
+                        // El calentador post-play ya corrió al arrancar; esto es red de seguridad
+                        // si la cola cambió a mitad de pista.
                         if (curTrack != null && curTrack.isStreamingTrack &&
                             streamingPrefetchTriggeredForId != curTrackId &&
-                            dur > 5000L && (remainingMs in 1..35000L || pos > (dur * 65L / 100L))
+                            dur > 5000L && (remainingMs in 1..20000L || pos > (dur * 50L / 100L))
                         ) {
                             streamingPrefetchTriggeredForId = curTrackId
                             getNearEndPrefetch()?.invoke(curTrack)

@@ -88,6 +88,15 @@ class StreamingCacheManager(private val context: Context) {
     fun getCachedArtworkFile(videoId: String): File? =
         lookup.getCachedArtworkFile(videoId)
 
+    fun getCachedHeadStartFile(videoId: String): File? =
+        lookup.getCachedHeadStartFile(videoId)
+
+    fun prefetchHeadStartAsync(
+        videoId: String,
+        streamUrl: String,
+        onHeadReady: ((File) -> Unit)? = null
+    ) = prefetcher.prefetchHeadStartAsync(videoId, streamUrl, onHeadReady = onHeadReady)
+
     fun prefetchAudioAheadAsync(
         videoId: String,
         streamUrl: String,

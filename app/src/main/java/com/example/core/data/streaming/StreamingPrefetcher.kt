@@ -78,6 +78,63 @@ internal class StreamingPrefetcher(
         s.jobs[jobKey] = job
     }
 
+    /**
+     * Head-Start (capa B): descarga solo los primeros ~2 MB del siguiente audio
+     * (~20-30s en Opus 48k, ~15s en M4A 128k) a `stream_head_<id>.<ext>`.
+     * Es rápido, cancelable y no colisiona con el prefetch completo (`audio_`).
+     * En Ahorro de Datos no se llama (lo filtra el coordinador).
+     */
+    fun prefetchHeadStartAsync(
+        videoId: String,
+        streamUrl: String,
+        maxHeadBytes: Long = HEAD_START_MAX_BYTES,
+        onHeadReady: ((File) -> Unit)? = null
+    ) {
+        val safeId = s.sanitizeId(videoId)
+        if (safeId.isBlank() || streamUrl.isBlank()) return
+        if (lookup.getCachedAudioFile(safeId) != null) return
+        if (lookup.getCachedHeadStartFile(safeId) != null) {
+            lookup.getCachedHeadStartFile(safeId)?.let { onHeadReady?.invoke(it) }
+            return
+        }
+        val jobKey = "head_$safeId"
+        if (s.jobs[jobKey]?.isActive == true) return
+        val job = s.scope.launch {
+            try {
+                requestEvict()
+                val ext = inferAudioExtension(streamUrl)
+                val targetFile = File(s.audioDir, "stream_head_$safeId.$ext")
+                val tempFile = File(s.audioDir, "stream_head_${safeId}.part")
+                val success = downloadWindow(
+                    safeId = safeId,
+                    streamUrl = streamUrl,
+                    outputFile = tempFile,
+                    maxPreloadBytes = maxHeadBytes
+                )
+                if (success && tempFile.exists() && tempFile.length() > StreamingCacheState.MIN_VALID_AUDIO_BYTES) {
+                    s.mutex.withLock {
+                        if (targetFile.exists()) targetFile.delete()
+                        tempFile.renameTo(targetFile)
+                        s.touchFile(targetFile)
+                    }
+                    requestEvict()
+                    onHeadReady?.invoke(targetFile)
+                } else {
+                    try { tempFile.delete() } catch (_: Exception) {}
+                }
+            } catch (e: Exception) {
+                AuraDebugManager.logWarning(
+                    tag = "StreamingCache",
+                    message = "Aviso en head-start ($safeId): ${e.localizedMessage ?: "Error en descarga inicial"}",
+                    throwable = e
+                )
+            } finally {
+                s.jobs.remove(jobKey)
+            }
+        }
+        s.jobs[jobKey] = job
+    }
+
     fun prefetchVideoCanvasAsync(
         videoId: String,
         videoStreamUrl: String,
@@ -244,5 +301,10 @@ internal class StreamingPrefetcher(
         } catch (_: Exception) {
             false
         }
+    }
+
+    companion object {
+        /** 2 MB ≈ 20-30s en Opus 48k / ~15s en M4A 128k: cubre la resolución en 2do plano. */
+        const val HEAD_START_MAX_BYTES = 2L * 1024L * 1024L
     }
 }

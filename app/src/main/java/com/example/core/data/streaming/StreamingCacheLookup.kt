@@ -53,4 +53,35 @@ internal class StreamingCacheLookup(private val s: StreamingCacheState) {
         }
         return null
     }
+
+    /**
+     * Head-Start (capa B): primeros ~2 MB del siguiente audio, descargados por el
+     * calentador mientras suena la pista actual. Sirve como arranque instantáneo
+     * de último recurso si la URL fresca falla (mejor 20-30s locales que silencio).
+     * TTL corto de 45 min, igual que las URLs firmadas de googlevideo.com.
+     */
+    fun getCachedHeadStartFile(videoId: String): File? {
+        val safeId = s.sanitizeId(videoId)
+        if (safeId.isBlank()) return null
+        val candidates = listOf(
+            File(s.audioDir, "stream_head_$safeId.opus"),
+            File(s.audioDir, "stream_head_$safeId.m4a")
+        )
+        for (file in candidates) {
+            if (file.exists() && file.length() > StreamingCacheState.MIN_VALID_AUDIO_BYTES) {
+                val ageMs = System.currentTimeMillis() - file.lastModified()
+                if (ageMs <= HEAD_START_TTL_MS) {
+                    s.touchFile(file)
+                    return file
+                } else {
+                    try { file.delete() } catch (_: Exception) {}
+                }
+            }
+        }
+        return null
+    }
+
+    companion object {
+        const val HEAD_START_TTL_MS = 45L * 60L * 1000L
+    }
 }

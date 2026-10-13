@@ -66,7 +66,10 @@ internal fun StreamingModeCoordinator.playStreamingItemInternal(
                     audioPlayer.playTrackList(queueTracks, startIdx)
                     loadLyricsIfAllowed(instantTrack)
                 }
-                if (!dataSaver) prefetchNextSimilarTrackForRadioInternal(instantTrack)
+                if (!dataSaver) {
+                    prefetchNextSimilarTrackForRadioInternal(instantTrack)
+                    warmNextQueueTrackInternal(instantTrack)
+                }
                 return@launch
             }
 
@@ -136,7 +139,9 @@ internal fun StreamingModeCoordinator.playStreamingItemInternal(
             }
 
             // 5. Preparar por adelantado una canción similar recomendada (pausado en ahorro)
+            // + calentar el vecino de la cola (capas A+B) para Siguiente sin silencio.
             prefetchNextSimilarTrackForRadioInternal(playingTrack)
+            warmNextQueueTrackInternal(playingTrack)
         } finally {
             _isResolvingStream.value = false
             _resolvingVideoId.value = null
@@ -176,7 +181,40 @@ internal fun StreamingModeCoordinator.handleStreamingTrackTransitionRequestInter
             audioPlayer.playTrack(readyTrack, isAutoCrossfadeOverlap = isAutoCrossfade)
             if (!dataSaverT) onLoadLyricsForTrack(readyTrack)
         }
-        if (!dataSaverT) prefetchNextSimilarTrackForRadioInternal(readyTrack)
+        if (!dataSaverT) {
+            prefetchNextSimilarTrackForRadioInternal(readyTrack)
+            warmNextQueueTrackInternal(readyTrack)
+        }
+        return true
+    }
+
+    // Capa A Head-Start: si el calentador ya resolvió URL fresca, arrancar sin yt-dlp (~200-400ms).
+    val warmed = try { getWarmedStream(videoId) } catch (_: Throwable) { null }
+    if (warmed != null && warmed.audioUrl.isNotBlank()) {
+        val warmedTrack = targetTrack.copy(
+            uriString = warmed.audioUrl,
+            videoUri = warmed.videoUrl.takeIf { it.isNotBlank() }
+                ?: if (!dataSaverT && cacheManager.isStreamingVideoAllowedByNetwork()) targetTrack.videoUri else null
+        )
+        scope.launch(Dispatchers.Main) {
+            audioPlayer.appendOrUpdateStreamingTrack(warmedTrack)
+            audioPlayer.playTrack(warmedTrack, isAutoCrossfadeOverlap = isAutoCrossfade)
+            if (!dataSaverT) onLoadLyricsForTrack(warmedTrack)
+        }
+        if (!dataSaverT) {
+            scope.launch(Dispatchers.IO) {
+                try {
+                    cacheManager.prefetchAudioAheadAsync(videoId, warmed.audioUrl) { file ->
+                        audioPlayer.appendOrUpdateStreamingTrack(
+                            warmedTrack.copy(uriString = file.absolutePath),
+                            updateCurrentTrackIfSame = false
+                        )
+                    }
+                } catch (_: Throwable) {}
+            }
+            prefetchNextSimilarTrackForRadioInternal(warmedTrack)
+            warmNextQueueTrackInternal(warmedTrack)
+        }
         return true
     }
 
@@ -225,6 +263,19 @@ internal fun StreamingModeCoordinator.handleStreamingTrackTransitionRequestInter
                     }
                 }
                 prefetchNextSimilarTrackForRadioInternal(resolvedTrack)
+                warmNextQueueTrackInternal(resolvedTrack)
+            } else {
+                // Último recurso capa B: si hay head-start local, sonar 20-30s en vez de silencio.
+                try {
+                    val headFallback = cacheManager.getCachedHeadStartFile(videoId)
+                    if (headFallback != null) {
+                        val headTrack = targetTrack.copy(uriString = headFallback.absolutePath)
+                        withContext(Dispatchers.Main) {
+                            audioPlayer.appendOrUpdateStreamingTrack(headTrack)
+                            audioPlayer.playTrack(headTrack, isAutoCrossfadeOverlap = isAutoCrossfade)
+                        }
+                    }
+                } catch (_: Throwable) {}
             }
         } finally {
             _isResolvingStream.value = false

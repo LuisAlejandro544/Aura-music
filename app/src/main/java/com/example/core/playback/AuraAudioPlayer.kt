@@ -53,6 +53,12 @@ class AuraAudioPlayer(
     internal var outgoingExoPlayer: ExoPlayer? = null
     internal var outgoingNativeAudioProcessor: NativeAudioProcessor? = null
 
+    // Capa C Head-Start: siguiente streaming prebuferizado como MediaItem 1 del Deck
+    // principal (seek 0ms). TTL 45 min igual que URLs firmadas googlevideo.com.
+    internal var streamingPrebufferTrackId: Long? = null
+    internal var streamingPrebufferUri: String? = null
+    internal var streamingPrebufferAtMs: Long = 0L
+
     internal val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
 
@@ -274,6 +280,17 @@ class AuraAudioPlayer(
     fun playPrevious() = playPreviousInternal()
 
     fun appendOrUpdateStreamingTrack(track: Track, updateCurrentTrackIfSame: Boolean = true) = appendOrUpdateStreamingTrackInternal(track, updateCurrentTrackIfSame)
+
+    /**
+     * Capa C: prebuferiza [track] como siguiente MediaItem del Deck principal para
+     * arranque en 0ms con `seekToNext()`. Llamado por el calentador tras capas A+B.
+     * No-op con Ahorro/Aleatorio/página sin resolver (lo filtran el calentador y
+     * el propio prebuffer). 100% compatible: no altera la pista en curso.
+     */
+    fun prebufferStreamingNext(track: Track) = prebufferStreamingNextInternal(track)
+
+    /** Purga el siguiente prebuferizado si la cola cambió o se hizo seek manual. */
+    fun clearStreamingPrebuffer() = clearStreamingPrebufferInternal()
 
     fun toggleShuffle() = toggleShuffleInternal()
 
