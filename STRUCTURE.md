@@ -341,7 +341,10 @@ app/
     │       │       │   ├── ReverbTabContent.kt             # Pestaña de Reverb C++20 y espacios acústicos
     │       │       │   ├── PlaybackParametersTabContent.kt # Pestaña de Velocidad/Tono (0.5x-2.0x), Voces HD y Normalizador LUFS
     │       │       │   ├── BalanceAndHeadphonesTabContent.kt # Pestaña de Balance Estéreo L/R y Crossfeed Chu Moy
-    │       │       │   ├── TransitionsTabContent.kt        # Pestaña de Crossfade Dual-Deck, Smart AutoMix DJ y Bucle A-B
+    │       │       │   ├── TransitionsTabContent.kt        # Fachada de transiciones (94 líneas)
+    │       │       │   ├── TransitionABLoopCard.kt         # Repetidor de segmento A-B
+    │       │       │   ├── TransitionAutomixCard.kt        # AutoMix DJ, crossfade y gapless
+    │       │       │   └── TransitionNormalizationCard.kt  # Normalización EBU R128
     │       │       │   └── SleepTimerTabContent.kt         # Pestaña del Temporizador de Apagado con Fade-Out de 10s
     │       │       ├── banners/                # Banners Superiores No Intrusivos
     │       │       │   ├── PackageUpdateBanner.kt     # Banner de verificación y actualización OTA de yt-dlp
