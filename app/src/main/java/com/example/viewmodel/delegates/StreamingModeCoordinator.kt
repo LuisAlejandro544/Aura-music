@@ -77,9 +77,33 @@ class StreamingModeCoordinator(
     internal var searchJob: Job? = null
     internal var playResolutionJob: Job? = null
     internal var similarPrefetchJob: Job? = null
+    internal var nextTrackWarmerJob: Job? = null
 
     internal val playedVideoIdsHistory = LinkedHashSet<String>()
     internal val itemRegistry = ConcurrentHashMap<String, StreamingSearchItem>()
+
+    /**
+     * Registro de URLs ya resueltas por el calentador (capa A Head-Start).
+     * Guarda audioUrl/videoUrl frescos con timestamp para reutilizarlos al pulsar
+     * Siguiente sin volver a invocar a yt-dlp (ahorra 2-5s de silencio).
+     * TTL 45 min porque las URLs firmadas de googlevideo.com expiran.
+     */
+    internal data class WarmedStreamEntry(
+        val audioUrl: String,
+        val videoUrl: String,
+        val resolvedAtMs: Long = System.currentTimeMillis()
+    )
+    internal val warmedStreamRegistry = ConcurrentHashMap<String, WarmedStreamEntry>()
+
+    internal fun getWarmedStream(videoId: String): WarmedStreamEntry? {
+        val entry = warmedStreamRegistry[videoId] ?: return null
+        val ageMs = System.currentTimeMillis() - entry.resolvedAtMs
+        if (ageMs > 45L * 60L * 1000L) {
+            warmedStreamRegistry.remove(videoId)
+            return null
+        }
+        return entry
+    }
 
     init {
         // Vincular hooks en AuraAudioPlayer para consultar la API + yt-dlp antes de ir a la canción
@@ -88,6 +112,7 @@ class StreamingModeCoordinator(
             handleStreamingTrackTransitionRequestInternal(track, isAutoCrossfade)
         }
         audioPlayer.onStreamingNearEndPrefetchCallback = { currentTrack ->
+            warmNextQueueTrackInternal(currentTrack)
             prefetchNextSimilarTrackForRadioInternal(currentTrack)
         }
         audioPlayer.onStreamingHttpErrorRecoveryCallback = { failedTrack, resumePositionMs ->
