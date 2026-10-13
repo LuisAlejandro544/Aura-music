@@ -124,7 +124,12 @@ object OnlineVideoAudioImporter {
         val finalArtist = customArtist?.trim()?.ifBlank { resolvedInfo.suggestedArtist } ?: resolvedInfo.suggestedArtist
 
         try {
-            val audioFile = File(storageManager.songsDir, "track_online_${timestamp}.m4a")
+            // Formato local según calidad elegida en Ajustes (M4A actual u Opus); vale para yt-dlp.
+            val localAudioExt = com.example.core.data.streaming.StreamingCacheManager
+                .cacheAudioExtension(
+                    com.example.core.data.streaming.StreamingCacheManager.readAudioQuality(context)
+                )
+            val audioFile = File(storageManager.songsDir, "track_online_${timestamp}.$localAudioExt")
             val tempVideoFile = File(storageManager.videosDir, "media_video_${timestamp}.mp4")
             var audioReady = false
             var durationMs = resolvedInfo.durationSeconds * 1000L
@@ -166,7 +171,7 @@ object OnlineVideoAudioImporter {
                         inputFile = sourceVidFile,
                         outputFile = audioFile,
                         audioBitrate = "256k",
-                        targetFormat = "m4a",
+                        targetFormat = localAudioExt,
                         totalDurationMs = durationMs
                     )
                     if (ffmpegResult.success && audioFile.exists() && audioFile.length() > 0L) {

@@ -375,3 +375,7 @@ Este documento traza las fases de evolución técnica y funcional para convertir
 
 
 
+- [x] **Calidad de Audio Elegible (2 modos Opus + M4A) para Local y Streaming con `yt-dlp`, y Letras Automáticas solo en Explorar (`StreamingAudioQuality`, `StreamingCacheManager`, `InnerTubeClient`, `InvidiousStreamResolver`, `YtDlpNativeEngine`, `YtDlpStreamDownloader`, `LyricsCoordinator` & `StreamingCacheAndVideoSettingsCard`)**:
+  - **Selector en Ajustes > Streaming & Caché Inteligente**: `Opus Ahorro (~48 kbps, itag 249)`, `M4A Estándar (~128 kbps, itag 140, formato actual por defecto)` y `Opus Alta (~160 kbps, itag 251)`. Vale para canciones locales, streaming de Explorar y descargas permanentes con `yt-dlp` (selector `-f` por calidad + nombre de archivo `.opus`/`.m4a` según corresponda).
+  - **Ranking por calidad en todos los resolutores**: `InnerTubeClient`, `InvidiousStreamResolver` y `YtDlpNativeEngine.resolveStream` priorizan Opus o M4A según lo elegido (en modo Ahorro se quedan con el Opus más liviano).
+  - **Interruptor "Letras en modo Explorar"**: desactiva la búsqueda/descarga automática de letras (LRCLIB) exclusivamente para canciones en streaming (Explorar); las canciones locales siempre conservan y buscan sus letras sin cambios.

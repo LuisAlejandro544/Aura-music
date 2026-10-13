@@ -174,6 +174,10 @@ Todo el panel de efectos se despliega al instante en una hoja modal desde el **M
   - **Caché para Música y Videos de Fondo (50 MB por defecto hasta 500 MB)**: Configurable por el usuario en **Ajustes > Aura Dinámica, Streaming & Modo Juego**. Permite volver a la canción anterior o repetirla en bucle de forma instantánea sin gastar datos. Los archivos en caché se eliminan automáticamente tras **30 minutos sin usarse**, o eliminando primero las canciones más antiguas (*LRU*) si se llena el límite de hasta 500 MB.
 - **Política de Red Exclusiva para Video Canvas en Streaming**:
   - Nueva opción en Ajustes para elegir cómo se comportan los videos de fondo en streaming: **Solo con Wi-Fi**, **Siempre (incluso con datos móviles)** o **Desactivado** (afecta únicamente al streaming sin alterar jamás tus videos locales).
+- **Calidad de Audio Elegible (Local y Streaming, incluye yt-dlp)**:
+  - En Ajustes puedes elegir entre **Opus Ahorro (~48 kbps)**, **M4A Estándar (~128 kbps)** (formato actual por defecto) y **Opus Alta (~160 kbps)**. Vale para canciones locales, streaming de Explorar y descargas con yt-dlp.
+- **Letras Automáticas solo en Explorar**:
+  - Nuevo interruptor para desactivar la búsqueda automática de letras exclusivamente en canciones en streaming (Explorar); las canciones locales no se ven afectadas.
 - **Radio Automática de Canciones Similares y Descarga Permanente en 1 Toque**:
   - Antes de que finalice la pista en reproducción (ya sea de YouTube Music, YouTube o SoundCloud), la API busca automáticamente una canción similar y la prepara para ofrecer reproducción continua infinita. Además, puedes pulsar el botón **Descargar** en cualquier resultado o dentro del reproductor para guardarla permanentemente en tu biblioteca offline (durante la reproducción en streaming, los efectos DSP C++20 permanecen en bypass directo, mientras las 28 bandas del visualizador reaccionan en tiempo real).
 - **Color Reactivo Cada 1 Segundo, Indicadores de Red y Enfriamiento Inteligente en Streaming**:

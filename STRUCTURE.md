@@ -150,7 +150,7 @@ app/
     │       │   │       ├── YouTubeSearchEngine.kt           # Búsqueda YouTube (WEB), Watch Next y recomendaciones
     │       │   │       ├── StreamingSearchUtils.kt          # Parseo JSON, intercalado tri-plataforma y POST HTTP
     │       │   │       ├── SoundCloudApiClient.kt           # Cliente modular de SoundCloud (hidratación client_id v2 y streams)
-    │       │   │       ├── StreamingCacheManager.kt         # Caché inteligente (50-500 MB, 30 min TTL, LRU) y Pre-descarga No Lineal
+    │       │   │       ├── StreamingCacheManager.kt         # Caché inteligente (50-500 MB, 30 min TTL, LRU), calidad Opus/M4A y letras de Explorar
     │       │   │       └── StreamingHttpDataSourceConfig.kt # Alineación de cabeceras User-Agent/Origin por perfil firmado c=
     │       │   │
     │       │   ├── model/                      # Modelos de Dominio y Estado
@@ -273,7 +273,7 @@ app/
     │       │           │   ├── AppearanceGameModeSection.kt       # Modo Juego / Ahorro en 2do plano
     │       │           │   ├── AppearancePaletteSection.kt        # Paleta dinámica y colores del tema
     │       │           │   ├── AppWallpaperSettingsSection.kt       # Controles de fondo de pantalla de galería (WebP/Video, Opacidad y Blur)
-    │       │           │   ├── StreamingCacheAndVideoSettingsCard.kt # Ajustes de caché inteligente (50-500 MB), política de red y Modo Juego
+    │       │           │   ├── StreamingCacheAndVideoSettingsCard.kt # Ajustes de caché (50-500 MB), política de red, calidad Opus/M4A y letras de Explorar
     │       │           │   ├── EnginesAndDiagnosticsSection.kt      # Estado de FFmpeg, QuickJS C99 puro, yt-dlp OTA y Aura Monitor
     │       │           │   └── PlayerDesignSettingsContent.kt       # Pantalla dedicada de selección de Diseño del Reproductor
     │       │           ├── headphones/                    # Ajustes de Auriculares, Acústica DSP, Bit-Perfect y Gestos

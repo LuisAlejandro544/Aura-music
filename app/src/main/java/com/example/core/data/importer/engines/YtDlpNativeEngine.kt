@@ -234,7 +234,13 @@ object YtDlpNativeEngine {
                 return true
             }
 
+            // Calidad elegida en Ajustes > Streaming & Caché (vale para streaming y local).
+            val preferredQuality =
+                com.example.core.data.streaming.StreamingCacheManager.readAudioQuality(context)
             val formats = rootJson.optJSONArray("formats")
+            var saverOpusUrl: String? = null
+            var saverOpusHeaders = mapOf<String, String>()
+            var minSaverAbr = Double.MAX_VALUE
             if (formats != null) {
                 var bestAudioScore = -1.0
                 var bestVideoScore = -999999
@@ -252,7 +258,20 @@ object YtDlpNativeEngine {
                     val abr = fmt.optDouble("abr", 0.0).takeIf { it > 0 } ?: fmt.optDouble("tbr", 0.0)
 
                     if (acodec != "none" && vcodec == "none") {
-                        val codecBonus = if (ext == "m4a" || acodec.contains("mp4a")) 500.0 else 0.0
+                        val isOpus = ext == "webm" || ext == "opus" || acodec.contains("opus")
+                        // Candidato de ahorro: Opus más liviano (itag 249 ~48 kbps).
+                        if (isOpus && abr > 0 && abr < minSaverAbr) {
+                            minSaverAbr = abr
+                            saverOpusUrl = fmtUrl
+                            saverOpusHeaders = extractHeaders(fmt)
+                        }
+                        val codecBonus = when (preferredQuality) {
+                            com.example.core.model.StreamingAudioQuality.OPUS_HIGH,
+                            com.example.core.model.StreamingAudioQuality.OPUS_SAVER ->
+                                if (isOpus) 1000.0 else 0.0
+                            com.example.core.model.StreamingAudioQuality.M4A_STANDARD ->
+                                if (ext == "m4a" || acodec.contains("mp4a")) 500.0 else 0.0
+                        }
                         val score = abr + codecBonus
                         if (score > bestAudioScore || directAudioUrl == null) {
                             bestAudioScore = score
@@ -274,6 +293,14 @@ object YtDlpNativeEngine {
                         }
                     }
                 }
+            }
+
+            // Modo Opus Ahorro: quedarse con el Opus más liviano aunque el m4a tenga más bitrate.
+            if (preferredQuality == com.example.core.model.StreamingAudioQuality.OPUS_SAVER &&
+                saverOpusUrl != null
+            ) {
+                directAudioUrl = saverOpusUrl
+                audioHeaders = saverOpusHeaders
             }
 
             if (directAudioUrl == null && directVideoUrl == null) {

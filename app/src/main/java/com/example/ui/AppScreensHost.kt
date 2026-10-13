@@ -295,7 +295,9 @@ fun AppScreensHost(
                                         streamingCacheConfig = viewModel.streamingCacheConfig.collectAsStateWithLifecycle().value,
                                         onSelectStreamingVideoPolicy = { viewModel.setStreamingVideoNetworkPolicy(it) },
                                         onChangeStreamingCacheMaxMb = { viewModel.setStreamingCacheMaxSizeMb(it) },
-                                        onClearStreamingCache = { viewModel.clearStreamingCache() }
+                                        onClearStreamingCache = { viewModel.clearStreamingCache() },
+                                        onSelectStreamingAudioQuality = { viewModel.setStreamingAudioQuality(it) },
+                                        onToggleExploreLyrics = { viewModel.setExploreLyricsEnabled(it) }
                                     )
                                 }
                             }

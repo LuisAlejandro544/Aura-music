@@ -75,7 +75,7 @@ fun LazyListScope.visualBehaviorMenuSection(
         SettingsNavigationCard(
             icon = Icons.Default.Videocam,
             title = "Streaming & Caché Inteligente",
-            subtitle = "${streamingCacheConfig.videoNetworkPolicy.title} • Caché máx: ${streamingCacheConfig.maxCacheSizeMb} MB (${streamingCacheConfig.usedMbFormatted} en uso)",
+            subtitle = "${streamingCacheConfig.videoNetworkPolicy.title} • ${streamingCacheConfig.audioQuality.title} • Caché máx: ${streamingCacheConfig.maxCacheSizeMb} MB (${streamingCacheConfig.usedMbFormatted} en uso)",
             iconTint = MaterialTheme.colorScheme.primary,
             badgeText = "${streamingCacheConfig.maxCacheSizeMb} MB",
             badgeColor = MaterialTheme.colorScheme.primary,

@@ -131,11 +131,13 @@ fun SettingsScreen(
     onDeleteTrackArtwork: (Track) -> Unit = {},
     onDeleteTrackVideo: (Track) -> Unit = {},
     onOpenOnboarding: () -> Unit = {},
-    // Configuración de Streaming (Video Canvas Wi-Fi/Datos + Caché 50MB-500MB 30 min)
+    // Configuración de Streaming (Video Canvas Wi-Fi/Datos + Caché 50MB-500MB 30 min + Calidad Opus/M4A + Letras Explorar)
     streamingCacheConfig: com.example.core.model.StreamingCacheConfig = com.example.core.model.StreamingCacheConfig(),
     onSelectStreamingVideoPolicy: (com.example.core.model.StreamingVideoNetworkPolicy) -> Unit = {},
     onChangeStreamingCacheMaxMb: (Int) -> Unit = {},
     onClearStreamingCache: () -> Unit = {},
+    onSelectStreamingAudioQuality: (com.example.core.model.StreamingAudioQuality) -> Unit = {},
+    onToggleExploreLyrics: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var activeSubScreen by remember { mutableStateOf(SettingsSubScreen.MAIN_MENU) }
@@ -292,7 +294,9 @@ fun SettingsScreen(
                             cacheConfig = streamingCacheConfig,
                             onSelectVideoPolicy = onSelectStreamingVideoPolicy,
                             onChangeMaxCacheMb = onChangeStreamingCacheMaxMb,
-                            onClearStreamingCache = onClearStreamingCache
+                            onClearStreamingCache = onClearStreamingCache,
+                            onSelectAudioQuality = onSelectStreamingAudioQuality,
+                            onToggleExploreLyrics = onToggleExploreLyrics
                         )
                     }
                 }

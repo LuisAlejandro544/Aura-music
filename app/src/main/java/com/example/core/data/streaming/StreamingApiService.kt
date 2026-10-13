@@ -6,6 +6,7 @@ import com.example.core.data.importer.OnlineVideoAudioImporter
 import com.example.core.data.importer.WebStreamExtractor
 import com.example.core.data.importer.YtDlpNativeEngine
 import com.example.debug.AuraDebugManager
+import com.example.core.model.StreamingAudioQuality
 import com.example.core.model.StreamingSearchFilter
 import com.example.core.model.StreamingSearchItem
 import com.example.core.model.StreamingSourcePlatform
@@ -158,6 +159,8 @@ object StreamingApiService {
         forceBypassYtDlp: Boolean = false
     ): Result<OnlineVideoAudioImporter.ResolvedMediaInfo> = withContext(Dispatchers.IO) {
         val watchUrl = item.canonicalWatchUrl
+        // Calidad elegida en Ajustes (2 modos Opus + M4A); por defecto M4A actual.
+        val preferredQuality: StreamingAudioQuality = StreamingCacheManager.readAudioQuality(context)
 
         fun enrichAndRegister(info: OnlineVideoAudioImporter.ResolvedMediaInfo): Result<OnlineVideoAudioImporter.ResolvedMediaInfo> {
             val enriched = info.copy(
@@ -201,7 +204,8 @@ object StreamingApiService {
             // Respaldo automático si el video de YouTube tiene bloqueo en yt-dlp o recibió HTTP 403
             val innerTubeFallback = InnerTubeClient.resolve(
                 videoId = item.videoId,
-                originalUrl = watchUrl
+                originalUrl = watchUrl,
+                preferredQuality = preferredQuality
             )
             if (innerTubeFallback != null && (!innerTubeFallback.audioUrl.isNullOrBlank() || innerTubeFallback.videoUrl.isNotBlank())) {
                 return@withContext enrichAndRegister(innerTubeFallback)
@@ -209,7 +213,8 @@ object StreamingApiService {
 
             val invidiousFallback = com.example.core.data.importer.InvidiousStreamResolver.resolve(
                 videoId = item.videoId,
-                originalUrl = watchUrl
+                originalUrl = watchUrl,
+                preferredQuality = preferredQuality
             )
             if (invidiousFallback != null && (!invidiousFallback.audioUrl.isNullOrBlank() || invidiousFallback.videoUrl.isNotBlank())) {
                 return@withContext enrichAndRegister(invidiousFallback)
@@ -231,7 +236,8 @@ object StreamingApiService {
             // === PLATAFORMA YT MUSIC: Resolución directa sin usar yt-dlp ===
             val innerTubeInfo = InnerTubeClient.resolve(
                 videoId = item.videoId,
-                originalUrl = watchUrl
+                originalUrl = watchUrl,
+                preferredQuality = preferredQuality
             )
             if (innerTubeInfo != null && (!innerTubeInfo.audioUrl.isNullOrBlank() || innerTubeInfo.videoUrl.isNotBlank())) {
                 return@withContext enrichAndRegister(innerTubeInfo)
@@ -239,7 +245,8 @@ object StreamingApiService {
 
             val invidiousInfo = com.example.core.data.importer.InvidiousStreamResolver.resolve(
                 videoId = item.videoId,
-                originalUrl = watchUrl
+                originalUrl = watchUrl,
+                preferredQuality = preferredQuality
             )
             if (invidiousInfo != null && (!invidiousInfo.audioUrl.isNullOrBlank() || invidiousInfo.videoUrl.isNotBlank())) {
                 return@withContext enrichAndRegister(invidiousInfo)

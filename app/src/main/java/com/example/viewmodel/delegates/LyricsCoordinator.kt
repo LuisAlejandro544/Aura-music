@@ -28,7 +28,13 @@ class LyricsCoordinator(
     private val context: Context,
     private val storageManager: AppStorageManager,
     private val scope: CoroutineScope,
-    private val getCurrentTrack: () -> Track?
+    private val getCurrentTrack: () -> Track?,
+    /**
+     * Interruptor de letras automáticas exclusivo del modo Explorar (streaming).
+     * Se lee de Ajustes > Streaming & Caché. Las canciones locales siempre tienen permitido
+     * buscar letras; solo las pistas de streaming (`isStreamingTrack`) respetan este valor.
+     */
+    private val isExploreLyricsEnabled: () -> Boolean = { true }
 ) {
 
     // Estado reactivo de Letras Sincronizadas (.LRC)
@@ -68,8 +74,11 @@ class LyricsCoordinator(
                     _lyricsState.value = autoDetected
                 } else {
                     _lyricsState.value = LyricsState(trackId = track.id)
-                    // 2. Intento de descarga en línea desde LRCLIB para canciones sin letras
-                    fetchOnlineLyrics(track)
+                    // 2. Intento de descarga en línea desde LRCLIB para canciones sin letras.
+                    //    En modo Explorar (streaming) solo si el usuario lo tiene activado en Ajustes.
+                    if (!track.isStreamingTrack || isExploreLyricsEnabled()) {
+                        fetchOnlineLyrics(track)
+                    }
                 }
             }
         }
@@ -92,6 +101,8 @@ class LyricsCoordinator(
 
     fun fetchOnlineLyrics(track: Track? = null) {
         val target = track ?: getCurrentTrack() ?: return
+        // Las letras automáticas desactivadas en Explorar solo afectan al streaming; local intacto.
+        if (target.isStreamingTrack && !isExploreLyricsEnabled()) return
         scope.launch(Dispatchers.IO) {
             _lyricsState.value = _lyricsState.value.copy(isLoading = true, error = null)
             val result = LyricsManager.fetchLyricsOnline(target, storageManager)

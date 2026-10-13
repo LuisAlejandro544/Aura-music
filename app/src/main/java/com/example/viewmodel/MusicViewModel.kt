@@ -196,12 +196,15 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val _audioIntensity = MutableStateFlow(0f)
     val audioIntensity: StateFlow<Float> = _audioIntensity.asStateFlow()
 
-    // Coordinador de Letras y Karaoke
+    // Coordinador de Letras y Karaoke (letras auto de Explorar desactivables en Ajustes; local intacto)
     val lyricsCoordinator = LyricsCoordinator(
         context = application,
         storageManager = AppStorageManager(application),
         scope = viewModelScope,
-        getCurrentTrack = { audioPlayer.currentTrack.value }
+        getCurrentTrack = { audioPlayer.currentTrack.value },
+        isExploreLyricsEnabled = {
+            com.example.core.data.streaming.StreamingCacheManager.readExploreLyricsEnabled(application)
+        }
     )
     val lyricsState: StateFlow<LyricsState> = lyricsCoordinator.lyricsState
     val isSearchLyricsDialogOpen: StateFlow<Boolean> = lyricsCoordinator.isSearchLyricsDialogOpen
@@ -787,6 +790,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     fun setStreamingCacheMaxSizeMb(sizeMb: Int) =
         streamingCoordinator.setStreamingCacheMaxSizeMb(sizeMb)
     fun clearStreamingCache() = streamingCoordinator.clearStreamingCache()
+    fun setStreamingAudioQuality(quality: com.example.core.model.StreamingAudioQuality) =
+        streamingCoordinator.setStreamingAudioQuality(quality)
+    fun setExploreLyricsEnabled(enabled: Boolean) =
+        streamingCoordinator.setExploreLyricsEnabled(enabled)
 
     override fun onCleared() {
         super.onCleared()

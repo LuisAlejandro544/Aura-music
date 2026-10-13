@@ -1,5 +1,6 @@
 package com.example.core.data.importer
 
+import com.example.core.model.StreamingAudioQuality
 import com.example.debug.AuraDebugManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -34,7 +35,8 @@ object InnerTubeClient {
      */
     suspend fun resolve(
         videoId: String,
-        originalUrl: String
+        originalUrl: String,
+        preferredQuality: StreamingAudioQuality = StreamingAudioQuality.M4A_STANDARD
     ): OnlineVideoAudioImporter.ResolvedMediaInfo? = withContext(Dispatchers.IO) {
         // Estrategia 1: ANDROID_VR (Meta Quest / VR). Entrega URLs directas sin signatureCipher ni n-sig.
         val vrResult = queryInnerTube(
@@ -44,7 +46,8 @@ object InnerTubeClient {
             clientName = "ANDROID_VR",
             clientVersion = "1.60.19",
             userAgent = "Mozilla/5.0 (Android; VR; Meta Quest 3) AppleWebKit/537.36",
-            extraClientProps = mapOf("deviceModel" to "Quest 3")
+            extraClientProps = mapOf("deviceModel" to "Quest 3"),
+            preferredQuality = preferredQuality
         )
         if (vrResult != null) return@withContext vrResult
 
@@ -56,7 +59,8 @@ object InnerTubeClient {
             clientName = "VISIONOS",
             clientVersion = "0.1.0",
             userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15",
-            extraClientProps = emptyMap()
+            extraClientProps = emptyMap(),
+            preferredQuality = preferredQuality
         )
         if (visionResult != null) return@withContext visionResult
 
@@ -68,7 +72,8 @@ object InnerTubeClient {
             clientName = "ANDROID_MUSIC",
             clientVersion = "6.42.52",
             userAgent = "com.google.android.apps.youtube.music/6.42.52 (Linux; U; Android 14; es_ES) gzip",
-            extraClientProps = mapOf("androidSdkVersion" to 34)
+            extraClientProps = mapOf("androidSdkVersion" to 34),
+            preferredQuality = preferredQuality
         )
         if (musicResult != null) return@withContext musicResult
 
@@ -80,7 +85,8 @@ object InnerTubeClient {
             clientName = "IOS",
             clientVersion = "19.29.1",
             userAgent = "com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)",
-            extraClientProps = mapOf("deviceModel" to "iPhone16,2", "osVersion" to "17.5.1.21F90")
+            extraClientProps = mapOf("deviceModel" to "iPhone16,2", "osVersion" to "17.5.1.21F90"),
+            preferredQuality = preferredQuality
         )
         if (iosResult != null) return@withContext iosResult
 
@@ -92,7 +98,8 @@ object InnerTubeClient {
             clientName = "MWEB",
             clientVersion = "2.20240715.01.00",
             userAgent = "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36",
-            extraClientProps = emptyMap()
+            extraClientProps = emptyMap(),
+            preferredQuality = preferredQuality
         )
         if (mwebResult != null) return@withContext mwebResult
 
@@ -104,7 +111,8 @@ object InnerTubeClient {
             clientName = "TVHTML5_SIMPLY_EMBEDDED_PLAYER",
             clientVersion = "2.0",
             userAgent = "Mozilla/5.0 (SMART-TV; LINUX; Tizen 5.0) AppleWebKit/537.36",
-            extraClientProps = emptyMap()
+            extraClientProps = emptyMap(),
+            preferredQuality = preferredQuality
         )
         if (tvEmbedResult != null) return@withContext tvEmbedResult
 
@@ -118,7 +126,8 @@ object InnerTubeClient {
         clientName: String,
         clientVersion: String,
         userAgent: String,
-        extraClientProps: Map<String, Any>
+        extraClientProps: Map<String, Any>,
+        preferredQuality: StreamingAudioQuality = StreamingAudioQuality.M4A_STANDARD
     ): OnlineVideoAudioImporter.ResolvedMediaInfo? {
         return try {
             val clientObj = JSONObject().apply {
@@ -178,6 +187,8 @@ object InnerTubeClient {
 
             var bestAudioUrl: String? = null
             var maxAudioBitrate = 0
+            var bestSaverOpusUrl: String? = null
+            var minSaverOpusBitrate = Int.MAX_VALUE
 
             var bestVideoUrl: String? = null
             var bestVideoScore = -999999
@@ -191,7 +202,23 @@ object InnerTubeClient {
 
                 if (url.isNotBlank() && !url.contains(".m3u8") && !url.contains(".mpd")) {
                     if (mimeType.contains("audio/")) {
-                        val bonus = if (mimeType.contains("mp4")) 50000 else 0
+                        val isOpus = mimeType.contains("opus") || mimeType.contains("webm")
+                        // Candidato de ahorro: Opus de menor bitrate (itag 249 ~48 kbps).
+                        if (isOpus && (bitrate in 1 until minSaverOpusBitrate)) {
+                            minSaverOpusBitrate = bitrate
+                            bestSaverOpusUrl = url
+                        }
+                        val bonus = when (preferredQuality) {
+                            // Opus Alta: prioriza Opus 251 (~160 kbps) sobre el m4a 140.
+                            StreamingAudioQuality.OPUS_HIGH ->
+                                if (isOpus) 100000 else 0
+                            // Opus Ahorro: también prefiere Opus, el ajuste fino se hace abajo.
+                            StreamingAudioQuality.OPUS_SAVER ->
+                                if (isOpus) 100000 else 0
+                            // M4A Estándar: comportamiento actual (mp4 140 primero).
+                            StreamingAudioQuality.M4A_STANDARD ->
+                                if (mimeType.contains("mp4")) 50000 else 0
+                        }
                         if (bitrate + bonus >= maxAudioBitrate) {
                             maxAudioBitrate = bitrate + bonus
                             bestAudioUrl = url
@@ -232,6 +259,11 @@ object InnerTubeClient {
                         bestAudioUrl = url
                     }
                 }
+            }
+
+            // Modo Opus Ahorro: quedarse con el Opus más liviano (itag 249 ~48 kbps).
+            if (preferredQuality == StreamingAudioQuality.OPUS_SAVER && !bestSaverOpusUrl.isNullOrBlank()) {
+                bestAudioUrl = bestSaverOpusUrl
             }
 
             if (!bestAudioUrl.isNullOrBlank()) {

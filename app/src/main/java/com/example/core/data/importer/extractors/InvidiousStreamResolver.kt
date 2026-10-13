@@ -1,6 +1,7 @@
 package com.example.core.data.importer
 
 import android.net.Uri
+import com.example.core.model.StreamingAudioQuality
 import com.example.debug.AuraDebugManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -77,7 +78,8 @@ object InvidiousStreamResolver {
      */
     suspend fun resolve(
         videoId: String,
-        originalUrl: String
+        originalUrl: String,
+        preferredQuality: StreamingAudioQuality = StreamingAudioQuality.M4A_STANDARD
     ): OnlineVideoAudioImporter.ResolvedMediaInfo? = withContext(Dispatchers.IO) {
         val cleanVideoId = videoId.trim()
         if (!SAFE_VIDEO_ID_REGEX.matches(cleanVideoId)) {
@@ -85,7 +87,7 @@ object InvidiousStreamResolver {
             return@withContext null
         }
         for (baseInstance in INSTANCES) {
-            val resolved = queryInstance(baseInstance, cleanVideoId, originalUrl)
+            val resolved = queryInstance(baseInstance, cleanVideoId, originalUrl, preferredQuality)
             if (resolved != null) {
                 return@withContext resolved
             }
@@ -96,7 +98,8 @@ object InvidiousStreamResolver {
     private fun queryInstance(
         baseInstance: String,
         videoId: String,
-        originalUrl: String
+        originalUrl: String,
+        preferredQuality: StreamingAudioQuality = StreamingAudioQuality.M4A_STANDARD
     ): OnlineVideoAudioImporter.ResolvedMediaInfo? {
         return try {
             val requestUrl = "$baseInstance/api/v1/videos/$videoId"
@@ -133,6 +136,8 @@ object InvidiousStreamResolver {
 
             var bestAudioUrl: String? = null
             var maxAudioBitrate = 0L
+            var bestSaverOpusUrl: String? = null
+            var minSaverOpusBitrate = Long.MAX_VALUE
 
             var bestVideoUrl: String? = null
             var bestVideoScore = -999999
@@ -147,7 +152,18 @@ object InvidiousStreamResolver {
 
                     if (!url.contains(".m3u8") && !url.contains(".mpd")) {
                         if (mimeType.contains("audio/")) {
-                            val bonus = if (mimeType.contains("mp4")) 50000L else 0L
+                            val isOpus = mimeType.contains("opus") || mimeType.contains("webm")
+                            if (isOpus && bitrate in 1 until minSaverOpusBitrate) {
+                                minSaverOpusBitrate = bitrate
+                                bestSaverOpusUrl = url
+                            }
+                            val bonus = when (preferredQuality) {
+                                StreamingAudioQuality.OPUS_HIGH,
+                                StreamingAudioQuality.OPUS_SAVER ->
+                                    if (isOpus) 100000L else 0L
+                                StreamingAudioQuality.M4A_STANDARD ->
+                                    if (mimeType.contains("mp4")) 50000L else 0L
+                            }
                             if (bitrate + bonus >= maxAudioBitrate) {
                                 maxAudioBitrate = bitrate + bonus
                                 bestAudioUrl = url
@@ -194,6 +210,10 @@ object InvidiousStreamResolver {
                         }
                     }
                 }
+            }
+
+            if (preferredQuality == StreamingAudioQuality.OPUS_SAVER && !bestSaverOpusUrl.isNullOrBlank()) {
+                bestAudioUrl = bestSaverOpusUrl
             }
 
             if (!bestAudioUrl.isNullOrBlank()) {

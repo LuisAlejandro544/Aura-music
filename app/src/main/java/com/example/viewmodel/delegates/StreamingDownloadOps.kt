@@ -88,6 +88,14 @@ internal fun StreamingModeCoordinator.setStreamingCacheMaxSizeMbInternal(sizeMb:
     cacheManager.setMaxCacheSizeMb(sizeMb)
 }
 
+internal fun StreamingModeCoordinator.setStreamingAudioQualityInternal(quality: com.example.core.model.StreamingAudioQuality) {
+    cacheManager.setAudioQuality(quality)
+}
+
+internal fun StreamingModeCoordinator.setExploreLyricsEnabledInternal(enabled: Boolean) {
+    cacheManager.setExploreLyricsEnabled(enabled)
+}
+
 internal fun StreamingModeCoordinator.setStreamingVideoNetworkPolicyInternal(policy: StreamingVideoNetworkPolicy) {
     cacheManager.setVideoNetworkPolicy(policy)
     // Si el usuario cambia la política mientras suena una pista en streaming, actualizamos su video al instante

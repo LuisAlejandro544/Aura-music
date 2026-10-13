@@ -49,7 +49,10 @@
    - Ábrelo desde **Tu Biblioteca (Pestaña Playlists)**, desde **Importar Música** o usando **"Compartir con..."** directamente desde la app de Spotify o YouTube Music hacia Aura Beta.
    - Previsualiza la portada oficial, el autor y todas las canciones detectadas, cambia el nombre si lo deseas y **elige cómo quieres guardarla**:
      1. ⚡ **Modo Streaming Rápido (Instantáneo)**: Crea la Playlist en segundos con su portada oficial en **WebP sin pérdida** lista para reproducirse en Modo Streaming bajo demanda sin ocupar almacenamiento en tu teléfono.
-     2. 📥 **Descargar Todo Offline (En 2do plano)**: Crea la Playlist y descarga automáticamente todas las canciones en segundo plano (`AuraDownloadService`), con opción para incluir su **Video Canvas en 480p** y **eliminar silencios al inicio y final**.
+      2. 📥 **Descargar Todo Offline (En 2do plano)**: Crea la Playlist y descarga automáticamente todas las canciones en segundo plano (`AuraDownloadService`), con opción para incluir su **Video Canvas en 480p** y **eliminar silencios al inicio y final**.
+10. 🎧 **Calidad de Audio a tu Medida (2 modos Opus + M4A) y Letras solo en Explorar**:
+    - En **Ajustes > Aura Dinámica, Streaming & Modo Juego > Streaming & Caché Inteligente** ahora puedes elegir el formato de audio para tus **canciones locales y el streaming de Explorar** (también vale para las descargas con **yt-dlp**): **Opus Ahorro (~48 kbps)** para gastar mínimos datos, **M4A Estándar (~128 kbps)** (el formato actual por defecto) y **Opus Alta (~160 kbps)** con la máxima calidad de YouTube pesando menos que el m4a.
+    - Nuevo interruptor **"Letras en modo Explorar"**: si lo apagas, las **canciones en streaming (Explorar) ya no buscan ni descargan letras automáticamente** (ahorro de datos y batería); tus **canciones locales siempre conservan sus letras** sin cambios.
 
 ---
 

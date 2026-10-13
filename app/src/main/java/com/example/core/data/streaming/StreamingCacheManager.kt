@@ -5,6 +5,7 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import com.example.core.data.importer.download.ChunkedStreamDownloader
 import com.example.debug.AuraDebugManager
+import com.example.core.model.StreamingAudioQuality
 import com.example.core.model.StreamingCacheConfig
 import com.example.core.model.StreamingVideoNetworkPolicy
 import kotlinx.coroutines.CoroutineScope
@@ -74,10 +75,14 @@ class StreamingCacheManager(private val context: Context) {
 
         val policyId = prefs.getInt(KEY_VIDEO_NETWORK_POLICY, StreamingVideoNetworkPolicy.WIFI_ONLY.id)
         val policy = StreamingVideoNetworkPolicy.fromId(policyId)
+        val qualityId = prefs.getInt(KEY_AUDIO_QUALITY, StreamingAudioQuality.M4A_STANDARD.id)
+        val exploreLyrics = prefs.getBoolean(KEY_EXPLORE_LYRICS_ENABLED, true)
 
         return StreamingCacheConfig(
             maxCacheSizeMb = maxMb,
-            videoNetworkPolicy = policy
+            videoNetworkPolicy = policy,
+            audioQuality = StreamingAudioQuality.fromId(qualityId),
+            isExploreLyricsEnabled = exploreLyrics
         )
     }
 
@@ -103,6 +108,29 @@ class StreamingCacheManager(private val context: Context) {
         prefs.edit().putInt(KEY_VIDEO_NETWORK_POLICY, policy.id).apply()
         _cacheConfig.value = _cacheConfig.value.copy(videoNetworkPolicy = policy)
     }
+
+    /**
+     * Actualiza la calidad / formato de audio (Opus Ahorro, M4A Estándar u Opus Alta).
+     * Aplica tanto a canciones en Streaming (Explorar) como a canciones locales
+     * (descargas permanentes e importaciones online, incluyendo yt-dlp).
+     */
+    fun setAudioQuality(quality: StreamingAudioQuality) {
+        prefs.edit().putInt(KEY_AUDIO_QUALITY, quality.id).apply()
+        _cacheConfig.value = _cacheConfig.value.copy(audioQuality = quality)
+    }
+
+    /**
+     * Activa o desactiva la búsqueda automática de letras exclusivamente para las
+     * canciones en modo Explorar (streaming). Las canciones locales no se ven afectadas.
+     */
+    fun setExploreLyricsEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_EXPLORE_LYRICS_ENABLED, enabled).apply()
+        _cacheConfig.value = _cacheConfig.value.copy(isExploreLyricsEnabled = enabled)
+    }
+
+    fun isExploreLyricsEnabled(): Boolean = _cacheConfig.value.isExploreLyricsEnabled
+
+    fun getAudioQuality(): StreamingAudioQuality = _cacheConfig.value.audioQuality
 
     /**
      * Verifica si la red actual permite descargar y mostrar el Video Canvas en modo Streaming,
@@ -150,18 +178,32 @@ class StreamingCacheManager(private val context: Context) {
      */
     fun getCachedAudioFile(videoId: String): File? {
         val safeId = sanitizeId(videoId)
-        val file = File(audioCacheDir, "stream_audio_$safeId.m4a")
-        if (file.exists() && file.length() > MIN_VALID_AUDIO_BYTES) {
-            val ageMs = System.currentTimeMillis() - file.lastModified()
-            if (ageMs <= StreamingCacheConfig.CACHE_TTL_MS) {
-                touchFile(file)
-                return file
-            } else {
-                try { file.delete() } catch (_: Exception) {}
+        // Búsqueda compatible con las 3 calidades: .m4a (M4A Estándar), .opus y .weba (modos Opus).
+        val candidates = listOf(
+            File(audioCacheDir, "stream_audio_$safeId.${cacheAudioExtension()}"),
+            File(audioCacheDir, "stream_audio_$safeId.m4a"),
+            File(audioCacheDir, "stream_audio_$safeId.opus"),
+            File(audioCacheDir, "stream_audio_$safeId.weba")
+        ).distinct()
+        for (file in candidates) {
+            if (file.exists() && file.length() > MIN_VALID_AUDIO_BYTES) {
+                val ageMs = System.currentTimeMillis() - file.lastModified()
+                if (ageMs <= StreamingCacheConfig.CACHE_TTL_MS) {
+                    touchFile(file)
+                    return file
+                } else {
+                    try { file.delete() } catch (_: Exception) {}
+                }
             }
         }
         return null
     }
+
+    /**
+     * Extensión de caché según la calidad elegida: `.opus` para los 2 modos Opus,
+     * `.m4a` para M4A Estándar. ExoPlayer detecta el códec por contenido, no por extensión.
+     */
+    fun cacheAudioExtension(): String = cacheAudioExtension(_cacheConfig.value.audioQuality)
 
     /**
      * Retorna el archivo de Video Canvas en caché si ya existe y es válido, actualizando su último acceso.
@@ -219,7 +261,7 @@ class StreamingCacheManager(private val context: Context) {
         val job = cacheScope.launch {
             try {
                 evictExpiredAndOverLimit()
-                val targetFile = File(audioCacheDir, "stream_audio_$safeId.m4a")
+                val targetFile = File(audioCacheDir, "stream_audio_$safeId.${cacheAudioExtension()}")
                 val tempFile = File(audioCacheDir, "stream_audio_${safeId}.part")
 
                 // Descarga acelerada por bloques HTTP Range (estilo YouTube Read-Ahead)
@@ -340,8 +382,15 @@ class StreamingCacheManager(private val context: Context) {
             if (safeId.length == 11) {
                 val isVideoTarget = outputFile.name.endsWith(".mp4", ignoreCase = true)
                 val watchUrl = "https://www.youtube.com/watch?v=$safeId"
-                val altInfo = com.example.core.data.importer.InnerTubeClient.resolve(safeId, watchUrl)
-                    ?: com.example.core.data.importer.InvidiousStreamResolver.resolve(safeId, watchUrl)
+                val altInfo = com.example.core.data.importer.InnerTubeClient.resolve(
+                    safeId,
+                    watchUrl,
+                    _cacheConfig.value.audioQuality
+                ) ?: com.example.core.data.importer.InvidiousStreamResolver.resolve(
+                    safeId,
+                    watchUrl,
+                    _cacheConfig.value.audioQuality
+                )
 
                 if (altInfo != null) {
                     val altUrl = if (isVideoTarget) altInfo.videoUrl else (altInfo.audioUrl ?: altInfo.videoUrl)
@@ -528,6 +577,46 @@ class StreamingCacheManager(private val context: Context) {
         private const val PREFS_NAME = "aura_streaming_cache_prefs"
         private const val KEY_MAX_CACHE_MB = "max_cache_size_mb"
         private const val KEY_VIDEO_NETWORK_POLICY = "streaming_video_network_policy"
+        private const val KEY_AUDIO_QUALITY = "streaming_audio_quality"
+        private const val KEY_EXPLORE_LYRICS_ENABLED = "explore_lyrics_enabled"
+
+        /**
+         * Extensión de archivo según calidad, sin necesidad de instanciar el gestor.
+         * Usado por yt-dlp y el importador online para nombrar archivos locales.
+         */
+        fun cacheAudioExtension(quality: StreamingAudioQuality): String = when (quality) {
+            StreamingAudioQuality.OPUS_SAVER,
+            StreamingAudioQuality.OPUS_HIGH -> "opus"
+            StreamingAudioQuality.M4A_STANDARD -> "m4a"
+        }
+
+        /**
+         * Lee la calidad guardada sin instanciar el gestor (hilo seguro).
+         * Misma fuente que Ajustes > Streaming & Caché; vale para streaming y local (yt-dlp).
+         */
+        fun readAudioQuality(context: Context): StreamingAudioQuality {
+            return try {
+                val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                StreamingAudioQuality.fromId(
+                    prefs.getInt(KEY_AUDIO_QUALITY, StreamingAudioQuality.M4A_STANDARD.id)
+                )
+            } catch (_: Exception) {
+                StreamingAudioQuality.M4A_STANDARD
+            }
+        }
+
+        /**
+         * Lee el interruptor de letras de Explorar sin instanciar el gestor.
+         * Exclusivo de canciones en modo Explorar (streaming); local siempre permitido.
+         */
+        fun readExploreLyricsEnabled(context: Context): Boolean {
+            return try {
+                val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                prefs.getBoolean(KEY_EXPLORE_LYRICS_ENABLED, true)
+            } catch (_: Exception) {
+                true
+            }
+        }
 
         private const val MIN_VALID_AUDIO_BYTES = 16 * 1024L
         private const val MIN_VALID_VIDEO_BYTES = 32 * 1024L

@@ -208,17 +208,58 @@ data class StreamingSearchItem(
 }
 
 /**
+ * Calidad / formato de audio elegido por el usuario para canciones en Streaming (Explorar)
+ * y para canciones locales (descargas permanentes e importaciones online).
+ * - OPUS_SAVER: Opus ~48 kbps (itag 249). Máximo ahorro de datos, ideal con datos móviles.
+ * - M4A_STANDARD: AAC/m4a ~128 kbps (itag 140). Equilibrio actual por defecto.
+ * - OPUS_HIGH: Opus ~160 kbps (itag 251). Máxima calidad disponible en YouTube, pesa menos que el m4a.
+ * Nota honesta: YouTube no ofrece lossless real; el techo práctico es Opus ~160 kbps.
+ */
+enum class StreamingAudioQuality(
+    val id: Int,
+    val title: String,
+    val description: String
+) {
+    OPUS_SAVER(
+        id = 0,
+        title = "Opus Ahorro (~48 kbps)",
+        description = "Máximo ahorro de datos para streaming y descargas. Ideal con datos móviles."
+    ),
+    M4A_STANDARD(
+        id = 1,
+        title = "M4A Estándar (~128 kbps)",
+        description = "Formato actual por defecto (AAC). Equilibrio entre calidad y peso, local y streaming."
+    ),
+    OPUS_HIGH(
+        id = 2,
+        title = "Opus Alta (~160 kbps)",
+        description = "Máxima calidad de YouTube con menor peso que el m4a. Recomendado con Wi-Fi."
+    );
+
+    companion object {
+        fun fromId(id: Int): StreamingAudioQuality {
+            return values().find { it.id == id } ?: M4A_STANDARD
+        }
+    }
+}
+
+/**
  * Estado y configuración de la caché temporal inteligente para Streaming (Audio + Video Canvas).
  * - Límite configurable por el usuario: 50 MB por defecto, máximo 500 MB.
  * - Expiración automática (TTL): 30 minutos sin usarse.
  * - Desalojo LRU: cuando se llena, elimina primero los elementos más antiguos.
+ * - [audioQuality]: formato/calidad de audio para streaming y descargas locales (incluye yt-dlp).
+ * - [isExploreLyricsEnabled]: búsqueda automática de letras, exclusiva de canciones en modo Explorar
+ *   (streaming). Las canciones locales siempre conservan sus letras.
  */
 data class StreamingCacheConfig(
     val maxCacheSizeMb: Int = DEFAULT_CACHE_SIZE_MB,
     val currentUsedBytes: Long = 0L,
     val cachedAudioCount: Int = 0,
     val cachedVideoCount: Int = 0,
-    val videoNetworkPolicy: StreamingVideoNetworkPolicy = StreamingVideoNetworkPolicy.WIFI_ONLY
+    val videoNetworkPolicy: StreamingVideoNetworkPolicy = StreamingVideoNetworkPolicy.WIFI_ONLY,
+    val audioQuality: StreamingAudioQuality = StreamingAudioQuality.M4A_STANDARD,
+    val isExploreLyricsEnabled: Boolean = true
 ) {
     val usedMbFormatted: String
         get() {

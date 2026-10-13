@@ -14,8 +14,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AudioFile
 import androidx.compose.material.icons.filled.CloudQueue
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.Lyrics
 import androidx.compose.material.icons.filled.SignalCellularAlt
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.VideocamOff
@@ -34,6 +36,8 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -43,6 +47,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.core.model.StreamingAudioQuality
 import com.example.core.model.StreamingCacheConfig
 import com.example.core.model.StreamingVideoNetworkPolicy
 import com.example.ui.theme.SurfaceCard
@@ -59,7 +64,10 @@ import kotlin.math.roundToInt
  *    - "Siempre (Wi-Fi y Datos Móviles)"
  *    - "Desactivado en Streaming"
  *    (Exclusivo para el streaming; no toca nada de la reproducción local).
- * 2. Caché Temporal Inteligente (Audio + Video Canvas):
+ * 2. Calidad de Audio (Local y Streaming, incluye yt-dlp):
+ *    - "Opus Ahorro (~48 kbps)", "M4A Estándar (~128 kbps)" y "Opus Alta (~160 kbps)".
+ * 3. Letras en modo Explorar (interruptor exclusivo del streaming; el local no se toca).
+ * 4. Caché Temporal Inteligente (Audio + Video Canvas):
  *    - Configurable entre 50 MB (por defecto) y 500 MB (máximo).
  *    - Expiración automática tras 30 minutos sin usarse y desalojo LRU de elementos más antiguos.
  */
@@ -69,7 +77,9 @@ fun StreamingCacheAndVideoSettingsCard(
     onSelectVideoPolicy: (StreamingVideoNetworkPolicy) -> Unit,
     onChangeMaxCacheMb: (Int) -> Unit,
     onClearStreamingCache: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onSelectAudioQuality: (StreamingAudioQuality) -> Unit = {},
+    onToggleExploreLyrics: (Boolean) -> Unit = {}
 ) {
     Card(
         shape = RoundedCornerShape(20.dp),
@@ -167,6 +177,120 @@ fun StreamingCacheAndVideoSettingsCard(
                         )
                     )
                 }
+            }
+
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 16.dp),
+                color = SurfaceVariantDark
+            )
+
+            // Sección de Calidad de Audio (local + streaming, incluye yt-dlp)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Filled.AudioFile,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Calidad de Audio (Local y Streaming)",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = TextPrimary,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Se aplica a canciones locales, al streaming de Explorar y a las descargas con yt-dlp.",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            StreamingAudioQuality.values().forEach { quality ->
+                val isSelected = cacheConfig.audioQuality == quality
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(
+                            if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                            else SurfaceVariantDark.copy(alpha = 0.45f)
+                        )
+                        .border(
+                            width = 1.dp,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                            shape = RoundedCornerShape(14.dp)
+                        )
+                        .clickable { onSelectAudioQuality(quality) }
+                        .padding(horizontal = 12.dp, vertical = 10.dp)
+                        .testTag("streaming_audio_quality_${quality.name.lowercase()}"),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = quality.title,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextPrimary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = quality.description,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary
+                        )
+                    }
+                    RadioButton(
+                        selected = isSelected,
+                        onClick = { onSelectAudioQuality(quality) },
+                        colors = RadioButtonDefaults.colors(
+                            selectedColor = MaterialTheme.colorScheme.primary,
+                            unselectedColor = TextMuted
+                        )
+                    )
+                }
+            }
+
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 16.dp),
+                color = SurfaceVariantDark
+            )
+
+            // Interruptor de letras automáticas, exclusivo del modo Explorar (streaming)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Lyrics,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Letras en modo Explorar",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = TextPrimary,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Exclusivo de canciones en streaming (Explorar). Tus canciones locales siempre conservan sus letras.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary
+                    )
+                }
+                Switch(
+                    checked = cacheConfig.isExploreLyricsEnabled,
+                    onCheckedChange = onToggleExploreLyrics,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = MaterialTheme.colorScheme.primary
+                    ),
+                    modifier = Modifier.testTag("explore_lyrics_switch")
+                )
             }
 
             HorizontalDivider(

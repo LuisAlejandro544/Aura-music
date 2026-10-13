@@ -15,7 +15,9 @@ import java.util.regex.Pattern
  * - Descarga directa hacia disco mediante CPython y el motor interno de yt-dlp.
  * - Captura y parseo en vivo de stdout con '--newline' para emitir métricas reales de progreso
  *   (porcentaje, velocidad en bytes/s, bytes descargados y total estimado).
- * - Soporte independiente para audio de alta fidelidad (.m4a) y Video Canvas en 480p (.mp4).
+ * - Soporte independiente para audio de alta fidelidad (.m4a / .opus según calidad elegida)
+ *   y Video Canvas en 480p (.mp4).
+ * - La calidad se lee de Ajustes > Streaming & Caché y vale para streaming y local.
  */
 object YtDlpStreamDownloader {
 
@@ -68,8 +70,21 @@ object YtDlpStreamDownloader {
             }
             targetFile.parentFile?.mkdirs()
 
+            // Calidad elegida por el usuario (2 modos Opus + M4A actual), válida para local y streaming.
+            val audioQuality =
+                com.example.core.data.streaming.StreamingCacheManager.readAudioQuality(context)
             val formatSelector = if (isAudioOnly) {
-                "bestaudio[ext=m4a]/bestaudio/best[ext=mp4]/best"
+                when (audioQuality) {
+                    // Opus Ahorro (~48 kbps, itag 249): el más liviano primero.
+                    com.example.core.model.StreamingAudioQuality.OPUS_SAVER ->
+                        "bestaudio[ext=webm][abr<=60]/bestaudio[ext=opus][abr<=60]/bestaudio[ext=webm]/bestaudio[ext=opus]/bestaudio"
+                    // Opus Alta (~160 kbps, itag 251): Opus de mayor bitrate primero.
+                    com.example.core.model.StreamingAudioQuality.OPUS_HIGH ->
+                        "bestaudio[ext=webm]/bestaudio[ext=opus]/bestaudio/best[ext=mp4]/best"
+                    // M4A Estándar (~128 kbps, itag 140): comportamiento actual.
+                    com.example.core.model.StreamingAudioQuality.M4A_STANDARD ->
+                        "bestaudio[ext=m4a]/bestaudio/best[ext=mp4]/best"
+                }
             } else {
                 "bestvideo[height<=480][ext=mp4]/bestvideo[height<=480]/best[height<=480][ext=mp4]/best[height<=480]/best"
             }
@@ -105,7 +120,16 @@ object YtDlpStreamDownloader {
                 add(cleanUrl)
             }
 
-            val phaseTitle = if (isAudioOnly) "Descargando audio de alta fidelidad (yt-dlp)..." else "Descargando Video Canvas 480p (yt-dlp)..."
+            val phaseTitle = if (isAudioOnly) {
+                when (audioQuality) {
+                    com.example.core.model.StreamingAudioQuality.OPUS_SAVER ->
+                        "Descargando audio Opus Ahorro (yt-dlp)..."
+                    com.example.core.model.StreamingAudioQuality.OPUS_HIGH ->
+                        "Descargando audio Opus Alta (yt-dlp)..."
+                    com.example.core.model.StreamingAudioQuality.M4A_STANDARD ->
+                        "Descargando audio M4A (yt-dlp)..."
+                }
+            } else "Descargando Video Canvas 480p (yt-dlp)..."
             AuraDebugManager.logInfo(TAG, "Iniciando descarga directa con yt-dlp (${if (isAudioOnly) "Audio" else "Video 480p"}) para: $cleanUrl")
 
             onProgressUpdate(

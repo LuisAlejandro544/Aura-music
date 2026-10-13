@@ -146,6 +146,12 @@ class StreamingModeCoordinator(
     fun setStreamingVideoNetworkPolicy(policy: StreamingVideoNetworkPolicy) = setStreamingVideoNetworkPolicyInternal(policy)
 
 
+    fun setStreamingAudioQuality(quality: com.example.core.model.StreamingAudioQuality) = setStreamingAudioQualityInternal(quality)
+
+
+    fun setExploreLyricsEnabled(enabled: Boolean) = setExploreLyricsEnabledInternal(enabled)
+
+
     fun clearStreamingCache() = clearStreamingCacheInternal()
 
 
