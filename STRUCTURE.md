@@ -127,7 +127,14 @@ app/
     │       │   │   │   │   ├── MediaAssetProcessor.kt        # Compresión WebP Lossless, recorte letterbox 4:3 y Video Canvas
     │       │   │   │   │   └── ProceduralArtworkGenerator.kt # Generador matemático de portadas procedurales
     │       │   │   │   ├── lyrics/             # Motor de Letras Sincronizadas (.LRC / .TXT)
-    │       │   │   │   │   └── LyricsManager.kt # Búsqueda y descarga de letras sincronizadas LRCLIB con versión oficial #1
+    │       │   │   │   │   ├── LyricsManager.kt # Fachada (67) que delega en 7 submódulos
+    │       │   │   │   │   ├── LyricsHttp.kt # Cliente HTTP LRCLIB compartido
+    │       │   │   │   │   ├── LyricsTextParsing.kt # Parser .LRC y limpieza de títulos
+    │       │   │   │   │   ├── LyricsLocalStore.kt # Carga y guardado en lyrics/
+    │       │   │   │   │   ├── LyricsOnlineFetch.kt # Descarga directa + búsqueda flexible
+    │       │   │   │   │   ├── LyricsSearchOptions.kt # Opciones y recomendación oficial
+    │       │   │   │   │   ├── LyricsUriImport.kt # Importación .lrc/.txt (512 KB)
+    │       │   │   │   │   └── LyricsAutoDetect.kt # Autodetección de hermanos y tags
     │       │   │   │   ├── mixtape/            # Fusión Continua y Auto-Remix / Mashup de 2 Canciones Locales
     │       │   │   │   │   ├── MixtapeEngine.kt        # Fusión FFmpeg acrossfade, collage WebP y capítulos reactivos
     │       │   │   │   │   ├── SmartAutoRemixEngine.kt # Fachada que delega en AutoRemixMatcher, AutoRemixPlanner y AutoRemixPostProcessor
