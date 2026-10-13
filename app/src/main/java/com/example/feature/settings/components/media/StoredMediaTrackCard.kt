@@ -15,7 +15,11 @@ import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.VideocamOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,6 +37,7 @@ import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import java.io.File
+import kotlinx.coroutines.withContext
 
 /**
  * Aura Music - Componente Modular de Tarjeta de Canción y Medios Guardados
@@ -74,27 +79,33 @@ fun StoredMediaTrackCard(
         } ?: ""
     }
 
-    val videoAspectTag = remember(track.videoUri) {
-        track.videoUri?.let { uriStr ->
-            try {
-                val path = if (uriStr.startsWith("file://")) uriStr.removePrefix("file://") else uriStr
-                val f = File(path)
-                if (f.exists()) {
-                    val retriever = android.media.MediaMetadataRetriever()
+    var videoAspectTag by remember(track.videoUri) { mutableStateOf<String?>(null) }
+    LaunchedEffect(track.videoUri) {
+        val uriStr = track.videoUri
+        videoAspectTag = withContext(kotlinx.coroutines.Dispatchers.IO) {
+            uriStr?.let { u ->
+                AspectTagCache.getOrPut(u) {
                     try {
-                        retriever.setDataSource(f.absolutePath)
-                        val w = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 0
-                        val h = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 0
-                        val rot = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull() ?: 0
-                        val isHoriz = if (rot == 90 || rot == 270) h > (w * 1.15f) else w > (h * 1.15f)
-                        if (isHoriz) "16:9 Panorámico" else "9:16 Vertical"
-                    } catch (_: Exception) {
-                        null
-                    } finally {
-                        try { retriever.release() } catch (_: Exception) {}
-                    }
-                } else null
-            } catch (_: Exception) { null }
+                        val path = if (u.startsWith("file://")) u.removePrefix("file://") else u
+                        val f = File(path)
+                        if (f.exists()) {
+                            val retriever = android.media.MediaMetadataRetriever()
+                            try {
+                                retriever.setDataSource(f.absolutePath)
+                                val w = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 0
+                                val h = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 0
+                                val rot = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull() ?: 0
+                                val isHoriz = if (rot == 90 || rot == 270) h > (w * 1.15f) else w > (h * 1.15f)
+                                if (isHoriz) "16:9 Panorámico" else "9:16 Vertical"
+                            } catch (_: Exception) {
+                                null
+                            } finally {
+                                try { retriever.release() } catch (_: Exception) {}
+                            }
+                        } else null
+                    } catch (_: Exception) { null }
+                }
+            }
         }
     }
 

@@ -53,7 +53,7 @@ fun ArtworkImage(
                 .memoryCacheKey(artPath)
                 .diskCacheKey(artPath)
                 .memoryCachePolicy(CachePolicy.ENABLED)
-                .diskCachePolicy(CachePolicy.ENABLED)
+                .diskCachePolicy(if (dataModel is File) CachePolicy.DISABLED else CachePolicy.ENABLED)
                 .crossfade(false)
                 .build()
         } else {

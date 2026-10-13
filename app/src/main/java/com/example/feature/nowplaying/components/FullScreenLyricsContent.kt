@@ -103,7 +103,7 @@ fun ColumnScope.FullScreenLyricsContent(
                                 verticalArrangement = Arrangement.spacedBy(16.dp),
                                 contentPadding = PaddingValues(top = 28.dp, bottom = 120.dp)
                             ) {
-                                itemsIndexed(lyricsState.lines) { index, line ->
+                                itemsIndexed(lyricsState.lines, key = { _, line -> line.timeMs }) { index, line ->
                                     val isCurrent = (index == activeIndex)
                                     val textScale by animateFloatAsState(
                                         targetValue = if (isCurrent) 1.05f else 1.0f,

@@ -17,10 +17,16 @@ import android.os.PowerManager
  */
 internal fun ArtworkColorExtractor.getAdaptiveSampleIntervalMsInternal(context: Context): Long {
     return try {
+        val now = android.os.SystemClock.elapsedRealtime()
+        synchronized(BatterySampleCache) {
+            if (now - BatterySampleCache.checkedAtMs < 45_000L) {
+                return BatterySampleCache.intervalMs
+            }
+        }
         val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
         val isPowerSave = powerManager?.isPowerSaveMode == true
         if (isPowerSave) {
-            return INTERVAL_BATTERY_SAVER_MS
+            return cacheInterval(INTERVAL_BATTERY_SAVER_MS)
         }
 
         val batteryStatus: Intent? = context.registerReceiver(
@@ -37,13 +43,26 @@ internal fun ArtworkColorExtractor.getAdaptiveSampleIntervalMsInternal(context: 
         }
 
         if (batteryPct in 0..15) {
-            INTERVAL_BATTERY_SAVER_MS
+            cacheInterval(INTERVAL_BATTERY_SAVER_MS)
         } else {
-            INTERVAL_NORMAL_MS
+            cacheInterval(INTERVAL_NORMAL_MS)
         }
     } catch (_: Throwable) {
         INTERVAL_NORMAL_MS
     }
+}
+
+private object BatterySampleCache {
+    var checkedAtMs: Long = 0L
+    var intervalMs: Long = ArtworkColorExtractor.INTERVAL_NORMAL_MS
+}
+
+private fun cacheInterval(value: Long): Long {
+    synchronized(BatterySampleCache) {
+        BatterySampleCache.checkedAtMs = android.os.SystemClock.elapsedRealtime()
+        BatterySampleCache.intervalMs = value
+    }
+    return value
 }
 
 /**

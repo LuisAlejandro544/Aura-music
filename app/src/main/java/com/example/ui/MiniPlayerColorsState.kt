@@ -115,42 +115,35 @@ fun rememberMiniPlayerColors(
             }
         }
 
-        // Respaldo periódico cada 1s para cuando el MiniPlayer tiene la miniatura de video oculta pero la canción tiene video activo
-        // Se suspende automáticamente en 2do plano mientras el usuario juega para ahorrar CPU/GPU
+        // Respaldo puntual cuando el MiniPlayer tiene la miniatura de video oculta pero la canción tiene video activo:
+        // una sola extracción por cambio de pista (sin bucle) para no duplicar el trabajo del sampler.
         LaunchedEffect(
             effectiveTrack?.id,
             effectiveTrack?.videoUri,
-            isPlaying,
-            isNowPlayingExpanded,
             isMiniPlayerVideoEnabled,
             videoDisplayMode,
-            isDynamicArtworkColorEnabled,
-            shouldRunLiveVisualSampling
+            isDynamicArtworkColorEnabled
         ) {
             val track = effectiveTrack
             val hasVideo = track != null && !track.videoUri.isNullOrEmpty()
             val isVideoColorActive = hasVideo && (videoDisplayMode != VideoDisplayMode.OFF)
             val hasActiveTextureSampler = isNowPlayingExpanded || isMiniPlayerVideoEnabled
             if (track != null && isDynamicArtworkColorEnabled && isVideoColorActive && !hasActiveTextureSampler && isPlaying && shouldRunLiveVisualSampling) {
-                while (true) {
-                    val intervalMs = ArtworkColorExtractor.getAdaptiveSampleIntervalMs(context)
-                    miniSampleIntervalMs = intervalMs
-                    miniPlayerColors = ArtworkColorExtractor.extractPlaybackColors(
-                        context = context,
-                        track = track,
-                        isVideoActive = true,
-                        isDynamicEnabled = true,
-                        fallbackPrimary = defaultMiniPrimary,
-                        fallbackSecondary = defaultMiniSecondary,
-                        positionMs = viewModel.currentPosition.value
-                    )
-                    kotlinx.coroutines.delay(intervalMs)
-                }
+                miniSampleIntervalMs = ArtworkColorExtractor.getAdaptiveSampleIntervalMs(context)
+                miniPlayerColors = ArtworkColorExtractor.extractPlaybackColors(
+                    context = context,
+                    track = track,
+                    isVideoActive = true,
+                    isDynamicEnabled = true,
+                    fallbackPrimary = defaultMiniPrimary,
+                    fallbackSecondary = defaultMiniSecondary,
+                    positionMs = viewModel.currentPosition.value
+                )
             }
         }
 
         val miniTransitionDurationMs = if (isDynamicArtworkColorEnabled && !effectiveTrack?.videoUri.isNullOrEmpty()) {
-            if (miniSampleIntervalMs <= ArtworkColorExtractor.INTERVAL_NORMAL_MS) 1000 else 1400
+            minOf(if (miniSampleIntervalMs <= ArtworkColorExtractor.INTERVAL_NORMAL_MS) 1000 else 1400, 450)
         } else {
             600
         }

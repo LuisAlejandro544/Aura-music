@@ -122,7 +122,7 @@ fun rememberNowPlayingVisualState(
         }
 
         val colorTransitionDurationMs = if (isVideoVisual && isDynamicEnabled) {
-            if (activeSampleIntervalMs <= ArtworkColorExtractor.INTERVAL_NORMAL_MS) 1000 else 1400
+            minOf(if (activeSampleIntervalMs <= ArtworkColorExtractor.INTERVAL_NORMAL_MS) 1000 else 1400, 450)
         } else {
             600
         }

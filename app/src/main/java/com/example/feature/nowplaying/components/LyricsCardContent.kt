@@ -81,7 +81,7 @@ fun LyricsCardContent(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         contentPadding = PaddingValues(vertical = 12.dp)
                     ) {
-                        itemsIndexed(lyricsState.lines) { index, line ->
+                        itemsIndexed(lyricsState.lines, key = { _, line -> line.timeMs }) { index, line ->
                             val isActive = index == activeIndex
 
                             Box(

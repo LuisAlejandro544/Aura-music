@@ -175,12 +175,12 @@ fun MiniPlayer(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clipToBounds()
-                            .basicMarquee(
+                            .then(if (isPlaying) Modifier.basicMarquee(
                                 iterations = Int.MAX_VALUE,
                                 repeatDelayMillis = 1600,
                                 initialDelayMillis = 1200,
                                 velocity = 30.dp
-                            )
+                            ) else Modifier)
                             .testTag("mini_player_marquee_title")
                     )
                     Spacer(modifier = Modifier.height(2.dp))
@@ -200,12 +200,12 @@ fun MiniPlayer(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clipToBounds()
-                            .basicMarquee(
+                            .then(if (isPlaying) Modifier.basicMarquee(
                                 iterations = Int.MAX_VALUE,
                                 repeatDelayMillis = 2000,
                                 initialDelayMillis = 1600,
                                 velocity = 25.dp
-                            )
+                            ) else Modifier)
                     )
                 }
 
