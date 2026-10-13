@@ -38,16 +38,13 @@
     });
   }
 
-  // 1. Último Pre-Release "-beta": enlaza los 3 APKs + SHA256SUMS.
+  // 1. Último Pre-Release "-beta": enlaza los 3 APKs + SHA256SUMS (caché 5 min).
   function wireDownloads() {
     var pill = document.getElementById("versionPill");
     var meta = document.getElementById("releaseMeta");
-    fetchTimeout(API, 10000, true).then(function (list) {
-      var rel = (list || []).find(function (x) {
-        return x.prerelease === true && String(x.tag_name || "").indexOf("-beta") !== -1;
-      }) || (list || [])[0];
-      if (!rel) throw new Error("sin releases");
-      if (pill) pill.textContent = rel.tag_name + " • " + (rel.name || "Aura Beta Nebula");
+    function showPill(t) { if (pill) { pill.textContent = t; pill.hidden = false; } }
+    function applyRelease(rel) {
+      showPill(rel.tag_name + " • " + (rel.name || "Aura Beta Nebula"));
       var statV = document.getElementById("statVersion");
       if (statV) statV.textContent = rel.tag_name;
       var statD = document.getElementById("statDownloads");
@@ -79,10 +76,23 @@
       // El botón del hero baja a la sección de APKs; no se sobrescribe su href.
       var label = document.getElementById("heroDownloadLabel");
       if (label) label.textContent = "Obtener APK Gratis";
-    }).catch(function () {
-      if (pill) pill.textContent = "Aura Beta • Nebula (ver Releases)";
-      meta.textContent = "No se pudo leer la API (límite de GitHub). Usa los botones: abren la página de Releases.";
-    });
+    }
+    function fail() {
+      showPill("Aura Beta • Nebula (ver Releases)");
+      if (meta) meta.textContent = "No se pudo leer la API (límite de GitHub). Usa los botones: abren la página de Releases.";
+    }
+    try {
+      var cached = JSON.parse(localStorage.getItem("auraRel") || "null");
+      if (cached && Date.now() - cached.at < 300000 && cached.rel) { applyRelease(cached.rel); return; }
+    } catch (e) { /* caché corrupta: se ignora */ }
+    fetchTimeout(API, 10000, true).then(function (list) {
+      var rel = (list || []).find(function (x) {
+        return x.prerelease === true && String(x.tag_name || "").indexOf("-beta") !== -1;
+      }) || (list || [])[0];
+      if (!rel) throw new Error("sin releases");
+      try { localStorage.setItem("auraRel", JSON.stringify({ at: Date.now(), rel: rel })); } catch (e) { /* sin storage */ }
+      applyRelease(rel);
+    }).catch(fail);
   }
 
   // 2. Render de Markdown remoto con marked (CDN). Recorta el README a su resumen inicial.
@@ -104,6 +114,7 @@
   renderMd(RAW + "README.md", "readmeBox", 55);
   wireBrowserModal();
   wireReveal();
+  wireStickyCta();
 
   // Galería opcional: solo se muestra si hay URLs configuradas arriba.
   function renderGallery() {
@@ -151,5 +162,17 @@
     setTimeout(function () {
       els.forEach(function (el) { el.classList.add("active"); });
     }, 4000);
+  }
+  // CTA fijo en móvil: aparece al pasar el hero, se oculta en #apks.
+  function wireStickyCta() {
+    var cta = document.getElementById("stickyCta");
+    var heroBtn = document.getElementById("heroDownloadBtn");
+    var apks = document.getElementById("apks");
+    if (!cta || !heroBtn || !("IntersectionObserver" in window)) return;
+    var pastHero = false;
+    var atApks = false;
+    function paint() { cta.hidden = !(pastHero && !atApks); }
+    new IntersectionObserver(function (e) { pastHero = !e[0].isIntersecting; paint(); }).observe(heroBtn);
+    if (apks) new IntersectionObserver(function (e) { atApks = e[0].isIntersecting; paint(); }, { threshold: 0.15 }).observe(apks);
   }
 })();
