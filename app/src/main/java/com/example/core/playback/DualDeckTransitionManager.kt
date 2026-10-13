@@ -10,6 +10,9 @@ import com.example.core.playback.controllers.AudioFadeController
  * Gestor de transiciones Dual-Deck para AuraAudioPlayer.
  * Rol arquitectónico: ejecuta el traspaso superpuesto de la pista saliente al Deck B
  * y la entrada con crossfade de igual potencia o fade-in de la pista entrante.
+ * Capa C: el handoff aplica también a pares streaming→streaming (antes solo local).
+ * Con el vecino prebuferizado como MediaItem 1, la entrante arranca en 0ms con
+ * `seekToNext()` mientras la saliente sigue en el Deck B: overlap 1-2s sin micro-corte.
  */
 internal class DualDeckTransitionManager(
     private val fadeController: AudioFadeController,

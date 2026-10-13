@@ -25,7 +25,8 @@ internal class PlayerStateListener(
     private val onTrackEnded: () -> Unit,
     private val onPlayerError: (PlaybackException) -> Unit,
     private val onStartTracking: () -> Unit,
-    private val onStopTracking: () -> Unit
+    private val onStopTracking: () -> Unit,
+    var onPlaylistAutoAdvance: (() -> Unit)? = null
 ) : Player.Listener {
 
     override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -79,5 +80,16 @@ internal class PlayerStateListener(
 
     override fun onPlayerError(error: PlaybackException) {
         onPlayerError(error)
+    }
+
+    /**
+     * Capa C: si ExoPlayer auto-avanza al MediaItem 1 prebuferizado (fin de pista
+     * sin seek manual previo), sincronizar la cola sin re-preparar (0ms).
+     * El reason EXOPLAYER skips manual seeks; solo reaccionar a PLAYLIST_CHANGED.
+     */
+    override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
+        if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
+            try { onPlaylistAutoAdvance?.invoke() } catch (_: Throwable) {}
+        }
     }
 }

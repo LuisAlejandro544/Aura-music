@@ -8,6 +8,7 @@ import com.example.core.model.Track
  * Rol arquitectónico: extensiones internas de AuraAudioPlayer; la API pública no cambia.
  */
 internal fun AuraAudioPlayer.playTrackListInternal(tracks: List<Track>, startIndex: Int = 0) {
+    try { clearStreamingPrebufferInternal() } catch (_: Throwable) {}
     val selected = queueController.setQueue(tracks, startIndex) ?: return
     playTrackInternal(selected)
 }
@@ -27,8 +28,6 @@ internal fun AuraAudioPlayer.playTrackInternal(track: Track, isAutoCrossfadeOver
     _currentTrack.value = track
     _currentPosition.value = 0L
     _duration.value = track.durationMs
-    _isBuffering.value = track.isStreamingTrack && (track.uriString.startsWith("http://", ignoreCase = true) || track.uriString.startsWith("https://", ignoreCase = true))
-    _isNetworkStalled.value = false
     progressTracker.resetForNewTrack()
     abLoopController.reset()
     // En modo Streaming omitimos por ahora el motor C++20 DSP; en modo local lo mantenemos 100% activo
@@ -45,7 +44,35 @@ internal fun AuraAudioPlayer.playTrackInternal(track: Track, isAutoCrossfadeOver
         durationMs = track.durationMs
     )
 
+    // Capa C: si el vecino ya está prebuferizado como MediaItem 1 (URL fresca del
+    // calentador o caché), saltar con seekToNext() en 0ms en vez de prepare() (200-400ms).
+    // El handoff Dual-Deck ya dejó la saliente en el Deck B, así con crossfade > 0
+    // ambas suenan superpuestas con curva de igual potencia (gapless + crossfade).
+    // Con crossfade = 0 es corte gapless puro. Ante 403 el recovery regenera el flujo.
+    if (track.isStreamingTrack && hasStreamingPrebufferForInternal(track)) {
+        _isBuffering.value = false
+        _isNetworkStalled.value = false
+        try {
+            player.playbackParameters = androidx.media3.common.PlaybackParameters(_playbackSpeed.value, _playbackPitch.value)
+            ensurePlaybackServiceStartedInternal()
+            val consumed = consumeStreamingPrebufferInternal()
+            if (consumed) {
+                try { player.playbackParameters = androidx.media3.common.PlaybackParameters(_playbackSpeed.value, _playbackPitch.value) } catch (_: Throwable) {}
+                dualDeckTransitions.startEntryTransition(handoff, isAutoCrossfadeOverlap)
+                return
+            }
+        } catch (_: Throwable) {
+            // Caer al arranque normal si el seek falla (p. ej. token expirado a mitad).
+        }
+    }
+
+    _isBuffering.value = track.isStreamingTrack && (track.uriString.startsWith("http://", ignoreCase = true) || track.uriString.startsWith("https://", ignoreCase = true))
+    _isNetworkStalled.value = false
+
     try {
+        // La pista cambió a una no prebuferizada: purgar el siguiente obsoleto para
+        // no gastar batería ni arriesgar un seek a URL vieja (403).
+        try { clearStreamingPrebufferInternal() } catch (_: Throwable) {}
         val mediaItem = TrackMediaFactory.buildTrackMedia(track) { uri ->
             AudioSilenceTrimmer.getClippingBounds(context, uri)
         }.mediaItem

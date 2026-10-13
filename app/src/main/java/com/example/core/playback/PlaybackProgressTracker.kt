@@ -109,7 +109,7 @@ internal class PlaybackProgressTracker(
 
                         // Si es una pista en modo Streaming y supera el 50% (o le quedan 20s),
                         // se avisa una sola vez al coordinador para calentar el vecino de la cola
-                        // (capas A+B Head-Start) + consultar la canción similar de radio.
+                        // (capas A+B+C Head-Start) + consultar la canción similar de radio.
                         // El calentador post-play ya corrió al arrancar; esto es red de seguridad
                         // si la cola cambió a mitad de pista.
                         if (curTrack != null && curTrack.isStreamingTrack &&

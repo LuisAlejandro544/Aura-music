@@ -20,10 +20,18 @@ internal fun AuraAudioPlayer.appendOrUpdateStreamingTrackInternal(track: Track, 
 
 internal fun AuraAudioPlayer.toggleShuffleInternal() {
     queueController.toggleShuffle()
+    // Capa C: con aleatorio el vecino es impredecible; purgar el prebuffer para
+    // no gastar datos/batería ni arriesgar un seek a pista equivocada.
+    try { clearStreamingPrebufferInternal() } catch (_: Throwable) {}
 }
 
 internal fun AuraAudioPlayer.cycleRepeatModeInternal() {
     queueController.cycleRepeatMode()
+    try {
+        if (repeatMode.value == com.example.core.model.RepeatMode.ONE) {
+            clearStreamingPrebufferInternal()
+        }
+    } catch (_: Throwable) {}
 }
 
 internal fun AuraAudioPlayer.updateTrackFavoriteInternal(trackId: Long, isFavorite: Boolean) {

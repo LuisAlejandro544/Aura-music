@@ -8,7 +8,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
- * Calentador del vecino (capas A + B Head-Start).
+ * Calentador del vecino (capas A + B Head-Start + C pre-buffer).
  * Rol arquitectónico: extensiones internas de StreamingModeCoordinator; la API pública no cambia.
  *
  * A: pre-resuelve la URL del siguiente en cola mientras suena el actual, guardándola
@@ -18,6 +18,12 @@ import kotlinx.coroutines.launch
  * B: descarga por adelantado los primeros segundos (head 2MB) + prefetch completo
  * del siguiente audio, para que la transición no dependa de la red en ese instante.
  * Solo 1 pista por delante, cancelable, y nada con Ahorro de Datos activo.
+ *
+ * C: pre-buffer real en ExoPlayer. Tras dejar la URL fresca en la cola, encola su
+ * MediaItem como siguiente en el Deck principal (`AuraAudioPlayer.prebufferStreamingNext`).
+ * ExoPlayer lo buferiza mientras suena la actual; al transicionar se consume con
+ * `seekToNext()` en 0ms percibidos + Dual-Deck (overlap 1-2s con igual potencia si
+ * hay crossfade). Respeta Ahorro/Aleatorio y TTL 45 min (ver PlayerStreamingPrebuffer).
  */
 internal fun StreamingModeCoordinator.warmNextQueueTrackInternal(currentTrack: Track) {
     if (cacheManager.isStreamingDataSaverEnabled()) return
@@ -48,12 +54,24 @@ internal fun StreamingModeCoordinator.warmNextQueueTrackInternal(currentTrack: T
     // Ya calentado y fresco: asegurar que el prefetch completo corre y salir.
     val alreadyWarmed = try { getWarmedStream(nextVideoId) } catch (_: Throwable) { null }
     if (alreadyWarmed != null && alreadyWarmed.audioUrl.isNotBlank()) {
+        // Capa C: re-asegurar el pre-buffer por si la cola cambió tras el primer warm.
+        try {
+            audioPlayer.prebufferStreamingNext(
+                nextTrack.copy(
+                    uriString = alreadyWarmed.audioUrl,
+                    videoUri = alreadyWarmed.videoUrl.takeIf { it.isNotBlank() } ?: nextTrack.videoUri
+                )
+            )
+        } catch (_: Throwable) {}
         try {
             cacheManager.prefetchAudioAheadAsync(nextVideoId, alreadyWarmed.audioUrl) { file ->
+                val ready = nextTrack.copy(uriString = file.absolutePath)
                 audioPlayer.appendOrUpdateStreamingTrack(
-                    nextTrack.copy(uriString = file.absolutePath),
+                    ready,
                     updateCurrentTrackIfSame = false
                 )
+                // El archivo local también se prebuferiza (0ms garantizados).
+                try { audioPlayer.prebufferStreamingNext(ready) } catch (_: Throwable) {}
             }
         } catch (_: Throwable) {}
         return
@@ -65,15 +83,19 @@ internal fun StreamingModeCoordinator.warmNextQueueTrackInternal(currentTrack: T
         audioPlayer.isUnresolvedStreamingPageUrl(nextUri)
     } catch (_: Throwable) { true }
     if (!isUnresolved && nextUri.startsWith("http", ignoreCase = true)) {
+        // Capa C: pre-buffer inmediato de la URL directa (sin yt-dlp).
+        try { audioPlayer.prebufferStreamingNext(nextTrack) } catch (_: Throwable) {}
         nextTrackWarmerJob?.cancel()
         nextTrackWarmerJob = scope.launch(Dispatchers.IO) {
             try {
                 cacheManager.prefetchHeadStartAsync(nextVideoId, nextUri)
                 cacheManager.prefetchAudioAheadAsync(nextVideoId, nextUri) { file ->
+                    val ready = nextTrack.copy(uriString = file.absolutePath)
                     audioPlayer.appendOrUpdateStreamingTrack(
-                        nextTrack.copy(uriString = file.absolutePath),
+                        ready,
                         updateCurrentTrackIfSame = false
                     )
+                    try { audioPlayer.prebufferStreamingNext(ready) } catch (_: Throwable) {}
                 }
             } catch (_: Throwable) {}
         }
@@ -106,27 +128,32 @@ internal fun StreamingModeCoordinator.warmNextQueueTrackInternal(currentTrack: T
                 videoUrl = warmedVideoUrl.orEmpty()
             )
             // Dejar la cola con URL directa para arranque en ~200-400ms al pulsar Siguiente.
+            // Capa C: además se prebuferiza como MediaItem 1 para 0ms con seekToNext().
+            val warmedCopy = nextTrack.copy(
+                uriString = playableAudioUrl,
+                videoUri = warmedVideoUrl ?: nextTrack.videoUri
+            )
             try {
                 audioPlayer.appendOrUpdateStreamingTrack(
-                    nextTrack.copy(
-                        uriString = playableAudioUrl,
-                        videoUri = warmedVideoUrl ?: nextTrack.videoUri
-                    ),
+                    warmedCopy,
                     updateCurrentTrackIfSame = false
                 )
             } catch (_: Throwable) {}
+            try { audioPlayer.prebufferStreamingNext(warmedCopy) } catch (_: Throwable) {}
 
             // Capa B: head rápido (2MB) + prefetch completo en 2do plano.
             try {
                 cacheManager.prefetchHeadStartAsync(nextVideoId, playableAudioUrl)
                 cacheManager.prefetchAudioAheadAsync(nextVideoId, playableAudioUrl) { file ->
+                    val ready = nextTrack.copy(
+                        uriString = file.absolutePath,
+                        videoUri = warmedVideoUrl ?: nextTrack.videoUri
+                    )
                     audioPlayer.appendOrUpdateStreamingTrack(
-                        nextTrack.copy(
-                            uriString = file.absolutePath,
-                            videoUri = warmedVideoUrl ?: nextTrack.videoUri
-                        ),
+                        ready,
                         updateCurrentTrackIfSame = false
                     )
+                    try { audioPlayer.prebufferStreamingNext(ready) } catch (_: Throwable) {}
                 }
             } catch (_: Throwable) {}
         } catch (_: Throwable) {}

@@ -227,8 +227,9 @@ app/
     │       │       ├── PlayerReleaseHandler.kt     # Liberación ordenada de reproductores y scopes
    │       │       ├── DualDeckTransitionManager.kt  # Handoff al Deck B y entrada con crossfade/fade-in
    │       │       ├── TrackMediaFactory.kt          # URIs, metadatos con carátula y recortes de silencio
-   │       │       ├── PlayerStateListener.kt        # Listener de estado ExoPlayer hacia los flujos
-   │       │       ├── PlaybackProgressTracker.kt    # Sondeo de progreso, bucle A-B, prefetch y disparo de crossfade
+    │       │       ├── PlayerStateListener.kt        # Listener de estado ExoPlayer hacia los flujos + sync auto-avance capa C
+    │       │       ├── PlayerStreamingPrebuffer.kt     # Capa C: pre-buffer MediaItem 1 + seekToNext 0ms + Dual-Deck streaming
+    │       │       ├── PlaybackProgressTracker.kt    # Sondeo de progreso, bucle A-B, prefetch y disparo de crossfade
    │       │       ├── StreamingErrorRecoveryHandler.kt # Reintento ante HTTP 403/416 y cortes de red
    │       │       ├── PlaybackParametersManager.kt  # Velocidad/tono con throttling de 40ms en Main
    │       │       ├── StreamingUrlPolicy.kt         # Detección de URLs de streaming sin resolver
@@ -508,6 +509,7 @@ app/
     │       │       ├── StreamingModeCoordinator.kt     # Fachada del Modo Streaming (156 líneas, API intacta)
     │       │       ├── StreamingSearchOps.kt           # Búsqueda y tendencias con cancelación de carrera
     │       │       ├── StreamingPlaybackResolver.kt    # Resolución por calidad, transición, recuperación 403, radio similar y Ahorro (sin video/letras/prefetch)
+    │       │       ├── StreamingNextWarmer.kt          # Head-Start A+B+C del vecino (URL fresca + head 2MB + pre-buffer ExoPlayer)
     │       │       ├── StreamingDownloadOps.kt         # Descarga permanente con calidad elegida y ajustes de caché/ahorro
     │       │       ├── StreamingTrackBuilders.kt       # Tracks sintéticos y colas desde resultados
     │       │       └── PlaylistImportCoordinator.kt # Fachada (141) que delega en 3 piezas

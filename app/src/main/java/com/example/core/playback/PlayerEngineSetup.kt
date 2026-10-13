@@ -80,6 +80,10 @@ internal fun AuraAudioPlayer.initPlayerInternal() {
         onStopTracking = { stopProgressTrackingInternal() }
     )
     player.addListener(stateListener)
+    // Capa C: auto-avance gapless al prebuffer (ExoPlayer playlist índice 1).
+    try {
+        stateListener.onPlaylistAutoAdvance = { syncQueueAfterPlaylistAutoAdvanceInternal() }
+    } catch (_: Throwable) {}
 
     mediaSessionBridge = MediaSessionBridge(
         context = context,
