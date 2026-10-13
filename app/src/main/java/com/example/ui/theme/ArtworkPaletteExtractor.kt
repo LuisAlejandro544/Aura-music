@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.palette.graphics.Palette
 import com.example.core.model.Track
 import kotlinx.coroutines.Dispatchers
@@ -72,8 +73,8 @@ internal suspend fun ArtworkColorExtractor.extractColorsInternal(
             val darkVibrant = palette.darkVibrantSwatch
             val muted = palette.mutedSwatch
 
-            val primaryInt = vibrant?.rgb ?: lightVibrant?.rgb ?: dominant?.rgb ?: fallbackPrimary.hashCode()
-            val secondaryInt = lightVibrant?.rgb ?: muted?.rgb ?: vibrant?.rgb ?: fallbackSecondary.hashCode()
+            val primaryInt = vibrant?.rgb ?: lightVibrant?.rgb ?: dominant?.rgb ?: fallbackPrimary.toArgb()
+            val secondaryInt = lightVibrant?.rgb ?: muted?.rgb ?: vibrant?.rgb ?: fallbackSecondary.toArgb()
             val accentInt = darkVibrant?.rgb ?: dominant?.rgb ?: primaryInt
 
             val primaryColor = boostColorVibrancyInternal(Color(primaryInt), minSaturation = 0.35f, minLightness = 0.42f)
@@ -206,8 +207,9 @@ internal suspend fun ArtworkColorExtractor.extractPlaybackColorsInternal(
             }
         }
 
-        if ((lastVideoUri == videoUri || lastVideoTrackId == track.id) && lastVideoColors != null) {
-            return@withContext lastVideoColors!!
+        if ((lastVideoUri == videoUri || lastVideoTrackId == track.id)) {
+            val snapshot = lastVideoColors
+            if (snapshot != null) return@withContext snapshot
         }
     }
 

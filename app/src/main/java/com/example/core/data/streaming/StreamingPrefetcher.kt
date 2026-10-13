@@ -120,7 +120,12 @@ internal class StreamingPrefetcher(
                 } else {
                     try { tempFile.delete() } catch (_: Exception) {}
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                AuraDebugManager.logWarning(
+                    tag = "StreamingCache",
+                    message = "Aviso en pre-carga de video ($safeId): ${e.localizedMessage ?: "Error en pre-carga por bloques"}",
+                    throwable = e
+                )
             } finally {
                 s.jobs.remove(jobKey)
             }

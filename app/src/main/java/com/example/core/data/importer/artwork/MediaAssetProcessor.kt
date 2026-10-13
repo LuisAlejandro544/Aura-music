@@ -29,15 +29,16 @@ object MediaAssetProcessor {
      */
     fun isValidVideoFile(file: File): Boolean {
         if (!file.exists() || file.length() < 4096L) return false
+        val vRetriever = MediaMetadataRetriever()
         return try {
-            val vRetriever = MediaMetadataRetriever()
             vRetriever.setDataSource(file.absolutePath)
             val hasVid = vRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_HAS_VIDEO)
             val width = vRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 0
-            vRetriever.release()
             hasVid == "yes" || width > 0
         } catch (_: Throwable) {
             false
+        } finally {
+            try { vRetriever.release() } catch (_: Throwable) {}
         }
     }
 

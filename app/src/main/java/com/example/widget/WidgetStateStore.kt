@@ -203,8 +203,9 @@ object WidgetStateStore {
      */
     fun extractColorsFromTrackImage(track: Track): Pair<Int, Int> {
         val cacheKey = "${track.id}_${track.albumArtPath ?: ""}"
-        if (cacheKey == lastArtKey && lastExtractedColors != null) {
-            return lastExtractedColors!!
+        val snapshot = lastExtractedColors
+        if (cacheKey == lastArtKey && snapshot != null) {
+            return snapshot
         }
 
         val artPath = track.albumArtPath
