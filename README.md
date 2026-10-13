@@ -186,6 +186,8 @@ Todo el panel de efectos se despliega al instante en una hoja modal desde el **M
 
 ## 📲 Descarga e Instalación (Guía de APKs)
 
+> 🌐 **Página oficial de descarga:** carpeta [`web/`](./web/) (lista para Cloudflare Pages, ver [`web/DEPLOY-CLOUDFLARE.md`](./web/DEPLOY-CLOUDFLARE.md)). Muestra las 3 arquitecturas con explicaciones y carga en vivo `README.md` + `chanelog-beta.md` y los APKs del último Pre-Release `-beta`.
+
 En la sección de [**Releases Oficiales**](../../releases) encontrarás **3 variantes del instalador APK** optimizadas exclusivamente para dispositivos móviles. Elige la indicada para tu teléfono:
 
 | Archivo APK | Arquitectura | ¿Para qué teléfonos sirve? | Recomendación |
