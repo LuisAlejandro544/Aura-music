@@ -71,4 +71,25 @@ fun GlobalPlaylistImportDialog(
             onDismiss = { viewModel.playlistImportCoordinator.dismissDialog() }
         )
     }
+
+    // Fase B: tarjeta global del lote 1-en-1 (visible aunque el diálogo ya se cerró),
+    // con posición de cola, pausa sin red y botón Cancelar.
+    val batchActive by viewModel.playlistImportCoordinator.batchActive.collectAsState()
+    if (batchActive && !showPlaylistImportDialog) {
+        val batchTotal by viewModel.playlistImportCoordinator.batchTotal.collectAsState()
+        val batchDone by viewModel.playlistImportCoordinator.batchDone.collectAsState()
+        val batchFailed by viewModel.playlistImportCoordinator.batchFailed.collectAsState()
+        val batchName by viewModel.playlistImportCoordinator.batchPlaylistName.collectAsState()
+        val batchWaiting by viewModel.playlistImportCoordinator.batchWaitingForNetwork.collectAsState()
+        val queuedGlobal by viewModel.playlistImportCoordinator.downloadQueueDepth.collectAsState()
+        PlaylistBatchProgressCard(
+            playlistName = batchName,
+            done = batchDone,
+            total = batchTotal,
+            failed = batchFailed,
+            queuedGlobal = queuedGlobal,
+            waitingForNetwork = batchWaiting,
+            onCancel = { viewModel.playlistImportCoordinator.cancelBatchDownload() }
+        )
+    }
 }

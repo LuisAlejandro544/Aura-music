@@ -28,8 +28,10 @@ import com.example.core.model.DownloadProgress
 import com.example.core.model.Track
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -86,6 +88,17 @@ class AuraDownloadService : Service() {
 
         private val pendingTasks = ConcurrentHashMap<Int, PendingDownloadTask>()
         private val taskIdCounter = AtomicInteger(1)
+
+        // === Fase B: cola FIFO global 1-en-1 ===
+        // `startDownload()` solo encola (mapa + canal). Un único consumidor en la
+        // instancia del servicio toma los taskId en orden de llegada y los procesa
+        // de a 1; el paralelismo se conserva dentro de cada archivo (bloques HTTP
+        // Range). Así dos lotes (playlist + descarga suelta de Explorar) nunca
+        // compiten entre sí por yt-dlp / FFmpeg / red.
+        private val fifoQueue = Channel<Int>(Channel.UNLIMITED)
+        // Ids cancelados mientras esperaban turno: el consumidor los salta sin
+        // tocar contadores (el `onDequeued` ya se aplicó al cancelar).
+        private val cancelledTaskIds = ConcurrentHashMap.newKeySet<Int>()
 
         private val _downloadProgress = MutableStateFlow(DownloadProgress(isDownloading = false))
         val downloadProgress: StateFlow<DownloadProgress> = _downloadProgress.asStateFlow()
@@ -238,7 +251,8 @@ class AuraDownloadService : Service() {
 
         /**
          * Encola e inicia una descarga en segundo plano respaldada por ForegroundService y notificación nativa.
-         * Si [autoPlayOnComplete] es `false` (ej. al descargar desde el reproductor online), guarda la pista
+         * Fase B: solo ENCOLA en la FIFO global 1-en-1 (el servicio la procesa por orden de
+         * llegada). Si [autoPlayOnComplete] es `false` (ej. al descargar desde el reproductor online), guarda la pista
          * y su Video Canvas en la biblioteca local sin interrumpir la canción que está sonando.
          */
         fun startDownload(
@@ -263,6 +277,7 @@ class AuraDownloadService : Service() {
                 autoPlayOnComplete = autoPlayOnComplete,
                 sourceVideoId = sourceVideoId
             )
+            DownloadQueueState.onEnqueued()
 
             val appContext = context.applicationContext
             val intent = Intent(appContext, AuraDownloadService::class.java).apply {
@@ -277,16 +292,47 @@ class AuraDownloadService : Service() {
                 } catch (inner: Throwable) {
                     AuraDebugManager.logError(TAG, "No se pudo iniciar el servicio de descarga: ${inner.message}", inner)
                     pendingTasks.remove(taskId)
+                    DownloadQueueState.onDequeued()
                     _taskFinishedEvents.tryEmit(DownloadFinishedEvent(sourceVideoId = sourceVideoId, success = false))
                 }
             }
+        }
+
+        /**
+         * Fase B: retira de la cola las tareas AÚN NO INICIADAS cuyo `sourceVideoId`
+         * esté en [videoIds] (ej. lote de playlist cancelado por el usuario).
+         * La descarga activa nunca se mata a mitad de escritura: termina sola y su
+         * evento `taskFinishedEvents` se emite con normalidad.
+         * @return cuántas tareas en espera fueron retiradas.
+         */
+        fun cancelQueuedTasks(videoIds: Set<String>): Int {
+            if (videoIds.isEmpty()) return 0
+            var removed = 0
+            val iterator = pendingTasks.entries.iterator()
+            while (iterator.hasNext()) {
+                val entry = iterator.next()
+                if (entry.value.sourceVideoId in videoIds) {
+                    iterator.remove()
+                    cancelledTaskIds.add(entry.key)
+                    DownloadQueueState.onDequeued()
+                    removed++
+                }
+            }
+            if (removed > 0) {
+                _statusMessages.tryEmit("Se cancelaron $removed descargas en cola.")
+            }
+            return removed
         }
     }
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private lateinit var notificationManager: NotificationManager
     private lateinit var repository: MusicRepository
+    // Semáforo de 1 permiso: con el consumidor FIFO único siempre vale 0 o 1.
     private val activeTaskCount = AtomicInteger(0)
+    // Único consumidor de la FIFO global (Fase B): garantiza orden de llegada.
+    private var fifoConsumer: Job? = null
+    private var foregroundStarted = false
 
     override fun attachBaseContext(newBase: Context?) {
         // Precalentar los recursos del ApplicationContext antes de adjuntar el ContextImpl del Service
@@ -313,6 +359,18 @@ class AuraDownloadService : Service() {
 
         val database = AppDatabase.getInstance(applicationContext)
         repository = MusicRepository(database)
+
+        // Fase B: un ÚNICO consumidor procesa la FIFO en orden de llegada (1-en-1 global).
+        fifoConsumer?.cancel()
+        fifoConsumer = serviceScope.launch {
+            for (taskId in fifoQueue) {
+                try {
+                    processDownload(taskId)
+                } catch (t: Throwable) {
+                    AuraDebugManager.logError(TAG, "Error procesando descarga encolada", t)
+                }
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -322,10 +380,8 @@ class AuraDownloadService : Service() {
         }
 
         val taskId = intent?.getIntExtra(EXTRA_TASK_ID, -1) ?: -1
-        val task = pendingTasks.remove(taskId)
-
-        if (task == null) {
-            if (activeTaskCount.get() == 0) {
+        if (taskId <= 0 || !pendingTasks.containsKey(taskId)) {
+            if (activeTaskCount.get() == 0 && pendingTasks.isEmpty()) {
                 try {
                     stopSelfResult(startId)
                 } catch (_: Throwable) {}
@@ -333,15 +389,80 @@ class AuraDownloadService : Service() {
             return START_NOT_STICKY
         }
 
+        // Fase B: solo encolar; el consumidor FIFO la tomará por orden de llegada.
+        fifoQueue.trySend(taskId)
+        ensureForegroundForQueue()
+
+        return START_NOT_STICKY
+    }
+
+    /**
+     * Promueve a primer plano (una vez) y refresca la notificación con la posición
+     * de cola (`En cola: N`) para que el usuario vea el lugar de cada descarga.
+     */
+    private fun ensureForegroundForQueue() {
+        try {
+            val active = DownloadQueueState.activeTitle.value
+            val queued = DownloadQueueState.queuedCountFlow.value
+            val title = active ?: if (queued > 0) "Descargas en cola ($queued)" else "Preparando descarga..."
+            val progress = _downloadProgress.value
+            val fgNotification = buildProgressNotification(
+                title = title,
+                artist = DownloadQueueState.queueLabel() ?: "Aura Music",
+                progress = progress
+            )
+            if (!foregroundStarted) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    startForeground(
+                        NOTIFICATION_ID_PROGRESS,
+                        fgNotification,
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+                    )
+                } else {
+                    startForeground(NOTIFICATION_ID_PROGRESS, fgNotification)
+                }
+                foregroundStarted = true
+            } else {
+                notificationManager.notify(NOTIFICATION_ID_PROGRESS, fgNotification)
+            }
+        } catch (t: Throwable) {
+            AuraDebugManager.logWarning(TAG, "Aviso al promover servicio a primer plano: ${t.message}")
+        }
+    }
+
+    /**
+     * Procesa UNA descarga (llamado en serie por el consumidor FIFO).
+     * Emite siempre [DownloadFinishedEvent] para que los lotes 1-en-1 avancen.
+     */
+    private suspend fun processDownload(taskId: Int) {
+        // Saltar ids cancelados mientras esperaban turno (contadores ya ajustados).
+        if (cancelledTaskIds.remove(taskId)) return
+
+        val task = pendingTasks.remove(taskId)
+        if (task == null) {
+            DownloadQueueState.onDequeued()
+            return
+        }
+        DownloadQueueState.onDequeued()
+
         val displayTitle = task.customTitle.ifBlank { task.resolvedInfo.suggestedTitle }.ifBlank { "Canción" }
         val displayArtist = task.customArtist.ifBlank { task.resolvedInfo.suggestedArtist }.ifBlank { "Artista" }
 
         activeTaskCount.incrementAndGet()
+        DownloadQueueState.setActiveTitle(displayTitle)
 
-        val initialProgress = DownloadProgress(
+        var initialProgress = DownloadProgress(
             isDownloading = true,
             phase = "Preparando descarga de \"$displayTitle\"..."
         )
+        // Fase B: si no hay red, pausar aquí (sin marcar fallo) hasta recuperarla.
+        if (!DownloadNetworkGate.isOnline(applicationContext)) {
+            initialProgress = initialProgress.copy(phase = "Sin conexión — en pausa, esperando red...")
+            _downloadProgress.value = initialProgress
+            updateProgressNotification(displayTitle, displayArtist, initialProgress)
+            DownloadNetworkGate.awaitOnline(applicationContext)
+            initialProgress = initialProgress.copy(phase = "Red recuperada, descargando \"$displayTitle\"...")
+        }
         _downloadProgress.value = initialProgress
 
         try {
@@ -350,22 +471,26 @@ class AuraDownloadService : Service() {
                 artist = displayArtist,
                 progress = initialProgress
             )
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                startForeground(
-                    NOTIFICATION_ID_PROGRESS,
-                    fgNotification,
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
-                )
+            if (!foregroundStarted) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    startForeground(
+                        NOTIFICATION_ID_PROGRESS,
+                        fgNotification,
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+                    )
+                } else {
+                    startForeground(NOTIFICATION_ID_PROGRESS, fgNotification)
+                }
+                foregroundStarted = true
             } else {
-                startForeground(NOTIFICATION_ID_PROGRESS, fgNotification)
+                notificationManager.notify(NOTIFICATION_ID_PROGRESS, fgNotification)
             }
         } catch (t: Throwable) {
             AuraDebugManager.logWarning(TAG, "Aviso al promover servicio a primer plano: ${t.message}")
         }
 
-        serviceScope.launch {
-            var succeeded = false
-            try {
+        var succeeded = false
+        try {
                 _statusMessages.tryEmit("Descargando \"$displayTitle\"...")
                 var lastNotifUpdateMs = 0L
                 val storageManager = AppStorageManager(applicationContext)
@@ -397,7 +522,7 @@ class AuraDownloadService : Service() {
                     val savedTrack = repository.insertCustomTrack(applicationContext, rawTrack)
 
                     // Precargar letras sincronizadas LRC en segundo plano sin bloquear
-                    launch(Dispatchers.IO) {
+                    serviceScope.launch(Dispatchers.IO) {
                         try {
                             LyricsManager.fetchLyricsOnline(savedTrack, storageManager)
                         } catch (_: Throwable) {}
@@ -439,26 +564,30 @@ class AuraDownloadService : Service() {
                         success = succeeded
                     )
                 )
+                DownloadQueueState.setActiveTitle(null)
                 if (activeTaskCount.decrementAndGet() <= 0) {
                     activeTaskCount.set(0)
-                    pendingTasks.clear()
-                    try {
-                        stopForeground(STOP_FOREGROUND_REMOVE)
-                    } catch (_: Throwable) {}
-                    try {
-                        stopSelf()
-                    } catch (_: Throwable) {}
+                    // Solo detenerse si no queda nada encolado (la FIFO puede traer más).
+                    if (pendingTasks.isEmpty()) {
+                        foregroundStarted = false
+                        try {
+                            stopForeground(STOP_FOREGROUND_REMOVE)
+                        } catch (_: Throwable) {}
+                        try {
+                            stopSelf()
+                        } catch (_: Throwable) {}
+                    }
                 }
             }
-        }
-
-        return START_NOT_STICKY
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
         pendingTasks.clear()
+        try { fifoConsumer?.cancel() } catch (_: Throwable) {}
+        foregroundStarted = false
+        DownloadQueueState.reset()
         serviceScope.cancel()
         super.onDestroy()
 
@@ -513,12 +642,21 @@ class AuraDownloadService : Service() {
         } else {
             progress.phase.ifBlank { "Procesando..." }
         }
+        // Fase B: posición de cola visible (`En cola: N`) usando el semáforo de 1 permiso.
+        val queueLabel = DownloadQueueState.queueLabel()
+        val subWithQueue = if (hasDeterminateProgress) {
+            "$percent% • ${progress.formattedSpeed}" + (queueLabel?.let { " • $it" } ?: "")
+        } else if (queueLabel != null) {
+            "$artist • $queueLabel"
+        } else {
+            artist
+        }
 
         return NotificationCompat.Builder(applicationContext, CHANNEL_ID_PROGRESS)
             .setSmallIcon(android.R.drawable.stat_sys_download)
             .setContentTitle("Descargando: $title")
             .setContentText(progress.phase.ifBlank { subText })
-            .setSubText(if (hasDeterminateProgress) "$percent% • ${progress.formattedSpeed}" else artist)
+            .setSubText(subWithQueue)
             .setProgress(100, percent, !hasDeterminateProgress)
             .setOngoing(true)
             .setOnlyAlertOnce(true)

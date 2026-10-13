@@ -75,8 +75,23 @@ class PlaylistImportCoordinator(
     val importProgressText: StateFlow<String?> = st.importProgressText.asStateFlow()
     val importProgressFraction: StateFlow<Float> = st.importProgressFraction.asStateFlow()
     val errorMessage: StateFlow<String?> = st.errorMessage.asStateFlow()
+    // Fase A: progreso del lote 1-en-1 (visible aunque el diálogo ya se cerró).
+    val batchTotal: StateFlow<Int> = st.batchTotal.asStateFlow()
+    val batchDone: StateFlow<Int> = st.batchDone.asStateFlow()
+    val batchFailed: StateFlow<Int> = st.batchFailed.asStateFlow()
+    val batchActive: StateFlow<Boolean> = st.batchActive.asStateFlow()
+    val batchPlaylistName: StateFlow<String?> = st.batchPlaylistName.asStateFlow()
+    // Fase B: pausa sin red + posición de la FIFO global 1-en-1.
+    val batchWaitingForNetwork: StateFlow<Boolean> = st.batchWaitingForNetwork.asStateFlow()
+    val downloadQueueDepth = com.example.core.playback.DownloadQueueState.queuedCountFlow
+    val downloadActiveTitle = com.example.core.playback.DownloadQueueState.activeTitle
 
     init {
+        // Fase B: reanudar el lote persistido si la app murió a mitad de una playlist.
+        scope.launch(Dispatchers.IO) {
+            kotlinx.coroutines.delay(1500L)
+            runner.resumePendingBatch()
+        }
         // Escuchar finalización de descargas en segundo plano para vincular cada pista descargada a su Playlist
         scope.launch(Dispatchers.IO) {
             AuraDownloadService.completedEvents.collect { event ->
@@ -138,4 +153,12 @@ class PlaylistImportCoordinator(
 
     fun confirmImportPlaylist() =
         runner.import()
+
+    /** Fase A: cancela el lote offline 1-en-1 (ya no se lanzan más pistas). */
+    fun cancelBatchDownload() =
+        runner.cancelBatchDownload()
+
+    /** Fase B: reanuda el lote persistido (si la app murió a mitad de la playlist). */
+    fun resumePendingBatch() =
+        runner.resumePendingBatch()
 }

@@ -50,6 +50,7 @@
    - Previsualiza la portada oficial, el autor y todas las canciones detectadas, cambia el nombre si lo deseas y **elige cómo quieres guardarla**:
      1. ⚡ **Modo Streaming Rápido (Instantáneo)**: Crea la Playlist en segundos con su portada oficial en **WebP sin pérdida** lista para reproducirse en Modo Streaming bajo demanda sin ocupar almacenamiento en tu teléfono.
      2. 📥 **Descargar Todo Offline (En 2do plano)**: Crea la Playlist y descarga automáticamente todas las canciones en segundo plano (`AuraDownloadService`), con opción para incluir su **Video Canvas en 480p** y **eliminar silencios al inicio y final**.
+   - ⏳ **Descargas 1-en-1 globales y persistentes (Fase B)**: el servicio procesa **una sola descarga a la vez en todo el sistema** (único consumidor sobre `Channel` FIFO — una playlist de 100 pistas y una canción suelta de Explorar **nunca compiten** por `yt-dlp`/`FFmpeg`/red), la notificación muestra la posición **`En cola: N`**, la tarjeta flotante global muestra `i/N` con botón **Cancelar lote** (retira las en espera sin matar la activa), el lote se persiste en **`metadata/playlist_batch.json`** y **se reanuda solo** al reabrir la app, y sin red la espera **se pausa** (`Sin conexión — en pausa`) en vez de marcar fallos.
 
 ---
 
