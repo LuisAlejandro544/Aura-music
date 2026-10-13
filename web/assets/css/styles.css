@@ -85,6 +85,8 @@ footer a { color: var(--cyan); }
 @media (max-width: 560px) {
   section { padding: 16px; }
   .btn { width: 100%; text-align: center; }
+  .btn-dl { width: 100%; padding: 15px 20px; font-size: 16px; }
+  .stats-container { gap: 14px 16px; }
 }
 /* ==================== 02 AURA ==================== */
 html { scroll-behavior: smooth; }
@@ -190,6 +192,26 @@ footer a:hover { color: #fff; }
 .creator-badge { transition: box-shadow .22s cubic-bezier(.2,.7,.3,1), transform .22s cubic-bezier(.2,.7,.3,1); }
 .creator-badge:hover { box-shadow: 0 0 18px rgba(0, 210, 255, .35); transform: translateY(-1px); }
 .tag:hover { transform: scale(1.05); }
+/* ===== Antidesborde global (móviles desde 320px) ===== */
+html, body { overflow-x: clip; }
+img, table, pre, code { max-width: 100%; }
+main, section, article, .card, .community-card, .md-box, .hero { min-width: 0; }
+h1 { font-size: clamp(36px, 8vw, 76px); overflow-wrap: break-word; }
+.creator-badge { max-width: 100%; }
+.stats-container { flex-wrap: wrap; gap: 16px 24px; }
+.stat-item { flex: 1 1 130px; align-items: center; text-align: center; min-width: 0; }
+.stat-value { font-size: clamp(24px, 7vw, 32px); overflow-wrap: anywhere; }
+.cards { grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); }
+.cards > *, .community-grid > * { min-width: 0; }
+.community-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); }
+.pill, .meta, .hint, .size, .sha, .card p, .app-brief, .card-desc, details p, code { overflow-wrap: anywhere; }
+.pill { max-width: 100%; }
+.btn-dl { max-width: 100%; justify-content: center; text-align: center; }
+.md-box { overflow-x: auto; }
+.md-box pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.md-box p, .md-box li, .md-box td, .md-box th, .md-box code, .md-box a, .md-box strong, .md-box em { overflow-wrap: anywhere; word-break: break-word; }
+.md-box table { width: 100%; table-layout: fixed; }
+.md-box td, .md-box th { min-width: 0; }
 .size:empty::before { content: "Buscando APK…"; color: var(--muted); }
 .sticky-cta { position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 60; display: block; text-align: center; padding: 14px; border-radius: 14px; font-weight: 800; text-decoration: none; color: #fff; background: linear-gradient(135deg, var(--violet), #6d28d9); box-shadow: 0 12px 30px rgba(0,0,0,.5); }
 .sticky-cta[hidden] { display: none; }
