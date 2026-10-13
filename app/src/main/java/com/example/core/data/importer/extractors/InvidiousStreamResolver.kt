@@ -77,7 +77,9 @@ object InvidiousStreamResolver {
      */
     suspend fun resolve(
         videoId: String,
-        originalUrl: String
+        originalUrl: String,
+        audioQuality: com.example.core.model.StreamingAudioQuality =
+            com.example.core.model.StreamingAudioQuality.AUTO_HIFI
     ): OnlineVideoAudioImporter.ResolvedMediaInfo? = withContext(Dispatchers.IO) {
         val cleanVideoId = videoId.trim()
         if (!SAFE_VIDEO_ID_REGEX.matches(cleanVideoId)) {
@@ -85,7 +87,7 @@ object InvidiousStreamResolver {
             return@withContext null
         }
         for (baseInstance in INSTANCES) {
-            val resolved = queryInstance(baseInstance, cleanVideoId, originalUrl)
+            val resolved = queryInstance(baseInstance, cleanVideoId, originalUrl, audioQuality)
             if (resolved != null) {
                 return@withContext resolved
             }
@@ -96,7 +98,9 @@ object InvidiousStreamResolver {
     private fun queryInstance(
         baseInstance: String,
         videoId: String,
-        originalUrl: String
+        originalUrl: String,
+        audioQuality: com.example.core.model.StreamingAudioQuality =
+            com.example.core.model.StreamingAudioQuality.AUTO_HIFI
     ): OnlineVideoAudioImporter.ResolvedMediaInfo? {
         return try {
             val requestUrl = "$baseInstance/api/v1/videos/$videoId"
@@ -147,9 +151,10 @@ object InvidiousStreamResolver {
 
                     if (!url.contains(".m3u8") && !url.contains(".mpd")) {
                         if (mimeType.contains("audio/")) {
-                            val bonus = if (mimeType.contains("mp4")) 50000L else 0L
-                            if (bitrate + bonus >= maxAudioBitrate) {
-                                maxAudioBitrate = bitrate + bonus
+                            val itag = format.optInt("itag", 0)
+                            val score = InnerTubeClient.rankAudioFormat(mimeType, bitrate, itag, audioQuality)
+                            if (score >= maxAudioBitrate) {
+                                maxAudioBitrate = score
                                 bestAudioUrl = url
                             }
                         } else if (mimeType.contains("video/")) {

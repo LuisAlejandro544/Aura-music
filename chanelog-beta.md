@@ -136,3 +136,17 @@ En cada lanzamiento de **Aura Beta (`Nebula`)** generamos **3 archivos APK exclu
 | 📱 **`AuraBeta-v0.2.0-beta-1a-Nebula-arm64-v8a.apk`** | **ARM 64-bits (`arm64-v8a`)** | **Recomendado para la mayoría de teléfonos modernos (2018 en adelante).** Incluye exclusivamente los motores nativos en C++20, FFmpeg y Python de 64 bits. Es más ligero en espacio de almacenamiento y ofrece el máximo rendimiento acústico y energético. |
 | 📱 **`AuraBeta-v0.2.0-beta-1a-Nebula-armeabi-v7a.apk`** | **ARM 32-bits (`armeabi-v7a`)** | **Diseñado para teléfonos antiguos, básicos o con sistemas Android de 32 bits.** Contiene exclusivamente los binarios nativos optimizados con instrucciones ARMv7 NEON de 32 bits sin cargar librerías de 64 bits que tu procesador no utilice. |
 | 🌐 **`AuraBeta-v0.2.0-beta-1a-Nebula-universal.apk`** | **Universal Móvil (`arm64-v8a` + `armeabi-v7a`)** | **Funciona en absolutamente cualquier teléfono Android (32 y 64 bits).** Es el APK todo-terreno ideal si no sabes qué procesador tiene tu celular, para compartir el archivo con amigos por mensajería o para subir directamente a tiendas como **Uptodown**. |
+
+---
+
+## 🆕 Actualización — Calidad de Audio Opus / M4A + 📶 Modo Ahorro de Datos (solo Explorar)
+
+> Todo lo anterior se conserva intacto; esto solo añade las nuevas funciones sin reescribir el historial.
+
+10. 🎚️ **Selector de Calidad de Audio (Opus y M4A, para local y streaming con `yt-dlp`)**:
+    - En **Ajustes > Streaming & Caché Inteligente** ahora puedes elegir entre **Ahorro Opus ~48 kbps (itag 249)**, **Estándar M4A ~128 kbps (itag 140, el formato de siempre)**, **Alta Opus ~160 kbps (itag 251, suena mejor y pesa menos)** o **Automática Hi-Fi (recomendada: Opus 251 si existe, si no M4A 140)**.
+    - Vale para **canciones en streaming (Explorar)** y para **canciones locales/descargas con `yt-dlp`**: el ranking por itag rige en `InnerTubeClient`, `Invidious` y `YtDlpNativeEngine`, el selector `bestaudio[ext=webm]/bestaudio[ext=m4a]` rige en `YtDlpStreamDownloader`, y lo descargado se guarda en `songs/` como **`.opus`** u **`.m4a`** según tu elección (ambos reproducibles por ExoPlayer).
+    - Nota honesta: YouTube no da lossless real; Opus ~160 kbps es el techo práctico.
+11. 📶 **Modo Ahorro de Datos (exclusivamente para el modo Explorar / streaming)**:
+    - Un solo interruptor en Ajustes que, solo en streaming, **fuerza Opus ahorro**, **apaga el Video Canvas de fondo**, **no busca letras automáticamente (ni LRCLIB ni auto-detección online)** y **pausa la pre-descarga de audio/video y la radio de canciones similares**.
+    - Tus **canciones locales, sus videos y sus letras no se tocan en absoluto**: siguen sonando, mostrándose y buscándose como siempre.

@@ -10,14 +10,20 @@ import java.io.File
 internal class StreamingCacheLookup(private val s: StreamingCacheState) {
     fun getCachedAudioFile(videoId: String): File? {
         val safeId = s.sanitizeId(videoId)
-        val file = File(s.audioDir, "stream_audio_$safeId.m4a")
-        if (file.exists() && file.length() > StreamingCacheState.MIN_VALID_AUDIO_BYTES) {
-            val ageMs = System.currentTimeMillis() - file.lastModified()
-            if (ageMs <= StreamingCacheConfig.CACHE_TTL_MS) {
-                s.touchFile(file)
-                return file
-            } else {
-                try { file.delete() } catch (_: Exception) {}
+        // Acepta tanto .m4a (AAC) como .opus (Opus/WebM) según la calidad elegida por el usuario.
+        val candidates = listOf(
+            File(s.audioDir, "stream_audio_$safeId.opus"),
+            File(s.audioDir, "stream_audio_$safeId.m4a")
+        )
+        for (file in candidates) {
+            if (file.exists() && file.length() > StreamingCacheState.MIN_VALID_AUDIO_BYTES) {
+                val ageMs = System.currentTimeMillis() - file.lastModified()
+                if (ageMs <= StreamingCacheConfig.CACHE_TTL_MS) {
+                    s.touchFile(file)
+                    return file
+                } else {
+                    try { file.delete() } catch (_: Exception) {}
+                }
             }
         }
         return null

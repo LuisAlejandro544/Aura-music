@@ -77,23 +77,29 @@ object YtDlpNativeEngine {
         url: String,
         targetFile: File,
         isAudioOnly: Boolean,
-        onProgressUpdate: (DownloadProgress) -> Unit = {}
+        onProgressUpdate: (DownloadProgress) -> Unit = {},
+        audioQuality: com.example.core.model.StreamingAudioQuality =
+            com.example.core.model.StreamingAudioQuality.AUTO_HIFI
     ): Boolean {
         return YtDlpStreamDownloader.downloadToFile(
             context = context,
             url = url,
             targetFile = targetFile,
             isAudioOnly = isAudioOnly,
-            onProgressUpdate = onProgressUpdate
+            onProgressUpdate = onProgressUpdate,
+            audioQuality = audioQuality
         )
     }
 
     /**
      * Resuelve los flujos de audio y video de YouTube utilizando yt-dlp y Python localmente.
+     * @param audioQuality preferencia Opus/M4A elegida en Ajustes; por defecto AUTO_HIFI.
      */
     suspend fun resolveStream(
         context: Context,
-        url: String
+        url: String,
+        audioQuality: com.example.core.model.StreamingAudioQuality =
+            com.example.core.model.StreamingAudioQuality.AUTO_HIFI
     ): Result<OnlineVideoAudioImporter.ResolvedMediaInfo> = withContext(Dispatchers.IO) {
         if (YtDlpAutoUpdater.isYtDlpTemporarilyBlocked()) {
             val msg = "Descarga por yt-dlp bloqueada temporalmente hasta que se aplique la actualización de paquetes."
@@ -252,8 +258,18 @@ object YtDlpNativeEngine {
                     val abr = fmt.optDouble("abr", 0.0).takeIf { it > 0 } ?: fmt.optDouble("tbr", 0.0)
 
                     if (acodec != "none" && vcodec == "none") {
-                        val codecBonus = if (ext == "m4a" || acodec.contains("mp4a")) 500.0 else 0.0
-                        val score = abr + codecBonus
+                        val isOpus = ext == "webm" || acodec.contains("opus")
+                        val isM4a = ext == "m4a" || acodec.contains("mp4a")
+                        val score = when (audioQuality) {
+                            com.example.core.model.StreamingAudioQuality.AHORRO_OPUS_48K ->
+                                (if (isOpus) 100000.0 else 0.0) - abr
+                            com.example.core.model.StreamingAudioQuality.ALTA_OPUS_160K ->
+                                abr + (if (isOpus) 50000.0 else 0.0)
+                            com.example.core.model.StreamingAudioQuality.ESTANDAR_M4A_128K ->
+                                abr + (if (isM4a) 50000.0 else 0.0)
+                            com.example.core.model.StreamingAudioQuality.AUTO_HIFI ->
+                                abr + (if (isOpus) 20000.0 else 0.0)
+                        }
                         if (score > bestAudioScore || directAudioUrl == null) {
                             bestAudioScore = score
                             directAudioUrl = fmtUrl

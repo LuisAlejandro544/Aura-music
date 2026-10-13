@@ -208,17 +208,68 @@ data class StreamingSearchItem(
 }
 
 /**
+ * Calidad de audio elegible por el usuario para Streaming (Explorar) y descargas locales.
+ * - AHORRO_OPUS_48K: Opus ~48kbps (itag 249), mínimo consumo de datos.
+ * - ESTANDAR_M4A_128K: AAC/m4a ~128kbps (itag 140), equilibrio clásico actual.
+ * - ALTA_OPUS_160K: Opus ~160kbps (itag 251), máxima calidad práctica en YouTube.
+ * - AUTO_HIFI: elige automáticamente el mejor flujo disponible (Opus 251 si existe, si no m4a 140).
+ * Nota honesta: YouTube no ofrece lossless real; Opus 251 es el techo práctico.
+ */
+enum class StreamingAudioQuality(
+    val id: Int,
+    val title: String,
+    val description: String
+) {
+    AHORRO_OPUS_48K(
+        id = 0,
+        title = "Ahorro Opus ~48 kbps",
+        description = "Opus ultra-ligero (itag 249). Gasta poquísimos datos, ideal con ahorro activado."
+    ),
+    ESTANDAR_M4A_128K(
+        id = 1,
+        title = "Estándar M4A ~128 kbps",
+        description = "AAC/m4a clásico (itag 140). El formato que Aura usaba hasta ahora."
+    ),
+    ALTA_OPUS_160K(
+        id = 2,
+        title = "Alta Opus ~160 kbps",
+        description = "Opus de alta calidad (itag 251). Suena mejor que m4a y pesa menos."
+    ),
+    AUTO_HIFI(
+        id = 3,
+        title = "Automática Hi-Fi (recomendada)",
+        description = "Elige sola lo mejor: Opus 251 si está disponible, si no M4A 140."
+    );
+
+    /** True si este modo prefiere contenedor Opus/WebM sobre M4A. */
+    val prefersOpus: Boolean get() = this == AHORRO_OPUS_48K || this == ALTA_OPUS_160K || this == AUTO_HIFI
+
+    /** Extensión de archivo local recomendada para descargas permanentes. */
+    val localFileExtension: String get() = if (prefersOpus && this != AUTO_HIFI) "opus" else "m4a"
+
+    companion object {
+        fun fromId(id: Int): StreamingAudioQuality {
+            return values().find { it.id == id } ?: AUTO_HIFI
+        }
+    }
+}
+
+/**
  * Estado y configuración de la caché temporal inteligente para Streaming (Audio + Video Canvas).
  * - Límite configurable por el usuario: 50 MB por defecto, máximo 500 MB.
  * - Expiración automática (TTL): 30 minutos sin usarse.
  * - Desalojo LRU: cuando se llena, elimina primero los elementos más antiguos.
+ * - Calidad de audio elegible (Opus/M4A) válida para streaming y descargas locales.
+ * - Modo Ahorro de Datos exclusivo de Explorar: sin video, sin letras auto y sin prefetch.
  */
 data class StreamingCacheConfig(
     val maxCacheSizeMb: Int = DEFAULT_CACHE_SIZE_MB,
     val currentUsedBytes: Long = 0L,
     val cachedAudioCount: Int = 0,
     val cachedVideoCount: Int = 0,
-    val videoNetworkPolicy: StreamingVideoNetworkPolicy = StreamingVideoNetworkPolicy.WIFI_ONLY
+    val videoNetworkPolicy: StreamingVideoNetworkPolicy = StreamingVideoNetworkPolicy.WIFI_ONLY,
+    val audioQuality: StreamingAudioQuality = StreamingAudioQuality.AUTO_HIFI,
+    val dataSaverEnabled: Boolean = false
 ) {
     val usedMbFormatted: String
         get() {

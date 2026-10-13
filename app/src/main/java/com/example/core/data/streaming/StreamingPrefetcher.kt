@@ -41,7 +41,9 @@ internal class StreamingPrefetcher(
         val job = s.scope.launch {
             try {
                 requestEvict()
-                val targetFile = File(s.audioDir, "stream_audio_$safeId.m4a")
+                // La extensión refleja el códec real (Opus/WebM vs M4A) para no etiquetar mal el contenedor.
+                val ext = inferAudioExtension(streamUrl)
+                val targetFile = File(s.audioDir, "stream_audio_$safeId.$ext")
                 val tempFile = File(s.audioDir, "stream_audio_${safeId}.part")
 
                 // Descarga acelerada por bloques HTTP Range (estilo YouTube Read-Ahead)
@@ -126,6 +128,16 @@ internal class StreamingPrefetcher(
         s.jobs[jobKey] = job
     }
 
+    internal fun inferAudioExtension(streamUrl: String): String {
+        val u = streamUrl.lowercase()
+        val isOpus = u.contains("itag%3d251") || u.contains("itag=251") ||
+            u.contains("itag%3d250") || u.contains("itag=250") ||
+            u.contains("itag%3d249") || u.contains("itag=249") ||
+            u.contains("mime%3daudio%2fwebm") || u.contains("mime=audio/webm") ||
+            u.contains("codecs%3dopus") || u.contains("opus")
+        return if (isOpus) "opus" else "m4a"
+    }
+
     private suspend fun downloadWindow(
         safeId: String,
         streamUrl: String,
@@ -154,8 +166,13 @@ internal class StreamingPrefetcher(
             if (safeId.length == 11) {
                 val isVideoTarget = outputFile.name.endsWith(".mp4", ignoreCase = true)
                 val watchUrl = "https://www.youtube.com/watch?v=$safeId"
-                val altInfo = com.example.core.data.importer.InnerTubeClient.resolve(safeId, watchUrl)
-                    ?: com.example.core.data.importer.InvidiousStreamResolver.resolve(safeId, watchUrl)
+                val prefQuality = try {
+                    s.config.value.audioQuality
+                } catch (_: Throwable) {
+                    com.example.core.model.StreamingAudioQuality.AUTO_HIFI
+                }
+                val altInfo = com.example.core.data.importer.InnerTubeClient.resolve(safeId, watchUrl, prefQuality)
+                    ?: com.example.core.data.importer.InvidiousStreamResolver.resolve(safeId, watchUrl, prefQuality)
 
                 if (altInfo != null) {
                     val altUrl = if (isVideoTarget) altInfo.videoUrl else (altInfo.audioUrl ?: altInfo.videoUrl)

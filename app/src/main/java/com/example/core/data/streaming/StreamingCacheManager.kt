@@ -56,6 +56,23 @@ class StreamingCacheManager(private val context: Context) {
     fun setVideoNetworkPolicy(policy: StreamingVideoNetworkPolicy) =
         configOps.setVideoNetworkPolicy(policy)
 
+    fun setAudioQuality(quality: com.example.core.model.StreamingAudioQuality) =
+        configOps.setAudioQuality(quality)
+
+    fun setDataSaverEnabled(enabled: Boolean) =
+        configOps.setDataSaverEnabled(enabled)
+
+    /** Ahorro activo: bloquea video + letras auto + prefetch solo en Explorar/streaming. Local intacto. */
+    fun isStreamingDataSaverEnabled(): Boolean =
+        cacheConfig.value.dataSaverEnabled
+
+    fun getStreamingAudioQuality(): com.example.core.model.StreamingAudioQuality =
+        cacheConfig.value.audioQuality
+
+    /** Letras automáticas online solo si NO hay ahorro en streaming. Local siempre permitido. */
+    fun isStreamingLyricsAutoFetchAllowed(): Boolean =
+        !cacheConfig.value.dataSaverEnabled
+
     fun isStreamingVideoAllowedByNetwork(): Boolean =
         network.isStreamingVideoAllowedByNetwork()
 

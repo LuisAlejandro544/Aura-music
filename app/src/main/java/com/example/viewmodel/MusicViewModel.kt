@@ -784,6 +784,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         streamingCoordinator.downloadCurrentStreamingTrackPermanently(track)
     fun setStreamingVideoNetworkPolicy(policy: StreamingVideoNetworkPolicy) =
         streamingCoordinator.setStreamingVideoNetworkPolicy(policy)
+    fun setStreamingAudioQuality(quality: com.example.core.model.StreamingAudioQuality) =
+        streamingCoordinator.setStreamingAudioQuality(quality)
+    fun setStreamingDataSaverEnabled(enabled: Boolean) =
+        streamingCoordinator.setStreamingDataSaverEnabled(enabled)
     fun setStreamingCacheMaxSizeMb(sizeMb: Int) =
         streamingCoordinator.setStreamingCacheMaxSizeMb(sizeMb)
     fun clearStreamingCache() = streamingCoordinator.clearStreamingCache()

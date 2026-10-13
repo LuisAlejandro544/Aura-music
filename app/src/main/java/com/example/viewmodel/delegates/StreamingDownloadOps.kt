@@ -32,7 +32,9 @@ internal fun StreamingModeCoordinator.downloadStreamingItemPermanentlyInternal(
 
     scope.launch(Dispatchers.IO) {
         try {
-            val resolvedResult = StreamingApiService.resolvePlayableStreamWithYtDlp(context, item)
+            val resolvedResult = StreamingApiService.resolvePlayableStreamWithYtDlp(
+                context, item, audioQuality = cacheManager.getStreamingAudioQuality()
+            )
             val resolved = resolvedResult.getOrNull()
             if (resolved == null) {
                 _downloadingVideoIds.value = _downloadingVideoIds.value - item.videoId
@@ -86,6 +88,19 @@ internal fun StreamingModeCoordinator.downloadCurrentStreamingTrackPermanentlyIn
 
 internal fun StreamingModeCoordinator.setStreamingCacheMaxSizeMbInternal(sizeMb: Int) {
     cacheManager.setMaxCacheSizeMb(sizeMb)
+}
+
+internal fun StreamingModeCoordinator.setStreamingAudioQualityInternal(quality: com.example.core.model.StreamingAudioQuality) {
+    cacheManager.setAudioQuality(quality)
+}
+
+internal fun StreamingModeCoordinator.setStreamingDataSaverEnabledInternal(enabled: Boolean) {
+    cacheManager.setDataSaverEnabled(enabled)
+    // Al activar el ahorro, cortar el video de la pista de streaming actual al instante (local intacto).
+    val cur = audioPlayer.currentTrack.value
+    if (enabled && cur != null && cur.isStreamingTrack) {
+        audioPlayer.appendOrUpdateStreamingTrack(cur.copy(videoUri = null))
+    }
 }
 
 internal fun StreamingModeCoordinator.setStreamingVideoNetworkPolicyInternal(policy: StreamingVideoNetworkPolicy) {

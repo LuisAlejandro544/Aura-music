@@ -89,11 +89,13 @@ fun SettingsStreamingCacheScreen(
     onSelectStreamingVideoPolicy: (com.example.core.model.StreamingVideoNetworkPolicy) -> Unit,
     onChangeStreamingCacheMaxMb: (Int) -> Unit,
     onClearStreamingCache: () -> Unit,
+    onSelectStreamingAudioQuality: (com.example.core.model.StreamingAudioQuality) -> Unit = {},
+    onToggleStreamingDataSaver: (Boolean) -> Unit = {},
     onBack: () -> Unit
 ) {
                     SettingsSubMenuScreen(
                         title = "Streaming & Caché Inteligente",
-                        subtitle = "Videos Canvas en Streaming (Wi-Fi/Datos) y caché temporal de 50 a 500 MB",
+                        subtitle = "Calidad Opus/M4A, Ahorro de Datos (solo Explorar), Video Canvas y caché de 50 a 500 MB",
                         icon = Icons.Default.CloudQueue,
                         iconTint = MaterialTheme.colorScheme.primary,
                         onBack = onBack,
@@ -104,7 +106,9 @@ fun SettingsStreamingCacheScreen(
                                 cacheConfig = streamingCacheConfig,
                                 onSelectVideoPolicy = onSelectStreamingVideoPolicy,
                                 onChangeMaxCacheMb = onChangeStreamingCacheMaxMb,
-                                onClearStreamingCache = onClearStreamingCache
+                                onClearStreamingCache = onClearStreamingCache,
+                                onSelectAudioQuality = onSelectStreamingAudioQuality,
+                                onToggleDataSaver = onToggleStreamingDataSaver
                             )
                         }
                     }
