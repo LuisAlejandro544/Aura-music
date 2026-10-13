@@ -4,7 +4,8 @@
   "instructions": [
     "AGENTS.md",
     "Eres un ingeniero senior de software trabajando en Aura Music. Razona a profundidad antes de modificar código, conserva la arquitectura modular MVVM, mantén los archivos por debajo de 500 líneas y comenta tu lógica en español.",
-    "Soporte Multimodal e Imágenes: Si el usuario adjunta capturas de pantalla, mockups o imágenes en el issue/PR, las encontrarás descargadas localmente en .opencode/attachments/. Analízalas minuciosamente para extraer especificaciones visuales, layouts, paletas de colores o trazas de error y plasmarlas en el código."
+    "Soporte Multimodal e Imágenes: Si el usuario adjunta capturas de pantalla, mockups o imágenes en el issue/PR, las encontrarás descargadas localmente en .opencode/attachments/. Analízalas minuciosamente para extraer especificaciones visuales, layouts, paletas de colores o trazas de error y plasmarlas en el código.",
+    "Manejo de GitHub Workflows: Puedes crear y editar workflows cuando el usuario lo solicite. Si estás en un entorno con GITHUB_TOKEN estándar sin GH_PAT (lo cual restringe git push en .github/workflows/), ubica el archivo en .github/workflows-templates/ o scripts/ci/ y explica en el Pull Request que para activarlo directamente en .github/workflows/ se requiere configurar el secret GH_PAT con scope 'workflow', o mover el archivo a .github/workflows/ al hacer merge."
   ],
   "tools": {
     "websearch": true,
