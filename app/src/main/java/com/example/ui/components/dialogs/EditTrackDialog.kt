@@ -144,317 +144,52 @@ fun EditTrackDialog(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Sección de Carátula (Previsualización y controles de galería)
-                Box(
-                    modifier = Modifier
-                        .size(120.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .border(1.dp, CardBorder, RoundedCornerShape(16.dp))
-                        .clickable {
-                            photoPickerLauncher.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                            )
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    when {
-                        // 1. Imagen recién seleccionada de la galería
-                        selectedCustomArtUri != null -> {
-                            AsyncImage(
-                                model = selectedCustomArtUri,
-                                contentDescription = "Nueva carátula seleccionada",
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-                        // 2. Se solicitó quitar la carátula -> mostrar arte procedural
-                        shouldRemoveArtwork -> {
-                            ProceduralArtwork(
-                                title = title.ifBlank { "Aura" },
-                                artist = artist.ifBlank { "Music" },
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-                        // 3. Carátula existente de la pista si existe
-                        !track.albumArtPath.isNullOrEmpty() && File(track.albumArtPath).exists() -> {
-                            AsyncImage(
-                                model = File(track.albumArtPath),
-                                contentDescription = "Carátula actual",
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-                        // 4. Arte procedural predeterminado
-                        else -> {
-                            ProceduralArtwork(
-                                title = track.title,
-                                artist = track.artist,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-                    }
-
-                    // Overlay con botón de cámara / galería para mayor claridad táctil
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(6.dp)
-                            .size(32.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.AddPhotoAlternate,
-                            contentDescription = "Seleccionar de galería",
-                            tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(18.dp)
+                EditTrackArtworkSection(
+                    track = track,
+                    title = title,
+                    artist = artist,
+                    artUri = selectedCustomArtUri,
+                    removeArtwork = shouldRemoveArtwork,
+                    onPickArtwork = {
+                        photoPickerLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                         )
+                    },
+                    onRemoveArtwork = {
+                        selectedCustomArtUri = null
+                        shouldRemoveArtwork = true
                     }
-                }
-
-                // Botones para gestionar la carátula
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    OutlinedButton(
-                        onClick = {
-                            photoPickerLauncher.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                            )
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("change_artwork_btn")
-                    ) {
-                        Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Carátula", style = MaterialTheme.typography.labelMedium)
-                    }
-
-                    val hasArtwork = (!track.albumArtPath.isNullOrEmpty() || selectedCustomArtUri != null) && !shouldRemoveArtwork
-                    if (hasArtwork) {
-                        Spacer(modifier = Modifier.width(8.dp))
-                        TextButton(
-                            onClick = {
-                                selectedCustomArtUri = null
-                                shouldRemoveArtwork = true
-                            },
-                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                            modifier = Modifier.testTag("remove_artwork_btn")
-                        ) {
-                            Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Procedural", style = MaterialTheme.typography.labelMedium)
-                        }
-                    }
-                }
-
+                )
                 // Sección de Video Canvas / Video de Fondo
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-                    shape = RoundedCornerShape(14.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Videocam,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Text(
-                                text = "Video Canvas de Fondo",
-                                style = MaterialTheme.typography.titleSmall.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = TextPrimary
-                                )
-                            )
-                        }
-
-                        val hasVideoAttached = (track.videoUri != null || selectedCustomVideoUri != null) && !shouldRemoveVideo
-                        val videoStatusText = when {
-                            selectedCustomVideoUri != null -> "🎬 Nuevo video seleccionado (se analizará duración al guardar)"
-                            shouldRemoveVideo -> "❌ Se eliminará el video de fondo"
-                            track.videoUri != null -> if (track.isVideoLoop) "🔁 Loop Canvas activo (≤ 20s)" else "⏱️ Video largo sincronizado activo"
-                            else -> "Sin video de fondo. Los videos cortos (≤ 20s) se repiten en loop y los largos se sincronizan con la música."
-                        }
-
-                        Text(
-                            text = videoStatusText,
-                            style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                EditTrackVideoSection(
+                    track = track,
+                    videoUri = selectedCustomVideoUri,
+                    removeVideo = shouldRemoveVideo,
+                    loopMode = selectedLoopMode,
+                    onLoopModeChange = { selectedLoopMode = it },
+                    loopStyle = selectedLoopStyle,
+                    onLoopStyleChange = { selectedLoopStyle = it },
+                    onPickVideo = {
+                        videoPickerLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)
                         )
-
-                        if (hasVideoAttached) {
-                            val editContext = androidx.compose.ui.platform.LocalContext.current
-                            val appPrefs = remember { editContext.getSharedPreferences("aura_music_ui_prefs", android.content.Context.MODE_PRIVATE) }
-                            var selectedFramingMode by remember {
-                                val saved = appPrefs.getString("pref_video_display_mode", com.example.core.model.VideoDisplayMode.FULLSCREEN_BACKGROUND.name)
-                                val initial = if (saved == com.example.core.model.VideoDisplayMode.FULLSCREEN_ADAPTED.name) {
-                                    com.example.core.model.VideoDisplayMode.FULLSCREEN_ADAPTED
-                                } else {
-                                    com.example.core.model.VideoDisplayMode.FULLSCREEN_BACKGROUND
-                                }
-                                mutableStateOf(initial)
-                            }
-
-                            Text(
-                                text = "Encuadre del Video de Fondo:",
-                                style = MaterialTheme.typography.labelSmall.copy(color = TextPrimary, fontWeight = FontWeight.Bold)
-                            )
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                FilterChip(
-                                    selected = selectedFramingMode == com.example.core.model.VideoDisplayMode.FULLSCREEN_BACKGROUND,
-                                    onClick = {
-                                        selectedFramingMode = com.example.core.model.VideoDisplayMode.FULLSCREEN_BACKGROUND
-                                        appPrefs.edit().putString("pref_video_display_mode", selectedFramingMode.name).apply()
-                                    },
-                                    label = { Text("📱 Rellenar (Recortar)", style = MaterialTheme.typography.labelSmall) }
-                                )
-                                FilterChip(
-                                    selected = selectedFramingMode == com.example.core.model.VideoDisplayMode.FULLSCREEN_ADAPTED,
-                                    onClick = {
-                                        selectedFramingMode = com.example.core.model.VideoDisplayMode.FULLSCREEN_ADAPTED
-                                        appPrefs.edit().putString("pref_video_display_mode", selectedFramingMode.name).apply()
-                                    },
-                                    label = { Text("🎬 Adaptado horizontal", style = MaterialTheme.typography.labelSmall) }
-                                )
-                            }
-
-                            Text(
-                                text = "Modo de reproducción de video:",
-                                style = MaterialTheme.typography.labelSmall.copy(color = TextPrimary, fontWeight = FontWeight.Bold)
-                            )
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                FilterChip(
-                                    selected = selectedLoopMode == null,
-                                    onClick = { selectedLoopMode = null },
-                                    label = { Text("Auto (≤20s)", style = MaterialTheme.typography.labelSmall) }
-                                )
-                                FilterChip(
-                                    selected = selectedLoopMode == true,
-                                    onClick = { selectedLoopMode = true },
-                                    label = { Text("Loop", style = MaterialTheme.typography.labelSmall) }
-                                )
-                                FilterChip(
-                                    selected = selectedLoopMode == false,
-                                    onClick = { selectedLoopMode = false },
-                                    label = { Text("Sync", style = MaterialTheme.typography.labelSmall) }
-                                )
-                            }
-
-                            if (selectedLoopMode != false) {
-                                Text(
-                                    text = "Efecto de bucle FFmpeg (para Loops ≤20s):",
-                                    style = MaterialTheme.typography.labelSmall.copy(color = TextPrimary, fontWeight = FontWeight.Bold)
-                                )
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    FilterChip(
-                                        selected = selectedLoopStyle == com.example.core.data.importer.FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE,
-                                        onClick = {
-                                            selectedLoopStyle = com.example.core.data.importer.FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE
-                                        },
-                                        label = { Text("✨ Crossfade (xfade)", style = MaterialTheme.typography.labelSmall) }
-                                    )
-                                    FilterChip(
-                                        selected = selectedLoopStyle == com.example.core.data.importer.FFmpegNativeEngine.CanvasLoopStyle.BOOMERANG,
-                                        onClick = {
-                                            selectedLoopStyle = com.example.core.data.importer.FFmpegNativeEngine.CanvasLoopStyle.BOOMERANG
-                                            selectedLoopMode = true
-                                        },
-                                        label = { Text("🪃 Boomerang (Ping-Pong)", style = MaterialTheme.typography.labelSmall) }
-                                    )
-                                }
-                            }
-                        }
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Button(
-                                onClick = {
-                                    videoPickerLauncher.launch(
-                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)
-                                    )
-                                },
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(Icons.Default.MovieFilter, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(if (hasVideoAttached) "Cambiar Video" else "Elegir Video")
-                            }
-
-                            if (hasVideoAttached) {
-                                OutlinedButton(
-                                    onClick = {
-                                        selectedCustomVideoUri = null
-                                        shouldRemoveVideo = true
-                                    },
-                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                                    shape = RoundedCornerShape(10.dp)
-                                ) {
-                                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
-                                }
-                            }
-                        }
+                    },
+                    onRemoveVideo = {
+                        selectedCustomVideoUri = null
+                        shouldRemoveVideo = true
                     }
-                }
+                )
 
                 Divider(color = CardBorder.copy(alpha = 0.5f), thickness = 0.8.dp)
 
-                OutlinedTextField(
-                    value = title,
-                    onValueChange = { title = it },
-                    label = { Text("Título de la canción") },
-                    singleLine = true,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("edit_track_title_input"),
-                    shape = RoundedCornerShape(12.dp)
-                )
-
-                OutlinedTextField(
-                    value = artist,
-                    onValueChange = { artist = it },
-                    label = { Text("Artista / Intérprete") },
-                    singleLine = true,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("edit_track_artist_input"),
-                    shape = RoundedCornerShape(12.dp)
-                )
-
-                OutlinedTextField(
-                    value = album,
-                    onValueChange = { album = it },
-                    label = { Text("Álbum o Colección") },
-                    singleLine = true,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("edit_track_album_input"),
-                    shape = RoundedCornerShape(12.dp)
+                // Campos de texto
+                EditTrackTextFields(
+                    title = title,
+                    onTitleChange = { title = it },
+                    artist = artist,
+                    onArtistChange = { artist = it },
+                    album = album,
+                    onAlbumChange = { album = it }
                 )
             }
         },

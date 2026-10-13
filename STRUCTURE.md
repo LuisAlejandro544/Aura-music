@@ -86,7 +86,13 @@ app/
     │       │   │   │   └── SafTrackImporter.kt # Importador SAF blindado contra colisiones de extensiones
     │       │   │   │
     │       │   │   ├── storage/                # Almacenamiento Interno y Exportación Pública del Usuario
-    │       │   │   │   ├── AppStorageManager.kt # Manejo de disco estructurado en Android/data/.../files/
+    │       │   │   │   ├── AppStorageManager.kt # Fachada (111) que delega en 6 piezas
+    │       │   │   │   ├── StoragePathGuards.kt # Anti-Zip-Slip y validación canónica
+    │       │   │   │   ├── CoverArtworkStore.kt # Carátulas WebP en images/
+    │       │   │   │   ├── SongLyricsMetadataStore.kt # Canciones, .lrc y JSON
+    │       │   │   │   ├── CanvasVideoStore.kt # Video Canvas .mp4 en videos/
+    │       │   │   │   ├── WallpaperStore.kt # Fondo de pantalla personalizado
+    │       │   │   │   └── ResidualCleanup.kt # Purga de residuos y duplicados
     │       │   │   │   └── UserPublicMediaExporter.kt # Exportador SAF a carpeta pública del usuario con fusión FFmpeg (.mp4 con audio)
     │       │   │   │
     │       │   │   ├── updater/                # Actualizador Automático de Versiones APK
@@ -119,7 +125,13 @@ app/
     │       │   │   │   │   └── WebStreamExtractor.kt       # Extractor web universal y detector de subdominios YouTube
     │       │   │   │   ├── audio/              # Procesamiento Acústico, Formatos Especiales y Metadatos
     │       │   │   │   │   ├── AudioMetadataParser.kt      # Extracción de tags ID3, Vorbis y WebP
-    │       │   │   │   │   ├── AudioSilenceTrimmer.kt      # Supresión inteligente de silencios al inicio y fin (-42 dB RMS)
+    │       │   │   │   │   ├── AudioSilenceTrimmer.kt      # Fachada (63) que delega en 5 piezas
+    │       │   │   │   │   ├── SilenceTrimConfig.kt          # Umbrales dBFS y ventanas
+    │       │   │   │   │   ├── SilenceMediaUtils.kt          # Pista de audio y duración
+    │       │   │   │   │   ├── SilenceDetector.kt            # Detección RMS con PCM rápido
+    │       │   │   │   │   ├── SilenceMuxer.kt               # Recorte sin pérdida MediaMuxer
+    │       │   │   │   │   ├── ClippingBoundsStore.kt        # Límites startMs/endMs por URI
+    │       │   │   │   │   └── SilenceTrimProcessor.kt       # Orquesta detección + mux
     │       │   │   │   │   ├── SpecialAudioFormatDecoder.kt # Decodificador nativo DSD, APE, WavPack, ALAC, AIFF, MPC y Chiptune
     │       │   │   │   │   ├── VideoAudioExtractor.kt      # Conversor Video a Música 3 en 1 (Demuxing directo en ~1s)
     │       │   │   │   │   └── SampleMusicGenerator.kt     # Generador procedural de pistas sintetizadas demo
@@ -136,7 +148,14 @@ app/
     │       │   │   │   │   ├── LyricsUriImport.kt # Importación .lrc/.txt (512 KB)
     │       │   │   │   │   └── LyricsAutoDetect.kt # Autodetección de hermanos y tags
     │       │   │   │   ├── mixtape/            # Fusión Continua y Auto-Remix / Mashup de 2 Canciones Locales
-    │       │   │   │   │   ├── MixtapeEngine.kt        # Fusión FFmpeg acrossfade, collage WebP y capítulos reactivos
+    │       │   │   │   │   ├── MixtapeEngine.kt        # Fachada (32) que delega en 7 piezas
+    │       │   │   │   │   ├── MixtapeCreator.kt         # Orquestador de fusión continua
+    │       │   │   │   │   ├── MixtapeAudioPrep.kt       # Validación y preparación de audios
+    │       │   │   │   │   ├── MixtapeChapters.kt        # Duración y marcas de capítulos
+    │       │   │   │   │   ├── MixtapeArtwork.kt         # Collage WebP sin pérdida
+    │       │   │   │   │   ├── MixtapeLyrics.kt          # LRC continuo con offset
+    │       │   │   │   │   ├── MixtapeMetadataStore.kt   # JSON de capítulos
+    │       │   │   │   │   └── MixtapeFfmpegRunner.kt    # Ejecución FFmpeg con avance
     │       │   │   │   │   ├── SmartAutoRemixEngine.kt # Fachada que delega en AutoRemixMatcher, AutoRemixPlanner y AutoRemixPostProcessor
     │       │   │   │   ├── AutoRemixMatcher.kt       # Selección del mejor par y validación de archivos
     │       │   │   │   ├── AutoRemixPlanner.kt       # Grafos FFmpeg Mashup/DJ y ejecución con progreso
@@ -157,7 +176,13 @@ app/
     │       │   │       ├── YouTubeSearchEngine.kt           # Búsqueda YouTube (WEB), Watch Next y recomendaciones
     │       │   │       ├── StreamingSearchUtils.kt          # Parseo JSON, intercalado tri-plataforma y POST HTTP
     │       │   │       ├── SoundCloudApiClient.kt           # Cliente modular de SoundCloud (hidratación client_id v2 y streams)
-    │       │   │       ├── StreamingCacheManager.kt         # Caché inteligente (50-500 MB, 30 min TTL, LRU) y Pre-descarga No Lineal
+    │       │   │       ├── StreamingCacheManager.kt         # Fachada (97) que delega en 6 piezas
+    │       │   │       ├── StreamingCacheState.kt             # Estado compartido interno
+    │       │   │       ├── StreamingCacheConfigOps.kt         # Límite y política de red
+    │       │   │       ├── StreamingNetworkPolicy.kt          # Puerta Wi-Fi/siempre/off
+    │       │   │       ├── StreamingCacheLookup.kt            # Lectura con TTL
+    │       │   │       ├── StreamingPrefetcher.kt             # Pre-descarga HTTP Range
+    │       │   │       └── StreamingCacheMaintenance.kt       # Expiración LRU y stats
     │       │   │       └── StreamingHttpDataSourceConfig.kt # Alineación de cabeceras User-Agent/Origin por perfil firmado c=
     │       │   │
     │       │   ├── model/                      # Modelos de Dominio y Estado
@@ -221,7 +246,12 @@ app/
     │       │   │   ├── StreamingResultCard.kt        # Fila de catálogo con acciones
     │       │   │   └── StreamingPlatformBadge.kt     # Insignia YT Music / YouTube / SoundCloud
     │       │   ├── library/
-    │       │   │   ├── LibraryScreen.kt        # Pantalla de Biblioteca (Canciones, Favoritos, Playlists, Artistas y Álbumes)
+    │       │   │   ├── LibraryScreen.kt        # Fachada (199) que delega en 5 secciones
+    │       │   │   ├── LibraryHeader.kt          # Título y botones nueva/importar
+    │       │   │   ├── LibrarySearchBar.kt       # Buscador en tiempo real
+    │       │   │   ├── LibraryTabsRow.kt         # Chips de pestañas
+    │       │   │   ├── LibraryPlayActions.kt     # Reproducir todo y aleatorio
+    │       │   │   └── LibraryTabContent.kt      # Contenido por pestaña
     │       │   │   └── components/
     │       │   │       ├── AlbumAndArtistCards.kt        # Tarjetas de Álbumes y Artistas con apertura de detalle de canciones
     │       │   │       ├── FavoritesPlaylistBannerCard.kt # Banner destacado de la lista sincronizada "Tus Me Gusta"
@@ -243,15 +273,26 @@ app/
     │       │   │       └── NowPlayingCinematicHost.kt      # Envoltorio de la rama cinemática
     │       │   │       ├── NowPlayingDesignSelectorDialog.kt # Selector modal de modo de diseño del reproductor
     │       │   │       ├── NowPlayingArtworkCard.kt        # Tarjeta de carátula 1:1 y lienzo de video despejado
-    │       │   │       ├── NowPlayingLyricsCard.kt         # Tarjeta sincronizada de letras Karaoke 1:1 con auto-scroll
-    │       │   │       ├── NowPlayingPlaybackControls.kt   # Controles de transporte y barra continua con selector circular ("bolita")
+    │       │   │       ├── NowPlayingLyricsCard.kt         # Fachada (161) que delega en 4 piezas
+    │       │   │       ├── LyricsCardTopBar.kt               # Insignia y 5 botones
+    │       │   │       ├── LyricsCardContent.kt              # Karaoke, texto o vacío
+    │       │   │       ├── LyricsPasteDialog.kt              # Pegado manual
+    │       │   │       └── LyricBinarySearch.kt              # Índice activo O(log N)
+    │       │   │       ├── NowPlayingPlaybackControls.kt   # Fachada (112) que delega en 3 piezas
+    │       │   │       ├── NowPlayingTrackHeader.kt          # Marquesina, mixtape y favorito
+    │       │   │       ├── NowPlayingSeekBarSection.kt       # Progreso y bucle A-B
+    │       │   │       └── NowPlayingButtonsRow.kt           # Shuffle, anterior, play, siguiente, repeat
     │       │   │       ├── NowPlayingQueueSheet.kt         # Hoja modal de cola de reproducción con miniaturas HD
     │       │   │       ├── NowPlayingTopBar.kt             # Barra superior con accesos a especificaciones, Karaoke, diseño y efectos
     │       │   │       ├── NowPlayingBalanceBar.kt         # Barra interactiva de Balance Estéreo Fino L/R
     │       │   │       ├── AudioSpecsDialog.kt             # Ficha técnica de pista, telemetría AAudio y estado Bit-Perfect
     │       │   │       └── VideoDisplayModeDialog.kt       # Selector modal de encuadre de Video Canvas (4 modos)
     │       │   ├── playlist/
-    │       │   │   └── PlaylistDetailScreen.kt # Vista detallada de canciones para Playlists, Artistas y Álbumes
+    │       │   │   └── PlaylistDetailScreen.kt # Fachada (206) que delega en 4 piezas
+    │       │   │       ├── PlaylistDetailHeader.kt       # Portada e insignia
+    │       │   │       ├── PlaylistDetailActions.kt      # Reproducir, añadir, Mixtape
+    │       │   │       ├── PlaylistTrackItems.kt         # Lista con menú de 3 puntos
+    │       │   │       └── PlaylistAddTracksDialog.kt    # Alta con buscador
     │       │   ├── importmusic/                   # Centro de importación (fachada + 6 piezas)
     │       │   │   ├── ImportMusicScreen.kt        # Fachada: orquesta lanzadores SAF y diálogos
     │       │   │   ├── ImportStatusCards.kt        # Tarjetas de aviso, carga y privacidad
@@ -380,8 +421,16 @@ app/
     │       │       │   ├── PlaylistImportSaveModeSelector.kt # Modo de guardado y Video Canvas
     │       │       │   ├── PlaylistImportProgress.kt       # Barra de progreso
     │       │       │   └── PlaylistImportActions.kt        # Botones finales
-    │       │       │   ├── EditTrackDialog.kt              # Editor de metadatos, portada WebP y Video Canvas
-    │       │       │   ├── SearchLyricsDialog.kt           # Buscador interactivo de letras LRCLIB con recomendación #1
+    │       │       │   ├── EditTrackDialog.kt              # Fachada (296) + 2 sobrecargas y 3 secciones
+    │       │       │   ├── EditTrackArtworkSection.kt        # Carátula y galería
+    │       │       │   ├── EditTrackVideoSection.kt          # Video Canvas y loop FFmpeg
+    │       │       │   └── EditTrackTextFields.kt            # Título, artista y álbum
+    │       │       │   ├── SearchLyricsDialog.kt           # Fachada (132) que delega en 5 piezas
+    │       │       │   ├── SearchLyricsHeader.kt             # Cabecera del diálogo
+    │       │       │   ├── SearchLyricsInputs.kt             # Campos título y artista
+    │       │       │   ├── SearchLyricsSubmitButton.kt       # Botón de búsqueda
+    │       │       │   ├── SearchLyricsResultsContent.kt     # Carga, error, vacío o lista
+    │       │       │   └── LyricResultItemCard.kt            # Tarjeta con insignia oficial
     │       │       │   └── VideoToMusicDialog.kt           # Conversor 3 en 1 de Video a Música (.m4a + WebP + Canvas)
     │       │       └── download/               # Subcomponentes del Modal de Descargas Web
     │       │           ├── DownloadProgressStatusCard.kt      # Tarjeta de progreso en vivo (MB/s, porcentaje y 2do plano)
