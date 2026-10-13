@@ -38,23 +38,30 @@ fun LazyListScope.libraryHeader(
     onOpenPlaylistImportDialog: () -> Unit,
     onNewListClick: () -> Unit
 ) {
-        // Título de la pantalla y botones de Nueva Lista / Importar Playlist
+        // Título de la pantalla y botones de Nueva Lista / Importar Playlist.
+        // Diseño apilado: título arriba y botones abajo a ancho completo para que
+        // en pantallas compactas (360dp / 720px) ningún botón se estreche en vertical
+        // letra por letra (fallo "N-u-e-v-a L-i-s-t-a" de la captura).
         item {
             Spacer(modifier = Modifier.height(16.dp))
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
                     text = "Tu Biblioteca",
                     style = MaterialTheme.typography.headlineMedium.copy(
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary
-                    )
+                    ),
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth()
                 )
 
                 Row(
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -63,7 +70,9 @@ fun LazyListScope.libraryHeader(
                         shape = RoundedCornerShape(20.dp),
                         border = BorderStroke(1.dp, Color(0xFF1DB954).copy(alpha = 0.65f)),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                        modifier = Modifier.testTag("import_external_playlist_header_btn")
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("import_external_playlist_header_btn")
                     ) {
                         Icon(
                             imageVector = Icons.Default.CloudDownload,
@@ -75,7 +84,10 @@ fun LazyListScope.libraryHeader(
                         Text(
                             text = "Importar",
                             color = TextPrimary,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                         )
                     }
 
@@ -87,11 +99,19 @@ fun LazyListScope.libraryHeader(
                             containerColor = MaterialTheme.colorScheme.primaryContainer,
                             contentColor = MaterialTheme.colorScheme.primary
                         ),
-                        modifier = Modifier.testTag("create_playlist_btn")
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("create_playlist_btn")
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Nueva Lista", fontWeight = FontWeight.SemiBold)
+                        Text(
+                            text = "Nueva Lista",
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        )
                     }
                 }
             }
