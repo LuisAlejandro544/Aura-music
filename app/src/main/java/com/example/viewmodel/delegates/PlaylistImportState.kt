@@ -62,4 +62,10 @@ internal class PlaylistImportState {
     val batchFailed = kotlinx.coroutines.flow.MutableStateFlow(0)
     val batchActive = kotlinx.coroutines.flow.MutableStateFlow(false)
     val batchPlaylistName = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+
+    // === Fase B: cola global persistente + pausa sin red ===
+    // Playlist Room destino del lote activo (para filtrar su cancelación sin tocar descargas sueltas).
+    var batchPlaylistId: Long = -1L
+    // true mientras el lote espera recuperar la red (pausa cooperativa, no fallo).
+    val batchWaitingForNetwork = kotlinx.coroutines.flow.MutableStateFlow(false)
 }
