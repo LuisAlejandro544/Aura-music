@@ -127,15 +127,17 @@ class NativeAudioProcessor : BaseAudioProcessor() {
 
         if (!outputBuffer.isDirect || outSize <= 0) return
 
-        // Si es una pista en modo Streaming, mantenemos el bypass de efectos de audio C++20
-        // pero ejecutamos el analizador espectral de solo lectura para que las 28 bandas del visualizador
-        // y la intensidad acústica reaccionen en tiempo real al ritmo de la música.
+        // Modo Streaming Fases 1-3: DSP activo para EQ, Normalización y 8D/16D.
+        // La Fase 4 (Reverb, VocalClarity, Crossfeed/Balance, Bit-Perfect, DJ) se
+        // fuerza a bypass a nivel nativo en applyStreamingPolicy() para que suene
+        // limpio aunque el usuario los tuviera activos en local. El visualizador
+        // de 28 bandas sigue reaccionando vía processPcmBuffer (incluye espectro).
         if (isStreamingBypassActive) {
             NativeAudioEngine.analyzePcmBufferReadOnly(outputBuffer, 0, outSize)
             return
         }
 
-        // Procesar efectos de audio + espectro en el buffer de salida mediante el motor DSP nativo C++20 para pistas locales
+        // Procesar efectos de audio + espectro en el buffer de salida mediante el motor DSP nativo C++20
         NativeAudioEngine.processPcmBuffer(outputBuffer, 0, outSize)
     }
 

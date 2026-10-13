@@ -82,10 +82,18 @@ internal class AudioEffectState {
         NativeAudioEngine.setEightDRoomDepth(_spatial8DConfig.value.roomDepth)
 
         val vc = _vocalClarityConfig.value
-        NativeAudioEngine.setVocalClarityParameters(vc.enabled, vc.strength)
+        if (NativeAudioEngine.streamingLockPhase4) {
+            NativeAudioEngine.setVocalClarityParameters(false, vc.strength)
+        } else {
+            NativeAudioEngine.setVocalClarityParameters(vc.enabled, vc.strength)
+        }
 
         val rev = _reverbConfig.value
-        NativeAudioEngine.setReverbParameters(rev.isEnabled, rev.roomSize, rev.decayMs, rev.reverbLevelDb)
+        if (NativeAudioEngine.streamingLockPhase4) {
+            NativeAudioEngine.setReverbParameters(false, rev.roomSize, rev.decayMs, rev.reverbLevelDb)
+        } else {
+            NativeAudioEngine.setReverbParameters(rev.isEnabled, rev.roomSize, rev.decayMs, rev.reverbLevelDb)
+        }
 
         val vn = _volumeNormalizationConfig.value
         NativeAudioEngine.setVolumeNormalization(vn.enabled, vn.targetLufs, vn.mode)

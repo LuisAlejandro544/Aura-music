@@ -54,7 +54,9 @@ fun TransitionsTabContent(
     onVolumeNormalizationToggle: (Boolean) -> Unit = {},
     volumeNormalizationMode: Int = 1,
     onVolumeNormalizationModeChange: (Int) -> Unit = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // Fases 1-2 activas en streaming (A-B, crossfade, normalización); DJ es Fase 4.
+    isStreamingTrack: Boolean = false
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -80,7 +82,8 @@ fun TransitionsTabContent(
             isDjAutomixEnabled = isDjAutomixEnabled,
             onDjAutomixToggle = onDjAutomixToggle,
             isDjEqCurveEnabled = isDjEqCurveEnabled,
-            onDjEqCurveToggle = onDjEqCurveToggle
+            onDjEqCurveToggle = onDjEqCurveToggle,
+            isStreamingTrack = isStreamingTrack
         )
 
         // Tarjeta 3: Normalización de Volumen Inteligente (Loudness Normalizer EBU R128)

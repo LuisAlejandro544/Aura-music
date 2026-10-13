@@ -34,8 +34,15 @@ fun BalanceAndHeadphonesTabContent(
     onSetCrossfeedStrength: (Int) -> Unit,
     onSetBalanceControlEnabled: (Boolean) -> Unit,
     onSetStereoBalance: (Float) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // Fase 4 en streaming: Crossfeed/Balance bloqueados con "Próximamente".
+    isStreamingTrack: Boolean = false
 ) {
+    StreamingComingSoonBlock(
+        title = "Crossfeed y Balance en streaming disponibles próximamente",
+        isStreaming = isStreamingTrack,
+        modifier = modifier
+    ) {
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -214,5 +221,6 @@ fun BalanceAndHeadphonesTabContent(
                 }
             }
         }
+    }
     }
 }

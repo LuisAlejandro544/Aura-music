@@ -16,6 +16,15 @@ object NativeAudioEngine {
     private const val TAG = "NativeAudioEngine"
     private var isLoaded = false
 
+    /**
+     * Candado Fase 4 en streaming: cuando está activo, los setters de
+     * Reverb, VocalClarity, Crossfeed/Balance, Bit-Perfect y DJ se ignoran
+     * a nivel nativo (se preserva el StateFlow local para al volver a local).
+     * EQ, Normalización y 8D/16D siguen pasando.
+     */
+    @Volatile
+    var streamingLockPhase4: Boolean = false
+
     // Frecuencias centrales ISO de las 10 bandas
     val BAND_FREQUENCIES_HZ = doubleArrayOf(
         31.25, 62.5, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0
@@ -119,6 +128,7 @@ object NativeAudioEngine {
     }
 
     fun setVocalClarityParameters(enabled: Boolean, strength: Float) {
+        if (streamingLockPhase4 && enabled) return
         if (isLoaded) {
             try {
                 nativeSetVocalClarityParameters(enabled, strength.coerceIn(0f, 1f))
@@ -127,6 +137,7 @@ object NativeAudioEngine {
     }
 
     fun setCrossfeedEnabled(enabled: Boolean) {
+        if (streamingLockPhase4 && enabled) return
         if (isLoaded) {
             try {
                 nativeSetCrossfeedEnabled(enabled)
@@ -145,12 +156,15 @@ object NativeAudioEngine {
     fun setCrossfeedStrength(strengthMode: Int) {
         if (isLoaded) {
             try {
+                // En streaming Fase 4 el Crossfeed queda en bypass aunque se ajuste intensidad.
+                if (streamingLockPhase4) return
                 nativeSetCrossfeedStrength(strengthMode.coerceIn(0, 2))
             } catch (ignored: Throwable) {}
         }
     }
 
     fun setBalanceEnabled(enabled: Boolean) {
+        if (streamingLockPhase4 && enabled) return
         if (isLoaded) {
             try {
                 nativeSetBalanceEnabled(enabled)
@@ -159,6 +173,7 @@ object NativeAudioEngine {
     }
 
     fun setStereoBalance(balance: Float) {
+        if (streamingLockPhase4) return
         val clamped = balance.coerceIn(-1.0f, 1.0f)
         if (isLoaded) {
             try {
@@ -168,6 +183,7 @@ object NativeAudioEngine {
     }
 
     fun setReverbParameters(enabled: Boolean, roomSize: Float, decayMs: Int, levelDb: Float) {
+        if (streamingLockPhase4 && enabled) return
         val clampedRoom = roomSize.coerceIn(0.1f, 2.0f)
         val clampedDecay = decayMs.coerceIn(100, 6000)
         val clampedLevel = levelDb.coerceIn(-30.0f, 6.0f)
@@ -254,6 +270,7 @@ object NativeAudioEngine {
      * [progress] va de 0.0f (reproducción normal) a 1.0f (outro/mezcla con recorte de bajos para dar paso a la siguiente).
      */
     fun setDjAutomixTransition(enabled: Boolean, progress: Float) {
+        if (streamingLockPhase4 && enabled) return
         if (isLoaded) {
             try {
                 nativeSetDjAutomixTransition(enabled, progress.coerceIn(0.0f, 1.0f))
@@ -266,6 +283,7 @@ object NativeAudioEngine {
      * Cuando está activo, se omiten todas las alteraciones DSP para entregar los bits puros al DAC.
      */
     fun setBitPerfectMode(enabled: Boolean) {
+        if (streamingLockPhase4 && enabled) return
         if (isLoaded) {
             try {
                 nativeSetBitPerfectMode(enabled)

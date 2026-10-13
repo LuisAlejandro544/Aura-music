@@ -386,7 +386,7 @@ Está construido con las tecnologías más modernas del ecosistema Android: **Je
 - **Radio Automática de Canciones Similares, Descarga Permanente en 1 Toque y Visualizador en Streaming**:
   - Cuando quedan ~35 segundos para terminar la canción actual en streaming, consulta automáticamente a la API una canción similar y la pre-resuelve para continuar la reproducción sin silencios.
   - Incluye botón de **Descarga Permanente** tanto en las tarjetas de búsqueda como en la barra superior de *Now Playing* para guardar la canción con su carátula WebP y Video Canvas en la biblioteca local (`AuraDownloadService`).
-  - Durante la reproducción en streaming, el procesador DSP en C++20 permanece en bypass limpio (`NativeAudioProcessor.isStreamingBypassActive = true`) mientras analiza en modo solo-lectura (`analyzeReadOnlyPcm16`) las muestras PCM para mantener las 28 bandas del visualizador espectral 100% reactivas.
+  - Durante la reproducción en streaming, el procesador DSP C++20 procesa en streaming las Fases 1-3 (EQ, normalización y 8D/16D vía processPcmBuffer con streamingLockPhase4 para la Fase 4) las muestras PCM para mantener las 28 bandas del visualizador espectral 100% reactivas.
 
 ---
 
