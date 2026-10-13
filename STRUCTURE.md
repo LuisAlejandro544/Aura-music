@@ -254,7 +254,11 @@ app/
     │       │           ├── SettingDetailRow.kt            # Fila reutilizable de información clave-valor
     │       │           ├── SettingsSubScreenComponents.kt # Tarjetas navegables y contenedor SettingsSubMenuScreen
     │       │           ├── widgets/                       # Personalización y Vista Previa de los 2 Widgets
-    │       │           │   └── WidgetSettingsContent.kt   # Selector Top 4 Canciones/Playlists, color de imagen y vista previa
+    │       │           │   ├── WidgetSettingsContent.kt       # Fachada de personalización (87 líneas)
+    │       │           │   ├── WidgetLivePreviewSection.kt    # Vista previa en vivo con colores dinámicos
+    │       │           │   ├── WidgetGridModeSection.kt       # Selector Top 4 Canciones/Playlists
+    │       │           │   ├── WidgetDynamicColorSection.kt  # Color de imagen e intensidad
+    │       │           │   └── WidgetProgressSection.kt       # Barra de progreso y sincronización
     │       │           ├── about/                         # Detrás del Proyecto (Creador & Contribuidores)
     │       │           │   └── BehindTheProjectSection.kt # Perfiles de GitHub con caché permanente de avatares en WebP
     │       │           ├── appearance/                    # Ajustes de Apariencia, Streaming, Modo Juego, Fondo y Motores
