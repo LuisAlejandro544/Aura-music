@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<!-- Página de descarga de Aura Music (Aura Beta • Nebula). -->
+<!-- Rol: landing estática para Cloudflare Pages. Lee versión y APKs desde GitHub Releases y muestra README + chanelog-beta sin duplicarlos. -->
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Aura Music • Descarga oficial (Aura Beta Nebula)</title>
+  <meta name="description" content="Descarga oficial de Aura Music (Aura Beta Nebula): elige tu APK según tu arquitectura arm64-v8a, armeabi-v7a o universal. Sin anuncios, con Video Canvas y DSP C++20." />
+  <link rel="stylesheet" href="./styles.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌌</text></svg>" />
+</head>
+<body>
+  <header class="hero">
+    <p class="pill" id="versionPill">🔍 Buscando última versión Beta…</p>
+    <h1>🌌 Aura Music <span class="beta">Aura Beta • Nebula</span></h1>
+    <p class="subtitle">Tu estudio audiófilo, centro de descargas y Video Canvas en tu bolsillo.<br /><strong>100% libre de anuncios y sin suscripciones.</strong></p>
+    <div class="badges">
+      <span class="badge violet">Android 8.0+ (API 26–36)</span>
+      <span class="badge cyan">DSP C++20 + AAudio</span>
+      <span class="badge green">0% anuncios</span>
+    </div>
+    <p class="meta" id="releaseMeta">Conectando con GitHub Releases…</p>
+    <div class="hero-actions">
+      <a class="btn primary" id="heroDownloadBtn" href="https://github.com/LuisAlejandro544/Aura-music/releases" target="_blank" rel="noopener">⬇️ Descargar recomendado</a>
+      <a class="btn ghost" href="https://github.com/LuisAlejandro544/Aura-music/blob/main/README.md" target="_blank" rel="noopener">📖 Ver README</a>
+      <a class="btn ghost" href="https://github.com/LuisAlejandro544/Aura-music/blob/main/chanelog-beta.md" target="_blank" rel="noopener">🚀 Ver changelog</a>
+    </div>
+  </header>
+
+  <main>
+    <!-- 3 arquitecturas: misma tabla que README.md, sin duplicar binarios (enlazan a Releases). -->
+    <section id="apks">
+      <h2>📲 Elige tu APK (3 arquitecturas móviles)</h2>
+      <p class="hint">Los botones se activan solos al detectar el último Pre-Release <code>-beta</code>. Si la API de GitHub falla, usan el enlace general a Releases.</p>
+      <div class="cards">
+        <article class="card recommended">
+          <p class="tag">⭐ Recomendado</p>
+          <h3>arm64-v8a <small>ARM 64-bits</small></h3>
+          <p>Casi todos los teléfonos modernos (2018 hasta hoy). Solo binarios de 64 bits: más ligero, más rápido y mejor batería.</p>
+          <ul>
+            <li>✅ Usa este si tu móvil es actual.</li>
+            <li>✅ Máximo rendimiento DSP y FFmpeg.</li>
+          </ul>
+          <a class="btn primary dl" data-abi="arm64-v8a" href="https://github.com/LuisAlejandro544/Aura-music/releases" target="_blank" rel="noopener">⬇️ Descargar arm64-v8a</a>
+          <p class="size" data-size="arm64-v8a"></p>
+        </article>
+        <article class="card">
+          <p class="tag alt">📱 Clásicos</p>
+          <h3>armeabi-v7a <small>ARM 32-bits</small></h3>
+          <p>Teléfonos antiguos, básicos o con Android de 32 bits. Binarios ARMv7 NEON sin cargar librerías de 64 bits.</p>
+          <ul>
+            <li>✅ Úsalo solo si el arm64-v8a no se instala.</li>
+            <li>✅ Error típico: “la app no es compatible”.</li>
+          </ul>
+          <a class="btn primary dl" data-abi="armeabi-v7a" href="https://github.com/LuisAlejandro544/Aura-music/releases" target="_blank" rel="noopener">⬇️ Descargar armeabi-v7a</a>
+          <p class="size" data-size="armeabi-v7a"></p>
+        </article>
+        <article class="card">
+          <p class="tag green">🌐 Todoterreno</p>
+          <h3>universal <small>32 + 64 bits</small></h3>
+          <p>Funciona en absolutamente cualquier Android. Ideal si no sabes tu procesador, para compartir por mensajería o subir a Uptodown.</p>
+          <ul>
+            <li>✅ Si dudas, descarga este.</li>
+            <li>⚠️ Pesa más (trae ambos juegos de .so).</li>
+          </ul>
+          <a class="btn primary dl" data-abi="universal" href="https://github.com/LuisAlejandro544/Aura-music/releases" target="_blank" rel="noopener">⬇️ Descargar universal</a>
+          <p class="size" data-size="universal"></p>
+        </article>
+      </div>
+      <p class="sha">🔐 Verifica tu APK con <a id="shaLink" href="https://github.com/LuisAlejandro544/Aura-music/releases" target="_blank" rel="noopener">SHA256SUMS.txt</a> del mismo Pre-Release (lo usa el actualizador OTA interno).</p>
+    </section>
+
+    <section id="como-saber">
+      <h2>🔍 ¿Cómo sé cuál es mi arquitectura?</h2>
+      <ol>
+        <li><strong>Opción fácil:</strong> descarga el <strong>universal</strong>; funciona siempre.</li>
+        <li><strong>En tu móvil:</strong> Ajustes → Acerca del teléfono → Procesador. Si ves “64 bits / octa-core moderno”, usa <strong>arm64-v8a</strong>.</li>
+        <li><strong>Dentro de la app:</strong> Ajustes → Motores Nativos &amp; Diagnóstico detecta tu ABI y descarga el APK exacto con verificación SHA-256.</li>
+      </ol>
+    </section>
+
+    <section id="instalar">
+      <h2>⚙️ Instalación en 3 pasos</h2>
+      <ol>
+        <li>Descarga el <code>.apk</code> de arriba (recomendado: <strong>arm64-v8a</strong>).</li>
+        <li>Ábrelo desde Descargas y autoriza “Instalar apps desconocidas” si Android lo pide.</li>
+        <li>Actualiza sin perder nada desde la app: <strong>Ajustes → Motores Nativos &amp; Diagnóstico</strong>. Tu música en <code>Android/data/com.auramusic.beta/files/</code> se conserva.</li>
+      </ol>
+    </section>
+
+    <!-- Conexión viva con chanelog-beta.md y README.md vía fetch (sin copiar el texto a mano). -->
+    <section id="novedades">
+      <h2>🚀 Novedades de esta Beta <span class="live">● en vivo desde chanelog-beta.md</span></h2>
+      <p class="hint">Texto cargado directo del archivo <code>chanelog-beta.md</code> del repositorio. Si estás offline, abre el <a href="https://github.com/LuisAlejandro544/Aura-music/blob/main/chanelog-beta.md" target="_blank" rel="noopener">changelog en GitHub</a>.</p>
+      <article id="changelogBox" class="md-box">Cargando novedades…</article>
+    </section>
+
+    <section id="porque">
+      <h2>🌟 ¿Por qué Aura Music? <span class="live">● resumen del README.md</span></h2>
+      <article id="readmeBox" class="md-box">Cargando resumen…</article>
+      <p class="hint">Documentación completa en <a href="https://github.com/LuisAlejandro544/Aura-music/blob/main/README.md" target="_blank" rel="noopener">README.md</a> y <a href="https://github.com/LuisAlejandro544/Aura-music/blob/main/READMEAI.md" target="_blank" rel="noopener">READMEAI.md</a>.</p>
+    </section>
+  </main>
+
+  <footer>
+    <p>🌟 Creador: <a href="https://github.com/LuisAlejandro544" target="_blank" rel="noopener">Luis Alejandro Sosa Camacho</a> • 🤝 Contribuidor: <a href="https://github.com/thelandy03-boop" target="_blank" rel="noopener">@thelandy03-boop</a></p>
+    <p>© 2026 Luis Alejandro Sosa Camacho • Licencia propietaria de código visible (ver <a href="https://github.com/LuisAlejandro544/Aura-music/blob/main/LICENSE" target="_blank" rel="noopener">LICENSE</a>)</p>
+    <p><a href="https://github.com/LuisAlejandro544/Aura-music/releases" target="_blank" rel="noopener">Releases oficiales</a> • <a href="https://github.com/LuisAlejandro544/Aura-music" target="_blank" rel="noopener">Repositorio</a></p>
+  </footer>
+
+  <!-- Sin framework: JS vanilla para que Cloudflare Pages la sirva sin build. -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>

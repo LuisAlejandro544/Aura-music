@@ -1,0 +1,79 @@
+/* Tema Dark Luxury Neo-Glass OLED de Aura Music: fondo negro puro, superficies opacas. */
+/* Paleta: Nebula Violet #8B5CF6, Cyber Cyan #00D2FF, Sunset Pink #F472B6, Verde #10B981, Ámbar #F59E0B. */
+:root {
+  --bg: #000000;
+  --surface: #111827;
+  --surface2: #1f2937;
+  --text: #f9fafb;
+  --muted: #9ca3af;
+  --violet: #8b5cf6;
+  --cyan: #00d2ff;
+  --pink: #f472b6;
+  --green: #10b981;
+  --amber: #f59e0b;
+  --radius: 16px;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.6;
+}
+.hero {
+  text-align: center; padding: 56px 20px 32px;
+  background: radial-gradient(600px 300px at 50% 0%, rgba(139, 92, 246, .35), transparent),
+              radial-gradient(500px 260px at 80% 20%, rgba(0, 210, 255, .18), transparent);
+}
+.pill {
+  display: inline-block; background: var(--surface2); border: 1px solid var(--violet);
+  padding: 6px 14px; border-radius: 999px; font-size: 14px; color: var(--text);
+}
+h1 { font-size: clamp(28px, 5vw, 48px); margin: 16px 0 8px; }
+.beta { color: var(--cyan); font-size: .55em; white-space: nowrap; }
+.subtitle { color: var(--muted); max-width: 640px; margin: 0 auto; }
+.subtitle strong { color: var(--text); }
+.badges { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin: 16px 0; }
+.badge { padding: 6px 12px; border-radius: 999px; font-size: 13px; font-weight: 700; color: #000; }
+.badge.violet { background: var(--violet); color: #fff; }
+.badge.cyan { background: var(--cyan); }
+.badge.green { background: var(--green); color: #fff; }
+.meta { color: var(--muted); font-size: 14px; }
+.hero-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 16px; }
+.btn {
+  display: inline-block; padding: 12px 22px; border-radius: 12px; min-height: 48px;
+  text-decoration: none; font-weight: 800; border: 1px solid transparent;
+}
+.btn.primary { background: var(--violet); color: #fff; }
+.btn.ghost { background: transparent; color: var(--text); border-color: var(--surface2); }
+.btn:hover { filter: brightness(1.12); }
+main { max-width: 1024px; margin: 0 auto; padding: 0 20px 40px; }
+section { background: var(--surface); border-radius: var(--radius); padding: 24px; margin: 20px 0; }
+h2 { margin-top: 0; }
+.hint { color: var(--muted); font-size: 14px; }
+.live { color: var(--green); font-size: 13px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.card { background: var(--surface2); border-radius: var(--radius); padding: 20px; border: 1px solid #374151; }
+.card.recommended { border-color: var(--violet); }
+.card h3 small { color: var(--cyan); }
+.tag { display: inline-block; font-size: 12px; font-weight: 800; background: var(--violet); color: #fff; border-radius: 999px; padding: 2px 10px; }
+.tag.alt { background: var(--amber); color: #000; }
+.tag.green { background: var(--green); }
+.card ul { padding-left: 18px; color: var(--muted); font-size: 14px; }
+.size { color: var(--cyan); font-size: 13px; min-height: 20px; }
+.sha { font-size: 14px; color: var(--muted); }
+code { background: #000; padding: 2px 6px; border-radius: 6px; color: var(--cyan); }
+ol li { margin: 8px 0; }
+.md-box {
+  background: #000; border: 1px solid #374151; border-radius: 12px;
+  padding: 16px; max-height: 420px; overflow: auto; font-size: 14px; white-space: normal;
+}
+.md-box h1, .md-box h2, .md-box h3 { color: var(--cyan); }
+.md-box a { color: var(--pink); }
+.md-box table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.md-box th, .md-box td { border: 1px solid #374151; padding: 6px; }
+footer { text-align: center; color: var(--muted); font-size: 13px; padding: 24px 16px 48px; }
+footer a { color: var(--cyan); }
+@media (max-width: 560px) {
+  section { padding: 16px; }
+  .btn { width: 100%; text-align: center; }
+}

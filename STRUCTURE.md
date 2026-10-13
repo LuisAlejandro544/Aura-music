@@ -37,6 +37,13 @@ El proyecto sigue una arquitectura reactiva y desacoplada organizada en capas:
 ## 📂 Árbol de Directorios y Módulos
 
 ```text
+web/                                            # Landing de descarga (Cloudflare Pages, sin build ni workflow)
+├── index.html                                  # Hero + 3 APKs (arm64-v8a, armeabi-v7a, universal) + README/changelog en vivo
+├── styles.css                                  # Paleta Dark Luxury Neo-Glass OLED (Violet #8B5CF6, Cyan #00D2FF)
+├── app.js                                      # Fetch a GitHub Releases + raw README.md y chanelog-beta.md
+├── _headers                                    # Caché de Cloudflare Pages
+└── DEPLOY-CLOUDFLARE.md                        # Guía de despliegue con Root directory `web`
+
 zips/                                           # Carpeta receptora de paquetes .zip para sincronización automática de ramas
 ├── README.md                                   # Guía rápida de uso desde dispositivos móviles
 └── .gitkeep                                    # Mantiene la carpeta visible tras auto-eliminar los .zip procesados
