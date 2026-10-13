@@ -174,7 +174,13 @@ app/
     │       │   │   └── NowPlayingDesignMode.kt # Modos de diseño del reproductor: Clásico, Cinemático Canvas y Auto
     │       │   │
     │       │   └── playback/                   # Capa de Audio y Reproducción ExoPlayer / Media3
-    │       │       ├── AuraAudioPlayer.kt          # Fachada del reproductor de audio y soporte Dual-Deck
+    │       │       ├── AuraAudioPlayer.kt          # Fachada del reproductor (estado + delegados, 297 líneas)
+    │       │       ├── PlayerEngineSetup.kt        # Construcción ExoPlayer Deck A/B, listeners y ajustes persistidos
+    │       │       ├── PlayerTrackStarter.kt       # Arranque de pistas con handoff dual-deck y DSP
+    │       │       ├── PlayerTransportControls.kt  # Transporte, saltos y fin de pista con repetición
+    │       │       ├── PlayerTransitionSettings.kt # Persistencia de crossfade, automix, EQ y gapless
+    │       │       ├── PlayerQueueOperations.kt    # Operaciones de cola con espejo en widgets
+    │       │       ├── PlayerReleaseHandler.kt     # Liberación ordenada de reproductores y scopes
    │       │       ├── DualDeckTransitionManager.kt  # Handoff al Deck B y entrada con crossfade/fade-in
    │       │       ├── TrackMediaFactory.kt          # URIs, metadatos con carátula y recortes de silencio
    │       │       ├── PlayerStateListener.kt        # Listener de estado ExoPlayer hacia los flujos
