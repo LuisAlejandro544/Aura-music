@@ -8,10 +8,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.BufferedReader
 import java.io.File
-import java.io.InputStreamReader
-import java.util.concurrent.TimeUnit
 
 /**
  * Aura Music - Motor y Fachada Pública de yt-dlp con Entorno Python Optimizado (< 450 líneas)
@@ -32,7 +29,7 @@ object YtDlpNativeEngine {
 
     fun isAvailable(context: Context): Boolean {
         val ytdlpFile = YtDlpAutoUpdater.getYtDlpFile(context)
-        return ytdlpFile.exists() && ytdlpFile.length() > 50_000L && getPythonExecutable(context) != null
+        return ytdlpFile.exists() && ytdlpFile.length() > YTDLP_MIN_PACKAGE_BYTES && getPythonExecutable(context) != null
     }
 
     fun getPythonExecutable(context: Context): File? = YtDlpEnvironmentSetup.getPythonExecutable(context)
@@ -41,10 +38,10 @@ object YtDlpNativeEngine {
 
     fun getQuickJsStatusSummary(context: Context): String {
         val qjs = getQuickJsExecutable(context)
-        return if (qjs != null && qjs.exists() && qjs.length() > 50_000L) {
+        return if (qjs != null && qjs.exists() && qjs.length() > YTDLP_MIN_PACKAGE_BYTES) {
             "QuickJS C99 activo"
         } else {
-            "Integrado en APK"
+            "QuickJS no disponible (respaldo sin motor JS)"
         }
     }
 
@@ -160,69 +157,19 @@ object YtDlpNativeEngine {
         }
 
         val nativeDir = context.applicationInfo.nativeLibraryDir
-        val directPythonZipSo = File(nativeDir, "libpython.zip.so")
-        val stdlibZip = File(pythonEnvDir, "stdlib.zip")
-        val stdlibDir = File(pythonEnvDir, "stdlib")
-        val modulesDir = File(pythonEnvDir, "modules")
-        val ffmpegEnvDir = File(context.filesDir, "env/ffmpeg")
-
-        val processBuilder = ProcessBuilder(cmdList)
-            .directory(File(nativeDir))
-            .redirectErrorStream(false)
-
-        processBuilder.environment().apply {
-            this["PYTHONHOME"] = pythonEnvDir.absolutePath
-            this["PYTHONPATH"] = "${directPythonZipSo.absolutePath}:${stdlibZip.absolutePath}:${stdlibDir.absolutePath}:${modulesDir.absolutePath}:${pythonEnvDir.absolutePath}:${pythonEnvDir.absolutePath}/usr/lib/python3.11:${context.filesDir.absolutePath}/bin"
-            this["PYTHONNOUSERSITE"] = "1"
-            this["HOME"] = pythonEnvDir.absolutePath
-            this["LD_LIBRARY_PATH"] = "$nativeDir:${modulesDir.absolutePath}:${pythonEnvDir.absolutePath}/usr/lib:${ffmpegEnvDir.absolutePath}/usr/lib"
-            if (localCert.exists() && localCert.length() > 0) {
-                this["SSL_CERT_FILE"] = localCert.absolutePath
-                this["CURL_CA_BUNDLE"] = localCert.absolutePath
-                this["REQUESTS_CA_BUNDLE"] = localCert.absolutePath
-            }
-            this["PATH"] = "$nativeDir:${context.filesDir.absolutePath}/bin:${System.getenv("PATH") ?: ""}"
-            this["TMPDIR"] = context.cacheDir.absolutePath
-        }
 
         AuraDebugManager.logInfo(TAG, "Ejecutando yt-dlp con Python nativo para resolver URL: $cleanUrl")
 
-        val process = processBuilder.start()
-        val jsonOutput = StringBuilder()
-        val errorLog = StringBuilder()
-
-        val stdoutThread = Thread {
-            try {
-                BufferedReader(InputStreamReader(process.inputStream)).use { reader ->
-                    var line: String?
-                    while (reader.readLine().also { line = it } != null) {
-                        jsonOutput.append(line)
-                    }
-                }
-            } catch (_: Exception) {}
-        }
-        stdoutThread.start()
-
-        val stderrThread = Thread {
-            try {
-                BufferedReader(InputStreamReader(process.errorStream)).use { reader ->
-                    var line: String?
-                    while (reader.readLine().also { line = it } != null) {
-                        errorLog.append(line).append("\n")
-                    }
-                }
-            } catch (_: Exception) {}
-        }
-        stderrThread.start()
-
-        val completedInTime = process.waitFor(20, TimeUnit.SECONDS)
-        if (!completedInTime) {
-            try { process.destroy() } catch (_: Throwable) {}
-            AuraDebugManager.logWarning(TAG, "yt-dlp excedió el tiempo límite de 20s.")
-        }
-        val exitCode = if (completedInTime) process.exitValue() else -1
-        stdoutThread.join(1000)
-        stderrThread.join(1000)
+        val procResult = runYtDlpProcess(
+            cmd = cmdList,
+            workDir = File(nativeDir),
+            env = ytdlpProcessEnv(context, pythonEnvDir, File(nativeDir)),
+            timeoutSeconds = 20,
+            tag = TAG
+        )
+        val exitCode = procResult.exitCode
+        val jsonOutput = procResult.stdout
+        val errorLog = procResult.stderr
 
         if (exitCode != 0 || jsonOutput.isBlank()) {
             AuraDebugManager.logWarning(TAG, "yt-dlp terminó con código $exitCode. Error: ${errorLog.takeLast(300)}")
@@ -315,6 +262,13 @@ object YtDlpNativeEngine {
                 }
             }
 
+            if (directAudioUrl == null && directVideoUrl == null) {
+                AuraDebugManager.logWarning(TAG, "yt-dlp no devolvió ningún flujo directo reproducible para: $cleanUrl")
+                return@withContext Result.failure(
+                    IllegalStateException("yt-dlp no encontró flujos de audio/video reproducibles para este enlace.")
+                )
+            }
+
             val finalVideoUrl = directVideoUrl ?: directAudioUrl ?: url
             val finalAudioHeaders = StreamingHttpDataSourceConfig.resolveHeadersForStream(
                 videoId = null,
@@ -398,16 +352,11 @@ object YtDlpNativeEngine {
             }
 
             val nativeDir = context.applicationInfo.nativeLibraryDir
-            val directPythonZipSo = File(nativeDir, "libpython.zip.so")
-            val quickJsExec = getQuickJsExecutable(context)
             val pythonEnvDir = File(context.filesDir, "env/python")
-            val stdlibZip = File(pythonEnvDir, "stdlib.zip")
-            val stdlibDir = File(pythonEnvDir, "stdlib")
-            val modulesDir = File(pythonEnvDir, "modules")
-            val ffmpegEnvDir = File(context.filesDir, "env/ffmpeg")
+
+            val quickJsExec = getQuickJsExecutable(context)
 
             ensureTlsCertificates(pythonEnvDir, forceRebuild = false)
-            val certPemFile = File(pythonEnvDir, "usr/etc/tls/cert.pem")
             val tmpDir = File(context.cacheDir, "ytdlp_tmp").apply { mkdirs() }
             val jsRuntimeSpec = if (quickJsExec != null && quickJsExec.exists()) "quickjs:${quickJsExec.absolutePath}" else "quickjs"
 
@@ -441,31 +390,16 @@ object YtDlpNativeEngine {
                 add(normalizedInput)
             }
 
-            val pb = ProcessBuilder(command)
-                .directory(File(nativeDir))
-                .redirectErrorStream(false)
-
-            pb.environment().apply {
-                this["PYTHONHOME"] = pythonEnvDir.absolutePath
-                this["PYTHONPATH"] = "${directPythonZipSo.absolutePath}:${stdlibZip.absolutePath}:${stdlibDir.absolutePath}:${modulesDir.absolutePath}:${pythonEnvDir.absolutePath}:${pythonEnvDir.absolutePath}/usr/lib/python3.11:${context.filesDir.absolutePath}/bin"
-                this["PYTHONNOUSERSITE"] = "1"
-                this["PYTHONDONTWRITEBYTECODE"] = "1"
-                this["PYTHONIOENCODING"] = "utf-8"
-                this["TMPDIR"] = tmpDir.absolutePath
-                this["HOME"] = pythonEnvDir.absolutePath
-                this["LD_LIBRARY_PATH"] = "$nativeDir:${modulesDir.absolutePath}:${pythonEnvDir.absolutePath}/usr/lib:${ffmpegEnvDir.absolutePath}/usr/lib"
-                this["PATH"] = "$nativeDir:${context.filesDir.absolutePath}/bin:${System.getenv("PATH") ?: "/system/bin"}"
-                if (certPemFile.exists() && certPemFile.length() > 0) {
-                    this["SSL_CERT_FILE"] = certPemFile.absolutePath
-                    this["REQUESTS_CA_BUNDLE"] = certPemFile.absolutePath
-                    this["CURL_CA_BUNDLE"] = certPemFile.absolutePath
-                }
-            }
-
-            val proc = pb.start()
-            val stdout = proc.inputStream.bufferedReader().use { it.readText() }
-            val stderr = proc.errorStream.bufferedReader().use { it.readText() }
-            val code = proc.waitFor()
+            val procResult = runYtDlpProcess(
+                cmd = command,
+                workDir = File(nativeDir),
+                env = ytdlpProcessEnv(context, pythonEnvDir, File(nativeDir), tmpDir),
+                timeoutSeconds = 60,
+                tag = TAG
+            )
+            val stdout = procResult.stdout
+            val stderr = procResult.stderr
+            val code = procResult.exitCode
 
             if (code != 0 || stdout.isBlank()) {
                 return@withContext Result.failure(IllegalStateException("yt-dlp flat-playlist error ($code): ${stderr.take(200)}"))
@@ -509,6 +443,7 @@ object YtDlpNativeEngine {
                 )
             )
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             Result.failure(e)
         }
     }

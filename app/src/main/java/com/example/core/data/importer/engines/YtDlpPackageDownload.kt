@@ -168,28 +168,12 @@ import java.security.MessageDigest
                 return true
             }
         } catch (t: Throwable) {
+            if (t is kotlinx.coroutines.CancellationException) throw t
             if (tempFile.exists()) tempFile.delete()
-            AuraDebugManager.logWarning(YTDLP_UPDATER_TAG, "Error en downloadFileWithProgressAndVerification: ${t.message}")
+            AuraDebugManager.logWarning(YTDLP_UPDATER_TAG, "Error en downloadYtDlpWithVerification: ${t.message}")
             if (showNotifications) {
                 AuraDownloadService.dismissPackageNotification(context)
             }
             return false
-        }
-    }
-
-    internal fun fetchYtDlpLatestTagFallback(): String? {
-        return try {
-            val req = Request.Builder()
-                .url("https://raw.githubusercontent.com/yt-dlp/yt-dlp/master/yt_dlp/version.py")
-                .header("User-Agent", "AuraMusic-Android-Client")
-                .build()
-            YtDlpUpdaterState.httpClient.newCall(req).execute().use { resp ->
-                if (!resp.isSuccessful) return null
-                val body = resp.body?.string() ?: return null
-                val match = """__version__\s*=\s*'([^']+)'""".toRegex().find(body)
-                match?.groupValues?.get(1)?.trim()
-            }
-        } catch (_: Exception) {
-            null
         }
     }

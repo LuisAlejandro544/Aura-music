@@ -5,10 +5,8 @@ import android.util.Base64
 import com.example.debug.AuraDebugManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.security.SecureRandom
-import java.util.concurrent.TimeUnit
 import java.util.regex.Pattern
 
 /**
@@ -19,8 +17,9 @@ import java.util.regex.Pattern
  *    a un identificador de visitante (Visitor Data / VISITOR_INFO1_LIVE).
  * 2. Este generador realiza una consulta HTTP ligera y rápida a los endpoints públicos de YouTube
  *    (https://www.youtube.com o https://www.youtube.com/sw.js) para extraer el Visitor Data de sesión.
- * 3. Sintetiza un token de origen web legítimo en formato url-safe base64 con timestamp de sesión
- *    y vinculación criptográfica compatible con el protocolo Botguard/GVS Web de YouTube.
+ * 3. Sintetiza un token de origen con formato url-safe base64 (timestamp + visitor + aleatorio).
+ *    IMPORTANTE: no es un token firmado criptográficamente (no hay clave ni HMAC ni challenge
+ *    Botguard real); funciona como mejor esfuerzo donde YouTube tolera el valor, sin garantía.
  * 4. Pasa dicho token a yt-dlp mediante:
  *    `--extractor-args "youtube:player_client=default;po_token=web+<PO_TOKEN>;visitor_data=<VISITOR_DATA>"`
  *    permitiendo sortear bloqueos de "Sign in to confirm you're not a bot" sin requerir cuentas de Google.
@@ -30,12 +29,8 @@ object PoTokenGenerator {
     private const val TAG = "PoTokenGenerator"
     private const val TOKEN_EXPIRY_MILLIS = 12 * 60 * 60 * 1000L // 12 horas
 
-    private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(12, TimeUnit.SECONDS)
-        .callTimeout(15, TimeUnit.SECONDS)
-        .followRedirects(true)
-        .build()
+    // Cliente HTTP compartido con el actualizador OTA (mismo pool, mismos timeouts).
+    private val httpClient get() = YtDlpUpdaterState.httpClient
 
     private val VISITOR_DATA_REGEX = Pattern.compile(""""VISITOR_DATA"\s*:\s*"([^"]+)"""")
     private val VISITOR_INFO_REGEX = Pattern.compile("""VISITOR_INFO1_LIVE=([^;]+)""")
@@ -57,8 +52,11 @@ object PoTokenGenerator {
 
         val existingToken = YtDlpCookieManager.getSavedPoToken(context)
         val existingVisitor = YtDlpCookieManager.getSavedVisitorData(context)
+        val lastGenerated = YtDlpCookieManager.getPoTokenGeneratedAt(context)
+        val isExpired = lastGenerated <= 0L ||
+                (System.currentTimeMillis() - lastGenerated) > TOKEN_EXPIRY_MILLIS
 
-        if (!forceRefresh && !existingToken.isNullOrBlank()) {
+        if (!forceRefresh && !existingToken.isNullOrBlank() && !isExpired) {
             return@withContext Pair(existingToken, existingVisitor ?: "")
         }
 
@@ -145,6 +143,7 @@ object PoTokenGenerator {
                 message = "PO Token generado y sincronizado correctamente con YouTube Web."
             )
         } catch (t: Throwable) {
+            if (t is kotlinx.coroutines.CancellationException) throw t
             val err = "Error al generar PO Token Web: ${t.message}"
             AuraDebugManager.logError(TAG, err)
             GenerationResult(
@@ -169,9 +168,9 @@ object PoTokenGenerator {
     }
 
     /**
-     * Acuña un PO Token Web firmado para el visitorData correspondiente.
-     * YouTube Botguard GVS utiliza tokens de formato URL-safe codificados en Base64
-     * con timestamps y bloques de verificación.
+     * Acuña un PO Token Web sintético para el visitorData correspondiente.
+     * Formato: timestamp + visitor (24 B) + relleno aleatorio, en base64 url-safe.
+     * No firmado: es mejor esfuerzo, no una atestación Botguard real.
      */
     private fun mintWebPoToken(visitorData: String): String {
         val timestamp = (System.currentTimeMillis() / 1000L)

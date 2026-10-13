@@ -46,10 +46,25 @@ fun LazyListScope.ytDlpCookiesAndPoTokenSettingsContent() {
         val context = LocalContext.current
         val coroutineScope = rememberCoroutineScope()
 
-        var cookieSummary by remember { mutableStateOf(YtDlpCookieManager.getCookieSummary(context)) }
+        var cookieSummary by remember {
+            mutableStateOf(
+                YtDlpCookieManager.CookieSummary(
+                    isEnabled = YtDlpCookieManager.isCookiesEnabled(context),
+                    fileExists = false,
+                    sizeBytes = 0L,
+                    lineCount = 0,
+                    validCookieCount = 0,
+                    lastModifiedFormatted = "Cargando…"
+                )
+            )
+        }
         var currentStrategy by remember { mutableStateOf(YtDlpCookieManager.getPlayerClientStrategy(context)) }
         var isPoTokenEnabled by remember { mutableStateOf(YtDlpCookieManager.isPoTokenEnabled(context)) }
         var isAutoCheckStartup by remember { mutableStateOf(YtDlpCookieManager.isAutoCheckOtaStartupEnabled(context)) }
+
+        LaunchedEffect(Unit) {
+            cookieSummary = YtDlpCookieManager.getCookieSummary(context)
+        }
 
         var showPasteCookieDialog by remember { mutableStateOf(false) }
         var showManualPoTokenDialog by remember { mutableStateOf(false) }
@@ -136,13 +151,17 @@ fun LazyListScope.ytDlpCookiesAndPoTokenSettingsContent() {
             showGuide = showHowToExportCookiesGuide,
             onToggleEnabled = { enabled ->
                 YtDlpCookieManager.setCookiesEnabled(context, enabled)
-                cookieSummary = YtDlpCookieManager.getCookieSummary(context)
+                coroutineScope.launch {
+                    cookieSummary = YtDlpCookieManager.getCookieSummary(context)
+                }
             },
             onImportClick = { cookieFilePickerLauncher.launch(arrayOf("text/plain", "*/*")) },
             onPasteClick = { showPasteCookieDialog = true },
             onClearCookies = {
                 YtDlpCookieManager.clearCookies(context)
-                cookieSummary = YtDlpCookieManager.getCookieSummary(context)
+                coroutineScope.launch {
+                    cookieSummary = YtDlpCookieManager.getCookieSummary(context)
+                }
                 statusFeedbackMessage = "Cookies eliminadas correctamente."
                 statusFeedbackIsError = false
             },

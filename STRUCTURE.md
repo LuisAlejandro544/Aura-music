@@ -102,6 +102,7 @@ app/
     │       │   │   │   │   ├── YtDlpNativeEngine.kt      # Fachada modular nativa yt-dlp, inspección y flat-playlists (< 500 líneas)
     │       │   │   │   │   ├── YtDlpEnvironmentSetup.kt  # Detección de binarios, symlinks CPython 0 bytes y certificados TLS Android 14+
     │       │   │   │   │   ├── YtDlpStreamDownloader.kt  # Descarga directa nativa con captura y parseo de progreso en vivo (DownloadProgress)
+    │       │   │   │   │   ├── YtDlpProcessRunner.kt       # Ejecutor común cancelable con entorno unificado y timeout
     │       │   │   │   │   ├── YtDlpAutoUpdater.kt       # Fachada OTA pública (API estable, 99 líneas)
     │       │   │   │   │   ├── YtDlpUpdaterState.kt      # Alcance, mutex, flujo reactivo y clientes HTTP
     │       │   │   │   │   ├── YtDlpPackagePaths.kt      # Rutas files/bin y aplicación de staged + reinicio

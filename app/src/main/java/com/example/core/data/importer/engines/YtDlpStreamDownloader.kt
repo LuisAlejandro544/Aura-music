@@ -5,10 +5,7 @@ import com.example.core.model.DownloadProgress
 import com.example.debug.AuraDebugManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.BufferedReader
 import java.io.File
-import java.io.InputStreamReader
-import java.util.concurrent.TimeUnit
 import java.util.regex.Pattern
 
 /**
@@ -28,7 +25,7 @@ object YtDlpStreamDownloader {
     // [download]  45.2% of ~  12.50MiB at    2.40MiB/s ETA 00:03
     // [download]  100% of 12.50MiB in 00:05
     private val PROGRESS_REGEX = Pattern.compile(
-        """\[download\]\s+([\d.]+)%\s+of\s+~?\s*([\d.]+)\s*([KMG]i?B)(?:\s+at\s+([\d.]+)\s*([KMG]i?B/s))?""",
+        """\[download\]\s+([\d.]+)%\s+of\s+~?\s*([\d.]+)\s*([KMG]i?B|B)(?:\s+at\s+([\d.]+)\s*([KMG]i?B/s|B/s))?""",
         Pattern.CASE_INSENSITIVE
     )
 
@@ -40,23 +37,29 @@ object YtDlpStreamDownloader {
         onProgressUpdate: (DownloadProgress) -> Unit = {}
     ): Boolean = withContext(Dispatchers.IO) {
         try {
-            if (YtDlpAutoUpdater.isYtDlpTemporarilyBlocked()) return@withContext false
+            if (YtDlpAutoUpdater.isYtDlpTemporarilyBlocked()) {
+                AuraDebugManager.logWarning(TAG, "Descarga directa omitida: yt-dlp bloqueado por actualización OTA en curso.")
+                return@withContext false
+            }
             YtDlpEnvironmentSetup.init(context)
             FFmpegNativeEngine.init(context)
 
             val ytdlpFile = YtDlpAutoUpdater.getYtDlpFile(context)
-            val activePython = YtDlpEnvironmentSetup.getPythonExecutable(context) ?: return@withContext false
-            if (!ytdlpFile.exists()) return@withContext false
+            val activePython = YtDlpEnvironmentSetup.getPythonExecutable(context)
+            if (activePython == null || !ytdlpFile.exists()) {
+                AuraDebugManager.logWarning(TAG, "Descarga directa omitida: entorno yt-dlp no disponible.")
+                return@withContext false
+            }
 
             val rawTrimmedUrl = url.trim()
             if (!rawTrimmedUrl.startsWith("http://", ignoreCase = true) && !rawTrimmedUrl.startsWith("https://", ignoreCase = true)) {
+                AuraDebugManager.logWarning(TAG, "Descarga directa omitida: URL no válida ni segura.")
                 return@withContext false
             }
             val cleanUrl = YtDlpEnvironmentSetup.normalizeYouTubeMusicUrlForYtDlp(rawTrimmedUrl)
 
             val pythonEnvDir = File(context.filesDir, "env/python")
             YtDlpEnvironmentSetup.ensureTlsCertificates(pythonEnvDir)
-            val localCert = File(pythonEnvDir, "usr/etc/tls/cert.pem")
             val qjsBin = YtDlpEnvironmentSetup.getQuickJsExecutable(context)
             val ffmpegBin = FFmpegNativeEngine.getBinaryFile(context)
 
@@ -105,32 +108,6 @@ object YtDlpStreamDownloader {
                 add(cleanUrl)
             }
 
-            val nativeDir = context.applicationInfo.nativeLibraryDir
-            val directPythonZipSo = File(nativeDir, "libpython.zip.so")
-            val stdlibZip = File(pythonEnvDir, "stdlib.zip")
-            val stdlibDir = File(pythonEnvDir, "stdlib")
-            val modulesDir = File(pythonEnvDir, "modules")
-            val ffmpegEnvDir = File(context.filesDir, "env/ffmpeg")
-
-            val pb = ProcessBuilder(cmdList)
-                .directory(File(nativeDir))
-                .redirectErrorStream(true)
-
-            pb.environment().apply {
-                this["PYTHONHOME"] = pythonEnvDir.absolutePath
-                this["PYTHONPATH"] = "${directPythonZipSo.absolutePath}:${stdlibZip.absolutePath}:${stdlibDir.absolutePath}:${modulesDir.absolutePath}:${pythonEnvDir.absolutePath}:${pythonEnvDir.absolutePath}/usr/lib/python3.11:${context.filesDir.absolutePath}/bin"
-                this["PYTHONNOUSERSITE"] = "1"
-                this["HOME"] = pythonEnvDir.absolutePath
-                this["LD_LIBRARY_PATH"] = "$nativeDir:${modulesDir.absolutePath}:${pythonEnvDir.absolutePath}/usr/lib:${ffmpegEnvDir.absolutePath}/usr/lib"
-                if (localCert.exists() && localCert.length() > 0) {
-                    this["SSL_CERT_FILE"] = localCert.absolutePath
-                    this["CURL_CA_BUNDLE"] = localCert.absolutePath
-                    this["REQUESTS_CA_BUNDLE"] = localCert.absolutePath
-                }
-                this["PATH"] = "$nativeDir:${context.filesDir.absolutePath}/bin:${System.getenv("PATH") ?: ""}"
-                this["TMPDIR"] = context.cacheDir.absolutePath
-            }
-
             val phaseTitle = if (isAudioOnly) "Descargando audio de alta fidelidad (yt-dlp)..." else "Descargando Video Canvas 480p (yt-dlp)..."
             AuraDebugManager.logInfo(TAG, "Iniciando descarga directa con yt-dlp (${if (isAudioOnly) "Audio" else "Video 480p"}) para: $cleanUrl")
 
@@ -145,28 +122,24 @@ object YtDlpStreamDownloader {
                 )
             )
 
-            val process = pb.start()
+            val nativeDir = context.applicationInfo.nativeLibraryDir
 
-            val stdoutThread = Thread {
-                try {
-                    BufferedReader(InputStreamReader(process.inputStream)).use { reader ->
-                        var line: String?
-                        while (reader.readLine().also { line = it } != null) {
-                            val l = line?.trim() ?: continue
-                            parseAndEmitProgress(l, phaseTitle, onProgressUpdate)
-                        }
-                    }
-                } catch (_: Throwable) {}
-            }
-            stdoutThread.start()
-
-            val completed = process.waitFor(120, TimeUnit.SECONDS)
+            val procResult = runYtDlpProcess(
+                cmd = cmdList,
+                workDir = File(nativeDir),
+                env = ytdlpProcessEnv(context, pythonEnvDir, File(nativeDir)),
+                timeoutSeconds = 120,
+                tag = TAG,
+                mergeStderr = true,
+                onStdoutLine = { rawLine ->
+                    parseAndEmitProgress(rawLine.trim(), phaseTitle, onProgressUpdate)
+                }
+            )
+            val completed = !procResult.timedOut
             if (!completed) {
-                try { process.destroy() } catch (_: Throwable) {}
                 AuraDebugManager.logWarning(TAG, "Descarga directa de yt-dlp excedió timeout de 120s.")
             }
-            val exitCode = if (completed) process.exitValue() else -1
-            stdoutThread.join(1000)
+            val exitCode = procResult.exitCode
 
             val ok = exitCode == 0 && targetFile.exists() && targetFile.length() > 1024L
             if (ok) {
@@ -183,9 +156,12 @@ object YtDlpStreamDownloader {
                 )
             } else {
                 AuraDebugManager.logWarning(TAG, "Descarga directa con yt-dlp finalizó con código $exitCode.")
+                // No dejar parciales corruptos ocupando disco; el próximo intento parte limpio.
+                runCatching { if (targetFile.exists()) targetFile.delete() }
             }
             ok
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             AuraDebugManager.logWarning(TAG, "Excepción en descarga directa con yt-dlp: ${e.message}")
             false
         }

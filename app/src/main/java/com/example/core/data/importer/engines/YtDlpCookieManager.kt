@@ -36,7 +36,6 @@ object YtDlpCookieManager {
 
     const val STRATEGY_DEFAULT = "default"
     const val STRATEGY_MWEB_AND_WEB = "mweb,web"
-    const val STRATEGY_ANDROID_VR = "android_vr,ios,mweb,android,web"
 
     data class CookieSummary(
         val isEnabled: Boolean,
@@ -113,13 +112,13 @@ object YtDlpCookieManager {
     }
 
     /**
-     * Obtiene resumen analítico del archivo de cookies actual.
+     * Obtiene resumen analítico del archivo de cookies actual (E/S en hilo IO).
      */
-    fun getCookieSummary(context: Context): CookieSummary {
+    suspend fun getCookieSummary(context: Context): CookieSummary = withContext(Dispatchers.IO) {
         val enabled = isCookiesEnabled(context)
         val file = getCookiesFile(context)
         if (!file.exists() || file.length() == 0L) {
-            return CookieSummary(
+            return@withContext CookieSummary(
                 isEnabled = enabled,
                 fileExists = false,
                 sizeBytes = 0L,
@@ -149,7 +148,7 @@ object YtDlpCookieManager {
         val df = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
         val dateStr = df.format(Date(file.lastModified()))
 
-        return CookieSummary(
+        return@withContext CookieSummary(
             isEnabled = enabled,
             fileExists = true,
             sizeBytes = file.length(),
@@ -173,13 +172,15 @@ object YtDlpCookieManager {
             val targetFile = getCookiesFile(context)
             val netscapeLines = mutableListOf<String>()
 
-            // Si el texto ya está en formato Netscape (comienza con # Netscape HTTP Cookie File o contiene tabs)
-            if (trimmed.contains("\t") || trimmed.contains("# Netscape HTTP Cookie File") || trimmed.contains(".youtube.com")) {
+            // Si el texto ya está en formato Netscape (cabecera oficial o líneas con tabs),
+            // se guarda tal cual. La mención suelta a ".youtube.com" NO basta: podría ser prosa
+            // pegada por error, y en ese caso se intenta la conversión desde header HTTP.
+            if (trimmed.contains("\t") || trimmed.contains("# Netscape HTTP Cookie File")) {
                 trimmed.lineSequence().forEach { line ->
                     val clean = line.replace("\r", "")
                     if (clean.isNotBlank()) netscapeLines.add(clean)
                 }
-            } else if (trimmed.contains("=") && (trimmed.contains(";") || trimmed.contains("SID=") || trimmed.contains("SAPISID="))) {
+            } else if (trimmed.contains("=") && (trimmed.contains(";") || trimmed.contains("SID=") || trimmed.contains("SAPISID=") || trimmed.contains(".youtube.com"))) {
                 // Conversión inteligente de Header HTTP ("Cookie: SID=xxx; HSID=yyy") a formato Netscape
                 netscapeLines.add("# Netscape HTTP Cookie File")
                 netscapeLines.add("# Exported and formatted by Aura Music (YTDLnis Style)")
@@ -216,6 +217,7 @@ object YtDlpCookieManager {
             AuraDebugManager.logInfo(TAG, "Guardadas exitosamente $count cookies en ${targetFile.absolutePath}")
             Result.success(count)
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             AuraDebugManager.logError(TAG, "Error guardando cookies de texto: ${e.message}")
             Result.failure(e)
         }
@@ -233,6 +235,7 @@ object YtDlpCookieManager {
             val text = inputStream.use { it.bufferedReader(Charsets.UTF_8).readText() }
             saveCookiesFromText(context, text)
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             AuraDebugManager.logError(TAG, "Error leyendo archivo de cookies SAF: ${e.message}")
             Result.failure(e)
         }
@@ -280,9 +283,13 @@ object YtDlpCookieManager {
     }
 
     fun getPoTokenLastGeneratedFormatted(context: Context): String {
-        val millis = getPrefs(context).getLong(KEY_PO_TOKEN_GENERATED_AT, 0L)
+        val millis = getPoTokenGeneratedAt(context)
         if (millis <= 0L) return "Nunca generado"
         val df = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
         return df.format(Date(millis))
+    }
+
+    fun getPoTokenGeneratedAt(context: Context): Long {
+        return getPrefs(context).getLong(KEY_PO_TOKEN_GENERATED_AT, 0L)
     }
 }

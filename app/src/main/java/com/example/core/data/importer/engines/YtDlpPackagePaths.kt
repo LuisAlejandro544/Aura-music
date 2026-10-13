@@ -18,15 +18,15 @@ import kotlin.system.exitProcess
             binDir.mkdirs()
         }
         val otaFile = File(binDir, "yt-dlp")
-        if (otaFile.exists() && otaFile.length() > 50_000L) {
+        if (otaFile.exists() && otaFile.length() > YTDLP_MIN_PACKAGE_BYTES) {
             return otaFile
         }
         val nativeYtdlpZipSo = File(context.applicationInfo.nativeLibraryDir, "libytdlp.zip.so")
-        if (nativeYtdlpZipSo.exists() && nativeYtdlpZipSo.length() > 50_000L) {
+        if (nativeYtdlpZipSo.exists() && nativeYtdlpZipSo.length() > YTDLP_MIN_PACKAGE_BYTES) {
             return nativeYtdlpZipSo
         }
         val nativeYtdlp = File(context.applicationInfo.nativeLibraryDir, "libytdlp.so")
-        if (nativeYtdlp.exists() && nativeYtdlp.length() > 50_000L) {
+        if (nativeYtdlp.exists() && nativeYtdlp.length() > YTDLP_MIN_PACKAGE_BYTES) {
             return nativeYtdlp
         }
         return otaFile

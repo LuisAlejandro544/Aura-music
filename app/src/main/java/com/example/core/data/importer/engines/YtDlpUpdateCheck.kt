@@ -164,6 +164,7 @@ import org.json.JSONObject
                     YtDlpAutoUpdater.UpdateResult.Error("Fallo de integridad o descarga del paquete yt-dlp.", currentVersion)
                 }
             } catch (t: Throwable) {
+                if (t is kotlinx.coroutines.CancellationException) throw t
                 val msg = "Excepción al verificar/actualizar paquetes: ${t.message}"
                 AuraDebugManager.logWarning(YTDLP_UPDATER_TAG, msg)
                 YtDlpUpdaterState.resetToIdle(appContext, true)

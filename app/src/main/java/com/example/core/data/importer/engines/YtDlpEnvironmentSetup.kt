@@ -76,7 +76,7 @@ object YtDlpEnvironmentSetup {
             val otaYtdlpFile = File(context.filesDir, "bin/yt-dlp")
             val versionFile = File(context.filesDir, "bin/ytdlp_version.txt")
 
-            if (nativeYtdlpSo.exists() && nativeYtdlpSo.length() > 50_000L) {
+            if (nativeYtdlpSo.exists() && nativeYtdlpSo.length() > YTDLP_MIN_PACKAGE_BYTES) {
                 val recordedVer = if (versionFile.exists()) runCatching { versionFile.readText().trim() }.getOrDefault("") else ""
                 if (otaYtdlpFile.exists() && (recordedVer.isEmpty() || recordedVer.contains("base", ignoreCase = true))) {
                     runCatching { otaYtdlpFile.delete() }
@@ -117,6 +117,7 @@ object YtDlpEnvironmentSetup {
 
     /**
      * Localiza el binario ejecutable de Python disponible para el proceso de la app.
+     * Solo nativeLibraryDir es camino vivo: init() elimina los alias obsoletos de files/bin.
      */
     fun getPythonExecutable(context: Context): File? {
         val nativeDir = File(context.applicationInfo.nativeLibraryDir)
@@ -129,13 +130,6 @@ object YtDlpEnvironmentSetup {
         if (python3InNative.exists() && python3InNative.length() > 1000L && python3InNative.canExecute()) {
             return python3InNative
         }
-
-        val binDir = File(context.filesDir, "bin")
-        val candidateInBin = File(binDir, "python3")
-        if (candidateInBin.exists() && candidateInBin.canExecute()) return candidateInBin
-
-        val candidateAlt = File(binDir, "python")
-        if (candidateAlt.exists() && candidateAlt.canExecute()) return candidateAlt
 
         return null
     }
