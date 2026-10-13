@@ -69,7 +69,8 @@ fun ColumnScope.FullScreenLyricsContent(
     onSeekTo: (Long) -> Unit,
     onOpenSearchLyrics: () -> Unit,
     onImportClick: () -> Unit,
-    onUserScrollConsumed: () -> Unit
+    onUserScrollConsumed: () -> Unit,
+    onAutoScrollStateChange: (Boolean) -> Unit = {}
 ) {
                 // Contenedor principal de letras
                 Box(
@@ -231,8 +232,13 @@ fun ColumnScope.FullScreenLyricsContent(
                                     .clickable {
                                         onUserScrollConsumed()
                                         coroutineScope.launch {
-                                            val targetScroll = (activeIndex - 2).coerceAtLeast(0)
-                                            listState.animateScrollToItem(targetScroll)
+                                            onAutoScrollStateChange(true)
+                                            try {
+                                                val targetScroll = (activeIndex - 2).coerceAtLeast(0)
+                                                listState.animateScrollToItem(targetScroll)
+                                            } finally {
+                                                onAutoScrollStateChange(false)
+                                            }
                                         }
                                     }
                                     .testTag("full_screen_lyrics_sync_btn")

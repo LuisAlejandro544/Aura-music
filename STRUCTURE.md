@@ -373,7 +373,8 @@ app/
     │       │           │   ├── AppearanceGameModeSection.kt       # Modo Juego / Ahorro en 2do plano
     │       │           │   ├── AppearancePaletteSection.kt        # Paleta dinámica y colores del tema
     │       │           │   ├── AppWallpaperSettingsSection.kt       # Controles de fondo de pantalla de galería (WebP/Video, Opacidad y Blur)
-    │       │           │   ├── StreamingCacheAndVideoSettingsCard.kt # Ajustes de caché (50-500 MB), política de red, calidad Opus/M4A y Modo Ahorro solo-Explorar
+    │       │           │   ├── StreamingCacheAndVideoSettingsCard.kt # Fachada combinada (reutiliza las 4 sub-tarjetas para compatibilidad)
+    │       │           │   ├── StreamingSectionCards.kt           # 4 tarjetas propias: Video Canvas, Calidad Opus/M4A, Ahorro Datos y Caché 50-500 MB
     │       │           │   ├── EnginesAndDiagnosticsSection.kt      # Estado de FFmpeg, QuickJS C99 puro, yt-dlp OTA y Aura Monitor
     │       │           │   └── PlayerDesignSettingsContent.kt       # Pantalla dedicada de selección de Diseño del Reproductor
     │       │           ├── headphones/                    # Ajustes de Auriculares, Acústica DSP, Bit-Perfect y Gestos

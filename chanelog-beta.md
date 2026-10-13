@@ -146,9 +146,14 @@ En cada lanzamiento de **Aura Beta (`Nebula`)** generamos **3 archivos APK exclu
 > Todo lo anterior se conserva intacto; esto solo añade las nuevas funciones sin reescribir el historial.
 
 10. 🎚️ **Selector de Calidad de Audio (Opus y M4A, para local y streaming con `yt-dlp`)**:
-    - En **Ajustes > Streaming & Caché Inteligente** ahora puedes elegir entre **Ahorro Opus ~48 kbps (itag 249)**, **Estándar M4A ~128 kbps (itag 140, el formato de siempre)**, **Alta Opus ~160 kbps (itag 251, suena mejor y pesa menos)** o **Automática Hi-Fi (recomendada: Opus 251 si existe, si no M4A 140)**.
+    - En **Ajustes > Aura Dinámica, Streaming & Modo Juego > Calidad de Audio (pantalla propia)** ahora puedes elegir entre **Ahorro Opus ~48 kbps (itag 249)**, **Estándar M4A ~128 kbps (itag 140, el formato de siempre)**, **Alta Opus ~160 kbps (itag 251, suena mejor y pesa menos)** o **Automática Hi-Fi (recomendada: Opus 251 si existe, si no M4A 140)**.
     - Vale para **canciones en streaming (Explorar)** y para **canciones locales/descargas con `yt-dlp`**: el ranking por itag rige en `InnerTubeClient`, `Invidious` y `YtDlpNativeEngine`, el selector `bestaudio[ext=webm]/bestaudio[ext=m4a]` rige en `YtDlpStreamDownloader`, y lo descargado se guarda en `songs/` como **`.opus`** u **`.m4a`** según tu elección (ambos reproducibles por ExoPlayer).
     - Nota honesta: YouTube no da lossless real; Opus ~160 kbps es el techo práctico.
-11. 📶 **Modo Ahorro de Datos (exclusivamente para el modo Explorar / streaming)**:
-    - Un solo interruptor en Ajustes que, solo en streaming, **fuerza Opus ahorro**, **apaga el Video Canvas de fondo**, **no busca letras automáticamente (ni LRCLIB ni auto-detección online)** y **pausa la pre-descarga de audio/video y la radio de canciones similares**.
+11. 📶 **Modo Ahorro de Datos (pantalla propia, exclusivamente para el modo Explorar / streaming)**:
+    - Interruptor en su propia pantalla (**Ajustes > Aura Dinámica, Streaming & Modo Juego > Ahorro de Datos**) que, solo en streaming, **fuerza Opus ahorro**, **apaga el Video Canvas de fondo**, **no busca letras automáticamente (ni LRCLIB ni auto-detección online)** y **pausa la pre-descarga de audio/video y la radio de canciones similares**.
     - Tus **canciones locales, sus videos y sus letras no se tocan en absoluto**: siguen sonando, mostrándose y buscándose como siempre.
+12. 🖌️ **Pulido de diseño en Ajustes + Karaoke con seguimiento real**:
+    - Tarjetas `SettingsNavigationCard` compactas sin huecos grandes: título flexible con peso, insignias (`OLED`, `MB`, `ON`, `6 OPCIONES`) de una sola línea sin corte vertical letra por letra y flecha alineada arriba.
+    - Botón "Vaciar caché" con ancho propio (texto en una línea) y chips 50/100/250/500 MB deslizables horizontalmente en pantallas compactas de 720px.
+    - Menú intermedio ampliado a **6 pantallas propias** (Streaming & Caché solo Video + Caché, Calidad de Audio, Ahorro de Datos, Aura Dinámica, Modo Juego y Fondo de Galería).
+    - Karaoke (`FullScreenLyricsScreen` y `NowPlayingLyricsCard`): al pulsar **"Sincronizar con audio"** el auto-follow sigue verso a verso hasta que el usuario arrastra la pantalla; el scroll programático ya no rompe el seguimiento (guardia `isAutoScrolling`).

@@ -68,6 +68,9 @@ fun NowPlayingLyricsCard(
 ) {
     val listState = rememberLazyListState()
     var showPasteDialog by remember { mutableStateOf(false) }
+    // El auto-follow sigue hasta que el usuario arrastra manualmente (igual que Karaoke).
+    var userScrolledManually by remember { mutableStateOf(false) }
+    var isAutoScrolling by remember { mutableStateOf(false) }
 
     // Launcher del sistema para seleccionar archivos .lrc o .txt locales
     val importLyricsFileLauncher = rememberLauncherForActivityResult(
@@ -88,12 +91,26 @@ fun NowPlayingLyricsCard(
         }
     }
 
-    // Desplazamiento automático para centrar la frase que suena
-    LaunchedEffect(activeIndex) {
-        if (activeIndex >= 0 && lyricsState.lines.isNotEmpty()) {
-            val targetScroll = (activeIndex - 1).coerceAtLeast(0)
-            listState.animateScrollToItem(targetScroll)
+    // Desplazamiento automático para centrar la frase que suena; se pausa solo
+    // con gesto manual del usuario y se reanuda al pulsar cualquier verso (seek).
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (listState.isScrollInProgress && !isAutoScrolling) {
+            userScrolledManually = true
         }
+    }
+    LaunchedEffect(activeIndex, userScrolledManually) {
+        if (!userScrolledManually && activeIndex >= 0 && lyricsState.lines.isNotEmpty()) {
+            val targetScroll = (activeIndex - 1).coerceAtLeast(0)
+            isAutoScrolling = true
+            try {
+                listState.animateScrollToItem(targetScroll)
+            } finally {
+                isAutoScrolling = false
+            }
+        }
+    }
+    LaunchedEffect(lyricsState.lines) {
+        userScrolledManually = false
     }
 
     Card(
@@ -136,7 +153,10 @@ fun NowPlayingLyricsCard(
                 activeIndex = activeIndex,
                 listState = listState,
                 animatedPrimary = animatedPrimary,
-                onSeekTo = onSeekTo,
+                onSeekTo = {
+                    userScrolledManually = false
+                    onSeekTo(it)
+                },
                 onFetchOnlineLyrics = onFetchOnlineLyrics,
                 onOpenSearchLyrics = onOpenSearchLyrics,
                 onPickFile = {

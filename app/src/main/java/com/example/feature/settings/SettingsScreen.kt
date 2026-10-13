@@ -53,6 +53,8 @@ enum class SettingsSubScreen {
     PLAYER_DESIGN,
     VISUAL_BEHAVIOR,
     VISUAL_STREAMING_AND_CACHE,
+    VISUAL_AUDIO_QUALITY,
+    VISUAL_DATA_SAVER,
     VISUAL_AURA_AND_MINIPLAYER,
     VISUAL_GAME_MODE,
     VISUAL_GALLERY_WALLPAPER,
@@ -150,6 +152,8 @@ fun SettingsScreen(
                 initialState == SettingsSubScreen.MAIN_MENU && targetState != SettingsSubScreen.MAIN_MENU -> true
                 initialState == SettingsSubScreen.VISUAL_BEHAVIOR && (
                     targetState == SettingsSubScreen.VISUAL_STREAMING_AND_CACHE ||
+                        targetState == SettingsSubScreen.VISUAL_AUDIO_QUALITY ||
+                        targetState == SettingsSubScreen.VISUAL_DATA_SAVER ||
                         targetState == SettingsSubScreen.VISUAL_AURA_AND_MINIPLAYER ||
                         targetState == SettingsSubScreen.VISUAL_GAME_MODE ||
                         targetState == SettingsSubScreen.VISUAL_GALLERY_WALLPAPER
@@ -221,7 +225,7 @@ fun SettingsScreen(
                 )
             }
 
-            // SUB-PANTALLA 2.1: STREAMING & CACHÉ INTELIGENTE
+            // SUB-PANTALLA 2.1: STREAMING & CACHÉ INTELIGENTE (VIDEO + CACHÉ)
             SettingsSubScreen.VISUAL_STREAMING_AND_CACHE -> {
                 SettingsStreamingCacheScreen(
                 streamingCacheConfig = streamingCacheConfig,
@@ -229,6 +233,24 @@ fun SettingsScreen(
                 onChangeStreamingCacheMaxMb = onChangeStreamingCacheMaxMb,
                 onClearStreamingCache = onClearStreamingCache,
                 onSelectStreamingAudioQuality = onSelectStreamingAudioQuality,
+                onToggleStreamingDataSaver = onToggleStreamingDataSaver,
+                onBack = { activeSubScreen = SettingsSubScreen.VISUAL_BEHAVIOR }
+                )
+            }
+
+            // SUB-PANTALLA 2.2: CALIDAD DE AUDIO (PANTALLA PROPIA OPUS/M4A)
+            SettingsSubScreen.VISUAL_AUDIO_QUALITY -> {
+                SettingsAudioQualityScreen(
+                streamingCacheConfig = streamingCacheConfig,
+                onSelectStreamingAudioQuality = onSelectStreamingAudioQuality,
+                onBack = { activeSubScreen = SettingsSubScreen.VISUAL_BEHAVIOR }
+                )
+            }
+
+            // SUB-PANTALLA 2.3: AHORRO DE DATOS (PANTALLA PROPIA, SOLO EXPLORAR)
+            SettingsSubScreen.VISUAL_DATA_SAVER -> {
+                SettingsDataSaverScreen(
+                streamingCacheConfig = streamingCacheConfig,
                 onToggleStreamingDataSaver = onToggleStreamingDataSaver,
                 onBack = { activeSubScreen = SettingsSubScreen.VISUAL_BEHAVIOR }
                 )
