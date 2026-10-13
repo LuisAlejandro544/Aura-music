@@ -22,9 +22,20 @@ jobs:
   opencode-agent:
     name: OpenCode Agent (Muse Spark 1.3)
     if: |
-      (github.event_name == 'issues' && (contains(github.event.issue.body, '/opencode') || contains(github.event.issue.body, '/oc'))) ||
-      (github.event_name == 'issue_comment' && (contains(github.event.comment.body, '/opencode') || contains(github.event.comment.body, '/oc'))) ||
-      (github.event_name == 'pull_request_review_comment' && (contains(github.event.comment.body, '/opencode') || contains(github.event.comment.body, '/oc')))
+      (github.event_name == 'issues' && (
+        contains(github.event.issue.title, '/opencode') ||
+        contains(github.event.issue.title, '/oc') ||
+        contains(github.event.issue.body, '/opencode') ||
+        contains(github.event.issue.body, '/oc')
+      )) ||
+      (github.event_name == 'issue_comment' && (
+        contains(github.event.comment.body, '/opencode') ||
+        contains(github.event.comment.body, '/oc')
+      )) ||
+      (github.event_name == 'pull_request_review_comment' && (
+        contains(github.event.comment.body, '/opencode') ||
+        contains(github.event.comment.body, '/oc')
+      ))
     runs-on: ubuntu-latest
     steps:
       - name: Checkout del código del repositorio
@@ -37,14 +48,47 @@ jobs:
         with:
           node-version: 20
 
+      - name: Resolver Prompt para OpenCode
+        id: prompt_resolver
+        run: |
+          if [ "$EVENT_NAME" = "issues" ]; then
+            COMBINED_PROMPT="$ISSUE_TITLE"
+            if [ -n "$ISSUE_BODY" ]; then
+              COMBINED_PROMPT="$COMBINED_PROMPT
+
+$ISSUE_BODY"
+            fi
+            if [ -z "$COMBINED_PROMPT" ]; then
+              COMBINED_PROMPT="Revisa y resuelve el issue solicitado."
+            fi
+            echo "resolved_prompt<<EOF" >> "$GITHUB_OUTPUT"
+            echo "$COMBINED_PROMPT" >> "$GITHUB_OUTPUT"
+            echo "EOF" >> "$GITHUB_OUTPUT"
+          else
+            USER_COMMENT="$COMMENT_BODY"
+            if [ -z "$USER_COMMENT" ]; then
+              USER_COMMENT="Revisa y responde al comentario solicitado."
+            fi
+            echo "resolved_prompt<<EOF" >> "$GITHUB_OUTPUT"
+            echo "$USER_COMMENT" >> "$GITHUB_OUTPUT"
+            echo "EOF" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+
       - name: Ejecutar OpenCode CLI con Muse Spark 1.3
         uses: anomalyco/opencode/github@latest
         with:
           use_github_token: true
           model: "opencode/meta/muse-spark-1.3-contributor-free"
+          prompt: ${{ steps.prompt_resolver.outputs.resolved_prompt }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          PROMPT: ${{ steps.prompt_resolver.outputs.resolved_prompt }}
 
   # Job secundario: Borrado automático de la rama tras aceptar y fusionar el Pull Request
   cleanup-branch:
