@@ -112,6 +112,8 @@ fun AudioEffectsBottomSheet(
     onSetBalanceControlEnabled: (Boolean) -> Unit = {},
     onSetStereoBalance: (Float) -> Unit = {},
     initialTab: Int = 0,
+    // Fases 1-3 activas en streaming; Fase 4 bloqueada con "Próximamente".
+    isStreamingTrack: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     var selectedTab by remember(initialTab) { mutableIntStateOf(initialTab.coerceIn(0, 6)) }
@@ -163,6 +165,12 @@ fun AudioEffectsBottomSheet(
                 ) {
                     Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = TextSecondary)
                 }
+            }
+
+            // Aviso de alcance en streaming: Fases 1-3 activas, resto próximamente.
+            if (isStreamingTrack) {
+                com.example.ui.components.audioeffects.StreamingEffectsBanner()
+                Spacer(modifier = Modifier.height(10.dp))
             }
 
             // Pestañas / Selector de Módulo con Scroll
@@ -242,7 +250,8 @@ fun AudioEffectsBottomSheet(
                         onPresetSelect = onPresetSelect,
                         vocalClarityConfig = vocalClarityConfig,
                         onVocalClarityEnabledChange = onSetVocalClarityEnabled,
-                        onVocalClarityStrengthChange = onSetVocalClarityStrength
+                        onVocalClarityStrengthChange = onSetVocalClarityStrength,
+                        isStreamingTrack = isStreamingTrack
                     )
                     1 -> Spatial8DTabContent(
                         config = spatial8DConfig,
@@ -256,7 +265,8 @@ fun AudioEffectsBottomSheet(
                         config = reverbConfig,
                         onToggle = onSetReverbEnabled,
                         onSelectPreset = onSetReverbPreset,
-                        onCustomParametersChange = onSetReverbCustomParameters
+                        onCustomParametersChange = onSetReverbCustomParameters,
+                        isStreamingTrack = isStreamingTrack
                     )
                     3 -> SleepTimerTabContent(
                         timerState = sleepTimerState,
@@ -275,7 +285,8 @@ fun AudioEffectsBottomSheet(
                         onReset = onResetSpeedAndPitch,
                         vocalClarityConfig = vocalClarityConfig,
                         onVocalClarityEnabledChange = onSetVocalClarityEnabled,
-                        onVocalClarityStrengthChange = onSetVocalClarityStrength
+                        onVocalClarityStrengthChange = onSetVocalClarityStrength,
+                        isStreamingTrack = isStreamingTrack
                     )
                     5 -> TransitionsTabContent(
                         crossfadeSeconds = crossfadeSeconds,
@@ -296,14 +307,16 @@ fun AudioEffectsBottomSheet(
                         isVolumeNormalizationEnabled = volumeNormalizationConfig.enabled,
                         onVolumeNormalizationToggle = onSetVolumeNormalizationEnabled,
                         volumeNormalizationMode = volumeNormalizationConfig.mode,
-                        onVolumeNormalizationModeChange = onSetVolumeNormalizationMode
+                        onVolumeNormalizationModeChange = onSetVolumeNormalizationMode,
+                        isStreamingTrack = isStreamingTrack
                     )
                     6 -> BalanceAndHeadphonesTabContent(
                         headphoneConfig = headphoneConfig,
                         onSetCrossfeedEnabled = onSetCrossfeedEnabled,
                         onSetCrossfeedStrength = onSetCrossfeedStrength,
                         onSetBalanceControlEnabled = onSetBalanceControlEnabled,
-                        onSetStereoBalance = onSetStereoBalance
+                        onSetStereoBalance = onSetStereoBalance,
+                        isStreamingTrack = isStreamingTrack
                     )
                 }
             }

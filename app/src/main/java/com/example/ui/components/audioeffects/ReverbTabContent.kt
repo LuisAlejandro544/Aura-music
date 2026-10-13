@@ -39,8 +39,15 @@ fun ReverbTabContent(
     onToggle: (Boolean) -> Unit,
     onSelectPreset: (ReverbPreset) -> Unit,
     onCustomParametersChange: (roomSize: Float, decayMs: Int, levelDb: Float) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // Fase 4 en streaming: bloqueado con insignia "Próximamente".
+    isStreamingTrack: Boolean = false
 ) {
+    StreamingComingSoonBlock(
+        title = "Reverb en streaming disponible próximamente",
+        isStreaming = isStreamingTrack,
+        modifier = modifier
+    ) {
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = SurfaceCard,
@@ -228,5 +235,6 @@ fun ReverbTabContent(
                 }
             }
         }
+    }
     }
 }

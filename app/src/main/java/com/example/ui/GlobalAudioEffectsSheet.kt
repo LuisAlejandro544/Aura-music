@@ -57,8 +57,10 @@ fun GlobalAudioEffectsSheet(
     // 2. Hoja modal de efectos de audio global (Ecualizador, 8D/16D, Reverb, etc.)
     if (show) {
         val eqScopeMode by viewModel.eqScopeMode.collectAsState()
+        val isStreamingTrack = viewModel.currentTrack.collectAsState().value?.isStreamingTrack == true
         AudioEffectsBottomSheet(
             onDismissRequest = onDismiss,
+            isStreamingTrack = isStreamingTrack,
             isEqEnabled = isEqEnabled,
             eqScopeMode = eqScopeMode,
             onSetEqScopeMode = { viewModel.setEqScopeMode(it) },

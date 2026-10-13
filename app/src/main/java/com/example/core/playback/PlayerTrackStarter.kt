@@ -30,12 +30,14 @@ internal fun AuraAudioPlayer.playTrackInternal(track: Track, isAutoCrossfadeOver
     _duration.value = track.durationMs
     progressTracker.resetForNewTrack()
     abLoopController.reset()
-    // En modo Streaming omitimos por ahora el motor C++20 DSP; en modo local lo mantenemos 100% activo
-    NativeAudioProcessor.isStreamingBypassActive = track.isStreamingTrack
-    if (previousTrackId != track.id && !track.isStreamingTrack) {
+    // Modo Streaming Fases 1-3: DSP C++20 activo para EQ, Normalización y 8D/16D.
+    // Fase 4 (Reverb, VocalClarity, Crossfeed/Balance, Bit-Perfect, DJ) en bypass nativo.
+    NativeAudioProcessor.isStreamingBypassActive = false
+    if (previousTrackId != track.id) {
         effectManager.onTrackChanged(track.id)
     }
     effectManager.flushBuffers()
+    effectManager.applyStreamingPolicy(track.isStreamingTrack)
     com.example.widget.AuraMusicWidgetProvider.pushPlaybackState(
         context = context,
         track = track,

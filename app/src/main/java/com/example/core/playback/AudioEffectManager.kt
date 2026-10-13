@@ -69,4 +69,34 @@ class AudioEffectManager {
     fun setDjAutomixTransition(enabled: Boolean, progress: Float) = rx.setDjAutomixTransition(enabled, progress)
     fun flushBuffers() = rx.flushBuffers()
     fun release() = st.releaseHardware()
+
+    /**
+     * Política DSP para Modo Streaming (Fases 1-3 activas, Fase 4 en bypass).
+     * En streaming se fuerza a OFF a nivel nativo (sin mutar StateFlows locales):
+     * Reverb, VocalClarity, Crossfeed/Balance, Bit-Perfect y curva DJ.
+     * EQ, Normalización y 8D/16D quedan intactos y audibles.
+     * Al volver a local se restaura todo con syncNative().
+     */
+    fun applyStreamingPolicy(isStreaming: Boolean) {
+        if (isStreaming) {
+            try {
+                NativeAudioEngine.streamingLockPhase4 = true
+                val rev = st.reverbConfig.value
+                // Los OFF pasan el candado (solo se bloquean los ON).
+                NativeAudioEngine.setReverbParameters(false, rev.roomSize, rev.decayMs, rev.reverbLevelDb)
+                NativeAudioEngine.setVocalClarityParameters(false, st.vocalClarityConfig.value.strength)
+                NativeAudioEngine.setCrossfeedEnabled(false)
+                NativeAudioEngine.setBalanceEnabled(false)
+                NativeAudioEngine.setBitPerfectMode(false)
+                NativeAudioEngine.setDjAutomixTransition(false, 0.0f)
+            } catch (_: Throwable) {
+                try { NativeAudioEngine.streamingLockPhase4 = true } catch (_: Throwable) {}
+            }
+        } else {
+            try {
+                NativeAudioEngine.streamingLockPhase4 = false
+                st.syncNative()
+            } catch (_: Throwable) {}
+        }
+    }
 }

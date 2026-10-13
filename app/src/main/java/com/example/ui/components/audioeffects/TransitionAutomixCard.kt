@@ -39,7 +39,9 @@ fun TransitionAutomixCard(
     isDjAutomixEnabled: Boolean,
     onDjAutomixToggle: (Boolean) -> Unit,
     isDjEqCurveEnabled: Boolean,
-    onDjEqCurveToggle: (Boolean) -> Unit
+    onDjEqCurveToggle: (Boolean) -> Unit,
+    // Fase 1 activa en streaming (crossfade manual + gapless); DJ es Fase 4.
+    isStreamingTrack: Boolean = false
 ) {
             // Tarjeta 2: Smart AutoMix DJ (Música Local) & Crossfade Dual-Deck con Curva Armónica
             Surface(
@@ -48,6 +50,11 @@ fun TransitionAutomixCard(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
+                    StreamingComingSoonBlock(
+                        title = "Smart AutoMix DJ en streaming disponible próximamente",
+                        isStreaming = isStreamingTrack
+                    ) {
+                    Column {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -140,6 +147,10 @@ fun TransitionAutomixCard(
                     }
 
                     Spacer(modifier = Modifier.height(14.dp))
+                    }
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
 
                     // Duración del Crossfade Dual-Deck
                     Row(

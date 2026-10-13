@@ -56,7 +56,9 @@ fun EqualizerTabContent(
     onEqScopeModeChange: (EqualizerScopeMode) -> Unit = {},
     vocalClarityConfig: VocalClarityConfig = VocalClarityConfig(),
     onVocalClarityEnabledChange: (Boolean) -> Unit = {},
-    onVocalClarityStrengthChange: (Float) -> Unit = {}
+    onVocalClarityStrengthChange: (Float) -> Unit = {},
+    // Fase 2 activa en streaming (EQ); VocalClarity queda "Próximamente".
+    isStreamingTrack: Boolean = false
 ) {
     val displayBands = if (bands.isNotEmpty()) bands else EqualizerPreset.DEFAULT_10_BANDS
 
@@ -86,11 +88,17 @@ fun EqualizerTabContent(
         )
 
         // Control Estratégico: Clarificador de Voces HD (C++20 Mid-Side)
-        VocalClarityControl(
-            config = vocalClarityConfig,
-            onEnabledChange = onVocalClarityEnabledChange,
-            onStrengthChange = onVocalClarityStrengthChange
-        )
+        // En streaming Fase 4: bloqueado con insignia "Próximamente".
+        StreamingComingSoonBlock(
+            title = "Disponible solo en música local por ahora",
+            isStreaming = isStreamingTrack
+        ) {
+            VocalClarityControl(
+                config = vocalClarityConfig,
+                onEnabledChange = onVocalClarityEnabledChange,
+                onStrengthChange = onVocalClarityStrengthChange
+            )
+        }
 
         // Bandas de Frecuencia (10 Bandas ISO)
         EqualizerBandsGrid(

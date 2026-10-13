@@ -31,7 +31,9 @@ fun PlaybackParametersTabContent(
     modifier: Modifier = Modifier,
     vocalClarityConfig: VocalClarityConfig = VocalClarityConfig(),
     onVocalClarityEnabledChange: (Boolean) -> Unit = {},
-    onVocalClarityStrengthChange: (Float) -> Unit = {}
+    onVocalClarityStrengthChange: (Float) -> Unit = {},
+    // Fase 1 activa en streaming (velocidad/tono); VocalClarity es Fase 4.
+    isStreamingTrack: Boolean = false
 ) {
     var localSpeed by remember(speed) { mutableFloatStateOf(speed) }
     var localPitch by remember(pitch) { mutableFloatStateOf(pitch) }
@@ -199,6 +201,12 @@ fun PlaybackParametersTabContent(
             HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
             Spacer(modifier = Modifier.height(12.dp))
 
+            // 3. Clarificador de Voces HD: Fase 4 bloqueada en streaming.
+            StreamingComingSoonBlock(
+                title = "Claridad vocal en streaming disponible próximamente",
+                isStreaming = isStreamingTrack
+            ) {
+            Column {
             // 3. Clarificador de Voces HD en C++20 (Aislamiento Mid-Side y Presencia Vocal)
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -256,6 +264,8 @@ fun PlaybackParametersTabContent(
                     .fillMaxWidth()
                     .testTag("voice_tab_vocal_clarity_slider")
             )
+            }
+            }
         }
     }
 }

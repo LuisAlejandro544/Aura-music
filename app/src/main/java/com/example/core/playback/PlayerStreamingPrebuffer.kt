@@ -220,7 +220,10 @@ internal fun AuraAudioPlayer.syncQueueAfterPlaylistAutoAdvanceInternal() {
                 _currentTrack.value = next
                 progressTracker.resetForNewTrack()
                 abLoopController.reset()
-                NativeAudioProcessor.isStreamingBypassActive = next.isStreamingTrack
+                NativeAudioProcessor.isStreamingBypassActive = false
+                try { effectManager.onTrackChanged(next.id) } catch (_: Throwable) {}
+                try { effectManager.flushBuffers() } catch (_: Throwable) {}
+                try { effectManager.applyStreamingPolicy(next.isStreamingTrack) } catch (_: Throwable) {}
                 _isBuffering.value = false
                 _isNetworkStalled.value = false
                 _duration.value = next.durationMs
