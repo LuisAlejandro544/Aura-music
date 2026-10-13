@@ -203,8 +203,16 @@ app/
     │       ├── feature/                        # Pantallas Modulares por Funcionalidad (Feature Layer)
     │       │   ├── home/
     │       │   │   └── HomeScreen.kt           # Pantalla de Inicio con acceso rápido, populares y recientes
-    │       │   ├── streaming/
-    │       │   │   └── StreamingExploreScreen.kt # Pestaña Explorar / Streaming Tri-Plataforma (YT Music, YouTube & SoundCloud)
+    │       │   ├── streaming/                    # Pestaña Explorar / Streaming Tri-Plataforma
+    │       │   │   ├── StreamingExploreScreen.kt     # Fachada (169 líneas, API intacta)
+    │       │   │   ├── StreamingExploreHeader.kt     # Título y estado de caché
+    │       │   │   ├── StreamingSearchBar.kt         # Entrada de consultas
+    │       │   │   ├── StreamingFilterRow.kt         # Chips de origen
+    │       │   │   ├── StreamingRadioSection.kt      # Guard + banner de similar
+    │       │   │   ├── SimilarTrackRadioBanner.kt    # Tarjeta de recomendación
+    │       │   │   ├── StreamingResultsList.kt       # Lista con estados por tarjeta
+    │       │   │   ├── StreamingResultCard.kt        # Fila de catálogo con acciones
+    │       │   │   └── StreamingPlatformBadge.kt     # Insignia YT Music / YouTube / SoundCloud
     │       │   ├── library/
     │       │   │   ├── LibraryScreen.kt        # Pantalla de Biblioteca (Canciones, Favoritos, Playlists, Artistas y Álbumes)
     │       │   │   └── components/
