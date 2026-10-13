@@ -13,7 +13,7 @@
 ## 🔥 Novedades Destacadas en `v0.2.0-beta-1a`
 
 1. 🖼️ **Fondo de Pantalla Personalizado de Galería (Imagen WebP o Video Corto)**:
-   - Ahora puedes elegir una **foto o un video corto de la galería de tu teléfono** para ponerlo como fondo de pantalla mientras navegas por **Tu Biblioteca**, **Inicio** o **toda la aplicación** (configurable desde **Ajustes > Aura Dinámica, Video & Modo Juego**).
+   - Ahora puedes elegir una **foto o un video corto de la galería de tu teléfono** para ponerlo como fondo de pantalla mientras navegas por **Tu Biblioteca**, **Inicio**, **Explorar** o **toda la aplicación (incluyendo Ajustes)** (configurable desde **Ajustes > Aura Dinámica, Video & Modo Juego** con alcances *Solo en Tu Biblioteca*, *En Biblioteca, Inicio y Explorar* o *En toda la app*).
    - Incluye **Control de Oscurecimiento / Velo OLED ajustable (25% a 92%)** para que los títulos y botones siempre se lean con nitidez perfecta, y **Control de Desenfoque / Blur ajustable (0 a 25 dp)** sobre la imagen de fondo.
 2. 🎛️ **Motor de Crossfade Profesional Dual-Deck (Mezcla Superpuesta Real sin Pausas)**:
    - Nuevo sistema de **doble reproductor sincronizado (`Deck A + Deck B`)** con curva trigonométrica de igual potencia (*Equal-Power S-Curve: `sin/cos`*): cuando una canción empieza a bajar de volumen en sus últimos segundos (o al cambiar de canción con el Crossfade activo), **la siguiente canción empieza a sonar exactamente al mismo tiempo** subiendo desde `0%` a `100%`, eliminando por completo cualquier pausa o silencio entre pistas.
@@ -25,9 +25,11 @@
    - Al minimizar la app mientras juegas o usas otras aplicaciones pesadas, Aura Beta **libera automáticamente todo lo que no se está viendo** (apaga el decodificador de video en GPU, detiene el muestreo de texturas, suspende el hilo del visualizador espectral de 28 bandas y recorta cachés gráficas en RAM), mientras **mantiene 100% activos la música y únicamente los efectos de audio que tengas encendidos** (EQ, 8D/16D, Reverb, A-B Loop o Crossfade Dual-Deck).
 5. 🎨 **Transición de Colores de Video Suave a 1 Segundo (1000 ms)**:
    - Tanto en el reproductor a pantalla completa como en el **Mini Reproductor**, el muestreo y fundido de colores del Video Canvas se realiza cada **1 segundo (1000 ms)** con interpolación orgánica (`tween(1000)`), logrando cambios cromáticos elegantes sin marear la vista.
-6. 📁 **Carpeta Pública / Personalizada de Usuario y Exportación de Vídeos con Audio Completo**:
-   - En **Ajustes > Medios & Almacenamiento** ahora puedes pulsar **"Crear / Elegir carpeta"** para seleccionar o crear libremente la carpeta que tú quieras en tu teléfono (fuera de la ruta restringida `Android/data/`), mostrando en todo momento la **ruta exacta** donde quedan tus archivos (`.../Videos`).
-   - Permite guardar cualquier vídeo ya descargado (o todos con un solo toque en **"Guardar todos"**) como un archivo `.mp4` **con su pista de audio original incluida** (uniendo instantáneamente el vídeo y el audio de la canción mediante `FFmpeg` en segundo plano) para que puedas reproducirlo con sonido en tu Galería o compartirlo en redes sociales.
+6. 📁 **Carpeta Pública / Personalizada de Usuario, Exportación de Vídeos con Audio Completo y Música para Llevar + Cierre del MiniPlayer por Deslizamiento**:
+   - En **Ajustes > Medios & Almacenamiento** ahora puedes pulsar **"Crear / Elegir carpeta"** para seleccionar o crear libremente la carpeta que tú quieras en tu teléfono (fuera de la ruta restringida `Android/data/`), mostrando en todo momento la **ruta exacta** de tu carpeta (con subcarpetas `Videos/` y `Musica/`).
+   - Permite guardar cualquier vídeo ya descargado (o todos con un solo toque en **"Vídeos (N)"**) como un archivo `.mp4` **con su pista de audio original incluida** (uniendo instantáneamente el vídeo y el audio de la canción mediante `FFmpeg` en segundo plano) para que puedas reproducirlo con sonido en tu Galería o compartirlo en redes sociales.
+   - Nuevo botón **"Música (N)"** y botón por canción **"Llevarme esta música a mi carpeta"**: copian tus canciones descargadas en su formato original (`.m4a`/`.opus`/`.mp3`/...) a la subcarpeta `Musica/` para escucharlas en cualquier otro reproductor o compartirlas fuera de la app.
+   - El **Mini Reproductor ahora se cierra deslizando hacia la derecha**, deteniendo la música por completo y liberando la notificación nativa.
 7. 🌐 **Modo Streaming Híbrido Tri-Plataforma Estilo Spotify (`Explorar`: YT Music, YouTube & SoundCloud), Caché Inteligente No Lineal (50MB–500MB • 30 min TTL), Radio Infinita y Política de Red para Video Canvas**:
    - **Pestaña `Explorar` en la Barra Inferior (`StreamingExploreScreen`) con Búsqueda en YT Music, YouTube y SoundCloud**: Busca canciones, remixes, phonk, música electrónica y sets de DJ al instante combinando resultados de **YouTube Music (`🎵 YT MUSIC`)**, **YouTube (`▶️ YOUTUBE`)** y **SoundCloud (`☁️ SOUNDCLOUD`)**, tanto integrados en el filtro **Todo** como mediante el filtro exclusivo **☁️ Solo SoundCloud**.
    - **Motor SoundCloud Integrado Sin Login (`SoundCloudApiClient`)**: Hidrata automáticamente el `client_id` público de SoundCloud (`api-v2.soundcloud.com`) sin pedir cuentas ni claves, resolviendo flujos de audio progresivos en alta calidad (MP3 / Opus) con portadas HD (`500x500`) y respaldo en `yt-dlp`.
@@ -125,7 +127,7 @@
   - Filtro **Crossfeed Chu Moy / Bauer** en C++20 (exclusivo al conectar auriculares), **Balance Estéreo Fino L/R**, protección contra desconexiones (*Becoming Noisy Guard*), memoria de volumen independiente y mapeo de gestos de botones.
 - **Almacenamiento Limpio, Transparente y Carpeta Pública del Usuario (`UserPublicMediaExporter`)**:
   - Organizado internamente en `Android/data/com.auramusic.beta/files/` (`songs/`, `images/`, `lyrics/`, `metadata/` y `videos/`), con panel dedicado en **Ajustes > Medios & Almacenamiento** para revisar cuántos KB/MB ocupa cada portada o video y liberar espacio con un toque.
-  - **Carpeta Pública de Vídeos (Sin Restricciones)**: Permite crear o seleccionar cualquier carpeta de tu teléfono, ver la ruta exacta y exportar tus vídeos descargados en `.mp4` **con su audio completo unido por FFmpeg** hacia la subcarpeta `Videos/` (con soporte arquitectónico listo para `Images/`).
+  - **Carpeta Pública de Medios (Sin Restricciones)**: Permite crear o seleccionar cualquier carpeta de tu teléfono, ver la ruta exacta y exportar tus vídeos descargados en `.mp4` **con su audio completo unido por FFmpeg** hacia la subcarpeta `Videos/`, además de **llevarte tus músicas en su formato original** hacia la subcarpeta `Musica/` (con soporte arquitectónico listo para `Images/`). El Mini Reproductor se cierra deslizando hacia la derecha, deteniendo la música.
 
 ---
 
@@ -146,9 +148,14 @@ En cada lanzamiento de **Aura Beta (`Nebula`)** generamos **3 archivos APK exclu
 > Todo lo anterior se conserva intacto; esto solo añade las nuevas funciones sin reescribir el historial.
 
 10. 🎚️ **Selector de Calidad de Audio (Opus y M4A, para local y streaming con `yt-dlp`)**:
-    - En **Ajustes > Streaming & Caché Inteligente** ahora puedes elegir entre **Ahorro Opus ~48 kbps (itag 249)**, **Estándar M4A ~128 kbps (itag 140, el formato de siempre)**, **Alta Opus ~160 kbps (itag 251, suena mejor y pesa menos)** o **Automática Hi-Fi (recomendada: Opus 251 si existe, si no M4A 140)**.
+    - En **Ajustes > Aura Dinámica, Streaming & Modo Juego > Calidad de Audio (pantalla propia)** ahora puedes elegir entre **Ahorro Opus ~48 kbps (itag 249)**, **Estándar M4A ~128 kbps (itag 140, el formato de siempre)**, **Alta Opus ~160 kbps (itag 251, suena mejor y pesa menos)** o **Automática Hi-Fi (recomendada: Opus 251 si existe, si no M4A 140)**.
     - Vale para **canciones en streaming (Explorar)** y para **canciones locales/descargas con `yt-dlp`**: el ranking por itag rige en `InnerTubeClient`, `Invidious` y `YtDlpNativeEngine`, el selector `bestaudio[ext=webm]/bestaudio[ext=m4a]` rige en `YtDlpStreamDownloader`, y lo descargado se guarda en `songs/` como **`.opus`** u **`.m4a`** según tu elección (ambos reproducibles por ExoPlayer).
     - Nota honesta: YouTube no da lossless real; Opus ~160 kbps es el techo práctico.
-11. 📶 **Modo Ahorro de Datos (exclusivamente para el modo Explorar / streaming)**:
-    - Un solo interruptor en Ajustes que, solo en streaming, **fuerza Opus ahorro**, **apaga el Video Canvas de fondo**, **no busca letras automáticamente (ni LRCLIB ni auto-detección online)** y **pausa la pre-descarga de audio/video y la radio de canciones similares**.
+11. 📶 **Modo Ahorro de Datos (pantalla propia, exclusivamente para el modo Explorar / streaming)**:
+    - Interruptor en su propia pantalla (**Ajustes > Aura Dinámica, Streaming & Modo Juego > Ahorro de Datos**) que, solo en streaming, **fuerza Opus ahorro**, **apaga el Video Canvas de fondo**, **no busca letras automáticamente (ni LRCLIB ni auto-detección online)** y **pausa la pre-descarga de audio/video y la radio de canciones similares**.
     - Tus **canciones locales, sus videos y sus letras no se tocan en absoluto**: siguen sonando, mostrándose y buscándose como siempre.
+12. 🖌️ **Pulido de diseño en Ajustes + Karaoke con seguimiento real**:
+    - Tarjetas `SettingsNavigationCard` compactas sin huecos grandes: título flexible con peso, insignias (`OLED`, `MB`, `ON`, `6 OPCIONES`) de una sola línea sin corte vertical letra por letra y flecha alineada arriba.
+    - Botón "Vaciar caché" con ancho propio (texto en una línea) y chips 50/100/250/500 MB deslizables horizontalmente en pantallas compactas de 720px.
+    - Menú intermedio ampliado a **6 pantallas propias** (Streaming & Caché solo Video + Caché, Calidad de Audio, Ahorro de Datos, Aura Dinámica, Modo Juego y Fondo de Galería).
+    - Karaoke (`FullScreenLyricsScreen` y `NowPlayingLyricsCard`): al pulsar **"Sincronizar con audio"** el auto-follow sigue verso a verso hasta que el usuario arrastra la pantalla; el scroll programático ya no rompe el seguimiento (guardia `isAutoScrolling`).

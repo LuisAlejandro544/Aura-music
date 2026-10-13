@@ -88,6 +88,9 @@ fun FullScreenLyricsScreen(
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     var userScrolledManually by remember { mutableStateOf(false) }
+    // Guardia para distinguir el scroll programático (auto-follow) del gesto real del
+    // usuario: mientras está en true, isScrollInProgress se ignora y no rompe el seguimiento.
+    var isAutoScrolling by remember { mutableStateOf(false) }
     var showPasteDialog by remember { mutableStateOf(false) }
 
     // Launcher del sistema para archivos .lrc / .txt
@@ -108,19 +111,32 @@ fun FullScreenLyricsScreen(
         }
     }
 
-    // Seguimiento de scroll manual
+    // Seguimiento de scroll manual: solo el gesto del usuario rompe el auto-follow.
+    // El scroll programático (animateScrollToItem del auto-follow o del botón Sincronizar)
+    // activa isScrollInProgress, por eso se ignora mientras isAutoScrolling está activo.
     LaunchedEffect(listState.isScrollInProgress) {
-        if (listState.isScrollInProgress) {
+        if (listState.isScrollInProgress && !isAutoScrolling) {
             userScrolledManually = true
         }
     }
 
-    // Auto-scroll centrado a la frase actual si no hay desplazamiento manual
+    // Auto-scroll centrado a la frase actual: al pulsar "Sincronizar con audio" se
+    // reanuda y sigue solo hasta que el usuario vuelva a arrastrar la pantalla.
     LaunchedEffect(activeIndex, userScrolledManually) {
         if (!userScrolledManually && activeIndex >= 0 && lyricsState.lines.isNotEmpty()) {
             val targetScroll = (activeIndex - 2).coerceAtLeast(0)
-            listState.animateScrollToItem(targetScroll)
+            isAutoScrolling = true
+            try {
+                listState.animateScrollToItem(targetScroll)
+            } finally {
+                isAutoScrolling = false
+            }
         }
+    }
+
+    // Al cambiar de canción, retomar el seguimiento automático desde el inicio.
+    LaunchedEffect(lyricsState.lines) {
+        userScrolledManually = false
     }
 
     Box(
@@ -170,7 +186,8 @@ fun FullScreenLyricsScreen(
                         arrayOf("text/*", "application/octet-stream", "*/*")
                     )
                 },
-                onUserScrollConsumed = { userScrolledManually = false }
+                onUserScrollConsumed = { userScrolledManually = false },
+                onAutoScrollStateChange = { auto -> isAutoScrolling = auto }
             )
             FullScreenLyricsTransportBar(
                 currentTrack = currentTrack,

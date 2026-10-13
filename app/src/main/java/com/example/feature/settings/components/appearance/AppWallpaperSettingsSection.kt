@@ -129,7 +129,11 @@ fun AppWallpaperCustomizationCard(
                             style = MaterialTheme.typography.titleSmall.copy(
                                 fontWeight = FontWeight.Bold,
                                 color = TextPrimary
-                            )
+                            ),
+                            maxLines = 2,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            softWrap = true,
+                            modifier = Modifier.weight(1f, fill = false)
                         )
                     }
                     Spacer(modifier = Modifier.height(4.dp))

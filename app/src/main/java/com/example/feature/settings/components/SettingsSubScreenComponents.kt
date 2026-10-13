@@ -21,9 +21,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.theme.BackgroundDark
 import com.example.ui.theme.CardBorder
 import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.TextPrimary
@@ -63,17 +63,19 @@ fun SettingsNavigationCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(18.dp),
+                .padding(16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.Top
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(verticalAlignment = Alignment.Top) {
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
                         tint = iconTint,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier
+                            .size(20.dp)
+                            .padding(top = 1.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
@@ -81,14 +83,19 @@ fun SettingsNavigationCard(
                         style = MaterialTheme.typography.titleSmall.copy(
                             fontWeight = FontWeight.Bold,
                             color = TextPrimary
-                        )
+                        ),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        softWrap = true,
+                        modifier = Modifier.weight(1f, fill = false)
                     )
                     if (!badgeText.isNullOrBlank()) {
                         Spacer(modifier = Modifier.width(8.dp))
                         Surface(
                             shape = RoundedCornerShape(8.dp),
                             color = badgeColor.copy(alpha = 0.18f),
-                            border = BorderStroke(1.dp, badgeColor.copy(alpha = 0.5f))
+                            border = BorderStroke(1.dp, badgeColor.copy(alpha = 0.5f)),
+                            modifier = Modifier.wrapContentWidth()
                         ) {
                             Text(
                                 text = badgeText,
@@ -97,7 +104,10 @@ fun SettingsNavigationCard(
                                     color = badgeColor,
                                     fontSize = 10.sp
                                 ),
-                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Clip,
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
                             )
                         }
                     }
@@ -105,7 +115,10 @@ fun SettingsNavigationCard(
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = subtitle,
-                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
+                    maxLines = 4,
+                    overflow = TextOverflow.Ellipsis,
+                    softWrap = true
                 )
             }
 
@@ -115,7 +128,9 @@ fun SettingsNavigationCard(
                 imageVector = Icons.Default.ChevronRight,
                 contentDescription = "Abrir menú $title",
                 tint = TextSecondary,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier
+                    .size(24.dp)
+                    .padding(top = 2.dp)
             )
         }
     }
@@ -139,7 +154,7 @@ fun SettingsSubMenuScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(BackgroundDark)
+            .background(Color.Transparent)
             .testTag(testTag)
     ) {
         // Barra Superior de la Pantalla Independiente de Ajuste
@@ -185,13 +200,20 @@ fun SettingsSubMenuScreen(
                         style = MaterialTheme.typography.titleLarge.copy(
                             fontWeight = FontWeight.Bold,
                             color = TextPrimary
-                        )
+                        ),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        softWrap = true,
+                        modifier = Modifier.weight(1f, fill = false)
                     )
                 }
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = subtitle,
-                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                    softWrap = true
                 )
             }
         }

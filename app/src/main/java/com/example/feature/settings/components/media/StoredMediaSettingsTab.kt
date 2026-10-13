@@ -81,6 +81,8 @@ private fun StoredMediaFilterAndList(
     }
     var pendingTrackToExportAfterFolderSelect by remember { mutableStateOf<Track?>(null) }
     var pendingExportAllAfterFolderSelect by remember { mutableStateOf(false) }
+    var pendingAudioTrackToExportAfterFolderSelect by remember { mutableStateOf<Track?>(null) }
+    var pendingExportAllAudioAfterFolderSelect by remember { mutableStateOf(false) }
 
     val tracksWithVideos = remember(allTracks) {
         allTracks.filter { !it.videoUri.isNullOrBlank() }
@@ -137,6 +139,57 @@ private fun StoredMediaFilterAndList(
         }
     }
 
+    fun triggerSingleAudioExport(track: Track) {
+        if (exportFolderState.exportingAudioTrackIds.contains(track.id)) return
+        coroutineScope.launch {
+            exportFolderState = exportFolderState.copy(
+                exportingAudioTrackIds = exportFolderState.exportingAudioTrackIds + track.id,
+                statusMessage = null
+            )
+            val result = UserPublicMediaExporter.exportTrackAudioToUserFolder(context, track)
+            val refreshed = UserPublicMediaExporter.loadCurrentState(context)
+            exportFolderState = refreshed.copy(
+                exportingAudioTrackIds = exportFolderState.exportingAudioTrackIds - track.id,
+                isExportingAllAudio = exportFolderState.isExportingAllAudio,
+                statusMessage = result.fold(
+                    onSuccess = { path -> "Música guardada en: $path" },
+                    onFailure = { err -> "No se pudo guardar: ${err.message}" }
+                )
+            )
+        }
+    }
+
+    fun triggerExportAllMusic(musicTracks: List<Track>) {
+        if (musicTracks.isEmpty() || exportFolderState.isExportingAllAudio) return
+        coroutineScope.launch {
+            exportFolderState = exportFolderState.copy(
+                isExportingAllAudio = true,
+                statusMessage = "Copiando ${musicTracks.size} música(s) a tu carpeta..."
+            )
+            var successCount = 0
+            for (track in musicTracks) {
+                exportFolderState = exportFolderState.copy(
+                    exportingAudioTrackIds = exportFolderState.exportingAudioTrackIds + track.id
+                )
+                val res = UserPublicMediaExporter.exportTrackAudioToUserFolder(context, track)
+                if (res.isSuccess) successCount++
+                exportFolderState = exportFolderState.copy(
+                    exportingAudioTrackIds = exportFolderState.exportingAudioTrackIds - track.id
+                )
+            }
+            val refreshed = UserPublicMediaExporter.loadCurrentState(context)
+            exportFolderState = refreshed.copy(
+                exportingAudioTrackIds = emptySet(),
+                isExportingAllAudio = false,
+                statusMessage = if (successCount > 0) {
+                    "¡Listo! Se copiaron $successCount música(s) en ${refreshed.readableMusicaPath}"
+                } else {
+                    "No se pudieron copiar las músicas seleccionadas."
+                }
+            )
+        }
+    }
+
     val folderPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
     ) { treeUri ->
@@ -150,16 +203,26 @@ private fun StoredMediaFilterAndList(
                 val pendingAll = pendingExportAllAfterFolderSelect
                 pendingTrackToExportAfterFolderSelect = null
                 pendingExportAllAfterFolderSelect = false
+                val pendingSingleAudio = pendingAudioTrackToExportAfterFolderSelect
+                val pendingAllAudio = pendingExportAllAudioAfterFolderSelect
+                pendingAudioTrackToExportAfterFolderSelect = null
+                pendingExportAllAudioAfterFolderSelect = false
 
                 if (pendingSingle != null) {
                     triggerSingleVideoExport(pendingSingle)
                 } else if (pendingAll) {
                     triggerExportAllVideos(tracksWithVideos)
+                } else if (pendingSingleAudio != null) {
+                    triggerSingleAudioExport(pendingSingleAudio)
+                } else if (pendingAllAudio) {
+                    triggerExportAllMusic(allTracks)
                 }
             }
         } else {
             pendingTrackToExportAfterFolderSelect = null
             pendingExportAllAfterFolderSelect = false
+            pendingAudioTrackToExportAfterFolderSelect = null
+            pendingExportAllAudioAfterFolderSelect = false
         }
     }
 
@@ -188,13 +251,15 @@ private fun StoredMediaFilterAndList(
     Column(modifier = Modifier.fillMaxWidth()) {
         Spacer(modifier = Modifier.height(6.dp))
 
-        // Tarjeta de Carpeta Personalizada del Usuario (Muestra ruta exacta y permite elegir carpeta o exportar vídeos)
+        // Tarjeta de Carpeta Personalizada del Usuario (Muestra ruta exacta y permite elegir carpeta o exportar vídeos y músicas)
         UserPublicFolderCard(
             exportState = exportFolderState,
             totalVideosCount = tracksWithVideos.size,
             onSelectFolderClick = {
                 pendingTrackToExportAfterFolderSelect = null
                 pendingExportAllAfterFolderSelect = false
+                pendingAudioTrackToExportAfterFolderSelect = null
+                pendingExportAllAudioAfterFolderSelect = false
                 folderPickerLauncher.launch(null)
             },
             onExportAllVideosClick = {
@@ -207,6 +272,15 @@ private fun StoredMediaFilterAndList(
             },
             onDismissStatusMessage = {
                 exportFolderState = exportFolderState.copy(statusMessage = null)
+            },
+            totalMusicsCount = allTracks.size,
+            onExportAllMusicClick = {
+                if (!exportFolderState.isConfigured) {
+                    pendingExportAllAudioAfterFolderSelect = true
+                    folderPickerLauncher.launch(null)
+                } else {
+                    triggerExportAllMusic(allTracks)
+                }
             }
         )
 
@@ -339,7 +413,17 @@ private fun StoredMediaFilterAndList(
                         }
                     } else null,
                     isVideoExported = exportFolderState.exportedTrackIds.contains(track.id),
-                    isExportingVideo = exportFolderState.exportingTrackIds.contains(track.id)
+                    isExportingVideo = exportFolderState.exportingTrackIds.contains(track.id),
+                    onExportAudioClick = {
+                        if (!exportFolderState.isConfigured) {
+                            pendingAudioTrackToExportAfterFolderSelect = track
+                            folderPickerLauncher.launch(null)
+                        } else {
+                            triggerSingleAudioExport(track)
+                        }
+                    },
+                    isAudioExported = exportFolderState.exportedAudioTrackIds.contains(track.id),
+                    isExportingAudio = exportFolderState.exportingAudioTrackIds.contains(track.id)
                 )
                 Spacer(modifier = Modifier.height(10.dp))
             }

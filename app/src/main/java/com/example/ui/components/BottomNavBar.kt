@@ -19,7 +19,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.ui.navigation.NavScreen
 import com.example.ui.theme.BackgroundDark
 import com.example.ui.theme.TextMuted
@@ -52,7 +54,7 @@ fun BottomNavBar(
                     contentDescription = "Inicio"
                 )
             },
-            label = { Text("Inicio") },
+            label = { NavLabel("Inicio") },
             colors = NavigationBarItemDefaults.colors(
                 selectedIconColor = Color.White,
                 selectedTextColor = MaterialTheme.colorScheme.primary,
@@ -72,7 +74,7 @@ fun BottomNavBar(
                     contentDescription = "Explorar Streaming"
                 )
             },
-            label = { Text("Explorar") },
+            label = { NavLabel("Explorar") },
             colors = NavigationBarItemDefaults.colors(
                 selectedIconColor = Color.White,
                 selectedTextColor = MaterialTheme.colorScheme.primary,
@@ -92,7 +94,7 @@ fun BottomNavBar(
                     contentDescription = "Tu Biblioteca"
                 )
             },
-            label = { Text("Biblioteca") },
+            label = { NavLabel("Biblioteca") },
             colors = NavigationBarItemDefaults.colors(
                 selectedIconColor = Color.White,
                 selectedTextColor = MaterialTheme.colorScheme.primary,
@@ -112,7 +114,7 @@ fun BottomNavBar(
                     contentDescription = "Importar Música"
                 )
             },
-            label = { Text("Importar") },
+            label = { NavLabel("Importar") },
             colors = NavigationBarItemDefaults.colors(
                 selectedIconColor = Color.White,
                 selectedTextColor = MaterialTheme.colorScheme.primary,
@@ -142,7 +144,7 @@ fun BottomNavBar(
                     )
                 }
             },
-            label = { Text("Ajustes") },
+            label = { NavLabel("Ajustes") },
             colors = NavigationBarItemDefaults.colors(
                 selectedIconColor = Color.White,
                 selectedTextColor = MaterialTheme.colorScheme.primary,
@@ -153,4 +155,19 @@ fun BottomNavBar(
             modifier = Modifier.testTag("nav_settings")
         )
     }
+}
+
+/**
+ * Etiqueta de una sola línea para pantallas compactas (360dp / 720px):
+ * evita el corte "Bibliotec/a" visto en capturas.
+ */
+@Composable
+private fun NavLabel(text: String) {
+    Text(
+        text = text,
+        maxLines = 1,
+        softWrap = false,
+        overflow = TextOverflow.Ellipsis,
+        fontSize = 11.sp
+    )
 }

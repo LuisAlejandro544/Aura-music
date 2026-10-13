@@ -94,7 +94,7 @@ fun LazyListScope.mainSettingsMenuContent(
         Spacer(modifier = Modifier.height(12.dp))
     }
 
-    // 2. Aura Dinámica, Streaming & Modo Juego (Menú de 4 Sub-Apartados)
+    // 2. Aura Dinámica, Streaming & Modo Juego (Menú de 6 Sub-Apartados)
     item {
         val auraStatus = if (isDynamicArtworkColorEnabled) "Aura Dinámica (1s)" else "Aura Dinámica OFF"
         val wallpaperStatus = if (appWallpaperConfig.hasValidMedia) "Fondo Galería activo" else "Fondo OLED"
@@ -102,9 +102,9 @@ fun LazyListScope.mainSettingsMenuContent(
         SettingsNavigationCard(
             icon = Icons.Default.Videocam,
             title = "Aura Dinámica, Streaming & Modo Juego",
-            subtitle = "Streaming y Caché • $auraStatus • $gameModeStatus • $wallpaperStatus",
+            subtitle = "Streaming y Caché • Calidad • Ahorro • $auraStatus • $gameModeStatus • $wallpaperStatus",
             iconTint = MaterialTheme.colorScheme.secondary,
-            badgeText = "4 OPCIONES",
+            badgeText = "6 OPCIONES",
             badgeColor = MaterialTheme.colorScheme.secondary,
             onClick = onOpenVisualBehavior,
             testTag = "settings_nav_visual_behavior"
@@ -245,6 +245,6 @@ fun LazyListScope.mainSettingsMenuContent(
 }
 
 /**
- * Menú intermedio con 4 tarjetas navegables para el apartado "Aura Dinámica, Streaming & Modo Juego",
+ * Menú intermedio con 6 tarjetas navegables para el apartado "Aura Dinámica, Streaming & Modo Juego",
  * evitando tener todas las opciones y controles apretados en una sola pantalla.
  */

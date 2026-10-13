@@ -65,12 +65,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import androidx.compose.ui.graphics.Color
 import com.example.core.model.StreamingCacheConfig
 import com.example.core.model.StreamingSearchFilter
 import com.example.core.model.StreamingSearchItem
 import com.example.core.model.StreamingSourcePlatform
 import com.example.core.model.Track
-import com.example.ui.theme.BackgroundDark
 import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.SurfaceVariantDark
 import com.example.ui.theme.TextMuted
@@ -117,7 +117,7 @@ fun StreamingExploreScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(BackgroundDark)
+            .background(Color.Transparent)
             .padding(horizontal = 16.dp)
             .testTag("streaming_explore_screen")
     ) {

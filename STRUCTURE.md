@@ -11,7 +11,7 @@ El proyecto sigue una arquitectura reactiva y desacoplada organizada en capas:
 1. **Capa Nativa (C++20 / NDK)**: Motores de procesamiento de audio digital DSP en tiempo real (Ecualizador paramétrico de 10 bandas IIR, Audio 8D/16D Multi-Órbita, Clarificador de Voces Mid-Side HD, Reverb Schroeder/Moorer y Crossfeed Chu Moy) + binarios nativos optimizados de FFmpeg y QuickJS/CPython.
 2. **Capa de Datos & Almacenamiento (Data & Storage)**:
    - Base de datos SQLite reactiva con **Room**.
-   - Acceso al almacenamiento estructurado en `Android/data/com.aistudio.musicplayer.aurasound/files/` (Debug) y `Android/data/com.auramusic.beta/files/` (APK Beta `Aura Beta` • Codename `Nebula`) con subcarpetas (`songs/`, `images/`, `lyrics/`, `metadata/`, `videos/`), además de **Carpeta Pública / Personalizada del Usuario (`UserPublicMediaExporter` & `UserPublicFolderCard`)** mediante SAF (`OpenDocumentTree`) con subcarpeta `Videos/` (y preparada para `Images/`) para exportar vídeos descargados con su audio completo.
+   - Acceso al almacenamiento estructurado en `Android/data/com.aistudio.musicplayer.aurasound/files/` (Debug) y `Android/data/com.auramusic.beta/files/` (APK Beta `Aura Beta` • Codename `Nebula`) con subcarpetas (`songs/`, `images/`, `lyrics/`, `metadata/`, `videos/`), además de **Carpeta Pública / Personalizada del Usuario (`UserPublicMediaExporter` & `UserPublicFolderCard`)** mediante SAF (`OpenDocumentTree`) con subcarpetas `Videos/` y `Musica/` (y preparada para `Images/`) para exportar vídeos descargados con su audio completo y llevarse las músicas en su formato original.
    - Motores de importación, sincronización de letras LRCLIB, extracción FFmpeg, descarga directa prioritaria con motor nativo yt-dlp (`YtDlpStreamDownloader`) con métricas de progreso en tiempo real y respaldo resiliente multi-nivel con separación de `audioHeaders`/`videoHeaders` por perfil `c=` (`ChunkedStreamDownloader` -> `InnerTubeClient` -> `InvidiousStreamResolver` -> `HeadlessWebViewExtractor`), arquitectura modular desacoplada en `engines/` (< 500 líneas por módulo), y actualizador automático de versiones APK (`AppReleaseUpdater` con comparador semántico de tags dinámicos `-beta`, selección por arquitectura móvil y verificación SHA-256).
 3. **Capa de Control & Reproducción (Playback Layer)**:
    - `AuraAudioPlayer` con ExoPlayer/Media3, modularizado con controladores especializados (`PlayerQueueController`, `AudioFadeController`, `ABLoopController`, `MediaSessionBridge`) y coordinadores de reproducción (`PlaybackProgressTracker`, `StreamingErrorRecoveryHandler`, `PlaybackParametersManager`, `StreamingUrlPolicy`).
@@ -373,7 +373,8 @@ app/
     │       │           │   ├── AppearanceGameModeSection.kt       # Modo Juego / Ahorro en 2do plano
     │       │           │   ├── AppearancePaletteSection.kt        # Paleta dinámica y colores del tema
     │       │           │   ├── AppWallpaperSettingsSection.kt       # Controles de fondo de pantalla de galería (WebP/Video, Opacidad y Blur)
-    │       │           │   ├── StreamingCacheAndVideoSettingsCard.kt # Ajustes de caché (50-500 MB), política de red, calidad Opus/M4A y Modo Ahorro solo-Explorar
+    │       │           │   ├── StreamingCacheAndVideoSettingsCard.kt # Fachada combinada (reutiliza las 4 sub-tarjetas para compatibilidad)
+    │       │           │   ├── StreamingSectionCards.kt           # 4 tarjetas propias: Video Canvas, Calidad Opus/M4A, Ahorro Datos y Caché 50-500 MB
     │       │           │   ├── EnginesAndDiagnosticsSection.kt      # Estado de FFmpeg, QuickJS C99 puro, yt-dlp OTA y Aura Monitor
     │       │           │   └── PlayerDesignSettingsContent.kt       # Pantalla dedicada de selección de Diseño del Reproductor
     │       │           ├── headphones/                    # Ajustes de Auriculares, Acústica DSP, Bit-Perfect y Gestos
@@ -402,7 +403,7 @@ app/
     │       ├── ui/                             # Orquestador UI Global, Componentes Compartidos, Navegación y Tema M3
     │       │   ├── AuraMusicAppContent.kt      # Fachada que delega en 4 hosts
     │       │   ├── MiniPlayerColorsState.kt    # Colores dinámicos del MiniPlayer cada 1s
-    │       │   ├── AppBottomBarHost.kt         # MiniPlayer flotante y navegación inferior
+    │       │   ├── AppBottomBarHost.kt         # MiniPlayer flotante con cierre por deslizamiento y navegación inferior
     │       │   ├── AppScreensHost.kt           # Las 7 pantallas con transiciones
     │       │   └── AppNowPlayingHost.kt        # Overlay de Now Playing cableado
     │       │   ├── GlobalDialogsHost.kt # Fachada (128) que delega en 8 anfitriones

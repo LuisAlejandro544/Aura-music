@@ -15,10 +15,12 @@ import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.DashboardCustomize
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Headphones
+import androidx.compose.material.icons.filled.HighQuality
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PermMedia
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.SignalWifiOff
 import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.*
@@ -30,6 +32,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import android.net.Uri
@@ -66,17 +69,18 @@ fun LazyListScope.visualBehaviorMenuSection(
     appWallpaperConfig: AppWallpaperConfig,
     streamingCacheConfig: com.example.core.model.StreamingCacheConfig,
     onOpenStreamingAndCache: () -> Unit,
+    onOpenAudioQuality: () -> Unit,
+    onOpenDataSaver: () -> Unit,
     onOpenAuraAndMiniPlayer: () -> Unit,
     onOpenGameMode: () -> Unit,
     onOpenGalleryWallpaper: () -> Unit
 ) {
-    // 1. Streaming & Caché Inteligente
+    // 1. Streaming: Video Canvas + Caché (pantalla propia, sin calidad ni ahorro adentro)
     item {
         SettingsNavigationCard(
             icon = Icons.Default.Videocam,
             title = "Streaming & Caché Inteligente",
-            subtitle = "${streamingCacheConfig.videoNetworkPolicy.title} • ${streamingCacheConfig.audioQuality.title}" +
-                (if (streamingCacheConfig.dataSaverEnabled) " • 📶 Ahorro activado" else "") +
+            subtitle = "${streamingCacheConfig.videoNetworkPolicy.title}" +
                 " • Caché máx: ${streamingCacheConfig.maxCacheSizeMb} MB (${streamingCacheConfig.usedMbFormatted} en uso)",
             iconTint = MaterialTheme.colorScheme.primary,
             badgeText = "${streamingCacheConfig.maxCacheSizeMb} MB",
@@ -87,7 +91,41 @@ fun LazyListScope.visualBehaviorMenuSection(
         Spacer(modifier = Modifier.height(12.dp))
     }
 
-    // 2. Aura Dinámica (1s) & Video en Mini Reproductor
+    // 2. Calidad de Audio (pantalla propia)
+    item {
+        SettingsNavigationCard(
+            icon = Icons.Default.HighQuality,
+            title = "Calidad de Audio",
+            subtitle = "${streamingCacheConfig.audioQuality.title} • Opus / M4A para Explorar y descargas",
+            iconTint = MaterialTheme.colorScheme.primary,
+            badgeText = "OPUS/M4A",
+            badgeColor = MaterialTheme.colorScheme.primary,
+            onClick = onOpenAudioQuality,
+            testTag = "visual_subtab_audio_quality"
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+    }
+
+    // 3. Ahorro de Datos (pantalla propia, solo Explorar)
+    item {
+        SettingsNavigationCard(
+            icon = Icons.Default.SignalWifiOff,
+            title = "Ahorro de Datos",
+            subtitle = if (streamingCacheConfig.dataSaverEnabled) {
+                "Activado • Solo Explorar, tu música local intacta"
+            } else {
+                "Desactivado • Streaming a calidad completa"
+            },
+            iconTint = MaterialTheme.colorScheme.secondary,
+            badgeText = if (streamingCacheConfig.dataSaverEnabled) "ON" else "OFF",
+            badgeColor = MaterialTheme.colorScheme.secondary,
+            onClick = onOpenDataSaver,
+            testTag = "visual_subtab_data_saver"
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+    }
+
+    // 4. Aura Dinámica (1s) & Video en Mini Reproductor
     item {
         val activeCount = listOf(isDynamicArtworkColorEnabled, isMiniPlayerVideoEnabled).count { it }
         val auraDesc = if (isDynamicArtworkColorEnabled) "Color reactivo cada 1s activo" else "Color reactivo OFF"
@@ -105,7 +143,7 @@ fun LazyListScope.visualBehaviorMenuSection(
         Spacer(modifier = Modifier.height(12.dp))
     }
 
-    // 3. Modo Juego / Ahorro en 2do Plano
+    // 5. Modo Juego / Ahorro en 2do Plano
     item {
         SettingsNavigationCard(
             icon = Icons.Default.SportsEsports,
@@ -124,7 +162,7 @@ fun LazyListScope.visualBehaviorMenuSection(
         Spacer(modifier = Modifier.height(12.dp))
     }
 
-    // 4. Fondo de Pantalla de Galería (Imagen WebP o Video corto MP4)
+    // 6. Fondo de Pantalla de Galería (Imagen WebP o Video corto MP4)
     item {
         val wallpaperSummary = if (appWallpaperConfig.hasValidMedia) {
             "Activo: ${appWallpaperConfig.mediaType.label} • ${appWallpaperConfig.screenScope.label} • Blur ${appWallpaperConfig.blurRadiusDp}dp"

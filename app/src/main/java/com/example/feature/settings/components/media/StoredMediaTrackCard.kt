@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.VideocamOff
 import androidx.compose.material3.*
@@ -43,8 +44,8 @@ import kotlinx.coroutines.withContext
  * Aura Music - Componente Modular de Tarjeta de Canción y Medios Guardados
  *
  * Muestra metadatos de la canción, tamaño de carátula WebP y video Canvas MP4,
- * con botones directos para liberar el espacio de cada medio o guardar el vídeo
- * con su audio completo en la carpeta pública seleccionada por el usuario.
+ * con botones directos para liberar el espacio de cada medio, guardar el vídeo
+ * con su audio completo o llevarse la música original a la carpeta pública del usuario.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -55,6 +56,9 @@ fun StoredMediaTrackCard(
     onExportVideoClick: (() -> Unit)? = null,
     isVideoExported: Boolean = false,
     isExportingVideo: Boolean = false,
+    onExportAudioClick: (() -> Unit)? = null,
+    isAudioExported: Boolean = false,
+    isExportingAudio: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val hasArt = !track.albumArtPath.isNullOrBlank()
@@ -138,6 +142,66 @@ fun StoredMediaTrackCard(
                 isVideoExported = isVideoExported,
                 isExportingVideo = isExportingVideo
             )
+
+            // Botón para llevarse la música original a la carpeta del usuario (subcarpeta Musica/)
+            if (onExportAudioClick != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                FilledTonalButton(
+                    onClick = onExportAudioClick,
+                    enabled = !isExportingAudio,
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = if (isAudioExported) {
+                            Color(0xFF10B981).copy(alpha = 0.16f)
+                        } else {
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+                        },
+                        contentColor = if (isAudioExported) {
+                            Color(0xFF10B981)
+                        } else {
+                            MaterialTheme.colorScheme.primary
+                        }
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                        .testTag("export_audio_${track.id}")
+                ) {
+                    if (isExportingAudio) {
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.primary,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Copiando música a tu carpeta...",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.5.sp
+                            )
+                        )
+                    } else {
+                        Icon(
+                            imageVector = if (isAudioExported) Icons.Default.CheckCircle else Icons.Default.MusicNote,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (isAudioExported) {
+                                "En tu carpeta (Volver a copiar)"
+                            } else {
+                                "Llevarme esta música a mi carpeta"
+                            },
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.5.sp
+                            )
+                        )
+                    }
+                }
+            }
         }
     }
 }

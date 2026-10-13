@@ -44,8 +44,8 @@ import com.example.ui.theme.TextSecondary
 import androidx.compose.ui.graphics.Color
 
 /**
- * Menú Aura Dinámica, Streaming & Modo Juego (4 tarjetas).
- * Rol arquitectónico: pantalla intermedia hacia las 4 sub-pantallas.
+ * Menú Aura Dinámica, Streaming & Modo Juego (6 tarjetas).
+ * Rol arquitectónico: pantalla intermedia hacia las 6 sub-pantallas.
  */
 @Composable
 fun SettingsVisualBehaviorMenuScreen(
@@ -72,6 +72,8 @@ fun SettingsVisualBehaviorMenuScreen(
                             appWallpaperConfig = appWallpaperConfig,
                             streamingCacheConfig = streamingCacheConfig,
                             onOpenStreamingAndCache = { onNavigate(SettingsSubScreen.VISUAL_STREAMING_AND_CACHE) },
+                            onOpenAudioQuality = { onNavigate(SettingsSubScreen.VISUAL_AUDIO_QUALITY) },
+                            onOpenDataSaver = { onNavigate(SettingsSubScreen.VISUAL_DATA_SAVER) },
                             onOpenAuraAndMiniPlayer = { onNavigate(SettingsSubScreen.VISUAL_AURA_AND_MINIPLAYER) },
                             onOpenGameMode = { onNavigate(SettingsSubScreen.VISUAL_GAME_MODE) },
                             onOpenGalleryWallpaper = { onNavigate(SettingsSubScreen.VISUAL_GALLERY_WALLPAPER) }
@@ -80,8 +82,9 @@ fun SettingsVisualBehaviorMenuScreen(
 }
 
 /**
- * Sub-pantalla Streaming & Caché Inteligente.
- * Rol arquitectónico: pantalla independiente con retroceso.
+ * Sub-pantalla Streaming & Caché Inteligente (solo Video Canvas + Caché).
+ * Rol arquitectónico: pantalla independiente con retroceso. Calidad y Ahorro
+ * viven en sus propias pantallas para no amontonar controles.
  */
 @Composable
 fun SettingsStreamingCacheScreen(
@@ -95,19 +98,79 @@ fun SettingsStreamingCacheScreen(
 ) {
                     SettingsSubMenuScreen(
                         title = "Streaming & Caché Inteligente",
-                        subtitle = "Calidad Opus/M4A, Ahorro de Datos (solo Explorar), Video Canvas y caché de 50 a 500 MB",
+                        subtitle = "Video Canvas en Explorar y caché temporal de 50 a 500 MB",
                         icon = Icons.Default.CloudQueue,
                         iconTint = MaterialTheme.colorScheme.primary,
                         onBack = onBack,
                         testTag = "subscreen_visual_streaming_cache"
                     ) {
                         item {
-                            com.example.feature.settings.components.appearance.StreamingCacheAndVideoSettingsCard(
+                            com.example.feature.settings.components.appearance.StreamingVideoPolicyCard(
                                 cacheConfig = streamingCacheConfig,
-                                onSelectVideoPolicy = onSelectStreamingVideoPolicy,
+                                onSelectVideoPolicy = onSelectStreamingVideoPolicy
+                            )
+                        }
+                        item {
+                            Spacer(modifier = Modifier.height(12.dp))
+                        }
+                        item {
+                            com.example.feature.settings.components.appearance.StreamingCacheUsageCard(
+                                cacheConfig = streamingCacheConfig,
                                 onChangeMaxCacheMb = onChangeStreamingCacheMaxMb,
-                                onClearStreamingCache = onClearStreamingCache,
-                                onSelectAudioQuality = onSelectStreamingAudioQuality,
+                                onClearStreamingCache = onClearStreamingCache
+                            )
+                        }
+                    }
+}
+
+/**
+ * Sub-pantalla Calidad de Audio (pantalla propia Opus/M4A).
+ * Rol arquitectónico: pantalla independiente con retroceso.
+ */
+@Composable
+fun SettingsAudioQualityScreen(
+    streamingCacheConfig: com.example.core.model.StreamingCacheConfig,
+    onSelectStreamingAudioQuality: (com.example.core.model.StreamingAudioQuality) -> Unit,
+    onBack: () -> Unit
+) {
+                    SettingsSubMenuScreen(
+                        title = "Calidad de Audio",
+                        subtitle = "Opus / M4A para Explorar y descargas permanentes con yt-dlp",
+                        icon = Icons.Default.HighQuality,
+                        iconTint = MaterialTheme.colorScheme.primary,
+                        onBack = onBack,
+                        testTag = "subscreen_visual_audio_quality"
+                    ) {
+                        item {
+                            com.example.feature.settings.components.appearance.StreamingAudioQualityCard(
+                                cacheConfig = streamingCacheConfig,
+                                onSelectAudioQuality = onSelectStreamingAudioQuality
+                            )
+                        }
+                    }
+}
+
+/**
+ * Sub-pantalla Ahorro de Datos (pantalla propia, solo Explorar).
+ * Rol arquitectónico: pantalla independiente con retroceso, sin tocar música local.
+ */
+@Composable
+fun SettingsDataSaverScreen(
+    streamingCacheConfig: com.example.core.model.StreamingCacheConfig,
+    onToggleStreamingDataSaver: (Boolean) -> Unit,
+    onBack: () -> Unit
+) {
+                    SettingsSubMenuScreen(
+                        title = "Ahorro de Datos",
+                        subtitle = "Solo Explorar: Opus ahorro, sin video ni pre-descarga. Local intacto.",
+                        icon = Icons.Default.SignalWifiOff,
+                        iconTint = MaterialTheme.colorScheme.secondary,
+                        onBack = onBack,
+                        testTag = "subscreen_visual_data_saver"
+                    ) {
+                        item {
+                            com.example.feature.settings.components.appearance.StreamingDataSaverCard(
+                                cacheConfig = streamingCacheConfig,
                                 onToggleDataSaver = onToggleStreamingDataSaver
                             )
                         }
