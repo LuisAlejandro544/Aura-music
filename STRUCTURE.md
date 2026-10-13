@@ -302,7 +302,9 @@ app/
     │       │           └── media/                         # Gestión de Medios Almacenados y Carpeta Pública del Usuario
     │       │               ├── StoredMediaSettingsTab.kt   # Pantalla de transparencia de medios guardados
     │       │               ├── UserPublicFolderCard.kt     # Selector de carpeta pública del usuario y exportación .mp4 con audio
-    │       │               ├── SavedMediaStorageSection.kt # Resumen de rutas estructuradas y espacio físico
+    │       │               ├── SavedMediaStorageSection.kt # Fachada (126 líneas, API intacta)
+    │       │               ├── StoredMediaSummaryCard.kt    # Stats, cómputo, formato y tarjeta resumen
+    │       │               ├── SavedMediaTrackCard.kt       # Tarjeta individual con borrado selectivo
     │       │               ├── StoredMediaFormatUtils.kt   # Utilidades de formato de pesos KB/MB y relaciones de aspecto
     │       │               ├── StoredMediaSummaryHeader.kt # Cabecera estadística de portadas WebP y videos MP4
     │       │               ├── StoredMediaTrackCard.kt     # Tarjeta individual de pista con inspección y borrado selectivo
