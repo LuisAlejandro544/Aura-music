@@ -6,26 +6,32 @@ import com.example.debug.AuraDebugManager
 import java.io.File
 import java.io.FileOutputStream
 import java.security.KeyStore
+import java.util.concurrent.TimeUnit
 import java.util.zip.ZipFile
 import javax.net.ssl.TrustManagerFactory
 import javax.net.ssl.X509TrustManager
 
 /**
- * Aura Music - Aprovisionador y Configuración del Entorno Nativo de Python y yt-dlp (< 400 líneas)
- *
- * Responsabilidades:
- * - Detección e inicialización de runtime CPython ('libpython.so') en [nativeLibraryDir].
- * - Vinculación de módulos C nativos ('libpymod_*.so') mediante symlinks de 0 bytes.
- * - Consolidación de certificados CA X.509 de Android 14+ (Conscrypt APEX / KeyStore) en 'cert.pem'.
- * - Detección de ejecutables de QuickJS ('libqjs.so') y FFmpeg.
- * - Normalización de URLs de YouTube Music y construcción de extractor-args.
+ * Aura Music - Aprovisionador del Entorno Nativo de Python y yt-dlp (< 500 líneas).
+ * - Runtime CPython ('libpython.so'), symlinks 'libpymod_*.so' y bundle TLS CA.
+ * - QuickJS C99 solo como CLI externo ('libqjs.so' -> 'files/bin/qjs', chmod 0700)
+ *   vía `--js-runtimes` de yt-dlp (nunca JNI). Normalización de URLs YouTube Music.
  */
 object YtDlpEnvironmentSetup {
-
     private const val TAG = "YtDlpEnvSetup"
+
+    /** Nombres del .so PIE instalado y del binario normalizado en files/bin. */
+    private const val QUICKJS_SO_NAME = "libqjs.so"
+    private const val QUICKJS_BIN_NAME = "qjs"
+
+    /** Pistas de stderr de yt-dlp que indican fallo por falta de motor JS. */
+    private val JS_FAILURE_HINTS = listOf("no js runtime", "js-runtimes", "nsig", "n-sig", "throttling", "decrypt_signature", "signature decipher", "cipher", "base.js", "po token", "botguard", "sign in to confirm")
 
     @Volatile
     private var isInitialized = false
+
+    @Volatile
+    private var cachedQuickJs: File? = null
 
     /**
      * Inicializa el entorno nativo de Python y el script de yt-dlp si aún no están listos.
@@ -109,6 +115,7 @@ object YtDlpEnvironmentSetup {
             }
 
             ensureTlsCertificates(pythonEnvDir)
+            ensureQuickJsExecutable(context)
             isInitialized = true
         } catch (e: Exception) {
             AuraDebugManager.logWarning(TAG, "Fallo al inicializar entorno Python yt-dlp: ${e.message}")
@@ -135,21 +142,193 @@ object YtDlpEnvironmentSetup {
     }
 
     /**
-     * Localiza el binario ejecutable de QuickJS C99 real (Bellard ECMAScript Engine > 200 KB)
-     * para resolución de firmas JS (n-sig / cipher) en yt-dlp.
+     * Localiza el binario ejecutable de QuickJS C99 real (Bellard ECMAScript Engine).
+     *
+     * Vía única normalizada:
+     * 1. Caché en memoria validada.
+     * 2. Copia normalizada y ejecutable en `files/bin/qjs` (preferida: filesDir sí
+     *    garantiza bit de ejecución con chmod 0700, nativeLibraryDir no en Android 10+
+     *    con SELinux / targetSdk 34).
+     * 3. `nativeLibraryDir/libqjs.so` directo si es ejecutable.
+     *
+     * Umbral unificado: [QUICKJS_MIN_PACKAGE_BYTES] (250 KB). Un stub menor nunca se
+     * considera válido, evitando el estado falso "activo" con binarios rotos.
+     * Uso exclusivo como CLI vía `--js-runtimes quickjs:<rutaAbsoluta>`, nunca JNI.
      */
     fun getQuickJsExecutable(context: Context): File? {
-        val nativeDir = File(context.applicationInfo.nativeLibraryDir)
-        val qjsInNative = File(nativeDir, "libqjs.so")
-        if (qjsInNative.exists() && qjsInNative.length() > 200_000L && qjsInNative.canExecute()) {
-            return qjsInNative
+        cachedQuickJs?.takeIf { isValidQuickJsFile(it) && it.canExecute() }?.let { return it }
+
+        val binQjs = File(File(context.filesDir, "bin"), QUICKJS_BIN_NAME)
+        if (isValidQuickJsFile(binQjs) && binQjs.canExecute()) {
+            cachedQuickJs = binQjs
+            return binQjs
         }
-        val binDir = File(context.filesDir, "bin")
-        val qjsInBin = File(binDir, "qjs")
-        if (qjsInBin.exists() && qjsInBin.length() > 200_000L && qjsInBin.canExecute()) {
-            return qjsInBin
+
+        val nativeQjs = File(context.applicationInfo.nativeLibraryDir, QUICKJS_SO_NAME)
+        if (isValidQuickJsFile(nativeQjs) && nativeQjs.canExecute()) {
+            // Intentar normalizar hacia files/bin/qjs para ejecuciones futuras garantizadas.
+            val normalized = ensureQuickJsExecutable(context)
+            if (normalized != null) return normalized
+            cachedQuickJs = nativeQjs
+            return nativeQjs
+        }
+
+        // Último recurso: si el .so existe con tamaño válido pero sin bit exec en su
+        // ubicación original, intentar copiarlo a files/bin con chmod.
+        if (isValidQuickJsFile(nativeQjs)) {
+            val normalized = ensureQuickJsExecutable(context)
+            if (normalized != null) return normalized
         }
         return null
+    }
+
+    /**
+     * Copia atómicamente `nativeLibraryDir/libqjs.so` hacia `files/bin/qjs`,
+     * aplica `chmod 0700` (vía Os.chmod con fallback a setExecutable) y valida tamaño.
+     * Retorna el [File] ejecutable o null si no hay fuente válida. Idempotente.
+     */
+    @Synchronized
+    fun ensureQuickJsExecutable(context: Context): File? {
+        try {
+            val binDir = File(context.filesDir, "bin").apply { mkdirs() }
+            val target = File(binDir, QUICKJS_BIN_NAME)
+            if (isValidQuickJsFile(target) && target.canExecute()) {
+                cachedQuickJs = target
+                return target
+            }
+            val src = File(context.applicationInfo.nativeLibraryDir, QUICKJS_SO_NAME)
+            if (!isValidQuickJsFile(src)) {
+                if (target.exists() && !isValidQuickJsFile(target)) runCatching { target.delete() }
+                return null
+            }
+            val tmp = File(binDir, "$QUICKJS_BIN_NAME.tmp")
+            src.copyTo(tmp, overwrite = true)
+            applyExecutablePermission(tmp)
+            if (!isValidQuickJsFile(tmp) || !tmp.canExecute()) {
+                runCatching { tmp.delete() }
+                AuraDebugManager.logWarning(TAG, "QuickJS copiado a files/bin pero sin bit de ejecución (SELinux).")
+                return null
+            }
+            if (target.exists()) runCatching { target.delete() }
+            val moved = runCatching { tmp.renameTo(target) }.getOrDefault(false)
+            val finalFile = if (moved) target else {
+                tmp.copyTo(target, overwrite = true)
+                runCatching { tmp.delete() }
+                applyExecutablePermission(target)
+                target
+            }
+            if (!finalFile.canExecute()) {
+                AuraDebugManager.logWarning(TAG, "QuickJS en files/bin/qjs sin permiso de ejecución tras chmod.")
+                return null
+            }
+            AuraDebugManager.logInfo(TAG, "QuickJS normalizado en ${finalFile.absolutePath} (${finalFile.length()} bytes).")
+            cachedQuickJs = finalFile
+            return finalFile
+        } catch (e: Exception) {
+            AuraDebugManager.logWarning(TAG, "Fallo al normalizar QuickJS a files/bin: ${e.message}")
+            return null
+        }
+    }
+
+    /** Valida tamaño mínimo unificado de un candidato QuickJS (sin exigir bit exec). */
+    fun isValidQuickJsFile(f: File): Boolean {
+        return try {
+            f.exists() && f.isFile && f.length() >= QUICKJS_MIN_PACKAGE_BYTES
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /**
+     * Única vía para construir el flag `--js-runtimes` de yt-dlp.
+     * Retorna lista vacía si no hay QuickJS ejecutable (el llamador debe registrar
+     * "sin motor JS" en lugar de usar el fallback literal `quickjs`, que buscaría
+     * un binario inexistente en PATH y produce errores genéricos).
+     */
+    fun buildJsRuntimeArgs(context: Context): List<String> {
+        val qjs = getQuickJsExecutable(context)
+        if (qjs == null || !qjs.exists() || !qjs.canExecute()) {
+            AuraDebugManager.logWarning(TAG, "yt-dlp correrá SIN motor JS (QuickJS no ejecutable): n-sig/cipher pueden fallar con 403.")
+            return emptyList()
+        }
+        return listOf("--js-runtimes", "quickjs:${qjs.absolutePath}")
+    }
+
+    /** Estados honestos del motor JS para UI y diagnóstico. */
+    enum class QuickJsState { OK, MISSING, PRESENT_NOT_EXECUTABLE, TOO_SMALL }
+
+    /** Clasifica el estado actual sin ejecutar procesos ni copiar archivos (apto para hilo UI). */
+    fun quickJsState(context: Context): QuickJsState {
+        cachedQuickJs?.takeIf { isValidQuickJsFile(it) && it.canExecute() }?.let { return QuickJsState.OK }
+        val binQjs = File(File(context.filesDir, "bin"), QUICKJS_BIN_NAME)
+        if (isValidQuickJsFile(binQjs) && binQjs.canExecute()) return QuickJsState.OK
+        val nativeQjs = File(context.applicationInfo.nativeLibraryDir, QUICKJS_SO_NAME)
+        if (isValidQuickJsFile(nativeQjs) && nativeQjs.canExecute()) return QuickJsState.OK
+        if (binQjs.exists() || nativeQjs.exists()) {
+            val biggest = if (binQjs.exists() && (!nativeQjs.exists() || binQjs.length() >= nativeQjs.length())) binQjs else nativeQjs
+            if (biggest.length() < QUICKJS_MIN_PACKAGE_BYTES) return QuickJsState.TOO_SMALL
+            return QuickJsState.PRESENT_NOT_EXECUTABLE
+        }
+        return QuickJsState.MISSING
+    }
+
+    /** Resultado del self-test real de ejecución JS (`qjs -e 'print(...)'`). */
+    data class QuickJsSelfTest(val ok: Boolean, val detail: String)
+
+    /**
+     * Ejecuta `qjs -e 'print("qjs-ok")'` con timeout corto para confirmar que el
+     * binario realmente corre JS en este dispositivo (no solo que existe en disco).
+     */
+    fun runQuickJsSelfTest(context: Context, timeoutSeconds: Long = 4L): QuickJsSelfTest {
+        val qjs = getQuickJsExecutable(context)
+            ?: return QuickJsSelfTest(false, "QuickJS no disponible (sin binario ejecutable).")
+        return try {
+            val proc = ProcessBuilder(qjs.absolutePath, "-e", "print('qjs-ok');")
+                .redirectErrorStream(true)
+                .start()
+            val output = StringBuilder()
+            val readerThread = Thread({
+                try {
+                    proc.inputStream.bufferedReader().use { r ->
+                        var line: String?
+                        while (r.readLine().also { line = it } != null) {
+                            output.append(line).append('\n')
+                        }
+                    }
+                } catch (_: Throwable) {
+                }
+            }, "qjs-selftest").apply { isDaemon = true; start() }
+            val finished = proc.waitFor(timeoutSeconds, TimeUnit.SECONDS)
+            if (!finished) {
+                runCatching { proc.destroyForcibly() }
+                return QuickJsSelfTest(false, "QuickJS no respondió en ${timeoutSeconds}s (timeout).")
+            }
+            readerThread.join(1000)
+            val code = proc.exitValue()
+            val out = output.toString()
+            if (code == 0 && out.contains("qjs-ok")) {
+                QuickJsSelfTest(true, "QuickJS ejecuta JS correctamente (${qjs.length() / 1024} KB).")
+            } else {
+                QuickJsSelfTest(false, "QuickJS respondió código $code sin salida esperada: ${out.take(160)}")
+            }
+        } catch (e: Exception) {
+            QuickJsSelfTest(false, "No se pudo ejecutar QuickJS: ${e.message}")
+        }
+    }
+
+    /** Detecta en el stderr de yt-dlp pistas de fallo por falta de motor JS. */
+    fun containsJsFailureHints(stderr: String): Boolean {
+        if (stderr.isBlank()) return false
+        val lower = stderr.lowercase()
+        return JS_FAILURE_HINTS.any { lower.contains(it) }
+    }
+
+    private fun applyExecutablePermission(f: File) {
+        try {
+            android.system.Os.chmod(f.absolutePath, 448) // 0700
+        } catch (_: Throwable) {
+        }
+        runCatching { f.setExecutable(true, false) }
     }
 
     /**

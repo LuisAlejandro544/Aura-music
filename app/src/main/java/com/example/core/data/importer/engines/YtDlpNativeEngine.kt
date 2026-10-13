@@ -36,14 +36,27 @@ object YtDlpNativeEngine {
 
     fun getQuickJsExecutable(context: Context): File? = YtDlpEnvironmentSetup.getQuickJsExecutable(context)
 
+    /**
+     * Estado honesto del motor JS (CLI vía `--js-runtimes`, nunca JNI).
+     * Distingue binario ausente, presente sin bit de ejecución y archivo demasiado
+     * pequeño (stub), en lugar del anterior "activo" basado solo en existencia.
+     */
     fun getQuickJsStatusSummary(context: Context): String {
-        val qjs = getQuickJsExecutable(context)
-        return if (qjs != null && qjs.exists() && qjs.length() > YTDLP_MIN_PACKAGE_BYTES) {
-            "QuickJS C99 activo"
-        } else {
-            "QuickJS no disponible (respaldo sin motor JS)"
+        return when (YtDlpEnvironmentSetup.quickJsState(context)) {
+            YtDlpEnvironmentSetup.QuickJsState.OK ->
+                "QuickJS C99 activo (JS ejecutable verificado)"
+            YtDlpEnvironmentSetup.QuickJsState.PRESENT_NOT_EXECUTABLE ->
+                "QuickJS presente pero no ejecutable (sin motor JS)"
+            YtDlpEnvironmentSetup.QuickJsState.TOO_SMALL ->
+                "QuickJS inválido (archivo demasiado pequeño, sin motor JS)"
+            YtDlpEnvironmentSetup.QuickJsState.MISSING ->
+                "QuickJS no disponible (respaldo sin motor JS)"
         }
     }
+
+    /** Self-test real de ejecución JS (`qjs -e`), para diagnóstico y Ajustes. */
+    fun runQuickJsSelfTest(context: Context) =
+        YtDlpEnvironmentSetup.runQuickJsSelfTest(context)
 
     fun ensureTlsCertificates(pythonEnvDir: File, forceRebuild: Boolean = false) {
         YtDlpEnvironmentSetup.ensureTlsCertificates(pythonEnvDir, forceRebuild)
@@ -112,7 +125,7 @@ object YtDlpNativeEngine {
         }
 
         val ffmpegBin = FFmpegNativeEngine.getBinaryFile(context)
-        val qjsBin = getQuickJsExecutable(context)
+        val jsRuntimeArgs = YtDlpEnvironmentSetup.buildJsRuntimeArgs(context)
 
         val rawTrimmedUrl = url.trim()
         if (!rawTrimmedUrl.startsWith("http://", ignoreCase = true) && !rawTrimmedUrl.startsWith("https://", ignoreCase = true)) {
@@ -141,10 +154,7 @@ object YtDlpNativeEngine {
                 add("--cookies")
                 add(activeCookies.absolutePath)
             }
-            if (qjsBin != null && qjsBin.exists()) {
-                add("--js-runtimes")
-                add("quickjs:${qjsBin.absolutePath}")
-            }
+            addAll(jsRuntimeArgs)
             if (ffmpegBin != null && ffmpegBin.exists()) {
                 add("--ffmpeg-location")
                 add(ffmpegBin.absolutePath)
@@ -172,7 +182,11 @@ object YtDlpNativeEngine {
         val errorLog = procResult.stderr
 
         if (exitCode != 0 || jsonOutput.isBlank()) {
-            AuraDebugManager.logWarning(TAG, "yt-dlp terminó con código $exitCode. Error: ${errorLog.takeLast(300)}")
+            if (YtDlpEnvironmentSetup.containsJsFailureHints(errorLog)) {
+                AuraDebugManager.logWarning(TAG, "yt-dlp falló con pistas de motor JS ausente (n-sig/cipher/throttling). QuickJS: ${getQuickJsStatusSummary(context)}. Error: ${errorLog.takeLast(300)}")
+            } else {
+                AuraDebugManager.logWarning(TAG, "yt-dlp terminó con código $exitCode. Error: ${errorLog.takeLast(300)}")
+            }
             return@withContext Result.failure(
                 Exception("yt-dlp finalizó con código $exitCode. Error: ${errorLog.takeLast(120).trim()}")
             )
@@ -354,11 +368,11 @@ object YtDlpNativeEngine {
             val nativeDir = context.applicationInfo.nativeLibraryDir
             val pythonEnvDir = File(context.filesDir, "env/python")
 
-            val quickJsExec = getQuickJsExecutable(context)
-
             ensureTlsCertificates(pythonEnvDir, forceRebuild = false)
             val tmpDir = File(context.cacheDir, "ytdlp_tmp").apply { mkdirs() }
-            val jsRuntimeSpec = if (quickJsExec != null && quickJsExec.exists()) "quickjs:${quickJsExec.absolutePath}" else "quickjs"
+            // Vía única: solo se añade --js-runtimes si hay binario ejecutable real.
+            // Se elimina el fallback literal "quickjs" (buscaba un binario inexistente en PATH).
+            val jsRuntimeArgs = YtDlpEnvironmentSetup.buildJsRuntimeArgs(context)
 
             val normalizedInput = if (trimmedInput.startsWith("http", ignoreCase = true)) {
                 normalizeYouTubeMusicUrlForYtDlp(trimmedInput)
@@ -379,9 +393,9 @@ object YtDlpNativeEngine {
                 "--no-warnings",
                 "--no-progress",
                 "--socket-timeout", "14",
-                "--extractor-args", extractorArgs,
-                "--js-runtimes", jsRuntimeSpec
+                "--extractor-args", extractorArgs
             ).apply {
+                addAll(jsRuntimeArgs)
                 if (activeCookies != null && activeCookies.exists()) {
                     add("--cookies")
                     add(activeCookies.absolutePath)
@@ -402,6 +416,9 @@ object YtDlpNativeEngine {
             val code = procResult.exitCode
 
             if (code != 0 || stdout.isBlank()) {
+                if (YtDlpEnvironmentSetup.containsJsFailureHints(stderr)) {
+                    AuraDebugManager.logWarning(TAG, "flat-playlist falló con pistas de motor JS ausente. QuickJS: ${getQuickJsStatusSummary(context)}")
+                }
                 return@withContext Result.failure(IllegalStateException("yt-dlp flat-playlist error ($code): ${stderr.take(200)}"))
             }
 
