@@ -121,7 +121,8 @@ fun AuraMusicAppContent(viewModel: MusicViewModel) {
                 com.example.core.model.WallpaperScreenScope.LIBRARY_ONLY ->
                     currentScreen is NavScreen.Library || currentScreen is NavScreen.PlaylistDetail
                 com.example.core.model.WallpaperScreenScope.HOME_AND_LIBRARY ->
-                    currentScreen is NavScreen.Home || currentScreen is NavScreen.Library || currentScreen is NavScreen.PlaylistDetail
+                    currentScreen is NavScreen.Home || currentScreen is NavScreen.Library ||
+                        currentScreen is NavScreen.PlaylistDetail || currentScreen is NavScreen.Streaming
                 com.example.core.model.WallpaperScreenScope.ALL_SCREENS ->
                     true
             }

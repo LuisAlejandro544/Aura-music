@@ -106,3 +106,35 @@ internal fun AuraAudioPlayer.handleTrackEndedInternal(isAutoCrossfadeOverlap: Bo
         }
     }
 }
+
+/**
+ * Detiene por completo la reproducción y desmonta la pista activa (cierre del MiniPlayer).
+ * Pausa el Deck principal y el Dual-Deck saliente, detiene ExoPlayer, limpia el prebuffer
+ * de streaming, purga los acumuladores DSP y resetea el estado reactivo para que el
+ * MiniPlayer desaparezca y la notificación nativa se libere. La cola se conserva para
+ * poder reanudar desde la biblioteca.
+ */
+internal fun AuraAudioPlayer.stopAndClearInternal() {
+    fadeController.stopOutgoingDeckImmediately(outgoingExoPlayer)
+    try {
+        outgoingExoPlayer?.stop()
+    } catch (_: Exception) {}
+    try {
+        exoPlayer?.pause()
+    } catch (_: Exception) {}
+    try {
+        exoPlayer?.stop()
+    } catch (_: Exception) {}
+    try {
+        exoPlayer?.clearMediaItems()
+    } catch (_: Exception) {}
+    try {
+        clearStreamingPrebufferInternal()
+    } catch (_: Throwable) {}
+    clearABLoop()
+    effectManager.flushBuffers()
+    _isPlaying.value = false
+    _currentTrack.value = null
+    _currentPosition.value = 0L
+    _duration.value = 0L
+}

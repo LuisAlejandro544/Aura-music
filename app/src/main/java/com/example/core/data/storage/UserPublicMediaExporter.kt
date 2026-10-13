@@ -23,7 +23,8 @@ import java.net.URLDecoder
  *   por `Android/data/` en Android 11+.
  * - Traduce el URI de SAF a una ruta legible y transparente para el usuario (ej. "Almacenamiento interno / MiCarpeta / Videos").
  * - Organiza automáticamente una estructura escalable por subcarpetas:
- *   - `Videos/` (activo actualmente para exportar vídeos descargados con su audio completo).
+ *   - `Videos/` (exporta vídeos descargados con su audio completo).
+ *   - `Musica/` (exporta las canciones descargadas en su formato original para llevarlas a otro reproductor).
  *   - `Images/` (preparado arquitectónicamente para habilitar exportación de carátulas WebP/PNG en el futuro).
  * - Ensambla en segundo plano (`Dispatchers.IO`) el archivo de vídeo `.mp4` uniendo el flujo de vídeo
  *   con la pista de audio original de la canción mediante `FFmpegNativeEngine`, entregando un vídeo
@@ -35,19 +36,29 @@ object UserPublicMediaExporter {
     private const val PREFS_NAME = "aura_music_ui_prefs"
     private const val KEY_USER_PUBLIC_FOLDER_URI = "pref_user_public_media_folder_uri"
     private const val KEY_EXPORTED_VIDEO_TRACK_IDS = "pref_exported_video_track_ids"
+    private const val KEY_EXPORTED_AUDIO_TRACK_IDS = "pref_exported_audio_track_ids"
 
     const val SUBFOLDER_VIDEOS = "Videos"
+    const val SUBFOLDER_MUSICA = "Musica"
     const val SUBFOLDER_IMAGES = "Images"
 
     data class ExportFolderState(
         val treeUriString: String = "",
         val readablePath: String = "",
+        val readableBasePath: String = "",
         val isConfigured: Boolean = false,
         val exportedTrackIds: Set<Long> = emptySet(),
         val exportingTrackIds: Set<Long> = emptySet(),
         val isExportingAll: Boolean = false,
+        val exportedAudioTrackIds: Set<Long> = emptySet(),
+        val exportingAudioTrackIds: Set<Long> = emptySet(),
+        val isExportingAllAudio: Boolean = false,
         val statusMessage: String? = null
-    )
+    ) {
+        /** Ruta legible de la subcarpeta de música (base + Musica/). */
+        val readableMusicaPath: String
+            get() = if (readableBasePath.isNotBlank()) "$readableBasePath / $SUBFOLDER_MUSICA" else readablePath
+    }
 
     /**
      * Guarda la carpeta elegida por el usuario mediante `OpenDocumentTree`, adquiriendo permisos
@@ -61,7 +72,7 @@ object UserPublicMediaExporter {
             AuraDebugManager.logWarning(TAG, "No se pudo persistir permiso URI, intentando acceso directo: ${e.message}")
         }
 
-        // Asegurar que la subcarpeta "Videos" se cree de inmediato dentro de la carpeta seleccionada
+        // Asegurar que las subcarpetas "Videos" y "Musica" se creen de inmediato dentro de la carpeta seleccionada
         try {
             val rootDoc = DocumentFile.fromTreeUri(context, treeUri)
             if (rootDoc != null && rootDoc.canWrite()) {
@@ -69,9 +80,13 @@ object UserPublicMediaExporter {
                 if (existingVideos == null || !existingVideos.isDirectory) {
                     rootDoc.createDirectory(SUBFOLDER_VIDEOS)
                 }
+                val existingMusica = rootDoc.findFile(SUBFOLDER_MUSICA)
+                if (existingMusica == null || !existingMusica.isDirectory) {
+                    rootDoc.createDirectory(SUBFOLDER_MUSICA)
+                }
             }
         } catch (e: Exception) {
-            AuraDebugManager.logWarning(TAG, "Aviso al pre-crear subcarpeta Videos: ${e.message}")
+            AuraDebugManager.logWarning(TAG, "Aviso al pre-crear subcarpetas Videos/Musica: ${e.message}")
         }
 
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -88,13 +103,17 @@ object UserPublicMediaExporter {
         val uriStr = prefs.getString(KEY_USER_PUBLIC_FOLDER_URI, "")?.trim().orEmpty()
         val exportedIdsRaw = prefs.getStringSet(KEY_EXPORTED_VIDEO_TRACK_IDS, emptySet()).orEmpty()
         val exportedIds = exportedIdsRaw.mapNotNull { it.toLongOrNull() }.toSet()
+        val exportedAudioIdsRaw = prefs.getStringSet(KEY_EXPORTED_AUDIO_TRACK_IDS, emptySet()).orEmpty()
+        val exportedAudioIds = exportedAudioIdsRaw.mapNotNull { it.toLongOrNull() }.toSet()
 
         if (uriStr.isBlank()) {
             return ExportFolderState(
                 treeUriString = "",
                 readablePath = "",
+                readableBasePath = "",
                 isConfigured = false,
-                exportedTrackIds = exportedIds
+                exportedTrackIds = exportedIds,
+                exportedAudioTrackIds = exportedAudioIds
             )
         }
 
@@ -106,24 +125,30 @@ object UserPublicMediaExporter {
                 ExportFolderState(
                     treeUriString = "",
                     readablePath = "",
+                    readableBasePath = "",
                     isConfigured = false,
-                    exportedTrackIds = exportedIds
+                    exportedTrackIds = exportedIds,
+                    exportedAudioTrackIds = exportedAudioIds
                 )
             } else {
                 val readable = formatTreeUriToReadablePath(context, uri)
                 ExportFolderState(
                     treeUriString = uriStr,
                     readablePath = readable,
+                    readableBasePath = formatTreeUriToReadableBasePath(context, uri),
                     isConfigured = true,
-                    exportedTrackIds = exportedIds
+                    exportedTrackIds = exportedIds,
+                    exportedAudioTrackIds = exportedAudioIds
                 )
             }
         } catch (_: Exception) {
             ExportFolderState(
                 treeUriString = "",
                 readablePath = "",
+                readableBasePath = "",
                 isConfigured = false,
-                exportedTrackIds = exportedIds
+                exportedTrackIds = exportedIds,
+                exportedAudioTrackIds = exportedAudioIds
             )
         }
     }
@@ -159,6 +184,36 @@ object UserPublicMediaExporter {
         }
     }
 
+    /**
+     * Convierte un Tree URI de Android SAF en la ruta base clara y legible (sin subcarpeta final).
+     * Ejemplo: "content://com.android.externalstorage.documents/tree/primary%3AMiMusica"
+     * -> "Almacenamiento interno / MiMusica"
+     */
+    fun formatTreeUriToReadableBasePath(context: Context, treeUri: Uri): String {
+        return try {
+            val docId = DocumentsContract.getTreeDocumentId(treeUri)
+            val decoded = URLDecoder.decode(docId, "UTF-8")
+            val parts = decoded.split(":", limit = 2)
+            val volume = parts.getOrNull(0).orEmpty()
+            val relativePath = parts.getOrNull(1)?.trim('/').orEmpty()
+
+            val volumeLabel = when {
+                volume.equals("primary", ignoreCase = true) -> "Almacenamiento interno"
+                volume.equals("home", ignoreCase = true) -> "Documentos"
+                volume.isNotBlank() -> "Tarjeta SD ($volume)"
+                else -> "Almacenamiento del teléfono"
+            }
+
+            if (relativePath.isNotEmpty()) {
+                "$volumeLabel / ${relativePath.replace("/", " / ")}"
+            } else {
+                volumeLabel
+            }
+        } catch (_: Exception) {
+            val docName = DocumentFile.fromTreeUri(context, treeUri)?.name ?: "Carpeta seleccionada"
+            "Almacenamiento del usuario / $docName"
+        }
+    }
     /**
      * Exporta el vídeo de una canción hacia la carpeta pública seleccionada por el usuario,
      * fusionando previamente su pista de audio original mediante FFmpeg para que el archivo .mp4
@@ -253,6 +308,74 @@ object UserPublicMediaExporter {
     }
 
     /**
+     * Exporta el archivo de música (.m4a/.opus/.mp3 original sin recomprimir) de una canción
+     * hacia la subcarpeta `Musica/` de la carpeta pública seleccionada por el usuario, para que
+     * pueda llevársela y escucharla en cualquier reproductor externo o compartirla.
+     */
+    suspend fun exportTrackAudioToUserFolder(
+        context: Context,
+        track: Track
+    ): Result<String> = withContext(Dispatchers.IO) {
+        val state = loadCurrentState(context)
+        if (!state.isConfigured || state.treeUriString.isBlank()) {
+            return@withContext Result.failure(IllegalStateException("Primero selecciona una carpeta destino."))
+        }
+
+        val audioFile = resolveTrackAudioFile(context, track)
+        if (audioFile == null || !audioFile.exists() || audioFile.length() == 0L) {
+            return@withContext Result.failure(IllegalStateException("El archivo de música local no se encontró en el dispositivo."))
+        }
+
+        val treeUri = Uri.parse(state.treeUriString)
+        val rootDoc = DocumentFile.fromTreeUri(context, treeUri)
+            ?: return@withContext Result.failure(IllegalStateException("No se pudo acceder a la carpeta seleccionada. Por favor elígela de nuevo."))
+
+        if (!rootDoc.exists() || !rootDoc.canWrite()) {
+            return@withContext Result.failure(IllegalStateException("La carpeta seleccionada ya no tiene permisos de escritura. Por favor selecciónala nuevamente."))
+        }
+
+        // 1. Obtener o crear subcarpeta "Musica" dentro de la carpeta del usuario
+        val musicaDirDoc = rootDoc.findFile(SUBFOLDER_MUSICA)?.takeIf { it.isDirectory }
+            ?: rootDoc.createDirectory(SUBFOLDER_MUSICA)
+            ?: rootDoc
+
+        try {
+            // 2. Nombre limpio conservando la extensión original (.m4a/.opus/.mp3/...)
+            val cleanFileName = buildCleanAudioFileName(track, audioFile)
+
+            musicaDirDoc.findFile(cleanFileName)?.delete()
+            val mime = when (cleanFileName.substringAfterLast('.', "").lowercase()) {
+                "opus" -> "audio/ogg"
+                "ogg" -> "audio/ogg"
+                "mp3" -> "audio/mpeg"
+                "wav" -> "audio/wav"
+                "flac" -> "audio/flac"
+                else -> "audio/mp4"
+            }
+            val targetDoc = musicaDirDoc.createFile(mime, cleanFileName)
+                ?: return@withContext Result.failure(IllegalStateException("No se pudo crear el archivo '$cleanFileName' en la carpeta seleccionada."))
+
+            context.contentResolver.openOutputStream(targetDoc.uri)?.use { outStream ->
+                FileInputStream(audioFile).use { inStream ->
+                    inStream.copyTo(outStream, bufferSize = 64 * 1024)
+                }
+            } ?: return@withContext Result.failure(IllegalStateException("Error al abrir flujo de escritura en la carpeta del usuario."))
+
+            markTrackAudioAsExported(context, track.id)
+            val finalPathDisplay = "${state.readableMusicaPath} / $cleanFileName"
+            AuraDebugManager.logInfo(TAG, "Música exportada exitosamente a: $finalPathDisplay")
+            Result.success(finalPathDisplay)
+        } catch (e: Exception) {
+            AuraDebugManager.logError(TAG, "Error exportando música a carpeta del usuario", e)
+            Result.failure(e)
+        } finally {
+            if (audioFile.absolutePath.startsWith(context.cacheDir.absolutePath)) {
+                try { audioFile.delete() } catch (_: Exception) {}
+            }
+        }
+    }
+
+    /**
      * Resuelve el archivo físico de audio de la canción (ya sea ruta local file:// o content:// SAF).
      */
     private fun resolveTrackAudioFile(context: Context, track: Track): File? {
@@ -306,5 +429,35 @@ object UserPublicMediaExporter {
         val current = prefs.getStringSet(KEY_EXPORTED_VIDEO_TRACK_IDS, emptySet())?.toMutableSet() ?: mutableSetOf()
         current.add(trackId.toString())
         prefs.edit().putStringSet(KEY_EXPORTED_VIDEO_TRACK_IDS, current).apply()
+    }
+
+    /**
+     * Construye un nombre de archivo de música seguro conservando la extensión original.
+     */
+    private fun buildCleanAudioFileName(track: Track, audioFile: File): String {
+        val safeArtist = track.artist.trim()
+            .replace(Regex("[\\\\/:*?\"<>|]"), "_")
+            .take(45)
+            .ifBlank { "Aura Music" }
+        val safeTitle = track.title.trim()
+            .replace(Regex("[\\\\/:*?\"<>|]"), "_")
+            .take(65)
+            .ifBlank { "Musica_${track.id}" }
+
+        val base = if (safeArtist.equals("Artista Desconocido", ignoreCase = true)) {
+            safeTitle
+        } else {
+            "$safeArtist - $safeTitle"
+        }
+        val originalExt = audioFile.extension.lowercase().takeIf { it.isNotBlank() } ?: "m4a"
+        val safeExt = originalExt.replace(Regex("[^a-z0-9]"), "").take(5).ifBlank { "m4a" }
+        return if (base.endsWith(".$safeExt", ignoreCase = true)) base else "$base.$safeExt"
+    }
+
+    private fun markTrackAudioAsExported(context: Context, trackId: Long) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val current = prefs.getStringSet(KEY_EXPORTED_AUDIO_TRACK_IDS, emptySet())?.toMutableSet() ?: mutableSetOf()
+        current.add(trackId.toString())
+        prefs.edit().putStringSet(KEY_EXPORTED_AUDIO_TRACK_IDS, current).apply()
     }
 }

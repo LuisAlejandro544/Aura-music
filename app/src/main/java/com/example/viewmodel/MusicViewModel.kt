@@ -583,6 +583,15 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     fun togglePlayPause() = audioPlayer.togglePlayPause()
     fun playNext() = audioPlayer.playNext()
     fun playPrevious() = audioPlayer.playPrevious()
+
+    /**
+     * Cierra el MiniPlayer deslizado por el usuario: detiene la música por completo,
+     * desmonta la pista activa y colapsa Now Playing si estaba expandido.
+     */
+    fun stopPlaybackAndDismiss() {
+        audioPlayer.stopAndClear()
+        setNowPlayingExpanded(false)
+    }
     fun seekTo(positionMs: Long) = audioPlayer.seekTo(positionMs)
     fun toggleShuffle() = audioPlayer.toggleShuffle()
     fun cycleRepeatMode() = audioPlayer.cycleRepeatMode()

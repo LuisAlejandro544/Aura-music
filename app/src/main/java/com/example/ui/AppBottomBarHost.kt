@@ -9,18 +9,31 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.Icon
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.core.model.Track
 import com.example.ui.components.BottomNavBar
 import com.example.ui.components.MiniPlayer
 import com.example.ui.navigation.NavScreen
-import com.example.ui.theme.BackgroundDark
 import com.example.viewmodel.MusicViewModel
 
 /**
@@ -51,7 +64,7 @@ fun AppBottomBarHost(
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(BackgroundDark)
+                                .background(Color.Transparent)
                         ) {
                             AnimatedVisibility(
                                 visible = effectiveTrack != null && !isNowPlayingExpanded,
@@ -64,23 +77,58 @@ fun AppBottomBarHost(
                                     animationSpec = tween(180)
                                 )
                             ) {
-                                MiniPlayer(
-                                    currentTrack = effectiveTrack,
-                                    isPlaying = isPlaying,
-                                    currentPositionFlow = viewModel.currentPosition,
-                                    durationMs = duration,
-                                    onTogglePlayPause = { viewModel.togglePlayPause() },
-                                    onSkipNext = { viewModel.playNext() },
-                                    onSkipPrevious = { viewModel.playPrevious() },
-                                    onClick = { viewModel.setNowPlayingExpanded(true) },
-                                    dynamicPrimary = animatedMiniPrimary,
-                                    dynamicSecondary = animatedMiniSecondary,
-                                    isMiniPlayerVideoEnabled = isMiniPlayerVideoEnabled && !isNowPlayingExpanded,
-                                    playbackSpeed = playbackSpeed,
-                                    isLoadingOrBuffering = effectiveTrack?.isStreamingTrack == true && (isAudioBuffering || isResolvingStreamGlobal),
-                                    isVideoLoading = effectiveTrack?.isStreamingTrack == true && isMiniPlayerVideoEnabled && !effectiveTrack?.videoUri.isNullOrEmpty() && isVideoBufferingGlobal,
-                                    isWaitingForNetwork = effectiveTrack?.isStreamingTrack == true && (isNetworkStalled || (isMiniPlayerVideoEnabled && !effectiveTrack?.videoUri.isNullOrEmpty() && isVideoNetworkStalledGlobal))
-                                )
+                                // Deslizar hacia la derecha cierra el MiniPlayer y detiene la música por completo.
+                                key(effectiveTrack?.id) {
+                                    val miniDismissState = rememberSwipeToDismissBoxState(
+                                        confirmValueChange = { target ->
+                                            if (target != SwipeToDismissBoxValue.Settled) {
+                                                viewModel.stopPlaybackAndDismiss()
+                                            }
+                                            false
+                                        }
+                                    )
+                                    SwipeToDismissBox(
+                                        state = miniDismissState,
+                                        enableDismissFromStartToEnd = true,
+                                        enableDismissFromEndToStart = false,
+                                        gesturesEnabled = effectiveTrack != null,
+                                        backgroundContent = {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                                                    .clip(RoundedCornerShape(16.dp))
+                                                    .background(Color(0xFFEF4444).copy(alpha = 0.85f))
+                                                    .padding(start = 20.dp),
+                                                contentAlignment = Alignment.CenterStart
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Close,
+                                                    contentDescription = "Cerrar y detener música",
+                                                    tint = Color.White
+                                                )
+                                            }
+                                        }
+                                    ) {
+                                        MiniPlayer(
+                                            currentTrack = effectiveTrack,
+                                            isPlaying = isPlaying,
+                                            currentPositionFlow = viewModel.currentPosition,
+                                            durationMs = duration,
+                                            onTogglePlayPause = { viewModel.togglePlayPause() },
+                                            onSkipNext = { viewModel.playNext() },
+                                            onSkipPrevious = { viewModel.playPrevious() },
+                                            onClick = { viewModel.setNowPlayingExpanded(true) },
+                                            dynamicPrimary = animatedMiniPrimary,
+                                            dynamicSecondary = animatedMiniSecondary,
+                                            isMiniPlayerVideoEnabled = isMiniPlayerVideoEnabled && !isNowPlayingExpanded,
+                                            playbackSpeed = playbackSpeed,
+                                            isLoadingOrBuffering = effectiveTrack?.isStreamingTrack == true && (isAudioBuffering || isResolvingStreamGlobal),
+                                            isVideoLoading = effectiveTrack?.isStreamingTrack == true && isMiniPlayerVideoEnabled && !effectiveTrack?.videoUri.isNullOrEmpty() && isVideoBufferingGlobal,
+                                            isWaitingForNetwork = effectiveTrack?.isStreamingTrack == true && (isNetworkStalled || (isMiniPlayerVideoEnabled && !effectiveTrack?.videoUri.isNullOrEmpty() && isVideoNetworkStalledGlobal))
+                                        )
+                                    }
+                                }
                             }
 
                             BottomNavBar(

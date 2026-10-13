@@ -273,6 +273,11 @@ class AuraAudioPlayer(
 
     fun togglePlayPause() = togglePlayPauseInternal()
 
+    /**
+     * Cierra el reproductor: detiene la música y desmonta la pista activa (oculta el MiniPlayer).
+     */
+    fun stopAndClear() = stopAndClearInternal()
+
     fun seekTo(positionMs: Long) = seekToInternal(positionMs)
 
     fun playNext(isAutoCrossfadeOverlap: Boolean = false) = playNextInternal(isAutoCrossfadeOverlap)

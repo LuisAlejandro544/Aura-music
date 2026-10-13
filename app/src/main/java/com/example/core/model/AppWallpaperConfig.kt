@@ -25,13 +25,13 @@ enum class WallpaperScreenScope(val id: Int, val label: String, val description:
     ),
     HOME_AND_LIBRARY(
         id = 1,
-        label = "En Biblioteca e Inicio",
-        description = "Muestra tu fondo personalizado en Tu Biblioteca y en la pantalla de Inicio."
+        label = "En Biblioteca, Inicio y Explorar",
+        description = "Muestra tu fondo personalizado en Tu Biblioteca, Inicio y Explorar (Streaming)."
     ),
     ALL_SCREENS(
         id = 2,
         label = "En toda la aplicación",
-        description = "Muestra tu fondo personalizado en Inicio, Biblioteca, Playlists, Importar y Ajustes."
+        description = "Muestra tu fondo personalizado en Inicio, Explorar, Biblioteca, Playlists, Importar y Ajustes."
     );
 
     companion object {

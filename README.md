@@ -110,7 +110,8 @@ Todo el panel de efectos se despliega al instante en una hoja modal desde el **M
   - **Bucles Infinitos sin Cortes**: En videos cortos (≤20s), elige entre fundido continuo (*Seamless Crossfade*) o **Efecto Boomerang / Ping-Pong** (ida y vuelta sin saltos).
   - **Saltos Instantáneos (0ms) y Ahorro de Espacio (hasta -85%)**: En videos largos sincronizados (>20s), reestructura los fotogramas clave a 1 segundo (GOP corto a 30fps) y elimina la pista de audio redundante (`-an`) del archivo de video para que adelantar o cambiar de canción sea instantáneo y sin pantallas negras.
 - **🖼️ Fondo de Pantalla Personalizado de Galería (Imagen WebP o Video Corto)**:
-  - Elige una **foto o un video corto de tu galería** para mostrarlo como fondo de pantalla mientras navegas por **Tu Biblioteca**, **Inicio** o **toda la aplicación**, con controles en vivo de **Oscurecimiento / Velo OLED (25%–92%)** y **Desenfoque / Blur (0–25 dp)** en *Ajustes > Aura Dinámica, Video & Modo Juego*.
+  - Elige una **foto o un video corto de tu galería** para mostrarlo como fondo de pantalla mientras navegas por **Tu Biblioteca**, **Inicio**, **Explorar** o **toda la aplicación (incluyendo Ajustes)**, con controles en vivo de **Oscurecimiento / Velo OLED (25%–92%)** y **Desenfoque / Blur (0–25 dp)** en *Ajustes > Aura Dinámica, Video & Modo Juego*.
+  - Desliza el **Mini Reproductor hacia la derecha** para cerrarlo y **detener la música por completo**.
 - **Armonización Cromática Suave a 1 Segundo (Cero Mareos Visuales)**:
   - Tanto en el reproductor completo como en el **Mini Reproductor**, los colores del video se muestrean cada **1 segundo (1000 ms)** con un fundido orgánico de **1000 ms**, evitando parpadeos bruscos.
 - **🎮 Modo Juego / Ahorro Inteligente en Segundo Plano**:
@@ -155,9 +156,9 @@ Todo el panel de efectos se despliega al instante en una hoja modal desde el **M
     - **Widget 1 (Reproductor Adaptativo)**: Reacciona automáticamente a los colores de la carátula de la canción actual, permite reanudar la música que estabas escuchando directamente en segundo plano (incluso tras cerrar la app), incluye botón de **Favorito ❤️** y **se adapta al estirarlo** en tu pantalla de inicio (*Compacto 4x1*, *Mediano 4x2 con barra de progreso y tiempos* y *Expandido 4x3 de estudio*).
     - **Widget 2 Independiente (Top 4 Canciones & 4 Playlists)**: Un segundo widget de buen tamaño (cuadrícula 2x2) que muestra tus **4 canciones más escuchadas** o tus **4 Playlists principales** (con su portada o collage dinámico) para reproducirlas con un solo toque, todo 100% configurable con vista previa en vivo desde el nuevo apartado **Ajustes > Widget**.
   - Soporte integrado para consolas de vehículos compatibles con **Android Auto**.
-- **Transparencia Total de Almacenamiento y Carpeta Pública de Vídeos**:
+- **Transparencia Total de Almacenamiento y Carpeta Pública de Medios**:
+  - **Carpeta Pública de Usuario (Sin Restricciones)**: Crea o selecciona libremente cualquier carpeta de tu teléfono (`OpenDocumentTree`), visualiza la ruta exacta donde se guardan tus archivos (con subcarpetas `Videos/` y `Musica/`), exporta cualquier vídeo descargado en `.mp4` **con su pista de audio original completa incluida** mediante fusión instantánea en FFmpeg para verlo en tu Galería o compartirlo fuera de la app, y **llévate tus músicas descargadas en su formato original** a `Musica/` (botón global o por canción) para escucharlas donde quieras.
   - En **Ajustes > Medios & Almacenamiento** puedes inspeccionar cada portada WebP y cada Video Canvas MP4 guardado, ver cuántos KB o MB ocupa y borrar individualmente los que no necesites para liberar espacio al instante.
-  - **Carpeta Pública de Usuario (Sin Restricciones)**: Crea o selecciona libremente cualquier carpeta de tu teléfono (`OpenDocumentTree`), visualiza la ruta exacta donde se guardan tus archivos (`.../Videos`) y exporta cualquier vídeo descargado en `.mp4` **con su pista de audio original completa incluida** mediante fusión instantánea en FFmpeg para verlo en tu Galería o compartirlo fuera de la app.
 
 </details>
 

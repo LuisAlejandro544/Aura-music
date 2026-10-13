@@ -50,7 +50,8 @@ fun AppWallpaperBackground(
         WallpaperScreenScope.LIBRARY_ONLY ->
             currentScreen is NavScreen.Library || currentScreen is NavScreen.PlaylistDetail
         WallpaperScreenScope.HOME_AND_LIBRARY ->
-            currentScreen is NavScreen.Home || currentScreen is NavScreen.Library || currentScreen is NavScreen.PlaylistDetail
+            currentScreen is NavScreen.Home || currentScreen is NavScreen.Library ||
+                currentScreen is NavScreen.PlaylistDetail || currentScreen is NavScreen.Streaming
         WallpaperScreenScope.ALL_SCREENS ->
             true
     }
