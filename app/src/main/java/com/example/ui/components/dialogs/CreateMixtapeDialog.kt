@@ -102,7 +102,6 @@ fun CreateMixtapeDialog(
 
     // Selector emergente para elegir Canción A (1) o Canción B (2)
     var pickingTrackSlot by remember { mutableIntStateOf(0) }
-    var pickerSearchQuery by remember { mutableStateOf("") }
 
     Dialog(
         onDismissRequest = { if (!isCreating) onDismissRequest() },
@@ -123,270 +122,45 @@ fun CreateMixtapeDialog(
                     .padding(20.dp)
             ) {
                 // Encabezado
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(
-                                Brush.linearGradient(
-                                    colors = listOf(
-                                        MaterialTheme.colorScheme.primary,
-                                        MaterialTheme.colorScheme.secondary
-                                    )
-                                )
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = if (isAutoRemixMode) Icons.Default.AutoAwesome else Icons.Default.AllInclusive,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = if (isAutoRemixMode) "Auto-Remix & Mashup (2 Pistas)" else "Crear Mixtape Continuo",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = TextPrimary
-                            )
-                        )
-                        Text(
-                            text = if (isAutoRemixMode) {
-                                "Música Local • Selección Manual o Inteligente"
-                            } else {
-                                "Fusión DJ sin pausas • ${localTracks.size} pistas locales"
-                            },
-                            style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
-                        )
-                    }
-                    if (!isCreating) {
-                        IconButton(onClick = onDismissRequest) {
-                            Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = TextMuted)
-                        }
-                    }
-                }
+                // Encabezado
+                MixtapeDialogHeader(
+                    isAutoRemixMode = isAutoRemixMode,
+                    localTrackCount = localTracks.size,
+                    isCreating = isCreating,
+                    onDismissRequest = onDismissRequest
+                )
 
                 Spacer(modifier = Modifier.height(14.dp))
 
                 // Selector de Modo: Mixtape Continuo vs Auto-Remix de 2 Canciones
-                if (!isCreating && createdTrack == null && onCreateAutoRemix != null) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(SurfaceCard)
-                            .padding(4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        val isMixSelected = !isAutoRemixMode
-                        Surface(
-                            onClick = { isAutoRemixMode = false },
-                            shape = RoundedCornerShape(10.dp),
-                            color = if (isMixSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                            modifier = Modifier
-                                .weight(1f)
-                                .testTag("mode_mixtape_tab")
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(vertical = 8.dp, horizontal = 8.dp),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.AllInclusive,
-                                    contentDescription = null,
-                                    tint = if (isMixSelected) Color.White else TextSecondary,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "Mixtape Lista",
-                                    style = MaterialTheme.typography.labelMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (isMixSelected) Color.White else TextSecondary
-                                    )
-                                )
-                            }
-                        }
-
-                        val isRemixSelected = isAutoRemixMode
-                        Surface(
-                            onClick = { isAutoRemixMode = true },
-                            shape = RoundedCornerShape(10.dp),
-                            color = if (isRemixSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                            modifier = Modifier
-                                .weight(1f)
-                                .testTag("mode_autoremix_tab")
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(vertical = 8.dp, horizontal = 8.dp),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.AutoAwesome,
-                                    contentDescription = null,
-                                    tint = if (isRemixSelected) Color.White else TextSecondary,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "Auto-Remix (2)",
-                                    style = MaterialTheme.typography.labelMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (isRemixSelected) Color.White else TextSecondary
-                                    )
-                                )
-                            }
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(14.dp))
-                }
+                MixtapeModeSelector(
+                    isAutoRemixMode = isAutoRemixMode,
+                    isCreating = isCreating,
+                    createdTrack = createdTrack,
+                    hasAutoRemix = onCreateAutoRemix != null,
+                    onSelectMode = { isAutoRemixMode = it }
+                )
 
                 // Aviso de estado o error si la creación previa reportó algún problema
                 if (!isCreating && createdTrack == null && !statusMessage.isNullOrBlank()) {
-                    val isErrorMsg = statusMessage.contains("No se pudo", ignoreCase = true) ||
-                        statusMessage.contains("Error", ignoreCase = true) ||
-                        statusMessage.contains("Verifica", ignoreCase = true) ||
-                        statusMessage.contains("solo para", ignoreCase = true)
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = if (isErrorMsg) Color(0xFFEF4444).copy(alpha = 0.14f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
-                        border = BorderStroke(
-                            1.dp,
-                            if (isErrorMsg) Color(0xFFEF4444).copy(alpha = 0.45f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("mixtape_status_alert_card")
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = if (isErrorMsg) Icons.Default.ErrorOutline else Icons.Default.Info,
-                                contentDescription = null,
-                                tint = if (isErrorMsg) Color(0xFFEF4444) else MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = statusMessage,
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    color = TextPrimary,
-                                    fontWeight = FontWeight.Medium
-                                ),
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    }
+                    MixtapeStatusAlert(statusMessage = statusMessage)
                     Spacer(modifier = Modifier.height(12.dp))
                 }
 
                 if (createdTrack != null && !isCreating) {
                     // Estado completado
-                    Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.CheckCircle,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(42.dp)
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = if (isAutoRemixMode) "¡Auto-Remix Listo!" else "¡Mixtape Continuo Listo!",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = TextPrimary
-                                )
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "'${createdTrack.title}' se guardó en tu biblioteca con carátula en collage WebP, letras sincronizadas y capítulos reactivos.",
-                                style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        OutlinedButton(
-                            onClick = onDismissRequest,
-                            shape = RoundedCornerShape(14.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Cerrar")
-                        }
-                        Button(
-                            onClick = { onPlayCreatedTrack(createdTrack) },
-                            shape = RoundedCornerShape(14.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                            modifier = Modifier.weight(1.3f)
-                        ) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Reproducir Ahora", fontWeight = FontWeight.Bold)
-                        }
-                    }
+                    MixtapeCompletedCard(
+                        createdTrack = createdTrack,
+                        isAutoRemixMode = isAutoRemixMode,
+                        onDismissRequest = onDismissRequest,
+                        onPlay = { onPlayCreatedTrack(it) }
+                    )
                 } else if (isCreating) {
                     // Progreso en vivo
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        CircularProgressIndicator(
-                            progress = { progress.coerceIn(0.05f, 1f) },
-                            color = MaterialTheme.colorScheme.primary,
-                            strokeWidth = 4.dp,
-                            modifier = Modifier.size(56.dp)
-                        )
-                        Spacer(modifier = Modifier.height(14.dp))
-                        Text(
-                            text = "${(progress * 100).roundToInt()}%",
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.ExtraBold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = statusMessage ?: "Procesando mezcla de estudio con FFmpeg...",
-                            style = MaterialTheme.typography.bodyMedium.copy(color = TextSecondary)
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        LinearProgressIndicator(
-                            progress = { progress.coerceIn(0.02f, 1f) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(6.dp)
-                                .clip(RoundedCornerShape(3.dp)),
-                            color = MaterialTheme.colorScheme.primary,
-                            trackColor = SurfaceCard
-                        )
-                    }
+                    MixtapeProgressView(
+                        progress = progress,
+                        statusMessage = statusMessage
+                    )
                 } else if (isAutoRemixMode) {
                     // Configuración del Modo Auto-Remix / Mashup de 2 Canciones Locales
                     AutoRemixConfigSection(
@@ -400,14 +174,8 @@ fun CreateMixtapeDialog(
                         onRemixTitleChange = { remixTitle = it },
                         onSelectStyle = { selectedRemixStyle = it },
                         onCrossfadeChange = { crossfadeSec = it },
-                        onPickTrackA = {
-                            pickerSearchQuery = ""
-                            pickingTrackSlot = 1
-                        },
-                        onPickTrackB = {
-                            pickerSearchQuery = ""
-                            pickingTrackSlot = 2
-                        },
+                        onPickTrackA = { pickingTrackSlot = 1 },
+                        onPickTrackB = { pickingTrackSlot = 2 },
                         onSwapTracks = {
                             val tmp = selectedTrackA
                             selectedTrackA = selectedTrackB
@@ -439,104 +207,20 @@ fun CreateMixtapeDialog(
                     )
                 } else {
                     // Configuración de Mixtape Continuo de Lista Completa
-                    OutlinedTextField(
-                        value = mixtapeTitle,
-                        onValueChange = { mixtapeTitle = it },
-                        label = { Text("Nombre del Mixtape") },
-                        singleLine = true,
-                        shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("mixtape_title_input")
+                    MixtapeListConfig(
+                        mixtapeTitle = mixtapeTitle,
+                        onTitleChange = { mixtapeTitle = it },
+                        crossfadeSec = crossfadeSec,
+                        onCrossfadeChange = { crossfadeSec = it },
+                        localTrackCount = localTracks.size,
+                        onDismissRequest = onDismissRequest,
+                        onConfirm = { title, crossfade ->
+                            onCreateMixtape(
+                                title.ifBlank { "Aura Continuous Mix" },
+                                crossfade.roundToInt()
+                            )
+                        }
                     )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Duración del Crossfade (Fundido):",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontWeight = FontWeight.SemiBold,
-                                color = TextPrimary
-                            )
-                        )
-                        Text(
-                            text = "${crossfadeSec.roundToInt()} seg",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        )
-                    }
-
-                    Slider(
-                        value = crossfadeSec,
-                        onValueChange = { crossfadeSec = it },
-                        valueRange = 2f..12f,
-                        steps = 9,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = SurfaceCard,
-                        border = BorderStroke(0.8.dp, CardBorder),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text(
-                                text = "✨ Incluye automáticamente:",
-                                style = MaterialTheme.typography.labelMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "• Fusión real de audio en 1 sola pista con curva DJ sin silencios.\n" +
-                                    "• Portada en Collage WebP con hasta 4 carátulas de la lista.\n" +
-                                    "• Cambio reactivo de carátula y Video Canvas en vivo según el minuto.\n" +
-                                    "• Letras .LRC combinadas automáticamente para modo Karaoke.",
-                                style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        TextButton(
-                            onClick = onDismissRequest,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Cancelar", color = TextSecondary)
-                        }
-                        Button(
-                            onClick = {
-                                onCreateMixtape(
-                                    mixtapeTitle.ifBlank { "Aura Continuous Mix" },
-                                    crossfadeSec.roundToInt()
-                                )
-                            },
-                            enabled = localTracks.size >= 2,
-                            shape = RoundedCornerShape(14.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                            modifier = Modifier
-                                .weight(1.4f)
-                                .testTag("confirm_create_mixtape_btn")
-                        ) {
-                            Icon(Icons.Default.AllInclusive, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Fusionar Pistas", fontWeight = FontWeight.Bold)
-                        }
-                    }
                 }
             }
         }
@@ -544,91 +228,14 @@ fun CreateMixtapeDialog(
 
     // Sub-diálogo para elegir manualmente la Canción A o la Canción B
     if (pickingTrackSlot != 0) {
-        val filteredPickerTracks = remember(localTracks, pickerSearchQuery) {
-            if (pickerSearchQuery.isBlank()) localTracks
-            else localTracks.filter {
-                it.title.contains(pickerSearchQuery, ignoreCase = true) ||
-                    it.artist.contains(pickerSearchQuery, ignoreCase = true)
-            }
-        }
-        AlertDialog(
-            onDismissRequest = { pickingTrackSlot = 0 },
-            title = {
-                Text(
-                    text = if (pickingTrackSlot == 1) "Elegir Canción A (Voz / Base 1)" else "Elegir Canción B (Base / Drop 2)",
-                    fontWeight = FontWeight.Bold
-                )
+        MixtapeTrackPickerDialog(
+            slot = pickingTrackSlot,
+            localTracks = localTracks,
+            onPick = { trk ->
+                if (pickingTrackSlot == 1) selectedTrackA = trk else selectedTrackB = trk
+                pickingTrackSlot = 0
             },
-            text = {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 380.dp)
-                ) {
-                    OutlinedTextField(
-                        value = pickerSearchQuery,
-                        onValueChange = { pickerSearchQuery = it },
-                        placeholder = { Text("Buscar canción local...", color = TextMuted) },
-                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = TextMuted) },
-                        singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier.weight(1f, fill = false)
-                    ) {
-                        items(filteredPickerTracks, key = { it.id }) { trk ->
-                            Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = SurfaceCard,
-                                border = BorderStroke(0.8.dp, CardBorder),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        if (pickingTrackSlot == 1) selectedTrackA = trk else selectedTrackB = trk
-                                        pickingTrackSlot = 0
-                                    }
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(10.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = trk.title,
-                                            style = MaterialTheme.typography.bodyMedium.copy(
-                                                fontWeight = FontWeight.Bold,
-                                                color = TextPrimary
-                                            ),
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        Text(
-                                            text = trk.artist,
-                                            style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                    Icon(
-                                        imageVector = Icons.Default.CheckCircleOutline,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { pickingTrackSlot = 0 }) {
-                    Text("Cerrar")
-                }
-            }
+            onDismiss = { pickingTrackSlot = 0 }
         )
     }
 }

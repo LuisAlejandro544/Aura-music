@@ -329,7 +329,12 @@ app/
     │       │       │   └── SettingsDiscoveryBanner.kt # Aviso interactivo para descubrir Ajustes en el primer uso
     │       │       ├── dialogs/                # Diálogos Modales Globales
     │       │       │   ├── AppUpdateDialog.kt              # Modal de descarga e instalación de actualización APK
-    │       │       │   ├── CreateMixtapeDialog.kt          # Modal unificado de Mixtape continuo y Auto-Remix de 2 pistas
+    │       │       │   ├── CreateMixtapeDialog.kt          # Fachada del modal (241 líneas, estado + llamadas)
+    │       │       │   ├── MixtapeDialogHeader.kt          # Encabezado con icono según modo
+    │       │       │   ├── MixtapeModeSelector.kt          # Pestañas Mixtape Lista vs Auto-Remix
+    │       │       │   ├── MixtapeStatusViews.kt           # Alerta, completado y progreso en vivo
+    │       │       │   ├── MixtapeListConfig.kt            # Formulario de mezcla de lista completa
+    │       │       │   ├── MixtapeTrackPickerDialog.kt     # Elector A/B con búsqueda local
     │       │       │   ├── AutoRemixConfigSection.kt       # Configurador de Mashup (Voz A + Base B), Remix DJ y Auto-Match
     │       │       │   ├── DownloadFromLinkDialog.kt       # Modal deslizable de descarga desde YouTube, TikTok y web
     │       │       │   ├── ImportExternalPlaylistDialog.kt # Modal de importación de Playlists de Spotify y YouTube Music
