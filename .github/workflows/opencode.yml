@@ -16,11 +16,12 @@ permissions:
   contents: write
   pull-requests: write
   issues: write
+  workflows: write
 
 jobs:
   # Job principal: Ejecución del agente OpenCode ante mención en Issue o Pull Request
   opencode-agent:
-    name: OpenCode Agent (Muse Spark 1.3)
+    name: OpenCode Agent (Muse Spark 1.3 Multimodal)
     if: |
       (github.event_name == 'issues' && (
         contains(github.event.issue.title, '/opencode') ||
@@ -40,6 +41,7 @@ jobs:
       contents: write
       pull-requests: write
       issues: write
+      workflows: write
 
     runs-on: ubuntu-latest
     steps:
@@ -58,29 +60,79 @@ jobs:
         with:
           node-version: 20
 
-      - name: Resolver Prompt para OpenCode
+      - name: Resolver Prompt y Descargar Imágenes para OpenCode Multimodal
         id: prompt_resolver
+        shell: python3 {0}
         run: |
-          if [ "$EVENT_NAME" = "issues" ]; then
-            COMBINED_PROMPT="$ISSUE_TITLE"
-            if [ -n "$ISSUE_BODY" ]; then
-              COMBINED_PROMPT="${COMBINED_PROMPT}"$'\n\n'"${ISSUE_BODY}"
-            fi
-            if [ -z "$COMBINED_PROMPT" ]; then
-              COMBINED_PROMPT="Revisa y resuelve el issue solicitado."
-            fi
-            echo "resolved_prompt<<EOF" >> "$GITHUB_OUTPUT"
-            echo "$COMBINED_PROMPT" >> "$GITHUB_OUTPUT"
-            echo "EOF" >> "$GITHUB_OUTPUT"
-          else
-            USER_COMMENT="$COMMENT_BODY"
-            if [ -z "$USER_COMMENT" ]; then
-              USER_COMMENT="Revisa y responde al comentario solicitado."
-            fi
-            echo "resolved_prompt<<EOF" >> "$GITHUB_OUTPUT"
-            echo "$USER_COMMENT" >> "$GITHUB_OUTPUT"
-            echo "EOF" >> "$GITHUB_OUTPUT"
-          fi
+          import os, re, urllib.request, mimetypes
+
+          event_name = os.environ.get("EVENT_NAME", "")
+          issue_title = os.environ.get("ISSUE_TITLE", "")
+          issue_body = os.environ.get("ISSUE_BODY", "")
+          comment_body = os.environ.get("COMMENT_BODY", "")
+
+          if event_name == "issues":
+              raw_prompt = issue_title
+              if issue_body:
+                  raw_prompt += "\n\n" + issue_body
+              if not raw_prompt.strip():
+                  raw_prompt = "Revisa y resuelve el issue solicitado."
+          else:
+              raw_prompt = comment_body
+              if not raw_prompt.strip():
+                  raw_prompt = "Revisa y responde al comentario solicitado."
+
+          # Extraer URLs de imágenes (Markdown links, HTML tags, o enlaces directos de GitHub user-attachments)
+          img_pattern = re.compile(
+              r'https?://(?:github\.com/user-attachments/assets/[a-zA-Z0-9_\-]+|user-images\.githubusercontent\.com/[^\s\)\"\'>]+|[^\s\)\"\'>]+\.(?:png|jpg|jpeg|webp|gif|svg)(?:\?[^\s\)\"\'>]*)?)',
+              re.IGNORECASE
+          )
+
+          found_urls = img_pattern.findall(raw_prompt)
+          seen = set()
+          unique_urls = []
+          for u in found_urls:
+              if u not in seen:
+                  seen.add(u)
+                  unique_urls.append(u)
+
+          downloaded_images = []
+          if unique_urls:
+              os.makedirs(".opencode/attachments", exist_ok=True)
+              for idx, url in enumerate(unique_urls, 1):
+                  try:
+                      req = urllib.request.Request(
+                          url,
+                          headers={"User-Agent": "Mozilla/5.0 (GitHubActions-OpenCodeAgent/1.0)"}
+                      )
+                      with urllib.request.urlopen(req, timeout=20) as resp:
+                          data = resp.read()
+                          content_type = resp.headers.get_content_type()
+                          ext = mimetypes.guess_extension(content_type) or ".png"
+                          if ext == ".jpe":
+                              ext = ".jpg"
+                          local_path = f".opencode/attachments/imagen_{idx}{ext}"
+                          with open(local_path, "wb") as f:
+                              f.write(data)
+                          downloaded_images.append((local_path, url))
+                          print(f"✅ Imagen {idx} descargada exitosamente: {local_path} ({len(data)} bytes)")
+                  except Exception as e:
+                      print(f"⚠️ No se pudo descargar la imagen {url}: {e}")
+
+          final_prompt = raw_prompt
+          if downloaded_images:
+              final_prompt += "\n\n---\n📸 [IMÁGENES / CAPTURAS ADJUNTAS DISPONIBLES LOCALMENTE]:\n"
+              final_prompt += "El usuario adjuntó las siguientes imágenes en el issue/comentario. Están descargadas localmente en el repositorio para tu análisis visual:\n"
+              for path, url in downloaded_images:
+                  final_prompt += f"- Archivo local: `{path}` (URL original: {url})\n"
+              final_prompt += "\nPor favor, utiliza tus herramientas de lectura y capacidades multimodales para revisar los archivos de imagen adjuntos, extraer detalles visuales, layouts o mensajes de error, y tenerlos en cuenta en tu respuesta e implementación de código.\n---"
+
+          github_output = os.environ.get("GITHUB_OUTPUT")
+          if github_output:
+              with open(github_output, "a", encoding="utf-8") as f:
+                  f.write("resolved_prompt<<EOF\n")
+                  f.write(final_prompt + "\n")
+                  f.write("EOF\n")
         env:
           EVENT_NAME: ${{ github.event_name }}
           ISSUE_TITLE: ${{ github.event.issue.title }}
