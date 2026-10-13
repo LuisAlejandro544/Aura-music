@@ -14,7 +14,7 @@ El proyecto sigue una arquitectura reactiva y desacoplada organizada en capas:
    - Acceso al almacenamiento estructurado en `Android/data/com.aistudio.musicplayer.aurasound/files/` (Debug) y `Android/data/com.auramusic.beta/files/` (APK Beta `Aura Beta` • Codename `Nebula`) con subcarpetas (`songs/`, `images/`, `lyrics/`, `metadata/`, `videos/`), además de **Carpeta Pública / Personalizada del Usuario (`UserPublicMediaExporter` & `UserPublicFolderCard`)** mediante SAF (`OpenDocumentTree`) con subcarpeta `Videos/` (y preparada para `Images/`) para exportar vídeos descargados con su audio completo.
    - Motores de importación, sincronización de letras LRCLIB, extracción FFmpeg, descarga directa prioritaria con motor nativo yt-dlp (`YtDlpStreamDownloader`) con métricas de progreso en tiempo real y respaldo resiliente multi-nivel con separación de `audioHeaders`/`videoHeaders` por perfil `c=` (`ChunkedStreamDownloader` -> `InnerTubeClient` -> `InvidiousStreamResolver` -> `HeadlessWebViewExtractor`), arquitectura modular desacoplada en `engines/` (< 500 líneas por módulo), y actualizador automático de versiones APK (`AppReleaseUpdater` con comparador semántico de tags dinámicos `-beta`, selección por arquitectura móvil y verificación SHA-256).
 3. **Capa de Control & Reproducción (Playback Layer)**:
-   - `AuraAudioPlayer` con ExoPlayer/Media3, modularizado con controladores especializados (`PlayerQueueController`, `AudioFadeController`, `ABLoopController`, `MediaSessionBridge`) y coordinadores de reproducción (`PlaybackProgressTracker`, `StreamingErrorRecoveryHandler`, `PlaybackParametersManager`, `StreamingUrlPolicy`).
+   - `AuraAudioPlayer` con ExoPlayer/Media3, modularizado con controladores especializados (`PlayerQueueController`, `AudioFadeController`, `ABLoopController`, `MediaSessionBridge`), coordinadores de reproducción (`PlaybackProgressTracker`, `StreamingErrorRecoveryHandler`, `PlaybackParametersManager`, `StreamingUrlPolicy`) y módulos de fachada (`ExoPlayerFactory`, `PlayerTransportDriver`, `TransitionPrefsStore`, `PlayerWidgetBridge`).
    - `NativeAudioEngine` conectando buffers de audio PCM en C++20 vía JNI.
 4. **Capa de Lógica de Negocio & Estado (ViewModel Layer)**:
    - `MusicViewModel` modularizado y ultra liviano, orquestado por coordinadores y delegados especializados:
@@ -27,6 +27,8 @@ El proyecto sigue una arquitectura reactiva y desacoplada organizada en capas:
       - `MixtapeCoordinator`: Fusión continua de canciones en FFmpeg y capítulos reactivos en tiempo real.
       - `StreamingModeCoordinator`: Orquestador del Modo Streaming tri-plataforma (YT Music, YouTube & SoundCloud), caché inteligente y Radio Similar.
       - `PlaylistImportCoordinator`: Orquestador del Importador Universal de Playlists de Spotify y YouTube Music / YouTube (Modo Streaming Instantáneo o Descarga Offline en 2do plano).
+      - `WidgetSyncCoordinator`: Configuración y sincronización reactiva de los Widgets de pantalla de inicio.
+      - Fachadas por interfaces (`MusicViewModelFacades.kt`), bucle de espectro FFT (`VisualizerLoopController`) y cableado reactivo (`MusicViewModelWiring`).
 5. **Capa de Presentación (UI con Jetpack Compose & Material 3)**:
    - Pantallas modulares (`HomeScreen`, `LibraryScreen`, `NowPlayingScreen`, `SettingsScreen`, `ImportMusicScreen`, `OnboardingScreen`, `PlaylistDetailScreen`).
    - Host global modularizado (`AuraMusicAppContent`, `GlobalDialogsHost`).
@@ -53,8 +55,11 @@ app/
     │   ├── AndroidManifest.xml                 # Manifiesto principal, servicios Media3/Descargas, Widgets y Android Auto
     │   ├── cpp/                                # Núcleo C++20 Nativo DSP & Launchers PIE (QuickJS C99 puro compilado en Gradle)
     │   │   ├── CMakeLists.txt                  # Configuración CMake C17 / ISO C++20 con optimización LTO y AAudio
-    │   │   ├── auramusic_dsp.h                 # Fachada pública del motor DSP de 64 bits
+    │   │   ├── auramusic_dsp.h                 # Fachada pública del motor DSP (<100 líneas: reexporta dsp_engine.h + dsp_jni_bridge.h)
     │   │   ├── auramusic_dsp.cpp               # Implementación JNI thread-safe (std::mutex) y ruteo de buffers std::span
+    │   │   ├── dsp_engine.h                    # Clase NativeDspEngine: orquestación EQ 10 bandas, 8D/16D, Reverb, Balance y Bit-Perfect
+    │   │   ├── dsp_visualizer.h                # Visualizador espectral de 28 bandas e intensidad RMS (SpectrumVisualizer)
+    │   │   ├── dsp_jni_bridge.h                # Declaraciones JNI para NativeAudioEngine
     │   │   ├── dsp_filters.h                   # Filtros Biquad IIR, EQ 10 bandas, Vocal Clarity Mid-Side, EBU R128 y DJ Automix
     │   │   ├── dsp_spatial.h                   # Paneo 8D Clásico y Audio Espacial 16D Multi-Órbita Binaural
     │   │   ├── dsp_crossfeed.h                 # Filtro Crossfeed acústico binaural Chu Moy / Bauer para auriculares

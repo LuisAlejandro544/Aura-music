@@ -2,12 +2,7 @@ package com.example.core.playback
 import com.example.core.model.RepeatMode
 
 import android.content.Context
-import android.net.Uri
 import androidx.annotation.OptIn
-import androidx.media3.common.MediaItem
-import androidx.media3.common.MediaMetadata
-import androidx.media3.common.PlaybackException
-import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
@@ -18,29 +13,22 @@ import com.example.core.playback.controllers.ABLoopController
 import com.example.core.playback.controllers.AudioFadeController
 import com.example.core.playback.controllers.MediaSessionBridge
 import com.example.core.playback.controllers.PlayerQueueController
-import java.io.File
+
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 
 /**
- * Aura Music - Motor Central de Reproducción de Audio Local
- *
- * Arquitectura y Diseño Modular:
- * - Orquestador central de reproducción multimedia sobre Jetpack Media3 ExoPlayer.
- * - Desacopla la gestión de cola a [PlayerQueueController].
- * - Desacopla la atenuación y transición de volumen a [AudioFadeController].
- * - Desacopla el bucle repetidor A-B a [ABLoopController].
- * - Desacopla los controles del sistema y notificaciones a [MediaSessionBridge].
- * - Ejecuta la limpieza de buffer (Buffer Flushing) en cambios de pista, saltos de tiempo (seekTo),
- *   pausas y liberación para prevenir chasquidos o ruidos residuales en filtros DSP nativos.
+ * Aura Music - Motor Central de Reproducción de Audio Local.
+ * Fachada modular sobre Media3 ExoPlayer: delega cola en [PlayerQueueController],
+ * transporte en [PlayerTransportDriver], construcción en [ExoPlayerFactory],
+ * fundidos en [AudioFadeController], bucle A-B en [ABLoopController],
+ * sesión del sistema en [MediaSessionBridge], prefs en [TransitionPrefsStore]
+ * y widgets en [PlayerWidgetBridge], con Buffer Flushing anti-chasquidos.
  */
 class AuraAudioPlayer(
     private val context: Context,
@@ -123,6 +111,24 @@ class AuraAudioPlayer(
         requestPlayNext = { playNext() }
     )
 
+    private val transportDriver = PlayerTransportDriver(
+        getPlayer = { exoPlayer },
+        getOutgoingDeck = { outgoingExoPlayer },
+        queueController = queueController,
+        fadeController = fadeController,
+        effectManager = effectManager,
+        getRepeatMode = { repeatMode.value },
+        getQueue = { queue.value },
+        getCurrentTrack = { _currentTrack.value },
+        getDuration = { _duration.value },
+        setPosition = { _currentPosition.value = it },
+        shouldInterceptStreaming = { track, overlap ->
+            track.isStreamingTrack && (onStreamingTrackRequestedCallback?.invoke(track, overlap) ?: false)
+        },
+        startTrack = { track, overlap -> playTrack(track, overlap) },
+        ensureServiceStarted = { ensurePlaybackServiceStarted() }
+    )
+
     private val progressTracker = PlaybackProgressTracker(
         scope = playerScope,
         appContext = context,
@@ -139,7 +145,7 @@ class AuraAudioPlayer(
         getRepeatMode = { repeatMode.value },
         onDjAutomixTransition = { enabled, progress -> effectManager.setDjAutomixTransition(enabled, progress) },
         getNearEndPrefetch = { onStreamingNearEndPrefetchCallback },
-        onTrackEnded = { autoOverlap -> handleTrackEnded(isAutoCrossfadeOverlap = autoOverlap) }
+        onTrackEnded = { autoOverlap -> transportDriver.handleTrackEnded(isAutoCrossfadeOverlap = autoOverlap) }
     )
     private val dualDeckTransitions = DualDeckTransitionManager(
         fadeController = fadeController,
@@ -152,37 +158,23 @@ class AuraAudioPlayer(
         resolveClipBounds = { uri -> AudioSilenceTrimmer.getClippingBounds(context, uri) },
         onDjAutomixTransition = { enabled, progress -> effectManager.setDjAutomixTransition(enabled, progress) }
     )
-    private val nativeAudioProcessor = NativeAudioProcessor()
+    private var nativeAudioProcessor: NativeAudioProcessor? = null
     private var mediaSessionBridge: MediaSessionBridge? = null
+    private val transitionPrefs = TransitionPrefsStore(context)
 
-    /**
-     * Interceptor opcional para resolver con la API + yt-dlp (o desde caché de 30 min)
-     * una pista de streaming antes de pasar a la canción anterior o siguiente.
-     */
+    /** Interceptor para resolver una pista de streaming (API + yt-dlp o caché) antes de reproducirla. */
     var onStreamingTrackRequestedCallback: ((Track, Boolean) -> Boolean)? = null
 
-    /**
-     * Notificación cuando una pista de streaming entra en el último tramo para pre-consultar
-     * a la API una canción similar y resolverla con yt-dlp por adelantado.
-     */
+    /** Prefetch de canción similar cuando una pista de streaming entra en su tramo final. */
     var onStreamingNearEndPrefetchCallback: ((Track) -> Unit)? = null
 
-    /**
-     * Callback invocado cuando ExoPlayer recibe un rechazo HTTP (ej. HTTP 403 Forbidden por firma o token expirado)
-     * en una pista de Streaming para conmutar a la copia en caché o regenerar el flujo automáticamente.
-     */
+    /** Recuperación ante rechazo HTTP (ej. 403) en streaming: caché o regeneración del flujo. */
     var onStreamingHttpErrorRecoveryCallback: ((Track, Long) -> Boolean)? = null
 
     companion object {
-        /**
-         * Referencia estática compatible con AuraMediaPlaybackService.
-         */
+        /** Referencia estática compatible con AuraMediaPlaybackService. */
         val activeMediaSession: MediaSession?
             get() = MediaSessionBridge.activeMediaSession
-    }
-
-    private val transitionPrefs by lazy {
-        context.getSharedPreferences("aura_transitions_prefs", Context.MODE_PRIVATE)
     }
 
     init {
@@ -191,57 +183,21 @@ class AuraAudioPlayer(
     }
 
     private fun loadPersistedTransitionSettings() {
-        try {
-            _crossfadeSeconds.value = transitionPrefs.getInt("crossfade_seconds", 0).coerceIn(0, 15)
-            _isGaplessEnabled.value = transitionPrefs.getBoolean("gapless_enabled", true)
-            _isDjAutomixEnabled.value = transitionPrefs.getBoolean("dj_automix_enabled", false)
-            _isDjEqCurveEnabled.value = transitionPrefs.getBoolean("dj_eq_curve_enabled", true)
-        } catch (_: Throwable) {}
+        val saved = transitionPrefs.load()
+        _crossfadeSeconds.value = saved.crossfadeSeconds
+        _isGaplessEnabled.value = saved.isGaplessEnabled
+        _isDjAutomixEnabled.value = saved.isDjAutomixEnabled
+        _isDjEqCurveEnabled.value = saved.isDjEqCurveEnabled
     }
 
     @OptIn(UnstableApi::class)
     private fun initPlayer() {
-        val audioSink = androidx.media3.exoplayer.audio.DefaultAudioSink.Builder(context)
-            .setAudioProcessors(arrayOf(nativeAudioProcessor))
-            .build()
-
-        val renderersFactory = object : androidx.media3.exoplayer.DefaultRenderersFactory(context) {
-            override fun buildAudioSink(
-                context: Context,
-                enableFloatOutput: Boolean,
-                enableAudioTrackPlaybackParams: Boolean
-            ): androidx.media3.exoplayer.audio.AudioSink {
-                return audioSink
-            }
-        }
-
-        val mediaSourceFactory = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(
-            com.example.core.data.streaming.StreamingHttpDataSourceConfig.buildExoPlayerDataSourceFactory(context)
-        )
-
-        val player = ExoPlayer.Builder(context, renderersFactory)
-            .setMediaSourceFactory(mediaSourceFactory)
-            .build()
+        val playerSet = ExoPlayerFactory.build(context)
+        val player = playerSet.mainPlayer
         exoPlayer = player
-
-        // Inicializar segundo reproductor auxiliar (Deck B Saliente) para Crossfade Dual-Deck superpuesto real
-        val auxProcessor = NativeAudioProcessor()
-        outgoingNativeAudioProcessor = auxProcessor
-        val auxAudioSink = androidx.media3.exoplayer.audio.DefaultAudioSink.Builder(context)
-            .setAudioProcessors(arrayOf(auxProcessor))
-            .build()
-        val auxRenderersFactory = object : androidx.media3.exoplayer.DefaultRenderersFactory(context) {
-            override fun buildAudioSink(
-                context: Context,
-                enableFloatOutput: Boolean,
-                enableAudioTrackPlaybackParams: Boolean
-            ): androidx.media3.exoplayer.audio.AudioSink {
-                return auxAudioSink
-            }
-        }
-        outgoingExoPlayer = ExoPlayer.Builder(context, auxRenderersFactory)
-            .setMediaSourceFactory(mediaSourceFactory)
-            .build()
+        nativeAudioProcessor = playerSet.mainProcessor
+        outgoingNativeAudioProcessor = playerSet.outgoingProcessor
+        outgoingExoPlayer = playerSet.outgoingPlayer
 
         val stateListener = PlayerStateListener(
             appContext = context,
@@ -254,7 +210,7 @@ class AuraAudioPlayer(
             setNetworkStalled = { _isNetworkStalled.value = it },
             setPlaybackError = { _playbackError.value = it },
             attachAudioSession = { effectManager.attachToSession(it) },
-            onTrackEnded = { handleTrackEnded() },
+            onTrackEnded = { transportDriver.handleTrackEnded() },
             onPlayerError = { streamingRecovery.handlePlayerError(player, it) },
             onStartTracking = { startProgressTracking() },
             onStopTracking = { stopProgressTracking() }
@@ -269,40 +225,21 @@ class AuraAudioPlayer(
         )
 
         // Vincular callbacks directos para el Widget de Pantalla de Inicio
-        com.example.widget.AuraMusicWidgetProvider.onTogglePlayPauseCallback = {
-            if (_currentTrack.value == null && queue.value.isEmpty()) {
-                false
-            } else {
-                togglePlayPause()
-                true
-            }
-        }
-        com.example.widget.AuraMusicWidgetProvider.onPlayNextCallback = {
-            if (queue.value.isEmpty()) {
-                false
-            } else {
-                playNext()
-                true
-            }
-        }
-        com.example.widget.AuraMusicWidgetProvider.onPlayPreviousCallback = {
-            if (queue.value.isEmpty()) {
-                false
-            } else {
-                playPrevious()
-                true
-            }
-        }
+        PlayerWidgetBridge.bindControlCallbacks(
+            hasTrackOrQueue = { _currentTrack.value != null || queue.value.isNotEmpty() },
+            hasQueue = { queue.value.isNotEmpty() },
+            onTogglePlayPause = { togglePlayPause() },
+            onPlayNext = { playNext() },
+            onPlayPrevious = { playPrevious() }
+        )
     }
 
     private fun ensurePlaybackServiceStarted() {
         mediaSessionBridge?.ensurePlaybackServiceStarted()
     }
 
-    fun playTrackList(tracks: List<Track>, startIndex: Int = 0) {
-        val selected = queueController.setQueue(tracks, startIndex) ?: return
-        playTrack(selected)
-    }
+    fun playTrackList(tracks: List<Track>, startIndex: Int = 0) =
+        transportDriver.playTrackList(tracks, startIndex)
 
     fun playTrack(track: Track, isAutoCrossfadeOverlap: Boolean = false) {
         if (track.isStreamingTrack && isUnresolvedStreamingPageUrl(track.uriString)) {
@@ -329,7 +266,7 @@ class AuraAudioPlayer(
             effectManager.onTrackChanged(track.id)
         }
         effectManager.flushBuffers()
-        com.example.widget.AuraMusicWidgetProvider.pushPlaybackState(
+        PlayerWidgetBridge.pushPlaybackState(
             context = context,
             track = track,
             isPlaying = true,
@@ -369,8 +306,6 @@ class AuraAudioPlayer(
         playbackParamsManager.reset()
     }
 
-
-
     fun setVolume(volume: Float) = fadeController.setVolume(volume, exoPlayer, outgoingExoPlayer)
 
     fun getVolume(): Float = fadeController.getVolume()
@@ -381,40 +316,19 @@ class AuraAudioPlayer(
 
     fun startSmoothFadeIn(durationMs: Long = 1500L) = fadeController.startSmoothFadeIn(durationMs, exoPlayer)
 
-    fun pause() {
-        fadeController.stopOutgoingDeckImmediately(outgoingExoPlayer)
-        exoPlayer?.pause()
-        effectManager.flushBuffers()
-    }
+    fun pause() = transportDriver.pause()
 
-    fun play() {
-        val player = exoPlayer ?: return
-        if (_currentTrack.value == null && queue.value.isNotEmpty()) {
-            playTrackList(queue.value, 0)
-            return
-        }
-        ensurePlaybackServiceStarted()
-        player.play()
-        if (fadeController.isFadeInOnResume) {
-            fadeController.startSmoothFadeIn(1200L, player)
-        } else {
-            fadeController.restoreFullVolume(player)
-        }
-    }
+    fun play() = transportDriver.play()
 
     fun setCrossfadeSeconds(seconds: Int) {
         val clamped = seconds.coerceIn(0, 15)
         _crossfadeSeconds.value = clamped
-        try {
-            transitionPrefs.edit().putInt("crossfade_seconds", clamped).apply()
-        } catch (_: Throwable) {}
+        transitionPrefs.saveCrossfadeSeconds(clamped)
     }
 
     fun setDjAutomixEnabled(enabled: Boolean) {
         _isDjAutomixEnabled.value = enabled
-        try {
-            transitionPrefs.edit().putBoolean("dj_automix_enabled", enabled).apply()
-        } catch (_: Throwable) {}
+        transitionPrefs.saveDjAutomixEnabled(enabled)
         if (!enabled) {
             effectManager.setDjAutomixTransition(false, 0.0f)
         }
@@ -422,9 +336,7 @@ class AuraAudioPlayer(
 
     fun setDjEqCurveEnabled(enabled: Boolean) {
         _isDjEqCurveEnabled.value = enabled
-        try {
-            transitionPrefs.edit().putBoolean("dj_eq_curve_enabled", enabled).apply()
-        } catch (_: Throwable) {}
+        transitionPrefs.saveDjEqCurveEnabled(enabled)
         if (!enabled) {
             effectManager.setDjAutomixTransition(false, 0.0f)
         }
@@ -432,9 +344,7 @@ class AuraAudioPlayer(
 
     fun setGaplessEnabled(enabled: Boolean) {
         _isGaplessEnabled.value = enabled
-        try {
-            transitionPrefs.edit().putBoolean("gapless_enabled", enabled).apply()
-        } catch (_: Throwable) {}
+        transitionPrefs.saveGaplessEnabled(enabled)
     }
 
     // --- Controles del Repetidor de Segmento A-B (Delegados en ABLoopController) ---
@@ -470,72 +380,14 @@ class AuraAudioPlayer(
 
     fun clearABLoop() = abLoopController.clearABLoop()
 
-    fun togglePlayPause() {
-        val player = exoPlayer ?: return
-        if (player.isPlaying) {
-            fadeController.stopOutgoingDeckImmediately(outgoingExoPlayer)
-            player.pause()
-            effectManager.flushBuffers()
-        } else {
-            if (_currentTrack.value == null && queue.value.isNotEmpty()) {
-                playTrackList(queue.value, 0)
-            } else {
-                ensurePlaybackServiceStarted()
-                player.play()
-                if (fadeController.isFadeInOnResume) {
-                    fadeController.startSmoothFadeIn(1200L, player)
-                } else {
-                    fadeController.restoreFullVolume(player)
-                }
-            }
-        }
-    }
+    fun togglePlayPause() = transportDriver.togglePlayPause()
 
-    fun seekTo(positionMs: Long) {
-        val player = exoPlayer ?: return
-        fadeController.stopOutgoingDeckImmediately(outgoingExoPlayer)
-        val clamped = positionMs.coerceIn(0L, _duration.value)
-        effectManager.flushBuffers()
-        player.seekTo(clamped)
-        _currentPosition.value = clamped
-    }
+    fun seekTo(positionMs: Long) = transportDriver.seekTo(positionMs)
 
-    fun playNext(isAutoCrossfadeOverlap: Boolean = false) {
-        val q = queue.value
-        if (q.isEmpty()) return
+    fun playNext(isAutoCrossfadeOverlap: Boolean = false) =
+        transportDriver.playNext(isAutoCrossfadeOverlap)
 
-        if (repeatMode.value == RepeatMode.ONE) {
-            _currentTrack.value?.let { playTrack(it, isAutoCrossfadeOverlap = false) }
-            return
-        }
-
-        val nextIndex = queueController.getNextIndex() ?: return
-        val nextTrack = q[nextIndex]
-        if (nextTrack.isStreamingTrack) {
-            val intercepted = onStreamingTrackRequestedCallback?.invoke(nextTrack, isAutoCrossfadeOverlap) ?: false
-            if (intercepted) return
-        }
-        playTrack(nextTrack, isAutoCrossfadeOverlap = isAutoCrossfadeOverlap)
-    }
-
-    fun playPrevious() {
-        val player = exoPlayer ?: return
-        if (player.currentPosition > 3000L) {
-            seekTo(0L)
-            return
-        }
-
-        val q = queue.value
-        if (q.isEmpty()) return
-
-        val prevIndex = queueController.getPreviousIndex() ?: return
-        val prevTrack = q[prevIndex]
-        if (prevTrack.isStreamingTrack) {
-            val intercepted = onStreamingTrackRequestedCallback?.invoke(prevTrack, false) ?: false
-            if (intercepted) return
-        }
-        playTrack(prevTrack, isAutoCrossfadeOverlap = false)
-    }
+    fun playPrevious() = transportDriver.playPrevious()
 
     /**
      * Encola una canción similar de streaming o actualiza su URI en la cola (ej. cuando ya está en la caché de 30 min).
@@ -560,9 +412,7 @@ class AuraAudioPlayer(
     fun updateTrackFavorite(trackId: Long, isFavorite: Boolean) {
         val (updatedCurrent, _) = queueController.updateTrackFavorite(trackId, isFavorite, _currentTrack.value)
         _currentTrack.value = updatedCurrent
-        com.example.widget.WidgetStateStore.updateFavoriteOnly(context, trackId, isFavorite)
-        com.example.widget.AuraMusicWidgetProvider.refreshAllWidgets(context)
-        com.example.widget.AuraLibraryWidgetProvider.refreshAllWidgets(context)
+        PlayerWidgetBridge.syncFavorite(context, trackId, isFavorite)
     }
 
     fun removeTrackFromQueue(trackId: Long) {
@@ -597,26 +447,13 @@ class AuraAudioPlayer(
         )
         _currentTrack.value = updatedCurrent
         if (updatedCurrent != null && updatedCurrent.id == trackId) {
-            com.example.widget.AuraMusicWidgetProvider.pushPlaybackState(
+            PlayerWidgetBridge.pushPlaybackState(
                 context = context,
                 track = updatedCurrent,
                 isPlaying = _isPlaying.value,
                 positionMs = _currentPosition.value,
                 durationMs = _duration.value
             )
-        }
-    }
-
-    private fun handleTrackEnded(isAutoCrossfadeOverlap: Boolean = false) {
-        when (repeatMode.value) {
-            RepeatMode.ONE -> {
-                seekTo(0L)
-                exoPlayer?.play()
-                startSmoothFadeIn(1200L)
-            }
-            RepeatMode.ALL, RepeatMode.OFF -> {
-                playNext(isAutoCrossfadeOverlap = isAutoCrossfadeOverlap)
-            }
         }
     }
 

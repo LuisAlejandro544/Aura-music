@@ -2,16 +2,10 @@ package com.example.viewmodel
 import com.example.core.model.LyricsState
 import com.example.core.model.LyricSearchResult
 import com.example.core.model.VideoDisplayMode
-import com.example.core.model.NowPlayingDesignMode
-import com.example.core.model.RepeatMode
 
 import android.app.Application
-import android.content.Intent
-import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.core.data.importer.FFmpegNativeEngine
-import com.example.core.data.importer.OnlineVideoAudioImporter
 import com.example.core.data.importer.YtDlpAutoUpdater
 import com.example.core.data.local.AppDatabase
 import com.example.core.data.repository.MusicRepository
@@ -20,33 +14,42 @@ import com.example.core.model.*
 import com.example.core.playback.AudioEffectManager
 import com.example.core.playback.AuraAudioPlayer
 import com.example.core.playback.HeadphoneController
-import com.example.core.playback.NativeAudioEngine
 import com.example.ui.navigation.LibraryTab
 import com.example.ui.navigation.NavScreen
 import com.example.viewmodel.delegates.*
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 /**
  * ViewModel central de Aura Music.
- * Arquitectura Modular MVVM (< 500 líneas):
- * Delega responsabilidades en coordinadores modulares:
- * - [AudioEffectsCoordinator]: EQ 10 bandas C++20, 8D/16D, Reverb, Vocal Clarity y Sleep Timer.
- * - [NavigationCoordinator]: Rutas de navegación, temas visuales y selección de colecciones.
- * - [HeadphoneSettingsCoordinator]: Acústica DSP, seguridad y control de audífonos.
- * - [LyricsCoordinator]: Karaoke sincronizado LRCLIB, parsing LRC y búsqueda interactiva.
- * - [IncomingMediaCoordinator]: Recepción de enlaces e intents externos ("Abrir con..." / "Compartir con...").
- * - [TrackLibraryCoordinator]: Gestión de pistas, metadatos, playlists e importaciones SAF / Video a Música.
- * - [MixtapeCoordinator]: Fusión continua de pistas con FFmpeg y capítulos reactivos en tiempo real.
+ * Fachada modular MVVM (< 500 líneas): expone el estado público reactivo y
+ * delega la lógica en coordinadores modulares (efectos, navegación, biblioteca,
+ * mixtape, letras, medios entrantes, streaming, widgets) más el bucle de
+ * espectro FFT ([VisualizerLoopController]) y el cableado reactivo
+ * ([MusicViewModelWiring]). Las funciones de reenvío viven como métodos por
+ * defecto en `MusicViewModelFacades.kt` con el 100% de la API pública.
  */
-class MusicViewModel(application: Application) : AndroidViewModel(application) {
+class MusicViewModel(application: Application) : AndroidViewModel(application),
+    MusicViewModelNavigationFacade,
+    MusicViewModelPlaybackFacade,
+    MusicViewModelLibraryFacade,
+    MusicViewModelMixtapeFacade,
+    MusicViewModelEffectsFacade,
+    MusicViewModelPackageUpdateFacade,
+    MusicViewModelHeadphoneFacade,
+    MusicViewModelLyricsFacade,
+    MusicViewModelIncomingFacade,
+    MusicViewModelStreamingFacade,
+    MusicViewModelWidgetFacade {
+
+    override val facadeScope: CoroutineScope get() = viewModelScope
+    override val facadeApp: Application get() = getApplication()
 
     private val database = AppDatabase.getInstance(application)
     private val repository = MusicRepository(database)
     val effectManager = AudioEffectManager()
-    val audioPlayer = AuraAudioPlayer(application, effectManager)
+    override val audioPlayer = AuraAudioPlayer(application, effectManager)
 
     // Controlador y gestor de hardware para Auriculares / Audífonos
     val headphoneController = HeadphoneController(
@@ -68,14 +71,14 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         getCurrentVolume = { audioPlayer.getVolume() }
     )
 
-    val headphoneCoordinator = HeadphoneSettingsCoordinator(
+    override val headphoneCoordinator = HeadphoneSettingsCoordinator(
         headphoneController = headphoneController,
         audioPlayer = audioPlayer
     )
     val headphoneConfig: StateFlow<HeadphoneConfig> = headphoneCoordinator.headphoneConfig
 
     // Coordinador modular de Efectos de Audio y Sleep Timer
-    private val effectsCoordinator = AudioEffectsCoordinator(
+    internal override val effectsCoordinator = AudioEffectsCoordinator(
         effectManager = effectManager,
         audioPlayer = audioPlayer,
         coroutineScope = viewModelScope
@@ -83,7 +86,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     // Coordinador modular de Navegación y Preferencias de UI
     private val appPrefs = getApplication<Application>().getSharedPreferences("aura_music_ui_prefs", android.content.Context.MODE_PRIVATE)
-    private val navigationCoordinator = NavigationCoordinator(
+    internal override val navigationCoordinator = NavigationCoordinator(
         appPrefs = appPrefs,
         repository = repository,
         coroutineScope = viewModelScope,
@@ -91,7 +94,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     )
 
     // Coordinador modular de Biblioteca, Playlists e Importaciones
-    val trackLibraryCoordinator = TrackLibraryCoordinator(
+    override val trackLibraryCoordinator = TrackLibraryCoordinator(
         context = application,
         repository = repository,
         audioPlayer = audioPlayer,
@@ -100,12 +103,12 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             navigationCoordinator.updateSelectedPlaylistMetadata(id, name, desc, art)
         },
         onPlaylistDeleted = { id ->
-            if (selectedPlaylist.value?.id == id) handleBackPress()
+            if (selectedPlaylist.value?.id == id) navigationCoordinator.handleBackPress()
         }
     )
 
     // Coordinador modular de Mixtape y Capítulos Continuos
-    val mixtapeCoordinator = MixtapeCoordinator(application, viewModelScope)
+    override val mixtapeCoordinator = MixtapeCoordinator(application, viewModelScope)
     val isCreatingMixtape: StateFlow<Boolean> = mixtapeCoordinator.isCreatingMixtape
     val mixtapeProgress: StateFlow<Float> = mixtapeCoordinator.mixtapeProgress
     val mixtapeStatusMessage: StateFlow<String?> = mixtapeCoordinator.mixtapeStatusMessage
@@ -113,7 +116,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val activeMixtapeMetadata = mixtapeCoordinator.activeMixtapeMetadata
 
     // Datos reactivos de Room
-    val allTracks: StateFlow<List<Track>> = repository.allTracks
+    override val allTracks: StateFlow<List<Track>> = repository.allTracks
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val favoriteTracks: StateFlow<List<Track>> = repository.favoriteTracks
@@ -125,7 +128,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val topPlayedTracks: StateFlow<List<Track>> = repository.topPlayedTracks
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val playlists: StateFlow<List<Playlist>> = repository.playlists
+    override val playlists: StateFlow<List<Playlist>> = repository.playlists
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // Estado del reproductor Media3
@@ -176,13 +179,13 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val selectedLibraryTab = navigationCoordinator.selectedLibraryTab
     val currentTheme = navigationCoordinator.currentTheme
     val isDynamicArtworkColorEnabled = navigationCoordinator.isDynamicArtworkColorEnabled
-    val isMiniPlayerVideoEnabled = navigationCoordinator.isMiniPlayerVideoEnabled
+    override val isMiniPlayerVideoEnabled = navigationCoordinator.isMiniPlayerVideoEnabled
     val isBackgroundGameModeEnabled = navigationCoordinator.isBackgroundGameModeEnabled
-    val appWallpaperConfig = navigationCoordinator.appWallpaperConfig
-    val videoDisplayMode = navigationCoordinator.videoDisplayMode
+    override val appWallpaperConfig = navigationCoordinator.appWallpaperConfig
+    override val videoDisplayMode = navigationCoordinator.videoDisplayMode
     val isVideoCanvasActive: StateFlow<Boolean> = videoDisplayMode.map { it != VideoDisplayMode.OFF }
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
-    val nowPlayingDesignMode = navigationCoordinator.nowPlayingDesignMode
+    override val nowPlayingDesignMode = navigationCoordinator.nowPlayingDesignMode
 
     // Estados de importación y progreso de descargas
     val isImporting = trackLibraryCoordinator.isImporting
@@ -196,8 +199,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val _audioIntensity = MutableStateFlow(0f)
     val audioIntensity: StateFlow<Float> = _audioIntensity.asStateFlow()
 
+    private val visualizerController = VisualizerLoopController(_visualizerBands, _audioIntensity)
+
     // Coordinador de Letras y Karaoke
-    val lyricsCoordinator = LyricsCoordinator(
+    override val lyricsCoordinator = LyricsCoordinator(
         context = application,
         storageManager = AppStorageManager(application),
         scope = viewModelScope,
@@ -210,7 +215,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val searchLyricsError: StateFlow<String?> = lyricsCoordinator.searchLyricsError
 
     // Coordinador Universal de Importación de Playlists (Spotify y YouTube Music / YouTube)
-    val playlistImportCoordinator = com.example.viewmodel.delegates.PlaylistImportCoordinator(
+    override val playlistImportCoordinator = com.example.viewmodel.delegates.PlaylistImportCoordinator(
         context = application,
         trackDao = database.trackDao(),
         playlistDao = database.playlistDao(),
@@ -221,22 +226,22 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             viewModelScope.launch {
                 val created = playlists.value.find { it.id == createdPlaylistId }
                 if (created != null) {
-                    openPlaylist(created)
+                    navigationCoordinator.openPlaylist(created)
                 } else {
-                    navigateTo(NavScreen.Library)
-                    setLibraryTab(LibraryTab.PLAYLISTS)
+                    navigationCoordinator.navigateTo(NavScreen.Library)
+                    navigationCoordinator.setLibraryTab(LibraryTab.PLAYLISTS)
                 }
             }
         }
     )
 
     // Coordinador de Medios Entrantes
-    val incomingMediaCoordinator = IncomingMediaCoordinator(
+    override val incomingMediaCoordinator = IncomingMediaCoordinator(
         context = application,
         repository = repository,
         scope = viewModelScope,
         onPlayTrack = { track, list -> playTrack(track, list) },
-        onExpandNowPlaying = { setNowPlayingExpanded(true) },
+        onExpandNowPlaying = { navigationCoordinator.setNowPlayingExpanded(true) },
         onFetchOnlineLyrics = { lyricsCoordinator.fetchOnlineLyrics() },
         setImportingStatus = { isImp, msg ->
             trackLibraryCoordinator.setImporting(isImp, msg)
@@ -245,19 +250,19 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             playlistImportCoordinator.openDialog(playlistUrl)
         }
     )
-    val pendingIncomingAudioUris: StateFlow<List<Uri>> = incomingMediaCoordinator.pendingIncomingAudioUris
-    val pendingIncomingVideoUri: StateFlow<Uri?> = incomingMediaCoordinator.pendingIncomingVideoUri
-    val pendingIncomingWebLink: StateFlow<String?> = incomingMediaCoordinator.pendingIncomingWebLink
+    val pendingIncomingAudioUris = incomingMediaCoordinator.pendingIncomingAudioUris
+    val pendingIncomingVideoUri = incomingMediaCoordinator.pendingIncomingVideoUri
+    val pendingIncomingWebLink = incomingMediaCoordinator.pendingIncomingWebLink
 
     // Coordinador del Modo Streaming Híbrido (Búsqueda API tri-plataforma, yt-dlp para YouTube/SoundCloud, Caché 30 min y Radio)
-    val streamingCoordinator = StreamingModeCoordinator(
+    override val streamingCoordinator = StreamingModeCoordinator(
         context = application,
         audioPlayer = audioPlayer,
         scope = viewModelScope,
         onLoadLyricsForTrack = { track -> lyricsCoordinator.loadLyrics(track) },
         onStatusMessage = { msg -> trackLibraryCoordinator.setStatusMessage(msg) }
     )
-    val streamingSearchQuery: StateFlow<String> = streamingCoordinator.searchQuery
+    override val streamingSearchQuery: StateFlow<String> = streamingCoordinator.searchQuery
     val streamingSelectedFilter: StateFlow<StreamingSearchFilter> = streamingCoordinator.selectedFilter
     val streamingSearchResults: StateFlow<List<StreamingSearchItem>> = streamingCoordinator.searchResults
     val isStreamingSearching: StateFlow<Boolean> = streamingCoordinator.isSearching
@@ -268,525 +273,60 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val downloadingStreamingIds: StateFlow<Set<String>> = streamingCoordinator.downloadingVideoIds
     val downloadedStreamingIds: StateFlow<Set<String>> = streamingCoordinator.downloadedVideoIds
 
-    fun openPlaylistImportDialog(prefilledUrl: String = "") {
-        playlistImportCoordinator.openDialog(prefilledUrl)
-    }
+    // Coordinador de Widgets de Escritorio (configuración, sincronización y callbacks)
+    override val widgetSyncCoordinator = WidgetSyncCoordinator(
+        appContext = application,
+        scope = viewModelScope,
+        topPlayedTracks = topPlayedTracks,
+        allTracks = allTracks,
+        playlists = playlists,
+        favoriteTracks = favoriteTracks,
+        onPlayTrack = { track, list -> playTrack(track, list) },
+        getCurrentTrack = { audioPlayer.currentTrack.value },
+        onToggleFavorite = { track -> toggleFavorite(track) }
+    )
+    val widgetConfig: StateFlow<WidgetConfig> = widgetSyncCoordinator.widgetConfig
 
     init {
-        // Hilo de renderizado de espectro FFT C++20 optimizado:
-        // - Pausa por completo el muestreo JNI y entra en suspensión profunda cuando la app está en segundo plano
-        //   (por ejemplo, mientras el usuario está jugando) para ahorrar CPU y batería.
-        // - Pausa el muestreo de las 28 bandas cuando la app está en Modo Cinemático (donde no hay barras de visualizador)
-        //   o cuando NowPlayingScreen está minimizada.
-        // - En modo Streaming con Video Canvas, reduce la frecuencia de despertado del hilo para enfriar el procesador.
-        viewModelScope.launch(Dispatchers.Default) {
-            val buffer = FloatArray(28)
-            var phase = 0.0
-            while (true) {
-                val isBackgroundSuspended = com.example.AuraApplication.shouldSuspendBackgroundVisuals()
-                if (isBackgroundSuspended) {
-                    delay(850L)
-                    continue
-                }
+        visualizerController.start(
+            scope = viewModelScope,
+            isPlaying = { audioPlayer.isPlaying.value },
+            isExpanded = { isNowPlayingExpanded.value },
+            getCurrentTrack = { audioPlayer.currentTrack.value },
+            getPositionMs = { audioPlayer.currentPosition.value },
+            getVideoDisplayMode = { videoDisplayMode.value },
+            getDesignMode = { nowPlayingDesignMode.value }
+        )
 
-                val playing = audioPlayer.isPlaying.value
-                val expanded = isNowPlayingExpanded.value
-                if (playing && expanded) {
-                    val currentTrk = audioPlayer.currentTrack.value
-                    val hasVideo = !currentTrk?.videoUri.isNullOrEmpty()
-                    val isFullscreenVid = hasVideo && videoDisplayMode.value.isFullscreen
-                    val isCinematicMode = when (nowPlayingDesignMode.value) {
-                        NowPlayingDesignMode.CINEMATIC_CANVAS -> true
-                        NowPlayingDesignMode.CLASSIC -> false
-                        NowPlayingDesignMode.AUTO -> isFullscreenVid
-                    }
+        MusicViewModelWiring.wireReactiveSyncs(
+            scope = viewModelScope,
+            audioPlayer = audioPlayer,
+            repository = repository,
+            lyricsCoordinator = lyricsCoordinator,
+            mixtapeCoordinator = mixtapeCoordinator
+        )
 
-                    if (currentTrk?.isStreamingTrack == true && isCinematicMode) {
-                        _audioIntensity.value = NativeAudioEngine.getAudioIntensity().coerceIn(0.15f, 0.85f)
-                        delay(220L)
-                        continue
-                    }
-
-                    var liveIntensity = NativeAudioEngine.getAudioIntensity()
-
-                    // Muestrear las 28 bandas cuando estamos en Modo Clásico (donde existe AudioVisualizer)
-                    if (!isCinematicMode) {
-                        NativeAudioEngine.getVisualizerBands(buffer)
-
-                        // Si por alguna ruta de decodificación aún no hay variación entre bandas, aplicar pulso rítmico en tiempo real
-                        var minB = 1.0f
-                        var maxB = 0.0f
-                        for (b in buffer) {
-                            if (b < minB) minB = b
-                            if (b > maxB) maxB = b
-                        }
-                        if ((maxB - minB) < 0.015f || maxB <= 0.19f) {
-                            phase += 0.25
-                            val posSec = (audioPlayer.currentPosition.value / 1000.0)
-                            val beatPulse = (kotlin.math.sin(posSec * 7.2 + phase * 0.65) * 0.5 + 0.5).toFloat()
-                            for (i in 0 until 28) {
-                                val freqWeight = 1.0f - (i / 36.0f)
-                                val w1 = kotlin.math.sin(phase * 1.35 + i * 0.48).toFloat() * 0.5f + 0.5f
-                                val w2 = kotlin.math.cos(phase * 0.85 - i * 0.31 + posSec * 4.2).toFloat() * 0.5f + 0.5f
-                                buffer[i] = (0.14f + (w1 * 0.44f + w2 * 0.32f + beatPulse * 0.24f) * freqWeight)
-                                    .coerceIn(0.10f, 0.94f)
-                            }
-                            liveIntensity = (0.22f + beatPulse * 0.45f).coerceIn(0.18f, 0.82f)
-                        }
-
-                        _visualizerBands.value = buffer.copyOf()
-                    }
-                    _audioIntensity.value = liveIntensity
-                    delay(if (isCinematicMode) 110L else 36L)
-                } else {
-                    var needsDecay = false
-                    for (i in buffer.indices) {
-                        if (buffer[i] > 0.08f) {
-                            buffer[i] = buffer[i] * 0.82f
-                            needsDecay = true
-                        }
-                    }
-                    if (_audioIntensity.value > 0.06f) {
-                        _audioIntensity.value = _audioIntensity.value * 0.80f
-                        needsDecay = true
-                    }
-                    if (needsDecay) {
-                        _visualizerBands.value = buffer.copyOf()
-                        delay(45L)
-                    } else {
-                        delay(350L)
-                    }
-                }
-            }
-        }
-
-        // Carga automática de letras sincronizadas
-        viewModelScope.launch {
-            audioPlayer.currentTrack.collect { track -> loadLyrics(track) }
-        }
-
-        // Seguimiento reactivo del capítulo activo para Mixtapes Continuos
-        viewModelScope.launch {
-            combine(audioPlayer.currentTrack, audioPlayer.currentPosition) { trk, pos ->
-                trk to pos
-            }.collect { (trk, pos) ->
-                mixtapeCoordinator.updateActiveChapter(trk, pos)
-            }
-        }
-
-        // Sincronización reactiva del reproductor con Room
-        viewModelScope.launch {
-            repository.allTracks.collect { tracks ->
-                val current = audioPlayer.currentTrack.value
-                if (current != null) {
-                    val updated = tracks.find { it.id == current.id }
-                    if (updated != null && (updated.isFavorite != current.isFavorite || updated.title != current.title || updated.artist != current.artist || updated.album != current.album || updated.albumArtPath != current.albumArtPath || updated.videoUri != current.videoUri || updated.isVideoLoop != current.isVideoLoop)) {
-                        audioPlayer.updateTrackFavorite(current.id, updated.isFavorite)
-                        audioPlayer.updateTrackMetadata(
-                            trackId = updated.id,
-                            title = updated.title,
-                            artist = updated.artist,
-                            album = updated.album,
-                            albumArtPath = updated.albumArtPath,
-                            updateArt = true,
-                            videoUri = updated.videoUri,
-                            isVideoLoop = updated.isVideoLoop,
-                            updateVideo = true
-                        )
-                    }
-                }
-            }
-        }
-
-        // Vincular callbacks en memoria de los Widgets de Pantalla de Inicio hacia MusicViewModel
-        com.example.widget.AuraMusicWidgetProvider.onToggleFavoriteCallback = {
-            val current = audioPlayer.currentTrack.value
-            if (current != null) {
-                toggleFavorite(current)
-                true
-            } else {
-                false
-            }
-        }
-        com.example.widget.AuraMusicWidgetProvider.onPlaySpecificTrackCallback = { track, queueList ->
-            playTrack(track, queueList)
-            true
-        }
-
-        // Sincronización reactiva de las 4 canciones más escuchadas y las 4 playlists con el segundo Widget independiente
-        viewModelScope.launch(Dispatchers.IO) {
-            combine(topPlayedTracks, allTracks, playlists, favoriteTracks) { top, all, pls, favs ->
-                val effectiveTop = if (top.isNotEmpty()) top else all.sortedByDescending { it.playCount }.take(4)
-                Triple(effectiveTop, pls, favs)
-            }.collect { (top4, pls, favs) ->
-                com.example.widget.WidgetStateStore.saveQuickGridItems(
-                    context = application,
-                    topTracks = top4,
-                    playlists = pls,
-                    favoriteTracks = favs
-                )
-                com.example.widget.AuraLibraryWidgetProvider.refreshAllWidgets(application)
-            }
-        }
+        widgetSyncCoordinator.registerWidgetCallbacks()
+        widgetSyncCoordinator.startLibraryWidgetSync()
     }
 
-    // --- Configuración de Widgets de Escritorio ---
-    private val _widgetConfig = MutableStateFlow(
-        com.example.widget.WidgetStateStore.getConfig(application)
-    )
-    val widgetConfig: StateFlow<WidgetConfig> = _widgetConfig.asStateFlow()
-
-    fun setWidgetDynamicColorEnabled(enabled: Boolean) {
-        val updated = _widgetConfig.value.copy(isDynamicColorEnabled = enabled)
-        _widgetConfig.value = updated
-        viewModelScope.launch(Dispatchers.IO) {
-            com.example.widget.WidgetStateStore.saveConfig(getApplication(), updated)
-            com.example.widget.AuraMusicWidgetProvider.refreshAllWidgets(getApplication())
-            com.example.widget.AuraLibraryWidgetProvider.refreshAllWidgets(getApplication())
-        }
-    }
-
-    fun setWidgetGridContentMode(mode: WidgetGridContentMode) {
-        val updated = _widgetConfig.value.copy(gridContentMode = mode)
-        _widgetConfig.value = updated
-        viewModelScope.launch(Dispatchers.IO) {
-            com.example.widget.WidgetStateStore.saveConfig(getApplication(), updated)
-            com.example.widget.AuraLibraryWidgetProvider.refreshAllWidgets(getApplication())
-        }
-    }
-
-    fun setWidgetShowProgress(enabled: Boolean) {
-        val updated = _widgetConfig.value.copy(showProgressInWidget = enabled)
-        _widgetConfig.value = updated
-        viewModelScope.launch(Dispatchers.IO) {
-            com.example.widget.WidgetStateStore.saveConfig(getApplication(), updated)
-            com.example.widget.AuraMusicWidgetProvider.refreshAllWidgets(getApplication())
-        }
-    }
-
-    fun setWidgetColorIntensityPercent(percent: Int) {
-        val updated = _widgetConfig.value.copy(colorIntensityPercent = percent.coerceIn(30, 100))
-        _widgetConfig.value = updated
-        viewModelScope.launch(Dispatchers.IO) {
-            com.example.widget.WidgetStateStore.saveConfig(getApplication(), updated)
-            com.example.widget.AuraMusicWidgetProvider.refreshAllWidgets(getApplication())
-            com.example.widget.AuraLibraryWidgetProvider.refreshAllWidgets(getApplication())
-        }
-    }
-
-    fun forceSyncAllWidgets() {
-        viewModelScope.launch(Dispatchers.IO) {
-            val app = getApplication<Application>()
-            val top = topPlayedTracks.value.ifEmpty { allTracks.value.sortedByDescending { it.playCount }.take(4) }
-            com.example.widget.WidgetStateStore.saveQuickGridItems(
-                context = app,
-                topTracks = top,
-                playlists = playlists.value,
-                favoriteTracks = favoriteTracks.value
-            )
-            com.example.widget.AuraMusicWidgetProvider.refreshAllWidgets(app)
-            com.example.widget.AuraLibraryWidgetProvider.refreshAllWidgets(app)
-        }
-    }
-
-    // --- Navegación ---
-    fun navigateTo(screen: NavScreen) = navigationCoordinator.navigateTo(screen)
-    fun markSettingsVisited() = navigationCoordinator.markSettingsVisited()
-    fun completeOnboarding() = navigationCoordinator.completeOnboarding()
-    fun reopenOnboarding() = navigationCoordinator.reopenOnboarding()
-    fun handleBackPress(): Boolean = navigationCoordinator.handleBackPress()
-    fun openPlaylist(playlist: Playlist) = navigationCoordinator.openPlaylist(playlist)
-    fun openAlbum(albumName: String) = navigationCoordinator.openAlbum(albumName)
-    fun openArtist(artistName: String) = navigationCoordinator.openArtist(artistName)
-    fun setNowPlayingExpanded(expanded: Boolean) = navigationCoordinator.setNowPlayingExpanded(expanded)
-    fun setSearchQuery(query: String) = navigationCoordinator.setSearchQuery(query)
-    fun setLibraryTab(tab: LibraryTab) = navigationCoordinator.setLibraryTab(tab)
-    fun setTheme(theme: AuraTheme) = navigationCoordinator.setTheme(theme)
-    fun setDynamicArtworkColorEnabled(enabled: Boolean) = navigationCoordinator.setDynamicArtworkColorEnabled(enabled)
-    fun toggleDynamicArtworkColor(enabled: Boolean) = setDynamicArtworkColorEnabled(enabled)
-    fun setMiniPlayerVideoEnabled(enabled: Boolean) = navigationCoordinator.setMiniPlayerVideoEnabled(enabled)
-    fun toggleMiniPlayerVideoEnabled() = setMiniPlayerVideoEnabled(!isMiniPlayerVideoEnabled.value)
-    fun setBackgroundGameModeEnabled(enabled: Boolean) = navigationCoordinator.setBackgroundGameModeEnabled(enabled)
-    fun toggleBackgroundGameMode(enabled: Boolean) = setBackgroundGameModeEnabled(enabled)
-    fun setAppWallpaperEnabled(enabled: Boolean) = navigationCoordinator.setAppWallpaperEnabled(enabled)
-    fun setAppWallpaperScope(scope: com.example.core.model.WallpaperScreenScope) = navigationCoordinator.setAppWallpaperScope(scope)
-    fun setAppWallpaperDimAlpha(alpha: Float) = navigationCoordinator.setAppWallpaperDimAlpha(alpha)
-    fun setAppWallpaperBlurDp(blurDp: Int) = navigationCoordinator.setAppWallpaperBlurDp(blurDp)
-    fun setCustomWallpaperImage(uri: Uri) {
-        viewModelScope.launch {
-            val storageManager = com.example.core.data.storage.AppStorageManager(getApplication())
-            val oldPath = appWallpaperConfig.value.mediaPath
-            val savedPath = storageManager.saveAppWallpaperImageFromUri(uri, oldPath)
-            if (!savedPath.isNullOrBlank()) {
-                navigationCoordinator.updateAppWallpaperMedia(
-                    type = com.example.core.model.WallpaperMediaType.IMAGE,
-                    path = savedPath,
-                    enabled = true
-                )
-            }
-        }
-    }
-    fun setCustomWallpaperVideo(uri: Uri) {
-        viewModelScope.launch {
-            val storageManager = com.example.core.data.storage.AppStorageManager(getApplication())
-            val oldPath = appWallpaperConfig.value.mediaPath
-            val savedPath = storageManager.saveAppWallpaperVideoFromUri(uri, oldPath)
-            if (!savedPath.isNullOrBlank()) {
-                navigationCoordinator.updateAppWallpaperMedia(
-                    type = com.example.core.model.WallpaperMediaType.VIDEO,
-                    path = savedPath,
-                    enabled = true
-                )
-            }
-        }
-    }
-    fun clearCustomWallpaper() {
-        viewModelScope.launch {
-            val storageManager = com.example.core.data.storage.AppStorageManager(getApplication())
-            val oldPath = appWallpaperConfig.value.mediaPath
-            storageManager.deleteAppWallpaperFile(oldPath)
-            navigationCoordinator.updateAppWallpaperMedia(
-                type = com.example.core.model.WallpaperMediaType.NONE,
-                path = "",
-                enabled = false
-            )
-        }
-    }
-    fun setVideoDisplayMode(mode: VideoDisplayMode) = navigationCoordinator.setVideoDisplayMode(mode)
-    fun cycleVideoDisplayMode() = setVideoDisplayMode(videoDisplayMode.value.next())
-    fun toggleVideoCanvas() = cycleVideoDisplayMode()
-    fun setVideoCanvasActive(active: Boolean) {
-        if (!active) setVideoDisplayMode(VideoDisplayMode.OFF)
-        else if (videoDisplayMode.value == VideoDisplayMode.OFF) setVideoDisplayMode(VideoDisplayMode.FULLSCREEN_BACKGROUND)
-    }
-    fun setNowPlayingDesignMode(mode: NowPlayingDesignMode) = navigationCoordinator.setNowPlayingDesignMode(mode)
-    fun cycleNowPlayingDesignMode() = setNowPlayingDesignMode(nowPlayingDesignMode.value.next())
-
-    // --- Reproducción ---
-    fun playTrack(track: Track, fromList: List<Track>? = null) {
+    // --- Reproducción (núcleo conservado en la fachada) ---
+    override fun playTrack(track: Track, fromList: List<Track>? = null) {
         viewModelScope.launch {
             repository.incrementPlayCount(track.id)
-            val fullList = allTracks.value
-            val list = if (!fromList.isNullOrEmpty()) {
-                fromList
-            } else if (fullList.isNotEmpty()) {
-                if (fullList.any { it.id == track.id }) fullList
-                else (listOf(track) + fullList).distinctBy { it.id }
-            } else {
-                listOf(track)
-            }
-            val index = list.indexOfFirst { it.id == track.id }.coerceAtLeast(0)
+            val (list, index) = MusicViewModelWiring.resolvePlaybackList(track, fromList, allTracks.value)
             audioPlayer.playTrackList(list, index)
         }
     }
 
-    fun togglePlayPause() = audioPlayer.togglePlayPause()
-    fun playNext() = audioPlayer.playNext()
-    fun playPrevious() = audioPlayer.playPrevious()
-    fun seekTo(positionMs: Long) = audioPlayer.seekTo(positionMs)
-    fun toggleShuffle() = audioPlayer.toggleShuffle()
-    fun cycleRepeatMode() = audioPlayer.cycleRepeatMode()
-
     fun toggleFavorite(track: Track) {
         viewModelScope.launch {
             val newFavorite = !track.isFavorite
-            val app = getApplication<Application>()
             repository.toggleFavorite(track.id, track.isFavorite)
             audioPlayer.updateTrackFavorite(track.id, newFavorite)
-            com.example.widget.WidgetStateStore.updateFavoriteOnly(app, track.id, newFavorite)
-            com.example.widget.AuraMusicWidgetProvider.refreshAllWidgets(app)
-            com.example.widget.AuraLibraryWidgetProvider.refreshAllWidgets(app)
+            widgetSyncCoordinator.syncFavoriteToggled(track.id, newFavorite)
         }
     }
-
-    // --- Pistas y Playlists (Delegadas en TrackLibraryCoordinator) ---
-    fun deleteTrack(track: Track) = trackLibraryCoordinator.deleteTrack(track)
-    fun updateTrackInfo(trackId: Long, newTitle: String, newArtist: String, newAlbum: String) =
-        trackLibraryCoordinator.updateTrackDetails(trackId, newTitle, newArtist, newAlbum)
-    fun updateTrackDetails(
-        trackId: Long,
-        newTitle: String,
-        newArtist: String,
-        newAlbum: String,
-        customArtUri: Uri? = null,
-        removeArtwork: Boolean = false,
-        customVideoUri: Uri? = null,
-        removeVideo: Boolean = false,
-        forceVideoLoop: Boolean? = null,
-        loopStyle: FFmpegNativeEngine.CanvasLoopStyle = FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE
-    ) = trackLibraryCoordinator.updateTrackDetails(
-        trackId, newTitle, newArtist, newAlbum, customArtUri, removeArtwork, customVideoUri, removeVideo, forceVideoLoop, loopStyle
-    )
-    fun deleteTrackArtwork(track: Track) = updateTrackDetails(track.id, track.title, track.artist, track.album, removeArtwork = true)
-    fun deleteTrackVideo(track: Track) = updateTrackDetails(track.id, track.title, track.artist, track.album, removeVideo = true)
-
-    fun createPlaylist(name: String, description: String = "", customArtUri: Uri? = null) =
-        trackLibraryCoordinator.createPlaylist(name, description, customArtUri)
-    fun updatePlaylist(playlistId: Long, newName: String, newDescription: String = "", customArtUri: Uri? = null, removeArtwork: Boolean = false) =
-        trackLibraryCoordinator.updatePlaylist(playlistId, newName, newDescription, customArtUri, removeArtwork)
-    fun deletePlaylist(playlistId: Long) = trackLibraryCoordinator.deletePlaylist(playlistId)
-    fun addTrackToPlaylist(playlistId: Long, trackId: Long) = trackLibraryCoordinator.addTrackToPlaylist(playlistId, trackId)
-    fun removeTrackFromPlaylist(playlistId: Long, trackId: Long) = trackLibraryCoordinator.removeTrackFromPlaylist(playlistId, trackId)
-    fun clearAllTracks() = trackLibraryCoordinator.clearAllTracks()
-
-    // --- Importación de Medios ---
-    fun importUris(uris: List<Uri>, trimSilence: Boolean = false) = trackLibraryCoordinator.importUris(uris, trimSilence)
-    fun importFolder(treeUri: Uri, trimSilence: Boolean = false) = trackLibraryCoordinator.importFolder(treeUri, trimSilence)
-    fun seedDemoTracks() = trackLibraryCoordinator.seedDemoTracks()
-    fun importVideoAsTrack(
-        videoUri: Uri,
-        title: String,
-        artist: String,
-        album: String,
-        attachAsCanvas: Boolean,
-        forceLoop: Boolean?,
-        trimSilence: Boolean = false,
-        loopStyle: FFmpegNativeEngine.CanvasLoopStyle = FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE,
-        onTrackCreated: ((Track) -> Unit)? = null
-    ) = trackLibraryCoordinator.importVideoAsTrack(videoUri, title, artist, album, attachAsCanvas, forceLoop, trimSilence, loopStyle, onTrackCreated)
-    fun importFromWebVideoLink(
-        resolvedInfo: OnlineVideoAudioImporter.ResolvedMediaInfo,
-        customTitle: String,
-        customArtist: String,
-        attachAsCanvas: Boolean,
-        trimSilence: Boolean = false,
-        loopStyle: FFmpegNativeEngine.CanvasLoopStyle = FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE,
-        onSuccess: (Track) -> Unit
-    ) = trackLibraryCoordinator.importFromWebVideoLink(resolvedInfo, customTitle, customArtist, attachAsCanvas, trimSilence, loopStyle, onSuccess)
-
-    fun playDownloadedTrackFromNotification(trackId: Long) {
-        if (trackId <= 0L) return
-        viewModelScope.launch {
-            var target = allTracks.value.find { it.id == trackId }
-            if (target == null) {
-                delay(250L)
-                target = allTracks.value.find { it.id == trackId }
-            }
-            if (target != null) {
-                playTrack(target)
-                setNowPlayingExpanded(true)
-            }
-        }
-    }
-
-    // --- Mixtapes Continuos y Auto-Remix de 2 Canciones Locales (FFmpeg) ---
-    fun createMixtape(
-        tracks: List<Track>,
-        title: String,
-        crossfadeSeconds: Int = 5,
-        onCreated: ((Track) -> Unit)? = null
-    ) = mixtapeCoordinator.createMixtape(tracks, title, crossfadeSeconds, onCreated)
-
-    fun createAutoRemix(
-        trackA: Track,
-        trackB: Track,
-        title: String,
-        style: AutoRemixStyle,
-        crossfadeSeconds: Int = 6,
-        onCreated: ((Track) -> Unit)? = null
-    ) = mixtapeCoordinator.createAutoRemix(trackA, trackB, title, style, crossfadeSeconds, onCreated)
-
-    fun dismissMixtapeStatus() = mixtapeCoordinator.dismissStatus()
-    fun getActiveChapterIndex(): Int = mixtapeCoordinator.getActiveChapterIndex()
-    fun getActiveTotalChapters(): Int = mixtapeCoordinator.getActiveTotalChapters()
-
-    fun dismissImportStatus() = trackLibraryCoordinator.dismissImportStatus()
-
-    // --- Efectos de Audio ---
-    fun setEqEnabled(enabled: Boolean) = effectsCoordinator.setEqEnabled(enabled)
-    fun setEqScopeMode(mode: EqualizerScopeMode) = effectsCoordinator.setEqScopeMode(mode)
-    fun setBandLevel(bandIndex: Int, levelMb: Int) = effectsCoordinator.setBandLevel(bandIndex, levelMb)
-    fun setBassBoost(level: Int) = effectsCoordinator.setBassBoost(level)
-    fun applyPreset(preset: EqualizerPreset) = effectsCoordinator.applyPreset(preset)
-    fun set8DEnabled(enabled: Boolean) = effectsCoordinator.set8DEnabled(enabled)
-    fun set8DMode16D(is16DMode: Boolean) = effectsCoordinator.set8DMode16D(is16DMode)
-    fun set8DOrbitSpeed(speedSeconds: Float) = effectsCoordinator.set8DOrbitSpeed(speedSeconds)
-    fun set8DSpatialIntensity(intensity: Float) = effectsCoordinator.set8DSpatialIntensity(intensity)
-    fun set8DRoomDepth(depth: Float) = effectsCoordinator.set8DRoomDepth(depth)
-    fun setVocalClarityEnabled(enabled: Boolean) = effectsCoordinator.setVocalClarityEnabled(enabled)
-    fun setVocalClarityStrength(strength: Float) = effectsCoordinator.setVocalClarityStrength(strength)
-    fun setReverbEnabled(enabled: Boolean) = effectsCoordinator.setReverbEnabled(enabled)
-    fun setReverbPreset(preset: ReverbPreset) = effectsCoordinator.setReverbPreset(preset)
-    fun setReverbCustomParameters(roomSize: Float, decayMs: Int, levelDb: Float) = effectsCoordinator.setReverbCustomParameters(roomSize, decayMs, levelDb)
-    fun startSleepTimer(minutes: Int) = effectsCoordinator.startSleepTimer(minutes)
-    fun cancelSleepTimer() = effectsCoordinator.cancelSleepTimer()
-    fun addSleepTimerMinutes(extraMinutes: Int = 5) = effectsCoordinator.addSleepTimerMinutes(extraMinutes)
-    fun setVolumeNormalizationEnabled(enabled: Boolean) = effectsCoordinator.setVolumeNormalizationEnabled(enabled)
-    fun setVolumeNormalizationMode(mode: Int) = effectsCoordinator.setVolumeNormalizationMode(mode)
-    fun setDjAutomixEnabled(enabled: Boolean) = effectsCoordinator.setDjAutomixEnabled(enabled)
-    fun setDjEqCurveEnabled(enabled: Boolean) = effectsCoordinator.setDjEqCurveEnabled(enabled)
-
-    // Parámetros de velocidad y bucle A-B
-    fun setPlaybackSpeed(speed: Float) = audioPlayer.setPlaybackSpeed(speed)
-    fun setPlaybackPitch(pitch: Float) = audioPlayer.setPlaybackPitch(pitch)
-    fun resetSpeedAndPitch() = audioPlayer.resetSpeedAndPitch()
-    fun setCrossfadeSeconds(seconds: Int) = audioPlayer.setCrossfadeSeconds(seconds)
-    fun setGaplessEnabled(enabled: Boolean) = audioPlayer.setGaplessEnabled(enabled)
-    fun markABPointA(positionMs: Long = audioPlayer.currentPosition.value) = audioPlayer.markABPointA(positionMs)
-    fun markABPointB(positionMs: Long = audioPlayer.currentPosition.value) = audioPlayer.markABPointB(positionMs)
-    fun toggleABLoopEnabled(enabled: Boolean) = audioPlayer.toggleABLoopEnabled(enabled)
-    fun adjustABPointA(deltaMs: Long) = audioPlayer.adjustABPointA(deltaMs)
-    fun adjustABPointB(deltaMs: Long) = audioPlayer.adjustABPointB(deltaMs)
-    fun clearABLoop() = audioPlayer.clearABLoop()
-
-    fun applyPendingPackageUpdateAndRestart() = YtDlpAutoUpdater.applyPendingUpdateAndRestart(getApplication())
-
-    // --- Auriculares ---
-    fun updateHeadphoneConfig(newConfig: HeadphoneConfig) = headphoneCoordinator.updateHeadphoneConfig(newConfig)
-    fun setCrossfeedEnabled(enabled: Boolean) = headphoneCoordinator.setCrossfeedEnabled(enabled)
-    fun setCrossfeedStrength(strengthMode: Int) = headphoneCoordinator.setCrossfeedStrength(strengthMode)
-    fun setBalanceControlEnabled(enabled: Boolean) = headphoneCoordinator.setBalanceControlEnabled(enabled)
-    fun setStereoBalance(balance: Float) = headphoneCoordinator.setStereoBalance(balance)
-    fun setBitPerfectEnabled(enabled: Boolean) = headphoneCoordinator.setBitPerfectEnabled(enabled)
-    fun setLowLatencyAAudioEnabled(enabled: Boolean) = headphoneCoordinator.setLowLatencyAAudioEnabled(enabled)
-    fun setUsbDacExclusiveEnabled(enabled: Boolean) = headphoneCoordinator.setUsbDacExclusiveEnabled(enabled)
-    fun setHiResTargetMode(mode: Int) = headphoneCoordinator.setHiResTargetMode(mode)
-    fun setBecomingNoisyGuardEnabled(enabled: Boolean) = headphoneCoordinator.setBecomingNoisyGuardEnabled(enabled)
-    fun setFadeInOnResumeEnabled(enabled: Boolean) = headphoneCoordinator.setFadeInOnResumeEnabled(enabled)
-    fun setDedicatedVolumeMemoryEnabled(enabled: Boolean) = headphoneCoordinator.setDedicatedVolumeMemoryEnabled(enabled)
-    fun setHeadsetControlsEnabled(enabled: Boolean) = headphoneCoordinator.setHeadsetControlsEnabled(enabled)
-    fun setHeadsetSingleClickAction(action: HeadsetButtonAction) = headphoneCoordinator.setHeadsetSingleClickAction(action)
-    fun setHeadsetDoubleClickAction(action: HeadsetButtonAction) = headphoneCoordinator.setHeadsetDoubleClickAction(action)
-    fun setHeadsetTripleClickAction(action: HeadsetButtonAction) = headphoneCoordinator.setHeadsetTripleClickAction(action)
-    fun setHeadsetLongClickAction(action: HeadsetButtonAction) = headphoneCoordinator.setHeadsetLongClickAction(action)
-    fun setHeadsetAction(type: Int, action: HeadsetButtonAction) = headphoneCoordinator.setHeadsetAction(type, action)
-
-    // --- Letras Sincronizadas ---
-    fun loadLyrics(track: Track?) = lyricsCoordinator.loadLyrics(track)
-    fun importLyricsFromUri(uri: Uri) = lyricsCoordinator.importLyricsFromUri(uri)
-    fun fetchOnlineLyrics(track: Track? = null) = lyricsCoordinator.fetchOnlineLyrics(track)
-    fun saveCustomLyrics(content: String, track: Track? = null) = lyricsCoordinator.saveCustomLyrics(content, track)
-    fun openSearchLyricsDialog() = lyricsCoordinator.openSearchLyricsDialog()
-    fun closeSearchLyricsDialog() = lyricsCoordinator.closeSearchLyricsDialog()
-    fun searchLyricsOptions(title: String, artist: String = "") = lyricsCoordinator.searchLyricsOptions(title, artist)
-    fun selectLyricSearchResult(result: LyricSearchResult) = lyricsCoordinator.selectLyricSearchResult(result)
-
-    // --- Medios Entrantes ---
-    fun onIncomingIntent(intent: Intent?) = incomingMediaCoordinator.onIncomingIntent(intent)
-    fun clearPendingIncomingAudio() = incomingMediaCoordinator.clearPendingIncomingAudio()
-    fun confirmIncomingAudioImport(trimSilence: Boolean) = incomingMediaCoordinator.confirmIncomingAudioImport(trimSilence)
-    fun clearPendingIncomingVideo() = incomingMediaCoordinator.clearPendingIncomingVideo()
-    fun clearPendingIncomingWebLink() = incomingMediaCoordinator.clearPendingIncomingWebLink()
-    fun handleIncomingAudioUri(uri: Uri, trimSilence: Boolean = false) = incomingMediaCoordinator.handleIncomingAudioUri(uri, trimSilence)
-    fun handleIncomingMultipleAudioUris(uris: List<Uri>, trimSilence: Boolean = false) = incomingMediaCoordinator.handleIncomingMultipleAudioUris(uris, trimSilence)
-
-    // --- Modo Streaming (YT Music & YouTube API + yt-dlp + Caché 30 min + Radio) ---
-    fun updateStreamingSearchQuery(query: String) = streamingCoordinator.updateSearchQuery(query)
-    fun performStreamingSearch(query: String = streamingSearchQuery.value) = streamingCoordinator.performSearch(query)
-    fun setStreamingSearchFilter(filter: StreamingSearchFilter) = streamingCoordinator.setSearchFilter(filter)
-    fun playStreamingItem(item: StreamingSearchItem) {
-        streamingCoordinator.playStreamingItem(item)
-        setNowPlayingExpanded(true)
-    }
-    fun downloadStreamingItemPermanently(item: StreamingSearchItem) =
-        streamingCoordinator.downloadStreamingItemPermanently(item, includeVideoCanvas = true)
-    fun downloadCurrentStreamingTrackPermanently(track: Track) =
-        streamingCoordinator.downloadCurrentStreamingTrackPermanently(track)
-    fun setStreamingVideoNetworkPolicy(policy: StreamingVideoNetworkPolicy) =
-        streamingCoordinator.setStreamingVideoNetworkPolicy(policy)
-    fun setStreamingCacheMaxSizeMb(sizeMb: Int) =
-        streamingCoordinator.setStreamingCacheMaxSizeMb(sizeMb)
-    fun clearStreamingCache() = streamingCoordinator.clearStreamingCache()
 
     override fun onCleared() {
         super.onCleared()
