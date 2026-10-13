@@ -261,6 +261,8 @@ fun AppScreensHost(
                                         onSelectWallpaperScope = { viewModel.setAppWallpaperScope(it) },
                                         onChangeWallpaperDimAlpha = { viewModel.setAppWallpaperDimAlpha(it) },
                                         onChangeWallpaperBlurDp = { viewModel.setAppWallpaperBlurDp(it) },
+                                        isWallpaperProcessing = viewModel.isWallpaperProcessing.collectAsStateWithLifecycle().value,
+                                        wallpaperProcessingLabel = viewModel.wallpaperProcessingLabel.collectAsStateWithLifecycle().value,
                                         nowPlayingDesignMode = nowPlayingDesignMode,
                                         onSetNowPlayingDesignMode = { viewModel.setNowPlayingDesignMode(it) },
                                         widgetConfig = widgetConfig,

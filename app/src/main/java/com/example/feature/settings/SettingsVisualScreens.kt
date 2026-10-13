@@ -245,6 +245,8 @@ fun SettingsGalleryWallpaperScreen(
     onSelectWallpaperScope: (WallpaperScreenScope) -> Unit,
     onChangeDimAlpha: (Float) -> Unit,
     onChangeBlurDp: (Int) -> Unit,
+    isProcessing: Boolean = false,
+    processingLabel: String = "",
     onBack: () -> Unit
 ) {
                     SettingsSubMenuScreen(
@@ -263,7 +265,9 @@ fun SettingsGalleryWallpaperScreen(
                             onClearWallpaper = onClearWallpaper,
                             onSelectWallpaperScope = onSelectWallpaperScope,
                             onChangeDimAlpha = onChangeDimAlpha,
-                            onChangeBlurDp = onChangeBlurDp
+                            onChangeBlurDp = onChangeBlurDp,
+                            isProcessing = isProcessing,
+                            processingLabel = processingLabel
                         )
                     }
 }

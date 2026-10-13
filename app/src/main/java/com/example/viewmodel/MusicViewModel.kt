@@ -179,6 +179,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val isMiniPlayerVideoEnabled = navigationCoordinator.isMiniPlayerVideoEnabled
     val isBackgroundGameModeEnabled = navigationCoordinator.isBackgroundGameModeEnabled
     val appWallpaperConfig = navigationCoordinator.appWallpaperConfig
+    val isWallpaperProcessing = navigationCoordinator.isWallpaperProcessing
+    val wallpaperProcessingLabel = navigationCoordinator.wallpaperProcessingLabel
     val videoDisplayMode = navigationCoordinator.videoDisplayMode
     val isVideoCanvasActive: StateFlow<Boolean> = videoDisplayMode.map { it != VideoDisplayMode.OFF }
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
@@ -514,29 +516,39 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     fun setAppWallpaperBlurDp(blurDp: Int) = navigationCoordinator.setAppWallpaperBlurDp(blurDp)
     fun setCustomWallpaperImage(uri: Uri) {
         viewModelScope.launch {
-            val storageManager = com.example.core.data.storage.AppStorageManager(getApplication())
-            val oldPath = appWallpaperConfig.value.mediaPath
-            val savedPath = storageManager.saveAppWallpaperImageFromUri(uri, oldPath)
-            if (!savedPath.isNullOrBlank()) {
-                navigationCoordinator.updateAppWallpaperMedia(
-                    type = com.example.core.model.WallpaperMediaType.IMAGE,
-                    path = savedPath,
-                    enabled = true
-                )
+            navigationCoordinator.setWallpaperProcessing(true, "Convirtiendo imagen a WebP…")
+            try {
+                val storageManager = com.example.core.data.storage.AppStorageManager(getApplication())
+                val oldPath = appWallpaperConfig.value.mediaPath
+                val savedPath = storageManager.saveAppWallpaperImageFromUri(uri, oldPath)
+                if (!savedPath.isNullOrBlank()) {
+                    navigationCoordinator.updateAppWallpaperMedia(
+                        type = com.example.core.model.WallpaperMediaType.IMAGE,
+                        path = savedPath,
+                        enabled = true
+                    )
+                }
+            } finally {
+                navigationCoordinator.setWallpaperProcessing(false)
             }
         }
     }
     fun setCustomWallpaperVideo(uri: Uri) {
         viewModelScope.launch {
-            val storageManager = com.example.core.data.storage.AppStorageManager(getApplication())
-            val oldPath = appWallpaperConfig.value.mediaPath
-            val savedPath = storageManager.saveAppWallpaperVideoFromUri(uri, oldPath)
-            if (!savedPath.isNullOrBlank()) {
-                navigationCoordinator.updateAppWallpaperMedia(
-                    type = com.example.core.model.WallpaperMediaType.VIDEO,
-                    path = savedPath,
-                    enabled = true
-                )
+            navigationCoordinator.setWallpaperProcessing(true, "Optimizando video de fondo…")
+            try {
+                val storageManager = com.example.core.data.storage.AppStorageManager(getApplication())
+                val oldPath = appWallpaperConfig.value.mediaPath
+                val savedPath = storageManager.saveAppWallpaperVideoFromUri(uri, oldPath)
+                if (!savedPath.isNullOrBlank()) {
+                    navigationCoordinator.updateAppWallpaperMedia(
+                        type = com.example.core.model.WallpaperMediaType.VIDEO,
+                        path = savedPath,
+                        enabled = true
+                    )
+                }
+            } finally {
+                navigationCoordinator.setWallpaperProcessing(false)
             }
         }
     }

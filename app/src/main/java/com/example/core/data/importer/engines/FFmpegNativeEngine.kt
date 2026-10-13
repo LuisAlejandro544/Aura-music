@@ -227,4 +227,12 @@ object FFmpegNativeEngine {
         preferVerticalCanvasOnHorizontal: Boolean = false
     ): ExecutionResult = withContext(Dispatchers.IO) { FFmpegCanvasOperations.processVideoForCanvas(context, inputFile, outputFile, isLoop, loopStyle, preferVerticalCanvasOnHorizontal) }
 
+    suspend fun optimizeWallpaperVideo(
+        context: Context,
+        inputFile: File,
+        outputFile: File,
+        minShortSidePx: Int = 720,
+        targetFps: Int = 30
+    ): ExecutionResult = withContext(Dispatchers.IO) { FFmpegCanvasOperations.optimizeWallpaperVideo(context, inputFile, outputFile, minShortSidePx, targetFps) }
+
 }

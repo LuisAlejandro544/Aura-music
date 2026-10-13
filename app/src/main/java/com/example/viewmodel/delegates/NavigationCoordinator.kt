@@ -98,6 +98,17 @@ class NavigationCoordinator(
     private val _appWallpaperConfig = MutableStateFlow(loadWallpaperConfigFromPrefs(appPrefs))
     val appWallpaperConfig: StateFlow<AppWallpaperConfig> = _appWallpaperConfig.asStateFlow()
 
+    private val _isWallpaperProcessing = MutableStateFlow(false)
+    val isWallpaperProcessing: StateFlow<Boolean> = _isWallpaperProcessing.asStateFlow()
+
+    private val _wallpaperProcessingLabel = MutableStateFlow("")
+    val wallpaperProcessingLabel: StateFlow<String> = _wallpaperProcessingLabel.asStateFlow()
+
+    fun setWallpaperProcessing(isProcessing: Boolean, label: String = "") {
+        _isWallpaperProcessing.value = isProcessing
+        _wallpaperProcessingLabel.value = if (isProcessing) label else ""
+    }
+
     private fun loadWallpaperConfigFromPrefs(prefs: SharedPreferences): AppWallpaperConfig {
         val enabled = prefs.getBoolean("pref_app_wallpaper_enabled", false)
         val mediaType = WallpaperMediaType.fromId(prefs.getInt("pref_app_wallpaper_type", 0))
