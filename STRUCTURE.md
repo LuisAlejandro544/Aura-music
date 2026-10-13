@@ -102,7 +102,12 @@ app/
     │       │   │   │   │   ├── YtDlpNativeEngine.kt      # Fachada modular nativa yt-dlp, inspección y flat-playlists (< 500 líneas)
     │       │   │   │   │   ├── YtDlpEnvironmentSetup.kt  # Detección de binarios, symlinks CPython 0 bytes y certificados TLS Android 14+
     │       │   │   │   │   ├── YtDlpStreamDownloader.kt  # Descarga directa nativa con captura y parseo de progreso en vivo (DownloadProgress)
-    │       │   │   │   │   ├── YtDlpAutoUpdater.kt       # Actualizador OTA de yt-dlp con blindaje criptográfico SHA-256 y diagnóstico CLI
+    │       │   │   │   │   ├── YtDlpAutoUpdater.kt       # Fachada OTA pública (API estable, 99 líneas)
+    │       │   │   │   │   ├── YtDlpUpdaterState.kt      # Alcance, mutex, flujo reactivo y clientes HTTP
+    │       │   │   │   │   ├── YtDlpPackagePaths.kt      # Rutas files/bin y aplicación de staged + reinicio
+    │       │   │   │   │   ├── YtDlpUpdateCheck.kt       # Verificación contra GitHub Releases
+    │       │   │   │   │   ├── YtDlpPackageDownload.kt   # Descarga con progreso y blindaje SHA-256
+    │       │   │   │   │   ├── YtDlpCliDiagnostics.kt    # Diagnóstico CLI (yt-dlp --version)
     │       │   │   │   │   ├── YtDlpCookieManager.kt     # Gestor opcional de cookies (cookies.txt formato Netscape estilo YTDLnis)
     │       │   │   │   │   └── PoTokenGenerator.kt       # Generador ligero de PO Token Web vinculado a Visitor Data para YouTube/GVS
     │       │   │   │   ├── extractors/         # Extractores de Video y Audio Web
@@ -225,8 +230,14 @@ app/
     │       │   │       └── VideoDisplayModeDialog.kt       # Selector modal de encuadre de Video Canvas (4 modos)
     │       │   ├── playlist/
     │       │   │   └── PlaylistDetailScreen.kt # Vista detallada de canciones para Playlists, Artistas y Álbumes
-    │       │   ├── importmusic/
-    │       │   │   └── ImportMusicScreen.kt    # Centro de importación SAF, Video a Música, descargas web y Playlists externas
+    │       │   ├── importmusic/                   # Centro de importación (fachada + 6 piezas)
+    │       │   │   ├── ImportMusicScreen.kt        # Fachada: orquesta lanzadores SAF y diálogos
+    │       │   │   ├── ImportStatusCards.kt        # Tarjetas de aviso, carga y privacidad
+    │       │   │   ├── ImportWebOptions.kt         # Descargas TikTok, YouTube y playlists externas
+    │       │   │   ├── ImportLocalOptions.kt       # Video a música, archivos, carpeta y demos
+    │       │   │   ├── ImportLibrarySummaryCard.kt # Resumen de colección con reinicio
+    │       │   │   ├── ImportPendingDialogs.kt     # Overlays de archivos, video y descarga web
+    │       │   │   └── ImportClearConfirmDialog.kt # Confirmación destructiva de limpieza
     │       │   ├── onboarding/
     │       │   │   ├── OnboardingScreen.kt         # Flujo de bienvenida e inducción en 3 etapas
     │       │   │   └── OnboardingStepComponents.kt # Tarjetas modulares de propuesta de valor y disclaimer de almacenamiento
@@ -240,7 +251,11 @@ app/
     │       │           ├── about/                         # Detrás del Proyecto (Creador & Contribuidores)
     │       │           │   └── BehindTheProjectSection.kt # Perfiles de GitHub con caché permanente de avatares en WebP
     │       │           ├── appearance/                    # Ajustes de Apariencia, Streaming, Modo Juego, Fondo y Motores
-    │       │           │   ├── AppearanceSettingsTab.kt             # Menú principal de categorías de Ajustes
+    │       │           │   ├── AppearanceMainMenu.kt              # Menú principal de categorías de Ajustes
+    │       │           │   ├── AppearanceBehaviorSection.kt       # Comportamiento y descubrimiento de ajustes
+    │       │           │   ├── AppearanceAuraMiniPlayerSection.kt # Aura Dinámica (1s) y Mini Reproductor
+    │       │           │   ├── AppearanceGameModeSection.kt       # Modo Juego / Ahorro en 2do plano
+    │       │           │   ├── AppearancePaletteSection.kt        # Paleta dinámica y colores del tema
     │       │           │   ├── AppWallpaperSettingsSection.kt       # Controles de fondo de pantalla de galería (WebP/Video, Opacidad y Blur)
     │       │           │   ├── StreamingCacheAndVideoSettingsCard.kt # Ajustes de caché inteligente (50-500 MB), política de red y Modo Juego
     │       │           │   ├── EnginesAndDiagnosticsSection.kt      # Estado de FFmpeg, QuickJS C99 puro, yt-dlp OTA y Aura Monitor

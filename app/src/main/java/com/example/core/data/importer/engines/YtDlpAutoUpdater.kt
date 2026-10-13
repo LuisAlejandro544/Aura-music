@@ -1,34 +1,12 @@
 package com.example.core.data.importer
 
 import android.content.Context
-import android.content.Intent
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
-import android.net.Uri
-import com.example.AuraApplication
-import com.example.debug.AuraDebugManager
 import com.example.core.model.PackageUpdateState
-import com.example.core.playback.AuraDownloadService
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
+import com.example.debug.AuraDebugManager
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import org.json.JSONObject
 import java.io.File
-import java.io.FileOutputStream
-import java.security.MessageDigest
-import java.util.concurrent.TimeUnit
-import kotlin.system.exitProcess
 
 /**
  * Gestor de Verificación y Actualización Transparente en Segundo Plano (OTA) para paquetes nativos (yt-dlp).
@@ -43,42 +21,10 @@ import kotlin.system.exitProcess
  *    las descargas por yt-dlp para prevenir conflictos o fallos a mitad de actualización.
  * 4. Verifica criptográficamente el paquete descargado con SHA-256 (SHA2-256SUMS) y, al finalizar,
  *    recomienda al usuario salir de la app o pulsar "Actualizar y Reiniciar" para aplicar los nuevos paquetes.
+ *
+ * Rol arquitectónico: fachada pública estable; la lógica vive en módulos internos.
  */
 object YtDlpAutoUpdater {
-
-    private const val TAG = "YtDlpAutoUpdater"
-    private const val GITHUB_RELEASES_API = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest"
-
-    private val updaterScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val updateMutex = Mutex()
-
-    private val _packageUpdateState = MutableStateFlow<PackageUpdateState>(PackageUpdateState.Idle)
-    val packageUpdateState: StateFlow<PackageUpdateState> = _packageUpdateState.asStateFlow()
-
-    private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .callTimeout(20, TimeUnit.SECONDS)
-        .followRedirects(true)
-        .build()
-
-    private val downloadHttpClient = OkHttpClient.Builder()
-        .connectTimeout(12, TimeUnit.SECONDS)
-        .readTimeout(35, TimeUnit.SECONDS)
-        .callTimeout(90, TimeUnit.SECONDS)
-        .followRedirects(true)
-        .build()
-
-    private fun hasActiveInternetConnection(context: Context): Boolean {
-        return try {
-            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return true
-            val net = cm.activeNetwork ?: return false
-            val caps = cm.getNetworkCapabilities(net) ?: return false
-            caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-        } catch (_: Throwable) {
-            true
-        }
-    }
 
     sealed class UpdateResult {
         data class Updated(val previousVersion: String, val newVersion: String) : UpdateResult()
@@ -86,12 +32,14 @@ object YtDlpAutoUpdater {
         data class Error(val message: String, val currentVersion: String) : UpdateResult()
     }
 
+    val packageUpdateState: StateFlow<PackageUpdateState> = YtDlpUpdaterState.packageState.asStateFlow()
+
     /**
      * Indica si las descargas de video por yt-dlp están temporalmente bloqueadas
      * porque hay una descarga de paquetes en curso o pendiente de reinicio.
      */
     fun isYtDlpTemporarilyBlocked(): Boolean {
-        return _packageUpdateState.value.isYtDlpTemporarilyLocked
+        return YtDlpUpdaterState.packageState.value.isYtDlpTemporarilyLocked
     }
 
     /**
@@ -99,109 +47,20 @@ object YtDlpAutoUpdater {
      * - Si existe una actualización OTA descargada en `files/bin/yt-dlp`, devuelve esa versión actualizada.
      * - En caso contrario, devuelve directamente `nativeLibraryDir/libytdlp.so` sin duplicar 3MB en `filesDir`.
      */
-    fun getYtDlpFile(context: Context): File {
-        val binDir = File(context.filesDir, "bin")
-        if (!binDir.exists()) {
-            binDir.mkdirs()
-        }
-        val otaFile = File(binDir, "yt-dlp")
-        if (otaFile.exists() && otaFile.length() > 50_000L) {
-            return otaFile
-        }
-        val nativeYtdlpZipSo = File(context.applicationInfo.nativeLibraryDir, "libytdlp.zip.so")
-        if (nativeYtdlpZipSo.exists() && nativeYtdlpZipSo.length() > 50_000L) {
-            return nativeYtdlpZipSo
-        }
-        val nativeYtdlp = File(context.applicationInfo.nativeLibraryDir, "libytdlp.so")
-        if (nativeYtdlp.exists() && nativeYtdlp.length() > 50_000L) {
-            return nativeYtdlp
-        }
-        return otaFile
-    }
-
-    /**
-     * Destino en almacenamiento privado (`files/bin/yt-dlp`) donde se instalan las actualizaciones OTA.
-     */
-    private fun getOtaTargetYtDlpFile(context: Context): File {
-        val binDir = File(context.filesDir, "bin")
-        if (!binDir.exists()) binDir.mkdirs()
-        return File(binDir, "yt-dlp")
-    }
-
-    private fun getStagedYtDlpFile(context: Context): File {
-        val binDir = File(context.filesDir, "bin")
-        if (!binDir.exists()) binDir.mkdirs()
-        return File(binDir, "yt-dlp.staged")
-    }
-
-    private fun getStagedVersionFile(context: Context): File {
-        val binDir = File(context.filesDir, "bin")
-        if (!binDir.exists()) binDir.mkdirs()
-        return File(binDir, "ytdlp_version.staged")
-    }
+    fun getYtDlpFile(context: Context): File = resolveYtDlpFile(context)
 
     /**
      * Aplica silenciosamente al arrancar la app cualquier actualización que haya quedado
      * descargada (.staged) de la sesión anterior cuando el usuario cerró la app.
      */
     @Synchronized
-    fun applyStagedUpdateIfPresent(context: Context): Boolean {
-        return try {
-            val stagedFile = getStagedYtDlpFile(context)
-            val stagedVersionFile = getStagedVersionFile(context)
-            if (stagedFile.exists() && stagedFile.length() > 100_000L) {
-                val targetFile = getOtaTargetYtDlpFile(context)
-                val versionFile = File(context.filesDir, "bin/ytdlp_version.txt")
-                val newVer = if (stagedVersionFile.exists()) {
-                    stagedVersionFile.readText().trim().ifBlank { "Actualizado" }
-                } else {
-                    "Actualizado"
-                }
-
-                if (targetFile.exists()) targetFile.delete()
-                val moved = stagedFile.renameTo(targetFile)
-                if (!moved) {
-                    stagedFile.copyTo(targetFile, overwrite = true)
-                    stagedFile.delete()
-                }
-                targetFile.setExecutable(true, false)
-                versionFile.writeText(newVer)
-                if (stagedVersionFile.exists()) stagedVersionFile.delete()
-                AuraDebugManager.logInfo(TAG, "Paquete yt-dlp ($newVer) aplicado exitosamente al iniciar la aplicación.")
-                true
-            } else {
-                false
-            }
-        } catch (e: Exception) {
-            AuraDebugManager.logWarning(TAG, "No se pudo aplicar paquete .staged al inicio: ${e.message}")
-            false
-        }
-    }
+    fun applyStagedUpdateIfPresent(context: Context): Boolean = applyStagedYtDlpUpdate(context)
 
     /**
      * Aplica de inmediato el paquete descargado y fuerza el reinicio limpio de la aplicación
      * para reflejar los nuevos paquetes sin que el usuario tenga que cerrarla manualmente.
      */
-    fun applyPendingUpdateAndRestart(context: Context) {
-        val appContext = context.applicationContext
-        applyStagedUpdateIfPresent(appContext)
-        AuraDownloadService.dismissPackageNotification(appContext)
-        _packageUpdateState.value = PackageUpdateState.Idle
-
-        try {
-            val packageManager = appContext.packageManager
-            val launchIntent = packageManager.getLaunchIntentForPackage(appContext.packageName)
-            val componentName = launchIntent?.component
-            if (componentName != null) {
-                val restartIntent = Intent.makeRestartActivityTask(componentName)
-                appContext.startActivity(restartIntent)
-            }
-        } catch (e: Exception) {
-            AuraDebugManager.logWarning(TAG, "Error preparando intent de reinicio: ${e.message}")
-        } finally {
-            exitProcess(0)
-        }
-    }
+    fun applyPendingUpdateAndRestart(context: Context) = applyPendingYtDlpUpdateAndRestart(context)
 
     /**
      * Inicia la verificación asíncrona en segundo plano al abrir la aplicación si está habilitada en Ajustes.
@@ -209,10 +68,10 @@ object YtDlpAutoUpdater {
     fun startBackgroundStartupCheck(context: Context) {
         val appContext = context.applicationContext
         if (!YtDlpCookieManager.isAutoCheckOtaStartupEnabled(appContext)) {
-            AuraDebugManager.logInfo(TAG, "Verificación OTA al inicio omitida por configuración del usuario.")
+            AuraDebugManager.logInfo(YTDLP_UPDATER_TAG, "Verificación OTA al inicio omitida por configuración del usuario.")
             return
         }
-        updaterScope.launch {
+        YtDlpUpdaterState.updaterScope.launch {
             checkAndUpdate(appContext, forceDownload = false, showNotifications = true)
         }
     }
@@ -220,26 +79,7 @@ object YtDlpAutoUpdater {
     /**
      * Lee la versión actualmente instalada en el dispositivo.
      */
-    fun getInstalledVersion(context: Context): String {
-        val versionFile = File(context.filesDir, "bin/ytdlp_version.txt")
-        return if (versionFile.exists()) {
-            try {
-                versionFile.readText().trim().ifBlank { "Sin instalar" }
-            } catch (_: Exception) {
-                "Sin instalar"
-            }
-        } else {
-            val ytdlpFile = getYtDlpFile(context)
-            if (ytdlpFile.exists() && ytdlpFile.length() > 0L) "Instalado (v. base)" else "No instalado"
-        }
-    }
-
-    private fun resetToIdle(context: Context, showNotifications: Boolean) {
-        if (showNotifications) {
-            AuraDownloadService.dismissPackageNotification(context)
-        }
-        _packageUpdateState.value = PackageUpdateState.Idle
-    }
+    fun getInstalledVersion(context: Context): String = readInstalledYtDlpVersion(context)
 
     /**
      * Consulta GitHub y actualiza yt-dlp si hay una versión más reciente,
@@ -249,398 +89,12 @@ object YtDlpAutoUpdater {
         context: Context,
         forceDownload: Boolean = false,
         showNotifications: Boolean = true
-    ): UpdateResult = withContext(Dispatchers.IO) {
-        updateMutex.withLock {
-            val appContext = context.applicationContext
-            // Si había un paquete .staged pendiente de una sesión previa, aplicarlo antes de verificar
-            applyStagedUpdateIfPresent(appContext)
-            YtDlpNativeEngine.init(appContext)
-
-            val currentVersion = getInstalledVersion(appContext)
-
-            // Si no hay conexión activa a internet, no mostrar notificación ni quedarse colgado
-            if (!hasActiveInternetConnection(appContext)) {
-                resetToIdle(appContext, showNotifications)
-                return@withLock UpdateResult.Error("Sin conexión a Internet activa.", currentVersion)
-            }
-
-            // Solo mostrar la notificación transitoria "Verificando..." si el usuario está en la app o si se forzó;
-            // si la app está en segundo plano se notificará únicamente si hay una descarga real en progreso.
-            val notifyChecking = showNotifications && (AuraApplication.isAppInForeground || forceDownload)
-            val checkingMsg = "Verificando paquetes necesarios..."
-            _packageUpdateState.value = PackageUpdateState.Checking(checkingMsg)
-            if (notifyChecking) AuraDownloadService.notifyPackageChecking(appContext, checkingMsg)
-            AuraDebugManager.logInfo(TAG, "Comprobando actualizaciones de paquetes (yt-dlp actual: $currentVersion)...")
-
-            try {
-                // Consultar metadatos de la última versión con timeout estricto de 16 segundos (evita bloqueos en redes 2G/EDGE)
-                val releaseJsonStr = withTimeoutOrNull(16_000L) {
-                    val request = Request.Builder()
-                        .url(GITHUB_RELEASES_API)
-                        .header("User-Agent", "AuraMusic-Android-Client")
-                        .header("Accept", "application/vnd.github.v3+json")
-                        .get()
-                        .build()
-
-                    httpClient.newCall(request).execute().use { response ->
-                        if (!response.isSuccessful) {
-                            throw IllegalStateException("HTTP ${response.code}")
-                        }
-                        response.body?.string()
-                    }
-                }
-
-                if (releaseJsonStr.isNullOrBlank()) {
-                    val err = "Tiempo de espera agotado o respuesta vacía al verificar paquetes."
-                    AuraDebugManager.logWarning(TAG, err)
-                    resetToIdle(appContext, showNotifications)
-                    return@withLock UpdateResult.Error(err, currentVersion)
-                }
-
-                val json = JSONObject(releaseJsonStr)
-                val latestTagName = json.optString("tag_name", "").trim()
-                if (latestTagName.isBlank()) {
-                    resetToIdle(appContext, showNotifications)
-                    return@withLock UpdateResult.Error("No se pudo obtener la versión de GitHub.", currentVersion)
-                }
-
-                // Comprobar si ya está al día
-                if (!forceDownload && currentVersion.equals(latestTagName, ignoreCase = true) && getYtDlpFile(appContext).exists()) {
-                    AuraDebugManager.logInfo(TAG, "Paquetes al día ($latestTagName).")
-                    if (!AuraApplication.isAppInForeground) {
-                        // Si el usuario ya salió de la app, quitar inmediatamente cualquier notificación de verificación
-                        resetToIdle(appContext, true)
-                    } else {
-                        _packageUpdateState.value = PackageUpdateState.UpToDate(
-                            version = latestTagName,
-                            message = "Paquetes necesarios al día ($latestTagName)"
-                        )
-                        if (showNotifications) AuraDownloadService.notifyPackageUpToDate(appContext, latestTagName)
-                        updaterScope.launch {
-                            delay(2400L)
-                            if (_packageUpdateState.value is PackageUpdateState.UpToDate) {
-                                resetToIdle(appContext, true)
-                            }
-                        }
-                    }
-                    return@withLock UpdateResult.AlreadyUpToDate(latestTagName)
-                }
-
-                // Buscar la URL de descarga directa del asset 'yt-dlp' y el archivo SHA2-256SUMS
-                var downloadUrl: String? = null
-                var checksumsUrl: String? = null
-                val assets = json.optJSONArray("assets")
-                if (assets != null) {
-                    for (i in 0 until assets.length()) {
-                        val asset = assets.getJSONObject(i)
-                        when (asset.optString("name")) {
-                            "yt-dlp" -> downloadUrl = asset.optString("browser_download_url")
-                            "SHA2-256SUMS" -> checksumsUrl = asset.optString("browser_download_url")
-                        }
-                    }
-                }
-
-                if (downloadUrl.isNullOrBlank()) downloadUrl = "https://github.com/yt-dlp/yt-dlp/releases/download/$latestTagName/yt-dlp"
-                if (checksumsUrl.isNullOrBlank()) checksumsUrl = "https://github.com/yt-dlp/yt-dlp/releases/download/$latestTagName/SHA2-256SUMS"
-
-                _packageUpdateState.value = PackageUpdateState.Downloading(
-                    progressPercent = 0,
-                    version = latestTagName,
-                    message = "Descargando actualización de paquetes ($latestTagName)..."
-                )
-                if (showNotifications) AuraDownloadService.notifyPackageDownloadProgress(appContext, 0, latestTagName)
-
-                val expectedSha256 = withTimeoutOrNull(15_000L) {
-                    fetchExpectedSha256(checksumsUrl, "yt-dlp")
-                }
-                if (expectedSha256.isNullOrBlank()) {
-                    val err = "No se pudo obtener el hash SHA-256 oficial para yt-dlp ($latestTagName). Cancelando."
-                    AuraDebugManager.logError(TAG, err)
-                    resetToIdle(appContext, showNotifications)
-                    return@withLock UpdateResult.Error(err, currentVersion)
-                }
-
-                AuraDebugManager.logInfo(TAG, "Descargando paquete yt-dlp ($latestTagName) con SHA-256 ($expectedSha256)...")
-                val downloadSuccess = downloadFileWithProgressAndVerification(
-                    url = downloadUrl,
-                    expectedSha256 = expectedSha256,
-                    versionTag = latestTagName,
-                    context = appContext,
-                    showNotifications = showNotifications
-                )
-
-                if (downloadSuccess) {
-                    val applied = applyStagedUpdateIfPresent(appContext)
-                    if (applied) {
-                        AuraDebugManager.logInfo(TAG, "¡Paquete yt-dlp ($latestTagName) aplicado en caliente con éxito!")
-                        _packageUpdateState.value = PackageUpdateState.UpToDate(latestTagName, "Paquetes actualizados ($latestTagName)")
-                        if (showNotifications) AuraDownloadService.notifyPackageUpToDate(appContext, latestTagName)
-                        updaterScope.launch {
-                            delay(2500L)
-                            if (_packageUpdateState.value is PackageUpdateState.UpToDate) resetToIdle(appContext, true)
-                        }
-                        UpdateResult.Updated(currentVersion, latestTagName)
-                    } else {
-                        AuraDebugManager.logInfo(TAG, "Paquete yt-dlp ($latestTagName) preparado (.staged). Pendiente de reinicio.")
-                        _packageUpdateState.value = PackageUpdateState.RestartRequired(latestTagName, "Paquetes descargados ($latestTagName).")
-                        if (showNotifications) AuraDownloadService.notifyPackageRestartRequired(appContext, latestTagName)
-                        UpdateResult.Updated(currentVersion, latestTagName)
-                    }
-                } else {
-                    resetToIdle(appContext, showNotifications)
-                    UpdateResult.Error("Fallo de integridad o descarga del paquete yt-dlp.", currentVersion)
-                }
-            } catch (t: Throwable) {
-                val msg = "Excepción al verificar/actualizar paquetes: ${t.message}"
-                AuraDebugManager.logWarning(TAG, msg)
-                resetToIdle(appContext, true)
-                UpdateResult.Error(msg, currentVersion)
-            } finally {
-                // Garantía absoluta: nunca dejar el estado ni la notificación atrapados en Checking
-                if (_packageUpdateState.value is PackageUpdateState.Checking) {
-                    resetToIdle(appContext, true)
-                }
-            }
-        }
-    }
-
-    /**
-     * Consulta el archivo oficial SHA2-256SUMS de GitHub Releases y extrae el hash del asset.
-     */
-    private fun fetchExpectedSha256(checksumsUrl: String, assetName: String): String? {
-        return try {
-            if (!isValidDownloadHost(checksumsUrl)) return null
-            val req = Request.Builder().url(checksumsUrl).header("User-Agent", "AuraMusic-Android-Client").build()
-            httpClient.newCall(req).execute().use { resp ->
-                if (!resp.isSuccessful) return null
-                val content = resp.body?.string() ?: return null
-
-                content.lineSequence().firstOrNull { line ->
-                    line.trim().endsWith(" $assetName") || line.trim().endsWith("*$assetName")
-                }?.trim()?.split("\\s+".toRegex())?.firstOrNull()?.lowercase()
-            }
-        } catch (_: Throwable) {
-            null
-        }
-    }
-
-    private fun isValidDownloadHost(url: String): Boolean {
-        val host = Uri.parse(url).host?.lowercase() ?: return false
-        return host == "github.com" || host.endsWith(".github.com") ||
-                host == "objects.githubusercontent.com" || host.endsWith(".githubusercontent.com")
-    }
-
-    private fun computeFileSha256(file: File): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        file.inputStream().use { stream ->
-            val buf = ByteArray(8192)
-            var n: Int
-            while (stream.read(buf).also { n = it } != -1) digest.update(buf, 0, n)
-        }
-        return digest.digest().joinToString("") { "%02x".format(it) }
-    }
-
-    /**
-     * Descarga el paquete reportando progreso en vivo hacia la notificación nativa y el banner UI,
-     * valida su integridad SHA-256 y lo deja preparado (.staged) para su activación limpia.
-     */
-    private fun downloadFileWithProgressAndVerification(
-        url: String,
-        expectedSha256: String?,
-        versionTag: String,
-        context: Context,
-        showNotifications: Boolean
-    ): Boolean {
-        if (!isValidDownloadHost(url)) {
-            AuraDebugManager.logWarning(TAG, "Rechazada descarga desde dominio no confiable: $url")
-            return false
-        }
-
-        val binDir = File(context.filesDir, "bin")
-        if (!binDir.exists()) binDir.mkdirs()
-
-        val tempFile = File(binDir, "yt-dlp.tmp")
-        val stagedFile = getStagedYtDlpFile(context)
-        val stagedVersionFile = getStagedVersionFile(context)
-
-        try {
-            val request = Request.Builder()
-                .url(url)
-                .header("User-Agent", "AuraMusic-Android-Client")
-                .get()
-                .build()
-
-            downloadHttpClient.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return false
-
-                val body = response.body ?: return false
-                val totalBytes = body.contentLength().takeIf { it > 0L } ?: 3_800_000L
-                var downloadedBytes = 0L
-                var lastReportedPct = -1
-
-                body.byteStream().use { input ->
-                    FileOutputStream(tempFile).use { output ->
-                        val buffer = ByteArray(8192)
-                        var read: Int
-                        while (input.read(buffer).also { read = it } != -1) {
-                            output.write(buffer, 0, read)
-                            downloadedBytes += read
-                            val pct = ((downloadedBytes * 100L) / totalBytes).toInt().coerceIn(0, 95)
-                            if (pct >= lastReportedPct + 2 || lastReportedPct == -1) {
-                                lastReportedPct = pct
-                                _packageUpdateState.value = PackageUpdateState.Downloading(
-                                    progressPercent = pct,
-                                    downloadedBytes = downloadedBytes,
-                                    totalBytes = totalBytes,
-                                    version = versionTag,
-                                    message = "Descargando actualización de paquetes ($pct%)..."
-                                )
-                                if (showNotifications) {
-                                    AuraDownloadService.notifyPackageDownloadProgress(context, pct, versionTag)
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if (!tempFile.exists() || tempFile.length() < 100_000L) {
-                    tempFile.delete()
-                    if (showNotifications) AuraDownloadService.dismissPackageNotification(context)
-                    return false
-                }
-
-                // Reportar progreso de verificación de hash SHA-256
-                _packageUpdateState.value = PackageUpdateState.Downloading(
-                    progressPercent = 98,
-                    downloadedBytes = totalBytes,
-                    totalBytes = totalBytes,
-                    version = versionTag,
-                    message = "Verificando integridad SHA-256 (98%)..."
-                )
-                if (showNotifications) {
-                    AuraDownloadService.notifyPackageDownloadProgress(context, 98, versionTag)
-                }
-
-                if (expectedSha256.isNullOrBlank()) {
-                    AuraDebugManager.logError(
-                        TAG,
-                        "Rechazando actualización OTA: No se pudo obtener la suma criptográfica SHA-256 oficial para yt-dlp ($versionTag). Abortando por seguridad."
-                    )
-                    tempFile.delete()
-                    if (showNotifications) AuraDownloadService.dismissPackageNotification(context)
-                    return false
-                }
-
-                val computedHash = computeFileSha256(tempFile)
-                if (!computedHash.equals(expectedSha256, ignoreCase = true)) {
-                    AuraDebugManager.logError(
-                        TAG,
-                        "Fallo de integridad SHA-256 en yt-dlp. Esperado: $expectedSha256, Calculado: $computedHash"
-                    )
-                    tempFile.delete()
-                    if (showNotifications) AuraDownloadService.dismissPackageNotification(context)
-                    return false
-                }
-
-                if (stagedFile.exists()) stagedFile.delete()
-                val renamed = tempFile.renameTo(stagedFile)
-                if (!renamed) {
-                    tempFile.copyTo(stagedFile, overwrite = true)
-                    tempFile.delete()
-                }
-                stagedFile.setExecutable(true, false)
-                stagedVersionFile.writeText(versionTag)
-
-                // Emitir 100% completado con éxito
-                _packageUpdateState.value = PackageUpdateState.Downloading(
-                    progressPercent = 100,
-                    downloadedBytes = totalBytes,
-                    totalBytes = totalBytes,
-                    version = versionTag,
-                    message = "¡Paquete verificado exitosamente! (100%)"
-                )
-                if (showNotifications) {
-                    AuraDownloadService.notifyPackageDownloadProgress(context, 100, versionTag)
-                }
-                return true
-            }
-        } catch (t: Throwable) {
-            if (tempFile.exists()) tempFile.delete()
-            AuraDebugManager.logWarning(TAG, "Error en downloadFileWithProgressAndVerification: ${t.message}")
-            if (showNotifications) {
-                AuraDownloadService.dismissPackageNotification(context)
-            }
-            return false
-        }
-    }
-
-    /**
-     * Fallback de consulta directa de versión en GitHub si la API REST está bloqueada por rate-limit (HTTP 403).
-     */
-    private fun fetchLatestTagFallback(): String? {
-        return try {
-            val req = Request.Builder()
-                .url("https://raw.githubusercontent.com/yt-dlp/yt-dlp/master/yt_dlp/version.py")
-                .header("User-Agent", "AuraMusic-Android-Client")
-                .build()
-            httpClient.newCall(req).execute().use { resp ->
-                if (!resp.isSuccessful) return null
-                val body = resp.body?.string() ?: return null
-                val match = """__version__\s*=\s*'([^']+)'""".toRegex().find(body)
-                match?.groupValues?.get(1)?.trim()
-            }
-        } catch (_: Exception) {
-            null
-        }
-    }
+    ): UpdateResult = performYtDlpCheckAndUpdate(context, forceDownload, showNotifications)
 
     /**
      * Diagnóstico y verificación nativa de ejecución CLI para yt-dlp.
      * Ejecuta `yt-dlp --version` en el subproceso Python nativo para confirmar
      * que la arquitectura (32/64 bits), librerías C++ y QuickJS operan sin bloqueos.
      */
-    suspend fun testYtDlpCliExecution(context: Context): Pair<Boolean, String> = withContext(Dispatchers.IO) {
-        try {
-            val ytdlpFile = getYtDlpFile(context)
-            val pythonBin = YtDlpNativeEngine.getPythonExecutable(context)
-            if (!ytdlpFile.exists() || pythonBin == null) {
-                return@withContext Pair(false, "Binario de yt-dlp o entorno Python nativo no encontrado.")
-            }
-            val nativeDir = context.applicationInfo.nativeLibraryDir
-            val pythonEnvDir = File(context.filesDir, "env/python")
-            val stdlibZip = File(pythonEnvDir, "stdlib.zip")
-            val stdlibDir = File(pythonEnvDir, "stdlib")
-            val modulesDir = File(pythonEnvDir, "modules")
-            val directPythonZipSo = File(nativeDir, "libpython.zip.so")
-
-            val cmd = listOf(pythonBin.absolutePath, "-I", ytdlpFile.absolutePath, "--version")
-            val pb = ProcessBuilder(cmd)
-                .directory(File(nativeDir))
-                .redirectErrorStream(true)
-
-            pb.environment().apply {
-                this["PYTHONHOME"] = pythonEnvDir.absolutePath
-                this["PYTHONPATH"] = "${directPythonZipSo.absolutePath}:${stdlibZip.absolutePath}:${stdlibDir.absolutePath}:${modulesDir.absolutePath}:${pythonEnvDir.absolutePath}"
-                this["HOME"] = pythonEnvDir.absolutePath
-                this["LD_LIBRARY_PATH"] = nativeDir
-                this["PATH"] = "$nativeDir:${context.filesDir.absolutePath}/bin"
-            }
-
-            val proc = pb.start()
-            val completed = proc.waitFor(6, TimeUnit.SECONDS)
-            if (!completed) {
-                proc.destroyForcibly()
-                return@withContext Pair(false, "Tiempo de espera agotado (6s) ejecutando yt-dlp --version.")
-            }
-            val output = proc.inputStream.bufferedReader().readText().trim()
-            val exitCode = proc.exitValue()
-            if (exitCode == 0 && output.isNotBlank()) {
-                Pair(true, "yt-dlp $output ejecutado exitosamente en Python 3.11 nativo.")
-            } else {
-                Pair(false, "Código de salida $exitCode: $output")
-            }
-        } catch (e: Exception) {
-            Pair(false, "Error ejecutando diagnóstico: ${e.message}")
-        }
-    }
+    suspend fun testYtDlpCliExecution(context: Context): Pair<Boolean, String> = runYtDlpCliDiagnostics(context)
 }
