@@ -24,11 +24,16 @@ import com.example.core.playback.AuraDownloadService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -48,6 +53,10 @@ internal class PlaylistImportRunner(
 ) {
     private companion object {
         const val TAG = "PlaylistImportCoordinator"
+        // Fase A: espera máxima por pista antes de darla por fallida y seguir con la siguiente.
+        const val PER_TRACK_TIMEOUT_MS = 10 * 60 * 1000L
+        // Pausa anti-bot entre pistas para no gatillar throttling / HTTP 403 en googlevideo.com.
+        const val INTER_TRACK_DELAY_MS = 750L
     }
     fun import() {
         val preview = st.playlistPreview.value ?: return
@@ -174,43 +183,18 @@ internal class PlaylistImportRunner(
                         onOpenCreatedPlaylist(playlistId)
                     }
 
-                    // Encolar secuencialmente en segundo plano para no saturar la red y vincular cada pista a la Playlist
-                    scope.launch(Dispatchers.IO) {
-                        for (item in validTracks) {
-                            val vid = item.videoIdOrUrl.trim()
-                            val searchItem = StreamingSearchItem(
-                                videoId = vid,
-                                title = item.title,
-                                artist = item.artist,
-                                album = finalPlaylistName,
-                                durationSeconds = item.durationSeconds,
-                                thumbnailUrl = item.thumbnailUrl,
-                                platform = StreamingSourcePlatform.YT_MUSIC
-                            )
-                            val resolved = StreamingApiService.resolvePlayableStreamWithYtDlp(context, searchItem).getOrNull()
-                            val mediaInfo = resolved ?: OnlineVideoAudioImporter.ResolvedMediaInfo(
-                                originalUrl = searchItem.canonicalWatchUrl,
-                                suggestedTitle = item.title,
-                                suggestedArtist = item.artist,
-                                videoUrl = searchItem.canonicalWatchUrl,
-                                audioUrl = null,
-                                coverUrl = item.thumbnailUrl,
-                                durationSeconds = item.durationSeconds
-                            )
-
-                            st.pendingMap[vid] = playlistId
-                            AuraDownloadService.startDownload(
-                                context = context,
-                                resolvedInfo = mediaInfo,
-                                customTitle = item.title,
-                                customArtist = item.artist,
-                                attachAsCanvas = includeCanvas,
-                                trimSilence = false,
-                                loopStyle = FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE,
-                                autoPlayOnComplete = false,
-                                sourceVideoId = vid
-                            )
-                        }
+                    // Encolar en SERIE 1-en-1 (Fase A): una pista a la vez hasta completar el lote.
+                    // El paralelismo real vive dentro de cada descarga (bloques HTTP Range en
+                    // ChunkedParallelDownload); lanzar N descargas en paralelo solo provocaba
+                    // progreso parpadeante, picos de RAM/CPU y HTTP 403 por throttling.
+                    st.currentBatchJob?.cancel()
+                    st.currentBatchJob = scope.launch(Dispatchers.IO) {
+                        importPlaylistSequential(
+                            validTracks = validTracks,
+                            playlistId = playlistId,
+                            playlistName = finalPlaylistName,
+                            includeCanvas = includeCanvas
+                        )
                     }
                 }
             } catch (e: Exception) {
@@ -222,6 +206,143 @@ internal class PlaylistImportRunner(
                 st.importProgressFraction.value = 0f
             }
         }
+    }
+
+    /**
+     * Fase A: descarga el lote 1-en-1. Resuelve, encola en [AuraDownloadService] y SUSPENDE
+     * hasta recibir [AuraDownloadService.taskFinishedEvents] con el mismo `sourceVideoId`
+     * antes de lanzar la siguiente pista. Un fallo nunca aborta el lote: se cuenta y se sigue.
+     */
+    private suspend fun importPlaylistSequential(
+        validTracks: List<ExternalPlaylistTrackItem>,
+        playlistId: Long,
+        playlistName: String,
+        includeCanvas: Boolean
+    ) {
+        val total = validTracks.size
+        var okCount = 0
+        var failCount = 0
+        st.batchTotal.value = total
+        st.batchDone.value = 0
+        st.batchFailed.value = 0
+        st.batchActive.value = true
+        st.batchPlaylistName.value = playlistName
+        try {
+            for ((index, item) in validTracks.withIndex()) {
+                ensureActive()
+                val vid = item.videoIdOrUrl.trim()
+                if (vid.isBlank()) {
+                    failCount++
+                    st.batchFailed.value = failCount
+                    continue
+                }
+                val pos = index + 1
+                st.importProgressFraction.value = index.toFloat() / total.coerceAtLeast(1).toFloat()
+                st.importProgressText.value = "Descargando $pos/$total: ${item.title} — ${item.artist}"
+
+                // Dedup: si la pista ya existe en biblioteca (modo streaming previo), vincular sin descargar.
+                val watchUrl = if (vid.startsWith("http", ignoreCase = true)) {
+                    vid
+                } else {
+                    "https://music.youtube.com/watch?v=$vid"
+                }
+                try {
+                    val existing = trackDao.getTrackByUri(watchUrl)
+                    if (existing != null) {
+                        linkTrack(playlistId, existing.id)
+                        okCount++
+                        st.batchDone.value = okCount + failCount
+                        continue
+                    }
+                } catch (_: Exception) {}
+
+                val searchItem = StreamingSearchItem(
+                    videoId = vid,
+                    title = item.title,
+                    artist = item.artist,
+                    album = playlistName,
+                    durationSeconds = item.durationSeconds,
+                    thumbnailUrl = item.thumbnailUrl,
+                    platform = StreamingSourcePlatform.YT_MUSIC
+                )
+                val resolved = try {
+                    StreamingApiService.resolvePlayableStreamWithYtDlp(context, searchItem).getOrNull()
+                } catch (_: Exception) { null }
+                val mediaInfo = resolved ?: OnlineVideoAudioImporter.ResolvedMediaInfo(
+                    originalUrl = searchItem.canonicalWatchUrl,
+                    suggestedTitle = item.title,
+                    suggestedArtist = item.artist,
+                    videoUrl = searchItem.canonicalWatchUrl,
+                    audioUrl = null,
+                    coverUrl = item.thumbnailUrl,
+                    durationSeconds = item.durationSeconds
+                )
+
+                st.pendingMap[vid] = playlistId
+                // Suscribirse ANTES de encolar: si startDownload falla en el acto emite
+                // taskFinished de forma síncrona y sin esta pre-suscripción lo perderíamos
+                // (SharedFlow sin replay) quedando 10 min colgados en timeout.
+                val waiter = async(Dispatchers.IO) {
+                    withTimeoutOrNull(PER_TRACK_TIMEOUT_MS) {
+                        AuraDownloadService.taskFinishedEvents.first { it.sourceVideoId == vid }
+                    }
+                }
+                AuraDownloadService.startDownload(
+                    context = context,
+                    resolvedInfo = mediaInfo,
+                    customTitle = item.title,
+                    customArtist = item.artist,
+                    attachAsCanvas = includeCanvas,
+                    trimSilence = false,
+                    loopStyle = FFmpegNativeEngine.CanvasLoopStyle.CROSSFADE,
+                    autoPlayOnComplete = false,
+                    sourceVideoId = vid
+                )
+
+                // Esperar a que ESTA pista termine (éxito o fallo) antes de lanzar la siguiente.
+                val finished = try {
+                    waiter.await()
+                } catch (_: Exception) { null }
+                if (finished == null) {
+                    // Timeout: el servicio no reportó; soltar el slot y contarla como fallo.
+                    st.pendingMap.remove(vid)
+                    failCount++
+                    AuraDebugManager.logWarning(TAG, "Timeout esperando descarga 1-en-1 de vid=$vid ($pos/$total)")
+                } else if (!finished.success) {
+                    failCount++
+                } else {
+                    okCount++
+                }
+                st.batchDone.value = okCount + failCount
+                st.batchFailed.value = failCount
+                st.importProgressFraction.value = (okCount + failCount).toFloat() / total.coerceAtLeast(1).toFloat()
+
+                // Respiro anti-bot entre pistas (los bloques intra-archivo ya van en paralelo).
+                if (pos < total) {
+                    try { delay(INTER_TRACK_DELAY_MS) } catch (_: Exception) { ensureActive() }
+                }
+            }
+        } catch (e: Exception) {
+            // Cancelación del lote (botón Cancelar) u error inesperado: no relanzar, solo resumir.
+            AuraDebugManager.logWarning(TAG, "Lote offline 1-en-1 interrumpido: ${e.message}")
+        } finally {
+            st.batchActive.value = false
+            st.importProgressFraction.value = 0f
+            st.importProgressText.value = null
+            val summary = if (failCount == 0) {
+                "Playlist \"$playlistName\": $okCount/$total descargadas."
+            } else {
+                "Playlist \"$playlistName\": $okCount/$total descargadas, $failCount fallaron."
+            }
+            withContext(Dispatchers.Main) { onStatusMessage(summary) }
+        }
+    }
+
+    /** Cancela el lote 1-en-1 en curso: ya no se lanzan más pistas (la activa termina sola). */
+    fun cancelBatchDownload() {
+        st.currentBatchJob?.cancel()
+        st.currentBatchJob = null
+        st.batchActive.value = false
     }
 
     suspend fun linkTrack(playlistId: Long, trackId: Long) {

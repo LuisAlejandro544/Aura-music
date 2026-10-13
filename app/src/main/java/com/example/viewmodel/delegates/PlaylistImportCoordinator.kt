@@ -75,6 +75,12 @@ class PlaylistImportCoordinator(
     val importProgressText: StateFlow<String?> = st.importProgressText.asStateFlow()
     val importProgressFraction: StateFlow<Float> = st.importProgressFraction.asStateFlow()
     val errorMessage: StateFlow<String?> = st.errorMessage.asStateFlow()
+    // Fase A: progreso del lote 1-en-1 (visible aunque el diálogo ya se cerró).
+    val batchTotal: StateFlow<Int> = st.batchTotal.asStateFlow()
+    val batchDone: StateFlow<Int> = st.batchDone.asStateFlow()
+    val batchFailed: StateFlow<Int> = st.batchFailed.asStateFlow()
+    val batchActive: StateFlow<Boolean> = st.batchActive.asStateFlow()
+    val batchPlaylistName: StateFlow<String?> = st.batchPlaylistName.asStateFlow()
 
     init {
         // Escuchar finalización de descargas en segundo plano para vincular cada pista descargada a su Playlist
@@ -138,4 +144,8 @@ class PlaylistImportCoordinator(
 
     fun confirmImportPlaylist() =
         runner.import()
+
+    /** Fase A: cancela el lote offline 1-en-1 (ya no se lanzan más pistas). */
+    fun cancelBatchDownload() =
+        runner.cancelBatchDownload()
 }

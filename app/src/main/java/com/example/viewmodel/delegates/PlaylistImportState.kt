@@ -52,4 +52,14 @@ internal class PlaylistImportState {
 
     // Mapa de videoIds encolados para descarga offline -> playlistId destino en Room
     val pendingMap = java.util.concurrent.ConcurrentHashMap<String, Long>()
+
+    // === Fase A: orquestador serie 1-en-1 (un lote a la vez) ===
+    // Job del lote offline en curso; permite botón "Cancelar lote" sin matar descargas sueltas.
+    var currentBatchJob: kotlinx.coroutines.Job? = null
+    // Progreso del lote visible aunque el diálogo ya se haya cerrado.
+    val batchTotal = kotlinx.coroutines.flow.MutableStateFlow(0)
+    val batchDone = kotlinx.coroutines.flow.MutableStateFlow(0)
+    val batchFailed = kotlinx.coroutines.flow.MutableStateFlow(0)
+    val batchActive = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val batchPlaylistName = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
 }
