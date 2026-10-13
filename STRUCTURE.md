@@ -362,7 +362,15 @@ app/
     │       │       │   ├── MixtapeTrackPickerDialog.kt     # Elector A/B con búsqueda local
     │       │       │   ├── AutoRemixConfigSection.kt       # Configurador de Mashup (Voz A + Base B), Remix DJ y Auto-Match
     │       │       │   ├── DownloadFromLinkDialog.kt       # Modal deslizable de descarga desde YouTube, TikTok y web
-    │       │       │   ├── ImportExternalPlaylistDialog.kt # Modal de importación de Playlists de Spotify y YouTube Music
+    │       │       │   ├── ImportExternalPlaylistDialog.kt # Fachada del modal (195 líneas)
+    │       │       │   ├── PlaylistImportHeader.kt         # Encabezado con acento por plataforma
+    │       │       │   ├── PlaylistImportUrlField.kt       # Campo de enlace
+    │       │       │   ├── PlaylistImportAnalyzeButton.kt  # Botón de análisis
+    │       │       │   ├── PlaylistImportError.kt          # Alerta de error
+    │       │       │   ├── PlaylistImportPreviewCard.kt    # Previsualización con nombre y pistas
+    │       │       │   ├── PlaylistImportSaveModeSelector.kt # Modo de guardado y Video Canvas
+    │       │       │   ├── PlaylistImportProgress.kt       # Barra de progreso
+    │       │       │   └── PlaylistImportActions.kt        # Botones finales
     │       │       │   ├── EditTrackDialog.kt              # Editor de metadatos, portada WebP y Video Canvas
     │       │       │   ├── SearchLyricsDialog.kt           # Buscador interactivo de letras LRCLIB con recomendación #1
     │       │       │   └── VideoToMusicDialog.kt           # Conversor 3 en 1 de Video a Música (.m4a + WebP + Canvas)
