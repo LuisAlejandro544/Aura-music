@@ -176,18 +176,42 @@ object YtDlpNativeEngine {
 
         AuraDebugManager.logInfo(TAG, "Ejecutando yt-dlp con Python nativo para resolver URL: $cleanUrl")
 
-        val procResult = runYtDlpProcess(
-            cmd = cmdList,
-            workDir = File(nativeDir),
-            env = ytdlpProcessEnv(context, pythonEnvDir, File(nativeDir)),
-            timeoutSeconds = 20,
-            tag = TAG
-        )
+        // workDir escribible (cacheDir): nativeLibraryDir es solo-lectura y como cwd
+        // puede provocar EACCES en Beta al crear pipes/archivos temporales.
+        val workDir = File(context.cacheDir, "ytdlp_tmp").apply { mkdirs() }
+        val procResult = try {
+            runYtDlpProcess(
+                cmd = cmdList,
+                workDir = workDir,
+                env = ytdlpProcessEnv(context, pythonEnvDir, File(nativeDir)),
+                timeoutSeconds = 20,
+                tag = TAG
+            )
+        } catch (e: Exception) {
+            // FIX Beta error=13: ProcessBuilder.start() lanzaba IOException cruda
+            // ("Cannot run program .../files/bin/python ... Permission denied") que
+            // impedía el fallback a InnerTube en WebStreamExtractor. Se retorna
+            // Result.failure con mensaje amigable para que la cascada continúe.
+            val friendly = friendlyYtDlpExecError(e.message)
+            AuraDebugManager.logWarning(TAG, "No se pudo lanzar yt-dlp (${e.message}). Fallback a InnerTube.")
+            return@withContext Result.failure(IllegalStateException(friendly, e))
+        }
         val exitCode = procResult.exitCode
         val jsonOutput = procResult.stdout
         val errorLog = procResult.stderr
 
         if (exitCode != 0 || jsonOutput.isBlank()) {
+            // Si el fallo es de exec (binario no lanzable), mensaje amigable para
+            // no mostrar paths crudos del sistema en el diálogo de descarga.
+            val rawErr = errorLog.takeLast(300)
+            if (rawErr.contains("Permission denied") || rawErr.contains("error=13") ||
+                rawErr.contains("Cannot run program") || exitCode == -1 && jsonOutput.isBlank()
+            ) {
+                AuraDebugManager.logWarning(TAG, "yt-dlp no ejecutable en este dispositivo. Fallback a InnerTube.")
+                return@withContext Result.failure(
+                    IllegalStateException(friendlyYtDlpExecError(rawErr))
+                )
+            }
             if (YtDlpEnvironmentSetup.containsJsFailureHints(errorLog)) {
                 AuraDebugManager.logWarning(TAG, "yt-dlp falló con pistas de motor JS ausente (n-sig/cipher/throttling). QuickJS: ${getQuickJsStatusSummary(context)}. Error: ${errorLog.takeLast(300)}")
             } else {
@@ -425,13 +449,18 @@ object YtDlpNativeEngine {
                 add(normalizedInput)
             }
 
-            val procResult = runYtDlpProcess(
-                cmd = command,
-                workDir = File(nativeDir),
-                env = ytdlpProcessEnv(context, pythonEnvDir, File(nativeDir), tmpDir),
-                timeoutSeconds = 60,
-                tag = TAG
-            )
+            val procResult = try {
+                runYtDlpProcess(
+                    cmd = command,
+                    workDir = tmpDir,
+                    env = ytdlpProcessEnv(context, pythonEnvDir, File(nativeDir), tmpDir),
+                    timeoutSeconds = 60,
+                    tag = TAG
+                )
+            } catch (e: Exception) {
+                AuraDebugManager.logWarning(TAG, "No se pudo lanzar yt-dlp flat-playlist (${e.message}).")
+                return@withContext Result.failure(IllegalStateException(friendlyYtDlpExecError(e.message), e))
+            }
             val stdout = procResult.stdout
             val stderr = procResult.stderr
             val code = procResult.exitCode

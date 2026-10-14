@@ -141,10 +141,11 @@ object YtDlpStreamDownloader {
             )
 
             val nativeDir = context.applicationInfo.nativeLibraryDir
+            val workDir = File(context.cacheDir, "ytdlp_tmp").apply { mkdirs() }
 
             val procResult = runYtDlpProcess(
                 cmd = cmdList,
-                workDir = File(nativeDir),
+                workDir = workDir,
                 env = ytdlpProcessEnv(context, pythonEnvDir, File(nativeDir)),
                 timeoutSeconds = 120,
                 tag = TAG,

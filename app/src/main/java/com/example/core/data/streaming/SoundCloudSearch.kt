@@ -185,7 +185,7 @@ internal object SoundCloudSearch {
                 "scsearch$limit:$query"
             )
             val pb = ProcessBuilder(cmd)
-                .directory(File(nativeDir))
+                .directory(context.cacheDir)
                 .redirectErrorStream(false)
             pb.environment().apply {
                 this["PYTHONHOME"] = pythonEnvDir.absolutePath

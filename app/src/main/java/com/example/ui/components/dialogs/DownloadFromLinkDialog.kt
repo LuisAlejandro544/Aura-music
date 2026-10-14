@@ -259,7 +259,7 @@ fun DownloadFromLinkDialog(
                     if (resolveError != null) {
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = resolveError ?: "",
+                            text = sanitizeResolveErrorForDisplay(resolveError ?: ""),
                             color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodySmall
                         )
@@ -396,4 +396,21 @@ fun DownloadFromLinkDialog(
             }
         }
     }
+}
+
+/**
+ * Oculta paths crudos del sistema (p. ej. "Cannot run program .../files/bin/python ...
+ * error=13, Permission denied" de la captura Beta) y muestra un mensaje accionable.
+ * El fallback yt-dlp -> InnerTube ya es automático en WebStreamExtractor.
+ */
+private fun sanitizeResolveErrorForDisplay(raw: String): String {
+    if (raw.contains("Cannot run program") || raw.contains("Permission denied") ||
+        raw.contains("error=13") || raw.contains("EACCES") ||
+        raw.contains("/files/bin/python") || raw.contains("/data/user/")
+    ) {
+        return "El motor yt-dlp no pudo ejecutarse en este dispositivo (permiso denegado). " +
+                "Prueba con el motor InnerTube o WebView en el selector de arriba."
+    }
+    // Recorta mensajes excesivamente largos sin perder la causa.
+    return if (raw.length > 280) raw.take(280).trim() + "…" else raw
 }

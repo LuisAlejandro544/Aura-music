@@ -40,7 +40,7 @@ internal object FFmpegCommandExecutor {
             val nativeDir = context.applicationInfo.nativeLibraryDir
             val envLibDir = File(context.filesDir, "env/ffmpeg/usr/lib")
             val processBuilder = ProcessBuilder(*args)
-                .directory(File(nativeDir))
+                .directory(context.cacheDir)
                 .redirectErrorStream(true)
 
             processBuilder.environment().apply {
