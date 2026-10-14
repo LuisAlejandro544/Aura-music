@@ -210,8 +210,18 @@ fun LazyListScope.enginesAndDiagnosticsSettingsContent(
                     Spacer(modifier = Modifier.height(14.dp))
                     Button(
                         onClick = {
-                            val intent = android.content.Intent(context, com.example.debug.DebugMonitorActivity::class.java)
-                            context.startActivity(intent)
+                            // Blindaje Beta: aunque Beta elimina DebugMonitorActivity del
+                            // manifiesto (tools:node="remove") y ENABLE_DEBUG_MONITOR=false,
+                            // se resuelve antes de lanzar para no crashear nunca con
+                            // ActivityNotFoundException/NoClassDefFoundError.
+                            try {
+                                val intent = android.content.Intent(context, com.example.debug.DebugMonitorActivity::class.java)
+                                if (intent.resolveActivity(context.packageManager) != null) {
+                                    context.startActivity(intent)
+                                }
+                            } catch (_: Throwable) {
+                                // Silencioso en Beta/Release: la tarjeta ni siquiera se muestra.
+                            }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                         shape = RoundedCornerShape(12.dp),
