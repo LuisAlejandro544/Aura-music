@@ -161,6 +161,13 @@ object StreamingApiService {
             com.example.core.model.StreamingAudioQuality.AUTO_HIFI
     ): Result<OnlineVideoAudioImporter.ResolvedMediaInfo> = withContext(Dispatchers.IO) {
         val watchUrl = item.canonicalWatchUrl
+        // v0.2.1-beta.1f: calidad efectiva automática según el SoC/teléfono (Opus solo si hay decodificador).
+        val effectiveQuality = try {
+            com.example.core.data.importer.AudioDownloadFormatResolver.resolveEffectiveQuality(audioQuality, context)
+        } catch (_: Throwable) { audioQuality }
+        val opusOk = try {
+            com.example.core.data.importer.AudioDownloadFormatResolver.supportsOpus(context)
+        } catch (_: Throwable) { true }
 
         fun enrichAndRegister(info: OnlineVideoAudioImporter.ResolvedMediaInfo): Result<OnlineVideoAudioImporter.ResolvedMediaInfo> {
             val enriched = info.copy(
@@ -201,7 +208,7 @@ object StreamingApiService {
         // Niveles: 1) yt-dlp → 2) InnerTube multi-cliente → 3) Invidious → 4) WebView.
         val platformLabel = if (item.platform == StreamingSourcePlatform.YOUTUBE) "YouTube" else "YT Music"
         if (!forceBypassYtDlp && !YtDlpAutoUpdaterIsBlockedSafe()) {
-            val ytdlpResult = YtDlpNativeEngine.resolveStream(context, watchUrl, audioQuality)
+            val ytdlpResult = YtDlpNativeEngine.resolveStream(context, watchUrl, effectiveQuality)
             val info = ytdlpResult.getOrNull()
             if (info != null && (!info.audioUrl.isNullOrBlank() || info.videoUrl.isNotBlank())) {
                 return@withContext enrichAndRegister(info)
@@ -214,7 +221,8 @@ object StreamingApiService {
         val innerTubeFallback = InnerTubeClient.resolve(
             videoId = item.videoId,
             originalUrl = watchUrl,
-            audioQuality = audioQuality
+            audioQuality = effectiveQuality,
+            opusSupported = opusOk
         )
         if (innerTubeFallback != null && (!innerTubeFallback.audioUrl.isNullOrBlank() || innerTubeFallback.videoUrl.isNotBlank())) {
             return@withContext enrichAndRegister(innerTubeFallback)
@@ -223,7 +231,8 @@ object StreamingApiService {
         val invidiousFallback = com.example.core.data.importer.InvidiousStreamResolver.resolve(
             videoId = item.videoId,
             originalUrl = watchUrl,
-            audioQuality = audioQuality
+            audioQuality = effectiveQuality,
+            opusSupported = opusOk
         )
         if (invidiousFallback != null && (!invidiousFallback.audioUrl.isNullOrBlank() || invidiousFallback.videoUrl.isNotBlank())) {
             return@withContext enrichAndRegister(invidiousFallback)

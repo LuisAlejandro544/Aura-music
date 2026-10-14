@@ -74,16 +74,32 @@ internal fun StreamingModeCoordinator.playStreamingItemInternal(
             }
 
             // 2. Resolver con cascada unificada yt-dlp (YT Music y YouTube) + InnerTube multi-cliente
-            val resolvedResult = StreamingApiService.resolvePlayableStreamWithYtDlp(
+            // v0.2.1-beta.1f: reintento con bypass si el primer intento falla + validación anti-URL vacía.
+            var resolved = StreamingApiService.resolvePlayableStreamWithYtDlp(
                 context, item, audioQuality = effectiveQuality
-            )
-            val resolved = resolvedResult.getOrNull()
+            ).getOrNull()
             if (resolved == null) {
-                onStatusMessage("No se pudo iniciar el stream de \"${item.title}\". Intenta con otra pista.")
+                // Reintento inmediato forzando InnerTube/Invidious/WebView (sin yt-dlp bloqueado o con PO token caducado).
+                kotlinx.coroutines.delay(600L)
+                resolved = StreamingApiService.resolvePlayableStreamWithYtDlp(
+                    context, item, forceBypassYtDlp = true, audioQuality = effectiveQuality
+                ).getOrNull()
+            }
+            if (resolved == null) {
+                withContext(Dispatchers.Main) {
+                    onStatusMessage("No se pudo iniciar el stream de \"${item.title}\". Revisa tu internet e inténtalo de nuevo.")
+                }
                 return@launch
             }
 
-            val playableAudioUrl = resolved.audioUrl?.takeIf { it.isNotBlank() } ?: resolved.videoUrl
+            val playableAudioUrl = resolved.audioUrl?.takeIf { it.isNotBlank() }
+                ?: resolved.videoUrl.takeIf { it.isNotBlank() }
+            if (playableAudioUrl.isNullOrBlank()) {
+                withContext(Dispatchers.Main) {
+                    onStatusMessage("La pista \"${item.title}\" no devolvió audio reproducible. Prueba con otra.")
+                }
+                return@launch
+            }
             val canUseVideoCanvas = !dataSaver && cacheManager.isStreamingVideoAllowedByNetwork()
             val initialVideoUri = if (canUseVideoCanvas) {
                 cacheManager.getCachedVideoFile(item.videoId)?.absolutePath
@@ -102,9 +118,41 @@ internal fun StreamingModeCoordinator.playStreamingItemInternal(
             val queueTracks = buildQueueTracksWithSelectedInternal(item, playingTrack, contextQueue)
             val startIdx = queueTracks.indexOfFirst { it.id == playingTrack.id }.coerceAtLeast(0)
 
-            withContext(Dispatchers.Main) {
-                audioPlayer.playTrackList(queueTracks, startIdx)
-                loadLyricsIfAllowed(playingTrack)
+            try {
+                withContext(Dispatchers.Main) {
+                    audioPlayer.playTrackList(queueTracks, startIdx)
+                    loadLyricsIfAllowed(playingTrack)
+                }
+            } catch (t: Throwable) {
+                // v0.2.1-beta.1f: si ExoPlayer rechaza la URL (ej. 403 tardío), reintentar con bypass y reanudar.
+                withContext(Dispatchers.Main) {
+                    onStatusMessage("Reintentando \"${item.title}\" con ruta alternativa...")
+                }
+                val retry = StreamingApiService.resolvePlayableStreamWithYtDlp(
+                    context, item, forceBypassYtDlp = true, audioQuality = effectiveQuality
+                ).getOrNull()
+                val retryUrl = retry?.audioUrl?.takeIf { it.isNotBlank() } ?: retry?.videoUrl?.takeIf { it.isNotBlank() }
+                if (!retryUrl.isNullOrBlank()) {
+                    val retryTrack = playingTrack.copy(uriString = retryUrl)
+                    val retryQueue = buildQueueTracksWithSelectedInternal(item, retryTrack, contextQueue)
+                    val retryIdx = retryQueue.indexOfFirst { it.id == retryTrack.id }.coerceAtLeast(0)
+                    try {
+                        withContext(Dispatchers.Main) {
+                            audioPlayer.playTrackList(retryQueue, retryIdx)
+                            loadLyricsIfAllowed(retryTrack)
+                        }
+                    } catch (_: Throwable) {
+                        withContext(Dispatchers.Main) {
+                            onStatusMessage("No se pudo reproducir \"${item.title}\". Intenta con otra pista.")
+                        }
+                        return@launch
+                    }
+                } else {
+                    withContext(Dispatchers.Main) {
+                        onStatusMessage("No se pudo reproducir \"${item.title}\". Intenta con otra pista.")
+                    }
+                    return@launch
+                }
             }
 
             if (dataSaver) return@launch
@@ -266,6 +314,7 @@ internal fun StreamingModeCoordinator.handleStreamingTrackTransitionRequestInter
                 warmNextQueueTrackInternal(resolvedTrack)
             } else {
                 // Último recurso capa B: si hay head-start local, sonar 20-30s en vez de silencio.
+                var playedFallback = false
                 try {
                     val headFallback = cacheManager.getCachedHeadStartFile(videoId)
                     if (headFallback != null) {
@@ -274,8 +323,16 @@ internal fun StreamingModeCoordinator.handleStreamingTrackTransitionRequestInter
                             audioPlayer.appendOrUpdateStreamingTrack(headTrack)
                             audioPlayer.playTrack(headTrack, isAutoCrossfadeOverlap = isAutoCrossfade)
                         }
+                        playedFallback = true
                     }
                 } catch (_: Throwable) {}
+                if (!playedFallback) {
+                    // v0.2.1-beta.1f: avisar en vez de quedarse en silencio al cambiar de pista.
+                    withContext(Dispatchers.Main) {
+                        onStatusMessage("No se pudo cargar \"${targetTrack.title}\". Se salta a la siguiente disponible.")
+                        try { audioPlayer.playNext() } catch (_: Throwable) {}
+                    }
+                }
             }
         } finally {
             _isResolvingStream.value = false

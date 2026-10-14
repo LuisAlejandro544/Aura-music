@@ -39,6 +39,14 @@ object YtDlpStreamDownloader {
             com.example.core.model.StreamingAudioQuality.AUTO_HIFI
     ): Boolean = withContext(Dispatchers.IO) {
         try {
+            // v0.2.1-beta.1f: corrección automática de formato según el teléfono + blindaje de disco.
+            val effectiveQuality = AudioDownloadFormatResolver.resolveEffectiveQuality(audioQuality, context)
+            try { targetFile.parentFile?.mkdirs() } catch (_: Throwable) {}
+            if (!AudioDownloadFormatResolver.hasEnoughFreeSpace(targetFile.parentFile, 30L * 1024L * 1024L)) {
+                AuraDebugManager.logWarning(TAG, "Descarga abortada: sin espacio libre suficiente (~30 MB).")
+                onProgressUpdate(DownloadProgress(isDownloading = false))
+                return@withContext false
+            }
             if (YtDlpAutoUpdater.isYtDlpTemporarilyBlocked()) {
                 AuraDebugManager.logWarning(TAG, "Descarga directa omitida: yt-dlp bloqueado por actualización OTA en curso.")
                 return@withContext false
@@ -71,7 +79,7 @@ object YtDlpStreamDownloader {
             targetFile.parentFile?.mkdirs()
 
             val formatSelector = if (isAudioOnly) {
-                when (audioQuality) {
+                when (effectiveQuality) {
                     com.example.core.model.StreamingAudioQuality.AHORRO_OPUS_48K ->
                         "bestaudio[ext=webm][acodec=opus]/bestaudio[ext=webm]/bestaudio/best"
                     com.example.core.model.StreamingAudioQuality.ALTA_OPUS_160K ->
@@ -172,6 +180,12 @@ object YtDlpStreamDownloader {
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
             AuraDebugManager.logWarning(TAG, "Excepción en descarga directa con yt-dlp: ${e.message}")
+            try { if (targetFile.exists() && targetFile.length() < 1024L) targetFile.delete() } catch (_: Throwable) {}
+            false
+        } catch (t: Throwable) {
+            AuraDebugManager.logWarning(TAG, "Descarga yt-dlp abortada por falta de memoria: ${t.message}")
+            try { if (targetFile.exists() && targetFile.length() < 1024L) targetFile.delete() } catch (_: Throwable) {}
+            try { System.gc() } catch (_: Throwable) {}
             false
         }
     }
