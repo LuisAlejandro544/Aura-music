@@ -1,0 +1,116 @@
+name: Purgar Pull Requests (Rechazo Masivo Manual)
+
+# Este flujo se ejecuta EXCLUSIVAMENTE de forma manual desde la pestaña Actions
+# para rechazar (cerrar sin fusionar) todos los Pull Requests abiertos del repositorio.
+# Nota honesta: GitHub no permite borrar el registro del historial de un PR vía API;
+# lo máximo posible es cerrarlo, comentarlo y eliminar su rama de origen. El registro
+# queda como "Closed" (rechazado), que es el equivalente funcional a eliminarlo.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_purge:
+        description: 'Escribe "RECHAZAR" para confirmar el cierre masivo de Pull Requests'
+        required: true
+        type: string
+        default: 'CANCELAR'
+      only_open:
+        description: '¿Cerrar solo los PRs abiertos? (false = abiertos + actualiza ya cerrados con comentario)'
+        required: true
+        type: boolean
+        default: true
+      delete_branches:
+        description: '¿Eliminar también las ramas de origen (no fork) tras rechazar?'
+        required: true
+        type: boolean
+        default: true
+
+jobs:
+  purge-pull-requests:
+    name: Rechazar todos los Pull Requests
+    # Bloqueo estricto: SOLO activación manual (jamás por push, pull_request ni commit)
+    if: github.event_name == 'workflow_dispatch' && inputs.confirm_purge == 'RECHAZAR'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: write
+
+    steps:
+      - name: 🔒 0. Verificar activación manual exclusiva
+        run: |
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            echo "❌ Error: Este workflow solo puede activarse manualmente."
+            exit 1
+          fi
+          if [ "${{ inputs.confirm_purge }}" != "RECHAZAR" ]; then
+            echo "❌ Operación cancelada. Debes escribir exactamente 'RECHAZAR'."
+            exit 1
+          fi
+          echo "✅ Activación manual verificada correctamente."
+
+      - name: 🗑️ 1. Rechazar Pull Requests y eliminar ramas
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          ONLY_OPEN: ${{ inputs.only_open }}
+          DELETE_BRANCHES: ${{ inputs.delete_branches }}
+        run: |
+          echo "=== Rechazo masivo de Pull Requests en ${REPO} ==="
+          echo "Solo abiertos: ${ONLY_OPEN} | Eliminar ramas: ${DELETE_BRANCHES}"
+
+          if [ "$ONLY_OPEN" = "true" ]; then
+            PR_DATA=$(gh api "repos/${REPO}/pulls?state=open&per_page=100" --paginate --jq '.[] | "\(.number)|\(.head.ref)|\(.head.repo.fork)"' || true)
+          else
+            PR_DATA=$(gh api "repos/${REPO}/pulls?state=all&per_page=100" --paginate --jq '.[] | select(.state == "open") | "\(.number)|\(.head.ref)|\(.head.repo.fork)"' || true)
+          fi
+
+          if [ -z "$PR_DATA" ]; then
+            echo "✅ No hay Pull Requests abiertos por rechazar."
+            echo "## 🗑️ Purga de Pull Requests" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "No se encontraron Pull Requests abiertos. Nada por hacer." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          CLOSED=0
+          BRANCHES=0
+          for ROW in $PR_DATA; do
+            NUM=$(echo "$ROW" | cut -d'|' -f1)
+            BRANCH=$(echo "$ROW" | cut -d'|' -f2)
+            IS_FORK=$(echo "$ROW" | cut -d'|' -f3)
+            echo "--- PR #${NUM} (rama: ${BRANCH}, fork: ${IS_FORK}) ---"
+
+            echo "💬 Dejando comentario de rechazo en PR #${NUM}..."
+            gh api -X POST "repos/${REPO}/issues/${NUM}/comments" \
+              -f body="🧹 **Rechazo masivo manual (Aura Music):** este Pull Request fue cerrado sin fusionar por decisión del mantenedor mediante el workflow manual \`purge-pull-requests.yml\`. El registro queda como *Closed* porque GitHub no permite borrar el historial de PRs vía API." \
+              || true
+
+            echo "❌ Cerrando PR #${NUM} sin fusionar..."
+            if gh api -X PATCH "repos/${REPO}/pulls/${NUM}" -f state="closed" >/dev/null 2>&1; then
+              CLOSED=$((CLOSED + 1))
+            else
+              echo "⚠️ No se pudo cerrar el PR #${NUM}, se intenta con gh CLI..."
+              gh pr close "$NUM" --comment "Cierre masivo manual." || true
+              CLOSED=$((CLOSED + 1))
+            fi
+
+            if [ "$DELETE_BRANCHES" = "true" ] && [ "$IS_FORK" = "false" ] && [ -n "$BRANCH" ] && [ "$BRANCH" != "main" ] && [ "$BRANCH" != "master" ]; then
+              echo "🌿 Eliminando rama de origen: ${BRANCH}"
+              if gh api -X DELETE "repos/${REPO}/git/refs/heads/${BRANCH}" >/dev/null 2>&1; then
+                BRANCHES=$((BRANCHES + 1))
+              else
+                echo "⚠️ No se pudo eliminar la rama ${BRANCH} (protegida o ya eliminada)."
+              fi
+            else
+              echo "⏭️ Rama ${BRANCH} conservada (fork=${IS_FORK} o protegida)."
+            fi
+          done
+
+          echo "🎉 ¡Purga completada! PRs rechazados: ${CLOSED} | Ramas eliminadas: ${BRANCHES}."
+          echo "ℹ️ Nota: GitHub no permite borrar el registro del historial de un PR; quedan como 'Closed'."
+          {
+            echo "## 🗑️ Purga de Pull Requests"
+            echo ""
+            echo "- **PRs rechazados (cerrados sin merge):** ${CLOSED}"
+            echo "- **Ramas de origen eliminadas:** ${BRANCHES}"
+            echo "- ℹ️ GitHub no permite borrar el historial de PRs vía API; el registro queda como *Closed*, que equivale funcionalmente a eliminado."
+          } >> "$GITHUB_STEP_SUMMARY"

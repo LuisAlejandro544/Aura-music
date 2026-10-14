@@ -1,0 +1,120 @@
+name: Purgar Issues (Cierre Masivo Manual)
+
+# Este flujo se ejecuta EXCLUSIVAMENTE de forma manual desde la pestaña Actions
+# para cerrar todos los Issues abiertos del repositorio de una sola vez.
+# Nota honesta: GitHub no permite borrar el registro del historial de un Issue vía API
+# (solo el autor o soporte pueden eliminarlo); lo máximo posible es comentarlo,
+# cerrarlo con motivo (completed / not_planned) y opcionalmente bloquearlo.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_purge:
+        description: 'Escribe "CERRAR" para confirmar el cierre masivo de Issues'
+        required: true
+        type: string
+        default: 'CANCELAR'
+      only_open:
+        description: '¿Cerrar solo los Issues abiertos? (false = re-procesa también con comentario)'
+        required: true
+        type: boolean
+        default: true
+      close_reason:
+        description: 'Motivo de cierre aplicado a cada Issue'
+        required: true
+        type: choice
+        options:
+          - 'not_planned'
+          - 'completed'
+        default: 'not_planned'
+      lock_issues:
+        description: '¿Bloquear los Issues tras cerrarlos (evita nuevos comentarios)?'
+        required: true
+        type: boolean
+        default: false
+
+jobs:
+  purge-issues:
+    name: Cerrar todos los Issues
+    # Bloqueo estricto: SOLO activación manual (jamás por push, pull_request ni commit)
+    if: github.event_name == 'workflow_dispatch' && inputs.confirm_purge == 'CERRAR'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+
+    steps:
+      - name: 🔒 0. Verificar activación manual exclusiva
+        run: |
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            echo "❌ Error: Este workflow solo puede activarse manualmente."
+            exit 1
+          fi
+          if [ "${{ inputs.confirm_purge }}" != "CERRAR" ]; then
+            echo "❌ Operación cancelada. Debes escribir exactamente 'CERRAR'."
+            exit 1
+          fi
+          echo "✅ Activación manual verificada correctamente."
+
+      - name: 🗑️ 1. Cerrar Issues masivamente
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          ONLY_OPEN: ${{ inputs.only_open }}
+          CLOSE_REASON: ${{ inputs.close_reason }}
+          LOCK_ISSUES: ${{ inputs.lock_issues }}
+        run: |
+          echo "=== Cierre masivo de Issues en ${REPO} ==="
+          echo "Solo abiertos: ${ONLY_OPEN} | Motivo: ${CLOSE_REASON} | Bloquear: ${LOCK_ISSUES}"
+
+          if [ "$ONLY_OPEN" = "true" ]; then
+            ISSUE_NUMS=$(gh api "repos/${REPO}/issues?state=open&per_page=100" --paginate --jq '.[] | select(has("pull_request") | not) | .number' || true)
+          else
+            ISSUE_NUMS=$(gh api "repos/${REPO}/issues?state=all&per_page=100" --paginate --jq '.[] | select(has("pull_request") | not and .state == "open") | .number' || true)
+          fi
+
+          if [ -z "$ISSUE_NUMS" ]; then
+            echo "✅ No hay Issues abiertos por cerrar."
+            echo "## 🗑️ Purga de Issues" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "No se encontraron Issues abiertos. Nada por hacer." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          CLOSED=0
+          LOCKED=0
+          for NUM in $ISSUE_NUMS; do
+            echo "--- Issue #${NUM} ---"
+
+            echo "💬 Dejando comentario de cierre en Issue #${NUM}..."
+            gh api -X POST "repos/${REPO}/issues/${NUM}/comments" \
+              -f body="🧹 **Cierre masivo manual (Aura Music):** este Issue fue cerrado por decisión del mantenedor mediante el workflow manual \`purge-issues.yml\` (motivo: \`${CLOSE_REASON}\`). El registro queda como *Closed* porque GitHub no permite borrar el historial de Issues vía API." \
+              || true
+
+            echo "❌ Cerrando Issue #${NUM} (motivo: ${CLOSE_REASON})..."
+            if gh api -X PATCH "repos/${REPO}/issues/${NUM}" -f state="closed" -f state_reason="${CLOSE_REASON}" >/dev/null 2>&1; then
+              CLOSED=$((CLOSED + 1))
+            else
+              echo "⚠️ Falló el cierre con motivo, reintentando cierre simple..."
+              gh issue close "$NUM" --reason "$CLOSE_REASON" || gh api -X PATCH "repos/${REPO}/issues/${NUM}" -f state="closed" || true
+              CLOSED=$((CLOSED + 1))
+            fi
+
+            if [ "$LOCK_ISSUES" = "true" ]; then
+              echo "🔒 Bloqueando Issue #${NUM}..."
+              if gh api -X PUT "repos/${REPO}/issues/${NUM}/lock" -f lock_reason="resolved" >/dev/null 2>&1; then
+                LOCKED=$((LOCKED + 1))
+              else
+                echo "⚠️ No se pudo bloquear el Issue #${NUM}."
+              fi
+            fi
+          done
+
+          echo "🎉 ¡Purga completada! Issues cerrados: ${CLOSED} | Bloqueados: ${LOCKED}."
+          echo "ℹ️ Nota: GitHub no permite borrar el registro del historial de un Issue vía API; quedan como 'Closed'."
+          {
+            echo "## 🗑️ Purga de Issues"
+            echo ""
+            echo "- **Issues cerrados:** ${CLOSED} (motivo: \`${CLOSE_REASON}\`)"
+            echo "- **Issues bloqueados:** ${LOCKED}"
+            echo "- ℹ️ GitHub no permite borrar el historial de Issues vía API; el registro queda como *Closed*, que equivale funcionalmente a eliminado."
+          } >> "$GITHUB_STEP_SUMMARY"

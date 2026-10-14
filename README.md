@@ -215,6 +215,7 @@ Aura Music está construida siguiendo principios de **Clean Architecture + MVVM*
 
 - **Interfaz y Arquitectura**: `Kotlin`, `Jetpack Compose (Material 3)`, `Coroutines & StateFlow`, `Room Database`, `Storage Access Framework (SAF)`.
 - **Audio y Multimedia**: `Jetpack Media3 (ExoPlayer & MediaSessionService)`, `Google AAudio (NDK)`, `ISO C++20 DSP (CMake)`, `FFmpeg Nativo`, `CPython 3.11 + QuickJS + yt-dlp OTA`.
+- **🧹 Mantenimiento manual (GitHub Actions)**: purgadores `workflow_dispatch` para **rechazar todos los Pull Requests** (`purge-pull-requests.yml`, confirmación `RECHAZAR`) y **cerrar todos los Issues** (`purge-issues.yml`, confirmación `CERRAR`). GitHub no permite borrar el historial: quedan como *Closed*.
 
 > 📄 **¿Quieres revisar la arquitectura interna, el árbol de módulos o los detalles de compilación?**  
 > Consulta los documentos técnicos del repositorio:

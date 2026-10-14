@@ -435,6 +435,10 @@ gradle :app:assembleBeta
 - **Purgar Binarios del Historial Git (`.github/workflows/purge-native-binaries-history.yml`)**:
   - Permite limpiar definitivamente los archivos `.so`, `.zip.so` y `yt-dlp` del historial remoto usando `git-filter-repo` previa confirmación manual (`PURGAR`), dejando el repositorio ultra liviano.
   - El archivo `.gitignore` está configurado para evitar que los archivos binarios compilados vuelvan a ser añadidos al control de versiones.
+- **Purgar Pull Requests — Rechazo Masivo Manual (`.github/workflows/purge-pull-requests.yml`)**:
+  - Solo `workflow_dispatch` con confirmación `RECHAZAR`; cierra sin fusionar todos los PRs abiertos, deja comentario de rechazo y elimina sus ramas de origen (no fork, excepto `main`/`master`). Inputs: `only_open` y `delete_branches`. GitHub no permite borrar el registro del PR: queda como *Closed*.
+- **Purgar Issues — Cierre Masivo Manual (`.github/workflows/purge-issues.yml`)**:
+  - Solo `workflow_dispatch` con confirmación `CERRAR`; cierra todos los Issues abiertos (excluyendo PRs) con motivo `not_planned`/`completed`, deja comentario y opcionalmente los bloquea. Inputs: `only_open`, `close_reason` y `lock_issues`. GitHub no permite borrar el registro del Issue: queda como *Closed*.
 
 ---
 
