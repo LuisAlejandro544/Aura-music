@@ -170,7 +170,10 @@ android {
       // Debug funciona porque no minifica; Beta crasheaba con fullMode + repackage +
       // overloadaggressively sobre OkHttp/Okio/Coil/Media3/WebView y JNI estático.
       // Se desactiva minify/shrink en Beta para no omitir nada (APK algo más pesado pero 100% funcional).
-      multiDexEnabled = false
+      // Multi-DEX activado: con el código completo sin podar se supera el límite de 64K
+      // métodos de un único classes.dex; Debug lo permite, Beta con single-DEX fallaría
+      // al instalar o con NoClassDefFoundError.
+      multiDexEnabled = true
       isCrunchPngs = true
       isMinifyEnabled = false
       isShrinkResources = false
@@ -1217,7 +1220,7 @@ val ensureDebugKeystore = tasks.register<EnsureDebugKeystoreTask>("ensureDebugKe
 
 val provisionNativeDeps = tasks.register<ProvisionNativeDepsTask>("provisionNativeDeps") {
   dependsOn(ensureDebugKeystore)
-  provisionVersion.set("v2.6-pure-ffmpeg-c-and-sqlite3-restored")
+  provisionVersion.set("v2.7-full-stdlib-no-prune-beta-parity")
   val mobileOnlyMode = gradle.startParameter.taskNames.any { it.contains("Beta", ignoreCase = true) } ||
     System.getenv("AURA_BETA_MOBILE_ONLY") == "true" ||
     System.getenv("AURA_SPLIT_APKS") == "true"
