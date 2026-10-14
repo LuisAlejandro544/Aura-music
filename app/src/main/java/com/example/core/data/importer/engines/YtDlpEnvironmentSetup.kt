@@ -51,7 +51,7 @@ object YtDlpEnvironmentSetup {
             }.orEmpty()
 
             val currentSignature = buildString {
-                append("direct_symlink_v4_")
+                append("direct_symlink_v5_")
                 if (pythonZip.exists()) append("${pythonZip.length()}_${pythonZip.lastModified()}_")
                 append("mods:${pymodFiles.size}")
             }
@@ -116,6 +116,9 @@ object YtDlpEnvironmentSetup {
 
             ensureTlsCertificates(pythonEnvDir)
             ensureQuickJsExecutable(context)
+            // Normaliza files/bin/python: en Beta no-debuggable el exec directo
+            // desde nativeLibraryDir falla (SELinux); en Debug sí permite.
+            ensurePythonExecutable(context)
             isInitialized = true
         } catch (e: Exception) {
             AuraDebugManager.logWarning(TAG, "Fallo al inicializar entorno Python yt-dlp: ${e.message}")
@@ -124,22 +127,11 @@ object YtDlpEnvironmentSetup {
 
     /**
      * Localiza el binario ejecutable de Python disponible para el proceso de la app.
-     * Solo nativeLibraryDir es camino vivo: init() elimina los alias obsoletos de files/bin.
+     * Vía única [resolvePythonExecutable]: files/bin/python (chmod 0700) primero y
+     * nativeLibraryDir como respaldo, con normalización automática. Sin esto, Beta
+     * (no-debuggable) falla con EACCES mientras Debug funciona.
      */
-    fun getPythonExecutable(context: Context): File? {
-        val nativeDir = File(context.applicationInfo.nativeLibraryDir)
-        val pythonInNative = File(nativeDir, "libpython.so")
-        if (pythonInNative.exists() && pythonInNative.length() > 1000L && pythonInNative.canExecute()) {
-            return pythonInNative
-        }
-
-        val python3InNative = File(nativeDir, "libpython3.so")
-        if (python3InNative.exists() && python3InNative.length() > 1000L && python3InNative.canExecute()) {
-            return python3InNative
-        }
-
-        return null
-    }
+    fun getPythonExecutable(context: Context): File? = resolvePythonExecutable(context)
 
     /**
      * Localiza el binario ejecutable de QuickJS C99 real (Bellard ECMAScript Engine).

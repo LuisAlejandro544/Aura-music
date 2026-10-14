@@ -1213,6 +1213,10 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
     // FIX Beta YT Music en Explorar: verificación estricta de motores críticos.
     // Antes un fallo de red en CI dejaba una Beta "recortada" (yt-dlp/python/quickjs
     // incompletos) que solo fallaba en YT Music en el teléfono. Ahora se falla aquí.
+    // Causa Beta vs Debug: con caché-hit se omitía provision y el lanzador
+    // libpython.so (1 KB) pasaba sin el motor real libpython3.11.so; además el exec
+    // directo desde nativeLibraryDir falla en Beta no-debuggable (SELinux) y exige
+    // normalización a files/bin en runtime (ver resolvePythonExecutable).
     val criticalAbis = if (isMobileOnly) listOf("arm64-v8a", "armeabi-v7a") else abis
     val missingCritical = mutableListOf<String>()
     for (abi in criticalAbis) {
@@ -1221,10 +1225,17 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
       val pyZip = File(abiDir, "libpython.zip.so")
       val pySo = File(abiDir, "libpython.so")
       val ytdlpSo = File(abiDir, "libytdlp.zip.so")
+      val pyEngine = File(abiDir, "libpython3.11.so").takeIf { it.exists() }
+        ?: File(abiDir, "libpython3.so").takeIf { it.exists() }
+      val pymodCount = abiDir.listFiles()?.count { it.isFile && it.name.startsWith("libpymod_") && it.name.endsWith(".so") } ?: 0
+      val hasAvCodec = File(abiDir, "libavcodec.so").exists() || File(abiDir, "libavcodec_neon.so").exists()
       if (!qjs.exists() || qjs.length() < 250_000L) missingCritical.add("$abi:libqjs.so<250KB")
       if (!pyZip.exists() || pyZip.length() < 500_000L) missingCritical.add("$abi:libpython.zip.so<500KB")
-      if (!pySo.exists() || pySo.length() < 1_000L) missingCritical.add("$abi:libpython.so ausente")
+      if (!pySo.exists() || pySo.length() < 5_000L) missingCritical.add("$abi:libpython.so<5KB(lanzador)")
+      if (pyEngine == null || pyEngine.length() < 500_000L) missingCritical.add("$abi:libpython3.11.so ausente/<500KB(motor)")
+      if (pymodCount < 5) missingCritical.add("$abi:libpymod_*.so=$pymodCount(<5)")
       if (!ytdlpSo.exists() || ytdlpSo.length() < 1_000_000L) missingCritical.add("$abi:libytdlp.zip.so<1MB")
+      if (!hasAvCodec) missingCritical.add("$abi:libavcodec.so ausente")
     }
     if (missingCritical.isNotEmpty()) {
       throw GradleException("Motores YT Music incompletos (${missingCritical.joinToString(", ")}). Re-ejecutar :app:provisionNativeDeps con red. No se empaqueta Beta recortada.")

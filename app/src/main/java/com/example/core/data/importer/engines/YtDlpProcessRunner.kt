@@ -66,6 +66,98 @@ internal fun ytdlpProcessEnv(
 }
 
 /**
+ * Normalización del lanzador CPython a files/bin (paridad con QuickJS).
+ * En APK Beta (isDebuggable=false, targetSdk 34+) la ejecución directa desde
+ * nativeLibraryDir/libpython.so falla con EACCES por SELinux / noexec, mientras
+ * en Debug (debuggable) el dominio SELinux lo permite. Por eso Debug funciona
+ * y Beta no, aunque R8 ya está desactivado (minify=false) en ambos.
+ * Se copia a files/bin/python con chmod 0700 y se reutiliza en caliente.
+ */
+internal const val PYTHON_BIN_NAME = "python"
+internal const val PYTHON_MIN_PACKAGE_BYTES = 5_000L
+
+@Volatile
+internal var cachedPythonBin: File? = null
+
+internal fun isValidPythonFile(f: File): Boolean {
+    return try {
+        f.exists() && f.isFile && f.length() >= PYTHON_MIN_PACKAGE_BYTES
+    } catch (_: Exception) {
+        false
+    }
+}
+
+internal fun applyPythonExecutablePermission(f: File) {
+    try {
+        android.system.Os.chmod(f.absolutePath, 448) // 0700
+    } catch (_: Throwable) {
+    }
+    runCatching { f.setExecutable(true, false) }
+}
+
+/** Copia atómica nativeLibraryDir/libpython.so -> files/bin/python con chmod. Idempotente. */
+internal fun ensurePythonExecutable(context: Context): File? {
+    try {
+        val binDir = File(context.filesDir, "bin").apply { mkdirs() }
+        val target = File(binDir, PYTHON_BIN_NAME)
+        if (isValidPythonFile(target) && target.canExecute()) {
+            cachedPythonBin = target
+            return target
+        }
+        val nativeDir = File(context.applicationInfo.nativeLibraryDir)
+        val src = File(nativeDir, "libpython.so").takeIf { isValidPythonFile(it) }
+            ?: File(nativeDir, "libpython3.so").takeIf { isValidPythonFile(it) }
+            ?: return null
+        val tmp = File(binDir, "$PYTHON_BIN_NAME.tmp")
+        src.copyTo(tmp, overwrite = true)
+        applyPythonExecutablePermission(tmp)
+        if (!isValidPythonFile(tmp) || !tmp.canExecute()) {
+            runCatching { tmp.delete() }
+            return null
+        }
+        if (target.exists()) runCatching { target.delete() }
+        val moved = runCatching { tmp.renameTo(target) }.getOrDefault(false)
+        val finalFile = if (moved) target else {
+            tmp.copyTo(target, overwrite = true)
+            runCatching { tmp.delete() }
+            applyPythonExecutablePermission(target)
+            target
+        }
+        if (!finalFile.canExecute()) return null
+        cachedPythonBin = finalFile
+        return finalFile
+    } catch (_: Exception) {
+        return null
+    }
+}
+
+/**
+ * Vía única de resolución del intérprete Python:
+ * 1. Caché en memoria, 2. files/bin/python, 3. nativeLibraryDir ejecutable,
+ * 4. normalización (copia + chmod) como último recurso.
+ */
+internal fun resolvePythonExecutable(context: Context): File? {
+    cachedPythonBin?.takeIf { isValidPythonFile(it) && it.canExecute() }?.let { return it }
+    val binPython = File(File(context.filesDir, "bin"), PYTHON_BIN_NAME)
+    if (isValidPythonFile(binPython) && binPython.canExecute()) {
+        cachedPythonBin = binPython
+        return binPython
+    }
+    val nativeDir = File(context.applicationInfo.nativeLibraryDir)
+    val nativePython = File(nativeDir, "libpython.so").takeIf { isValidPythonFile(it) && it.canExecute() }
+        ?: File(nativeDir, "libpython3.so").takeIf { isValidPythonFile(it) && it.canExecute() }
+    if (nativePython != null) {
+        // Normalizar a files/bin para ejecuciones futuras garantizadas en Beta.
+        return ensurePythonExecutable(context) ?: nativePython.also { cachedPythonBin = it }
+    }
+    // El .so existe pero sin bit exec (caso Beta SELinux): intentar normalizar.
+    if (File(nativeDir, "libpython.so").let { isValidPythonFile(it) }) {
+        ensurePythonExecutable(context)?.let { return it }
+    }
+    return null
+}
+
+/**
  * Lanza el proceso, drena sus flujos en hilos daemon y espera con timeout.
  * Si la corrutina se cancela, el proceso se destruye de inmediato.
  * Si expira el timeout, se destruye forzosamente y se reporta [YtDlpProcessResult.timedOut].

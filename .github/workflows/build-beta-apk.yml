@@ -163,9 +163,10 @@ jobs:
           fi
 
       - name: ⚙️ 8. Aprovisionar Motores Nativos Puros Solo para Móvil (arm64-v8a y armeabi-v7a, con caché)
-        # La caché evita APKs Beta incompletos por descargas parciales (causa de fallos de YT Music en Explorar):
-        # si la caché es válida se reutiliza; si no, se re-aprovisiona completo y se verifica.
-        if: steps.cache-native-deps.outputs.cache-hit != 'true'
+        # La caché acelera descargas, pero NUNCA se omite provision: es idempotente y
+        # recompila solo lo faltante. Omitirla con cache-hit dejaba Betas recortadas
+        # (lanzador sin motor libpython3.11.so) que fallaban en yt-dlp solo en Beta
+        # no-debuggable (SELinux niega exec desde nativeLibraryDir; Debug sí permite).
         env:
           AURA_BETA_MOBILE_ONLY: "true"
         run: |
@@ -189,10 +190,15 @@ jobs:
             QJS="app/src/main/jniLibs/$ABI/libqjs.so"
             PYZIP="app/src/main/jniLibs/$ABI/libpython.zip.so"
             PYSO="app/src/main/jniLibs/$ABI/libpython.so"
+            PYENGINE="app/src/main/jniLibs/$ABI/libpython3.11.so"
+            [ -f "$PYENGINE" ] || PYENGINE="app/src/main/jniLibs/$ABI/libpython3.so"
             YTDLP="app/src/main/jniLibs/$ABI/libytdlp.zip.so"
             if [ ! -f "$QJS" ] || [ "$(stat -c%s "$QJS")" -lt 250000 ]; then echo "❌ $ABI: libqjs.so ausente o <250KB (motor JS para n-sig/cipher)"; FAIL=1; fi
             if [ ! -f "$PYZIP" ] || [ "$(stat -c%s "$PYZIP")" -lt 500000 ]; then echo "❌ $ABI: libpython.zip.so ausente o <500KB (stdlib yt-dlp)"; FAIL=1; fi
-            if [ ! -f "$PYSO" ] || [ "$(stat -c%s "$PYSO")" -lt 1000 ]; then echo "❌ $ABI: libpython.so ausente (lanzador PIE)"; FAIL=1; fi
+            if [ ! -f "$PYSO" ] || [ "$(stat -c%s "$PYSO")" -lt 5000 ]; then echo "❌ $ABI: libpython.so ausente o <5KB (lanzador PIE)"; FAIL=1; fi
+            if [ ! -f "$PYENGINE" ] || [ "$(stat -c%s "$PYENGINE")" -lt 500000 ]; then echo "❌ $ABI: libpython3.11.so ausente o <500KB (motor CPython real)"; FAIL=1; fi
+            PYMODS=$(ls app/src/main/jniLibs/$ABI/libpymod_*.so 2>/dev/null | wc -l)
+            if [ "$PYMODS" -lt 5 ]; then echo "❌ $ABI: libpymod_*.so=$PYMODS (<5, stdlib C incompleto)"; FAIL=1; fi
             if [ ! -f "$YTDLP" ] || [ "$(stat -c%s "$YTDLP")" -lt 1000000 ]; then echo "❌ $ABI: libytdlp.zip.so ausente o <1MB (motor YT Music)"; FAIL=1; fi
           done
           if [ "$FAIL" = "1" ]; then
