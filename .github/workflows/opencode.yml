@@ -18,21 +18,36 @@ permissions:
 jobs:
   opencode-agent:
     name: OpenCode Agent (Muse Spark 1.3 Multimodal)
+    # ANTI-BUCLE: ignora eventos generados por bots (el propio agente publica
+    # comentarios con enlaces https://opencode.ai/s/... que contienen el
+    # substring "/opencode" y antes re-disparaban el workflow en cascada,
+    # generando 3-5 comentarios y hasta 8 PRs por un solo comando /oc).
+    # La validación fina del comando (token con frontera de palabra + descarte
+    # de marcadores del bot) se hace en el paso `run_guard`.
     if: |
-      (github.event_name == 'issues' && (
-        contains(github.event.issue.title, '/opencode') ||
-        contains(github.event.issue.title, '/oc') ||
-        contains(github.event.issue.body, '/opencode') ||
-        contains(github.event.issue.body, '/oc')
-      )) ||
-      (github.event_name == 'issue_comment' && (
-        contains(github.event.comment.body, '/opencode') ||
-        contains(github.event.comment.body, '/oc')
-      )) ||
-      (github.event_name == 'pull_request_review_comment' && (
-        contains(github.event.comment.body, '/opencode') ||
-        contains(github.event.comment.body, '/oc')
-      ))
+      github.event.sender.type != 'Bot' &&
+      github.actor != 'github-actions[bot]' &&
+      (
+        (github.event_name == 'issues' && (
+          contains(github.event.issue.title, '/opencode') ||
+          contains(github.event.issue.title, '/oc') ||
+          contains(github.event.issue.body, '/opencode') ||
+          contains(github.event.issue.body, '/oc')
+        )) ||
+        (github.event_name == 'issue_comment' && (
+          contains(github.event.comment.body, '/opencode') ||
+          contains(github.event.comment.body, '/oc')
+        )) ||
+        (github.event_name == 'pull_request_review_comment' && (
+          contains(github.event.comment.body, '/opencode') ||
+          contains(github.event.comment.body, '/oc')
+        ))
+      )
+    # ANTI-DUPLICADOS: un solo consumidor por issue/PR. Las ejecuciones se
+    # encolan (no se cancelan ni corren en paralelo), así 1 comando => 1 run => 1 PR.
+    concurrency:
+      group: opencode-${{ github.event.issue.number || github.event.pull_request.number }}
+      cancel-in-progress: false
     permissions:
       contents: write
       pull-requests: write
@@ -40,23 +55,67 @@ jobs:
 
     runs-on: ubuntu-latest
     steps:
+      - name: Guardia anti-bucle y validación de comando
+        id: run_guard
+        shell: python3 {0}
+        run: |
+          import os, re
+          event_name = os.environ.get("EVENT_NAME", "")
+          sender_type = os.environ.get("SENDER_TYPE", "")
+          actor = os.environ.get("ACTOR", "")
+          title = os.environ.get("ISSUE_TITLE", "") or ""
+          issue_body = os.environ.get("ISSUE_BODY", "") or ""
+          comment_body = os.environ.get("COMMENT_BODY", "") or ""
+          text = (title + "\n" + issue_body) if event_name == "issues" else comment_body
+          # Marcadores que identifican comentarios generados por el propio bot.
+          # NOTA: "https://opencode.ai/s/..." contiene el substring "/opencode"
+          # (la 2ª "/" de "://" + "opencode"), por eso el `contains` del `if`
+          # del job no basta y hay que excluirlos aquí explícitamente.
+          bot_markers = (
+              "opencode.ai/s/",
+              "[opencode session]",
+              "Created PR #",
+              "actions/runs/",
+          )
+          is_bot_actor = sender_type == "Bot" or actor == "github-actions[bot]"
+          is_bot_comment = any(m in text for m in bot_markers)
+          # Comando real: /oc u /opencode como token aislado (frontera de palabra),
+          # no como substring de URLs, rutas o palabras (p. ej. "/octubre", "/opencv").
+          has_command = re.search(r"(?:^|\s)/(?:oc|opencode)(?:\s|$|[,.:;!?])", text) is not None
+          should_run = (not is_bot_actor) and (not is_bot_comment) and has_command
+          print(f"event={event_name} sender_type={sender_type} actor={actor}")
+          print(f"is_bot_actor={is_bot_actor} is_bot_comment={is_bot_comment} has_command={has_command} => should_run={should_run}")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
+              f.write(f"should_run={'true' if should_run else 'false'}\n")
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          SENDER_TYPE: ${{ github.event.sender.type }}
+          ACTOR: ${{ github.actor }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+
       - name: Checkout del código del repositorio
+        if: steps.run_guard.outputs.should_run == 'true'
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.PAT_TOKEN }}   # <-- CAMBIO: tu PAT en lugar de GITHUB_TOKEN
 
       - name: Configurar identidad de Git para el Agente
+        if: steps.run_guard.outputs.should_run == 'true'
         run: |
           git config --global user.name "${{ github.repository_owner }}"   # <-- CAMBIO: tu nombre de usuario
           git config --global user.email "${{ secrets.PAT_EMAIL }}"        # <-- CAMBIO: tu email (guárdalo como secret, o pon tu noreply: ID+usuario@users.noreply.github.com)
 
       - name: Configurar Node.js (Runtime oficial de OpenCode)
+        if: steps.run_guard.outputs.should_run == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
       - name: Resolver Prompt y Descargar Imágenes para OpenCode Multimodal
+        if: steps.run_guard.outputs.should_run == 'true'
         id: prompt_resolver
         shell: python3 {0}
         run: |
@@ -135,6 +194,7 @@ jobs:
           COMMENT_BODY: ${{ github.event.comment.body }}
 
       - name: Ejecutar OpenCode CLI con Muse Spark 1.3
+        if: steps.run_guard.outputs.should_run == 'true'
         uses: anomalyco/opencode/github@latest
         with:
           use_github_token: true
