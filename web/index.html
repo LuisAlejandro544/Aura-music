@@ -64,6 +64,17 @@
     </div>
   </div>
 
+  <!-- ===================== MODAL: Hashes SHA-256 + VirusTotal ===================== -->
+  <div id="hashModal" class="custom-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="hashModalTitle">
+    <div class="custom-modal-box hash-box">
+      <h3 id="hashModalTitle">Verifica tu APK</h3>
+      <p>Hash oficial del release actual. Compáralo con tu descarga o ábrelo en VirusTotal.</p>
+      <p class="dim">Si VirusTotal aún no lo analizó, súbelo gratis ahí: el hash debe coincidir con este.</p>
+      <div id="hashRows"></div>
+      <button type="button" class="modal-btn modal-btn-alt" id="btnCloseHash">Cerrar</button>
+    </div>
+  </div>
+
   <!-- ===================== NAV STICKY ===================== -->
   <header class="site-header">
     <nav aria-label="Navegación principal">
@@ -140,10 +151,10 @@
       <p class="hero-kicker">Aura Beta • Codename <strong>Nebula</strong></p>
 
       <div class="badges-row">
-        <div class="badge-info virus">
+        <a class="badge-info virus" id="shaBadge" href="https://github.com/LuisAlejandro544/Aura-music/releases" target="_blank" rel="noopener" aria-disabled="true" title="Ver SHA256SUMS del release actual">
           <span class="material-symbols-rounded">verified_user</span>
           <span>Verificado SHA-256</span>
-        </div>
+        </a>
         <div class="badge-info size">
           <span class="material-symbols-rounded">phone_android</span>
           <span id="apkSizeBadge">Android 8.0+</span>

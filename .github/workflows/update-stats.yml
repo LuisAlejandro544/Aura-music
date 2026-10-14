@@ -26,11 +26,14 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           python3 - <<'EOF'
-          import json, urllib.request, datetime
+          import json, os, re, urllib.request, datetime
+
+          TOKEN = os.environ["GH_TOKEN"]
+          HEADERS = {"Accept": "application/vnd.github+json", "Authorization": "Bearer " + TOKEN}
 
           req = urllib.request.Request(
               "https://api.github.com/repos/LuisAlejandro544/Aura-music/releases?per_page=30",
-              headers={"Accept": "application/vnd.github+json", "Authorization": "Bearer " + __import__("os").environ["GH_TOKEN"]},
+              headers=HEADERS,
           )
           with urllib.request.urlopen(req, timeout=30) as r:
               releases = json.load(r)
@@ -46,6 +49,19 @@ jobs:
                "browser_download_url": a.get("browser_download_url", "")}
               for a in rel.get("assets", [])
           ]
+          # Hashes oficiales: se parsean del SHA256SUMS.txt del propio release.
+          sha256 = {}
+          sha_asset = next((a for a in rel.get("assets", []) if "SHA256SUMS" in str(a.get("name", ""))), None)
+          if sha_asset and sha_asset.get("browser_download_url"):
+              try:
+                  sreq = urllib.request.Request(sha_asset["browser_download_url"], headers={**HEADERS, "Accept": "application/octet-stream"})
+                  with urllib.request.urlopen(sreq, timeout=30) as sr:
+                      for line in sr.read().decode("utf-8", "replace").splitlines():
+                          m = re.match(r"^([0-9a-f]{64})\s+(.+)$", line.strip(), re.I)
+                          if m:
+                              sha256[m.group(2).strip()] = m.group(1).lower()
+              except Exception as e:
+                  print("aviso: sin SHA256SUMS:", e)
           stats = {
               "generated_at": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
               "tag_name": rel.get("tag_name", ""),
@@ -53,6 +69,7 @@ jobs:
               "published_at": rel.get("published_at", ""),
               "total_downloads": sum(a["download_count"] for a in assets),
               "assets": assets,
+              "sha256": sha256,
           }
           with open("web/data/stats.json", "w") as f:
               json.dump(stats, f, separators=(",", ":"))

@@ -11,6 +11,11 @@
   // URLs de capturas reales (postimg u otro host). Vacío = galería oculta.
   var SCREENSHOTS = [];
 
+  // Lo llena wireHashModal() en el INIT; applyRelease() lo usa si ya existe.
+  var setShaMap = null;
+  // Veredicto VirusTotal (web/data/vt.json, gratis y sin cuota).
+  var lastVtMap = {};
+
   /* ── Formateo ─────────────────────────────────────────────── */
   function fmtInt(n) {
     if (!n && n !== 0) return "…";
@@ -116,9 +121,19 @@
       });
       var sha     = findAsset("SHA256SUMS");
       var shaLink = document.getElementById("shaLink");
-      if (sha && shaLink) shaLink.href = sha.browser_download_url;
+      var shaBadge = document.getElementById("shaBadge");
+      if (sha) {
+        // Verificación real: el badge solo enlaza si el SHA256SUMS existe en el release.
+        if (shaLink) shaLink.href = sha.browser_download_url;
+        if (shaBadge) { shaBadge.href = sha.browser_download_url; shaBadge.removeAttribute("aria-disabled"); }
+      } else if (shaBadge) {
+        shaBadge.setAttribute("aria-disabled", "true");
+      }
+      // Nota: los hashes vienen en stats.json (el Action los parsea del
+      // SHA256SUMS). Descargar el SHA por navegador lo bloquea CORS.
       var label = document.getElementById("heroDownloadLabel");
       if (label) label.textContent = "Obtener APK Gratis";
+      if (setShaMap) setShaMap(rel.sha256 || {}, lastVtMap);
     }
 
     function fail(first) {
@@ -222,6 +237,10 @@
     function tick(first) {
       if (!first && !claimPollSlot()) return;
       loadJson().then(function (j) {
+        // Veredicto VT en paralelo (gratis); no bloquea el pintado.
+        fetchTimeout("./data/vt.json", 10000, true).then(function (v) {
+          if (v && v.tag_name === j.tag_name && v.files) lastVtMap = v.files;
+        }).catch(function () { /* sin veredicto: el modal lo indica */ });
         applyRelease(j);          // ← siempre pinta; nunca bloquea la UI
         saveCache(j, relETag);
         if (!jsonFresh(j) && Date.now() >= suspendedUntil) {
@@ -429,7 +448,74 @@
     });
   }
 
+  /* ── Modal de hashes SHA-256 + VirusTotal ──────────────────── */
+  function wireHashModal() {
+    var modal = document.getElementById("hashModal");
+    var rows  = document.getElementById("hashRows");
+    var badge = document.getElementById("shaBadge");
+    var close = document.getElementById("btnCloseHash");
+    var lastSha = {};
+    var lastVt = {};
+    function closeModal() { if (modal) modal.classList.remove("active"); }
+    if (close) close.addEventListener("click", closeModal);
+    if (modal) modal.addEventListener("click", function (e) { if (e.target === modal) closeModal(); });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeModal(); });
+    if (badge) badge.addEventListener("click", function (e) {
+      e.preventDefault(); // el modal muestra el hash; el href queda como fallback
+      if (!modal || !rows) return;
+      rows.textContent = "";
+      var names = Object.keys(lastSha);
+      if (!names.length) {
+        var p = document.createElement("p");
+        p.className = "dim";
+        p.textContent = "Aún sin hashes del release actual.";
+        rows.appendChild(p);
+      }
+      names.forEach(function (n) {
+        var h = lastSha[n];
+        var row = document.createElement("div"); row.className = "hash-row";
+        var t = document.createElement("p"); t.className = "hash-name"; t.textContent = n;
+        var c = document.createElement("code"); c.className = "hash-code"; c.textContent = h;
+        var info = lastVt[n] || {};
+        if (info.status === "clean" || info.status === "flagged") {
+          var vs = document.createElement("p");
+          vs.className = "vt-status " + info.status;
+          vs.textContent = info.status === "clean"
+            ? "✓ Limpio en VirusTotal · " + info.malicious + "/" + info.total
+            : "⚠ " + info.malicious + " detecciones en VirusTotal · ver informe";
+          row.appendChild(t); row.appendChild(c); row.appendChild(vs);
+        } else {
+          var vp = document.createElement("p");
+          vp.className = "vt-status pending";
+          vp.textContent = "No disponible por ahora.";
+          row.appendChild(t); row.appendChild(c); row.appendChild(vp);
+        }
+        var btns = document.createElement("div"); btns.className = "hash-btns";
+        var cp = document.createElement("button"); cp.type = "button"; cp.className = "mini-btn"; cp.textContent = "Copiar";
+        cp.addEventListener("click", function () {
+          function done() { cp.textContent = "¡Copiado!"; setTimeout(function () { cp.textContent = "Copiar"; }, 1500); }
+          if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(h).then(done, done);
+          else {
+            var ta = document.createElement("textarea"); ta.value = h;
+            document.body.appendChild(ta); ta.select();
+            try { document.execCommand("copy"); } catch (err) { /* portapapeles no disponible */ }
+            document.body.removeChild(ta); done();
+          }
+        });
+        var vt = document.createElement("a"); vt.className = "mini-btn"; vt.target = "_blank"; vt.rel = "noopener";
+        vt.href = (lastVt[n] && lastVt[n].permalink) || ("https://www.virustotal.com/gui/file/" + h);
+        vt.textContent = "VirusTotal";
+        btns.appendChild(cp); btns.appendChild(vt);
+        row.appendChild(btns);
+        rows.appendChild(row);
+      });
+      modal.classList.add("active");
+    });
+    return function (map, vt) { lastSha = map || {}; lastVt = (vt && vt.files) || vt || {}; };
+  }
+
   /* ── INIT ──────────────────────────────────────────────────── */
+  setShaMap = wireHashModal();
   wireDownloads();
   renderGallery();
   renderMd(RAW + "chanelog-beta.md", "changelogBox", 58);

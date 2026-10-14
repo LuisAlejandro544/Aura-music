@@ -1,0 +1,168 @@
+# Escaneo automático del último release en VirusTotal.
+# Requiere el secreto VIRUSTOTAL_API_KEY (key gratuita). Sin él, se omite sin fallar.
+# Guarda el veredicto en web/data/vt.json (el workflow update-stats no lo toca).
+name: Escaneo VirusTotal
+
+on:
+  release:
+    types: [published]
+  schedule:
+    - cron: "45 * * * *"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag a escanear (vacío = última Beta)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: virustotal-scan
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Escanear APKs en VirusTotal
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VT_KEY: ${{ secrets.VIRUSTOTAL_API_KEY }}
+          TAG_INPUT: ${{ inputs.tag }}
+        run: |
+          python3 - <<'EOF'
+          import json, os, re, time, hashlib, urllib.request, urllib.error, datetime
+
+          VT_KEY = os.environ.get("VT_KEY", "")
+          if not VT_KEY:
+              print("sin VIRUSTOTAL_API_KEY: se omite el escaneo")
+              raise SystemExit(0)
+
+          GH_TOKEN = os.environ["GH_TOKEN"]
+          TAG_INPUT = os.environ.get("TAG_INPUT", "").strip()
+          GH = {"Accept": "application/vnd.github+json", "Authorization": "Bearer " + GH_TOKEN}
+          VT = {"x-apikey": VT_KEY}
+
+          def gh_json(url):
+              req = urllib.request.Request(url, headers=GH)
+              with urllib.request.urlopen(req, timeout=30) as r:
+                  return json.load(r)
+
+          def vt_json(url, data=None, headers=None, timeout=60):
+              h = dict(VT); h.update(headers or {})
+              req = urllib.request.Request(url, data=data, headers=h, method="POST" if data is not None else "GET")
+              try:
+                  with urllib.request.urlopen(req, timeout=timeout) as r:
+                      return json.load(r), r.status
+              except urllib.error.HTTPError as e:
+                  try:
+                      return json.load(e), e.code
+                  except Exception:
+                      return {}, e.code
+
+          releases = gh_json("https://api.github.com/repos/LuisAlejandro544/Aura-music/releases?per_page=30")
+          if TAG_INPUT:
+              rel = next((x for x in releases if x.get("tag_name") == TAG_INPUT), None)
+          else:
+              rel = next((x for x in releases if x.get("prerelease") and "-beta" in str(x.get("tag_name", ""))), None)
+              rel = rel or (releases[0] if releases else None)
+          if not rel:
+              raise SystemExit("sin releases")
+          tag = rel.get("tag_name", "")
+          print("release:", tag)
+
+          try:
+              prev = json.load(open("web/data/vt.json"))
+          except Exception:
+              prev = {}
+          files = prev.get("files", {}) if prev.get("tag_name") == tag else {}
+          try:
+              known = (json.load(open("web/data/stats.json")) or {}).get("sha256", {}) or {}
+          except Exception:
+              known = {}
+
+          def record(name, sha, fstats, link=""):
+              mal = int(fstats.get("malicious", 0)) + int(fstats.get("suspicious", 0)) if fstats else 0
+              total = sum(int(fstats.get(k, 0)) for k in ("harmless", "undetected", "malicious", "suspicious", "timeout", "failure", "type-unsupported")) if fstats else 0
+              status = "clean" if (total and mal == 0) else ("flagged" if mal > 0 else "pending")
+              files[name] = {"sha256": sha, "status": status, "malicious": mal, "total": total,
+                             "permalink": link or ("https://www.virustotal.com/gui/file/" + sha),
+                             "analysed_at": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
+              print(name, "→", status, f"{mal}/{total}")
+
+          apks = [a for a in rel.get("assets", []) if str(a.get("name", "")).endswith(".apk")]
+          for a in apks:
+              name, url = a.get("name", ""), a.get("browser_download_url", "")
+              cur = files.get(name, {})
+              if cur.get("status") in ("clean", "flagged"):
+                  print(name, "ya verificado:", cur.get("status"))
+                  continue
+              # ¿VT ya lo conoce? (por el hash de stats.json, sin subir nada)
+              sha0 = known.get(name, "")
+              if sha0:
+                  time.sleep(16)
+                  frep, _ = vt_json("https://www.virustotal.com/api/v3/files/" + sha0)
+                  fstats = ((frep.get("data") or {}).get("attributes") or {}).get("last_analysis_stats") or {}
+                  if fstats:
+                      record(name, sha0, fstats)
+                      continue
+                  print(name, "VT no lo conoce: se sube")
+              time.sleep(16)  # límite gratis: 4 req/min
+              # Descargar APK para subirlo si hace falta
+              req = urllib.request.Request(url, headers={**GH, "Accept": "application/octet-stream"})
+              with urllib.request.urlopen(req, timeout=300) as r:
+                  blob = r.read()
+              print(name, "%.1f MB descargados" % (len(blob) / 1048576))
+              sha = hashlib.sha256(blob).hexdigest()
+              print(name, "sha256:", sha[:16] + "…")
+              up, _ = vt_json("https://www.virustotal.com/api/v3/files/upload_url")
+              time.sleep(16)
+              boundary = "----AuraFormBoundary7MA4YWxkTrZu0gW"
+              body = (f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{name}\"\r\n"
+                      f"Content-Type: application/vnd.android.package-archive\r\n\r\n").encode() + blob + f"\r\n--{boundary}--\r\n".encode()
+              ana, code = vt_json(up.get("data", ""), data=body,
+                                  headers={"Content-Type": "multipart/form-data; boundary=" + boundary}, timeout=300)
+              aid = ((ana.get("data") or {}).get("id", ""))
+              print(name, "análisis:", aid, "http:", code)
+              status, mal, total, link, done_at = "pending", 0, 0, "", ""
+              for _ in range(18):  # hasta ~18 min
+                  time.sleep(60)
+                  rep, _ = vt_json("https://www.virustotal.com/api/v3/analyses/" + aid)
+                  st = ((rep.get("data") or {}).get("attributes") or {}).get("status", "")
+                  print(name, "estado:", st)
+                  if st == "completed":
+                      stats = ((rep.get("data") or {}).get("attributes") or {}).get("stats", {}) or {}
+                      mal = int(stats.get("malicious", 0)) + int(stats.get("suspicious", 0))
+                      total = sum(int(stats.get(k, 0)) for k in ("harmless", "undetected", "malicious", "suspicious", "timeout", "failure", "type-unsupported"))
+                      break
+              # Ficha del archivo para el permalink y conteo final (por su SHA real).
+              time.sleep(16)
+              frep, _ = vt_json("https://www.virustotal.com/api/v3/files/" + sha)
+              fattr = ((frep.get("data") or {}).get("attributes") or {})
+              fstats = fattr.get("last_analysis_stats") or {}
+              if fstats:
+                  mal = int(fstats.get("malicious", 0)) + int(fstats.get("suspicious", 0))
+                  total = sum(int(fstats.get(k, 0)) for k in ("harmless", "undetected", "malicious", "suspicious", "timeout", "failure", "type-unsupported"))
+              link = fattr.get("permalink", "") or ("https://www.virustotal.com/gui/file/" + sha)
+              record(name, sha, fstats, link)
+
+          out = {"generated_at": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                 "tag_name": tag, "files": files}
+          os.makedirs("web/data", exist_ok=True)
+          with open("web/data/vt.json", "w") as f:
+              json.dump(out, f, separators=(",", ":"))
+              f.write("\n")
+          print("vt.json:", tag, len(files), "apks")
+          EOF
+
+      - name: Commit si cambió
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main || true
+          git add web/data/vt.json
+          git diff --cached --quiet && echo "sin cambios" || (git commit -m "Actualizo veredicto VirusTotal [bot]" && git push origin HEAD:main)
