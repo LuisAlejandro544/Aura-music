@@ -1481,7 +1481,18 @@ p.size:empty::before {
 .modal-btn-alt:hover { background: rgba(255,255,255,.14); }
 .hash-box { text-align: left; }
 .hash-box h3, .hash-box > p { text-align: center; }
-.hash-row { background: rgba(255,255,255,.04); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin: 10px 0; }
+.hash-rail { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; margin: 12px -4px 0; }
+.hash-rail::-webkit-scrollbar { display: none; }
+.hash-cell { flex: 0 0 100%; scroll-snap-align: center; padding: 0 4px; box-sizing: border-box; }
+.hash-nav { display: flex; align-items: center; justify-content: space-between; margin: 10px 0 2px; }
+.hash-arrow { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line); background: rgba(255,255,255,.05); color: var(--text); font-size: 22px; line-height: 1; cursor: pointer; }
+.hash-arrow:hover { border-color: var(--secondary); }
+.hash-dots { display: flex; gap: 8px; }
+.hash-dot { width: 9px; height: 9px; border-radius: 999px; border: none; background: rgba(255,255,255,.2); cursor: pointer; padding: 0; transition: width .2s var(--ease), background .2s var(--ease); }
+.hash-dot.active { width: 26px; background: var(--secondary); }
+.hash-row { background: rgba(255,255,255,.04); border: 1px solid var(--line); border-radius: 12px; padding: 16px 14px; margin: 10px 0; }
+.hash-abi { font-size: 20px; font-weight: 800; margin: 0; letter-spacing: -.01em; }
+.hash-cap { font-size: 11.5px; color: var(--text-dim); margin: 2px 0 10px; overflow-wrap: anywhere; }
 .hash-name { font-size: 12.5px; font-weight: 700; margin: 0 0 6px; overflow-wrap: anywhere; }
 .hash-code { display: block; font-size: 11.5px; color: var(--secondary); overflow-wrap: break-word; word-break: break-all; }
 .vt-status { font-size: 12.5px; font-weight: 700; margin: 8px 0 0; }
@@ -1491,6 +1502,7 @@ p.size:empty::before {
 .hash-btns { display: flex; gap: 8px; margin-top: 10px; }
 .mini-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255,255,255,.06); color: var(--text); font-weight: 800; font-size: 13px; cursor: pointer; text-decoration: none; }
 .mini-btn:hover { border-color: var(--secondary); }
+.mini-btn.primary { background: linear-gradient(135deg, var(--primary), var(--primary-d)); border-color: transparent; color: #fff; }
 
 @keyframes fadeIn {
   from { opacity: 0; }

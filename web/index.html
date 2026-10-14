@@ -70,7 +70,13 @@
       <h3 id="hashModalTitle">Verifica tu APK</h3>
       <p>Hash oficial del release actual. Compáralo con tu descarga o ábrelo en VirusTotal.</p>
       <p class="dim">Si VirusTotal aún no lo analizó, súbelo gratis ahí: el hash debe coincidir con este.</p>
-      <div id="hashRows"></div>
+      <div class="hash-rail" id="hashRail"></div>
+      <div class="hash-nav">
+        <button type="button" class="hash-arrow" id="hashPrev" aria-label="Anterior">‹</button>
+        <div class="hash-dots" id="hashDots"></div>
+        <button type="button" class="hash-arrow" id="hashNext" aria-label="Siguiente">›</button>
+      </div>
+      <div id="hashRows" hidden></div>
       <button type="button" class="modal-btn modal-btn-alt" id="btnCloseHash">Cerrar</button>
     </div>
   </div>

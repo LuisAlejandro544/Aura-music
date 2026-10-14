@@ -460,57 +460,111 @@
     if (close) close.addEventListener("click", closeModal);
     if (modal) modal.addEventListener("click", function (e) { if (e.target === modal) closeModal(); });
     document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeModal(); });
+    function abiOf(n) {
+      var m = String(n).match(/arm64-v8a|armeabi-v7a|universal/);
+      return m ? m[0] : n;
+    }
+    function detail(i, names) {
+      var n = names[i], h = lastSha[n];
+      var row = document.createElement("div"); row.className = "hash-row";
+      var ab = document.createElement("p"); ab.className = "hash-abi"; ab.textContent = abiOf(n);
+      var fp = document.createElement("p"); fp.className = "hash-cap"; fp.textContent = n;
+      var c = document.createElement("code"); c.className = "hash-code"; c.textContent = h;
+      var info = lastVt[n] || {};
+      var v = document.createElement("p");
+      if (info.status === "clean" || info.status === "flagged") {
+        v.className = "vt-status " + info.status;
+        v.textContent = info.status === "clean"
+          ? "✓ Limpio en VirusTotal · " + info.malicious + "/" + info.total
+          : "⚠ " + info.malicious + " detecciones en VirusTotal · ver informe";
+      } else {
+        v.className = "vt-status pending";
+        v.textContent = "No disponible por ahora.";
+      }
+      var btns = document.createElement("div"); btns.className = "hash-btns";
+      var cp = document.createElement("button"); cp.type = "button"; cp.className = "mini-btn"; cp.textContent = "Copiar hash";
+      cp.addEventListener("click", function () {
+        function done() { cp.textContent = "¡Copiado!"; setTimeout(function () { cp.textContent = "Copiar hash"; }, 1500); }
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(h).then(done, done);
+        else {
+          var ta = document.createElement("textarea"); ta.value = h;
+          document.body.appendChild(ta); ta.select();
+          try { document.execCommand("copy"); } catch (err) { /* portapapeles no disponible */ }
+          document.body.removeChild(ta); done();
+        }
+      });
+      var vt = document.createElement("a"); vt.className = "mini-btn primary"; vt.target = "_blank"; vt.rel = "noopener";
+      vt.href = (lastVt[n] && lastVt[n].permalink) || ("https://www.virustotal.com/gui/file/" + h);
+      vt.textContent = "Abrir en VirusTotal";
+      btns.appendChild(cp); btns.appendChild(vt);
+      row.appendChild(ab); row.appendChild(fp); row.appendChild(c); row.appendChild(v); row.appendChild(btns);
+      return row;
+    }
+    var railCur = 0, railNames = [];
+    function railGo(i) {
+      var rail = document.getElementById("hashRail");
+      var dots = document.getElementById("hashDots");
+      if (!rail || !railNames.length) return;
+      railCur = (i + railNames.length) % railNames.length; // ruleta infinita
+      if (rail.scrollTo) rail.scrollTo({ left: railCur * rail.clientWidth, behavior: "smooth" });
+      else rail.scrollLeft = railCur * rail.clientWidth;
+      if (dots) Array.from(dots.children).forEach(function (d, j) { d.classList.toggle("active", j === railCur); });
+    }
+    var prev = document.getElementById("hashPrev");
+    var next = document.getElementById("hashNext");
+    if (prev) prev.addEventListener("click", function () { railGo(railCur - 1); });
+    if (next) next.addEventListener("click", function () { railGo(railCur + 1); });
+    document.addEventListener("keydown", function (e) {
+      if (!modal.classList.contains("active")) return;
+      if (e.key === "ArrowLeft") railGo(railCur - 1);
+      if (e.key === "ArrowRight") railGo(railCur + 1);
+    });
     if (badge) badge.addEventListener("click", function (e) {
       e.preventDefault(); // el modal muestra el hash; el href queda como fallback
-      if (!modal || !rows) return;
-      rows.textContent = "";
-      var names = Object.keys(lastSha);
-      if (!names.length) {
+      var rail = document.getElementById("hashRail");
+      var dots = document.getElementById("hashDots");
+      if (!modal || !rail) return;
+      rail.textContent = "";
+      if (dots) dots.textContent = "";
+      railNames = Object.keys(lastSha);
+      if (!railNames.length) {
         var p = document.createElement("p");
         p.className = "dim";
         p.textContent = "Aún sin hashes del release actual.";
-        rows.appendChild(p);
+        rail.appendChild(p);
       }
-      names.forEach(function (n) {
-        var h = lastSha[n];
-        var row = document.createElement("div"); row.className = "hash-row";
-        var t = document.createElement("p"); t.className = "hash-name"; t.textContent = n;
-        var c = document.createElement("code"); c.className = "hash-code"; c.textContent = h;
-        var info = lastVt[n] || {};
-        if (info.status === "clean" || info.status === "flagged") {
-          var vs = document.createElement("p");
-          vs.className = "vt-status " + info.status;
-          vs.textContent = info.status === "clean"
-            ? "✓ Limpio en VirusTotal · " + info.malicious + "/" + info.total
-            : "⚠ " + info.malicious + " detecciones en VirusTotal · ver informe";
-          row.appendChild(t); row.appendChild(c); row.appendChild(vs);
-        } else {
-          var vp = document.createElement("p");
-          vp.className = "vt-status pending";
-          vp.textContent = "No disponible por ahora.";
-          row.appendChild(t); row.appendChild(c); row.appendChild(vp);
+      railNames.forEach(function (n, i) {
+        var cell = document.createElement("div");
+        cell.className = "hash-cell";
+        cell.appendChild(detail(i, railNames));
+        rail.appendChild(cell);
+        if (dots) {
+          var d = document.createElement("button");
+          d.type = "button"; d.className = "hash-dot" + (i === 0 ? " active" : "");
+          d.setAttribute("aria-label", abiOf(n));
+          d.addEventListener("click", function () { railGo(i); });
+          dots.appendChild(d);
         }
-        var btns = document.createElement("div"); btns.className = "hash-btns";
-        var cp = document.createElement("button"); cp.type = "button"; cp.className = "mini-btn"; cp.textContent = "Copiar";
-        cp.addEventListener("click", function () {
-          function done() { cp.textContent = "¡Copiado!"; setTimeout(function () { cp.textContent = "Copiar"; }, 1500); }
-          if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(h).then(done, done);
-          else {
-            var ta = document.createElement("textarea"); ta.value = h;
-            document.body.appendChild(ta); ta.select();
-            try { document.execCommand("copy"); } catch (err) { /* portapapeles no disponible */ }
-            document.body.removeChild(ta); done();
-          }
-        });
-        var vt = document.createElement("a"); vt.className = "mini-btn"; vt.target = "_blank"; vt.rel = "noopener";
-        vt.href = (lastVt[n] && lastVt[n].permalink) || ("https://www.virustotal.com/gui/file/" + h);
-        vt.textContent = "VirusTotal";
-        btns.appendChild(cp); btns.appendChild(vt);
-        row.appendChild(btns);
-        rows.appendChild(row);
       });
+      railCur = 0;
+      if (rail.scrollTo) rail.scrollTo({ left: 0, behavior: "auto" });
+      else rail.scrollLeft = 0;
       modal.classList.add("active");
     });
+    // Sincroniza el punto activo al deslizar con el dedo.
+    (function () {
+      var rail = document.getElementById("hashRail");
+      if (!rail) return;
+      var tm = null;
+      rail.addEventListener("scroll", function () {
+        if (tm) clearTimeout(tm);
+        tm = setTimeout(function () {
+          var dots = document.getElementById("hashDots");
+          railCur = Math.round(rail.scrollLeft / rail.clientWidth) || 0;
+          if (dots) Array.from(dots.children).forEach(function (d, j) { d.classList.toggle("active", j === railCur); });
+        }, 80);
+      });
+    })();
     return function (map, vt) { lastSha = map || {}; lastVt = (vt && vt.files) || vt || {}; };
   }
 
