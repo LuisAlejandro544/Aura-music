@@ -1206,6 +1206,26 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
       ?.sortedBy { it.name }
       ?.joinToString(", ") { "${it.name} (${it.length() / 1024} KB)" } ?: "ninguno"
     logger.lifecycle("📦 [Aura Gradle] Binarios arm64-v8a: $arm64Summary")
+
+    // FIX Beta YT Music en Explorar: verificación estricta de motores críticos.
+    // Antes un fallo de red en CI dejaba una Beta "recortada" (yt-dlp/python/quickjs
+    // incompletos) que solo fallaba en YT Music en el teléfono. Ahora se falla aquí.
+    val criticalAbis = if (isMobileOnly) listOf("arm64-v8a", "armeabi-v7a") else abis
+    val missingCritical = mutableListOf<String>()
+    for (abi in criticalAbis) {
+      val abiDir = File(jniLibsDir, abi)
+      val qjs = File(abiDir, "libqjs.so")
+      val pyZip = File(abiDir, "libpython.zip.so")
+      val pySo = File(abiDir, "libpython.so")
+      val ytdlpSo = File(abiDir, "libytdlp.zip.so")
+      if (!qjs.exists() || qjs.length() < 250_000L) missingCritical.add("$abi:libqjs.so<250KB")
+      if (!pyZip.exists() || pyZip.length() < 500_000L) missingCritical.add("$abi:libpython.zip.so<500KB")
+      if (!pySo.exists() || pySo.length() < 1_000L) missingCritical.add("$abi:libpython.so ausente")
+      if (!ytdlpSo.exists() || ytdlpSo.length() < 1_000_000L) missingCritical.add("$abi:libytdlp.zip.so<1MB")
+    }
+    if (missingCritical.isNotEmpty()) {
+      throw GradleException("Motores YT Music incompletos (${missingCritical.joinToString(", ")}). Re-ejecutar :app:provisionNativeDeps con red. No se empaqueta Beta recortada.")
+    }
     logger.lifecycle("🎉 [Aura Gradle] Motores nativos puros aprovisionados exitosamente para las 4 ABIs.")
   }
 }

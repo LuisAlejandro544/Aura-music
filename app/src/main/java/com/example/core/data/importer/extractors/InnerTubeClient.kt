@@ -35,14 +35,34 @@ object InnerTubeClient {
     /**
      * Resuelve los flujos multimedia probando clientes InnerTube en cascada.
      * @param audioQuality calidad elegida por el usuario (Opus/M4A); por defecto AUTO_HIFI.
+     * @param preferMusicFirst true para pistas YT Music: prueba ANDROID_MUSIC (music.youtube.com)
+     * en primer lugar, ya que los temas oficiales/Topic suelen devolver LOGIN_REQUIRED o solo-HLS
+     * en clientes VR/WEB. En Beta esto evita el fallo típico de YT Music en Explorar.
      */
     suspend fun resolve(
         videoId: String,
         originalUrl: String,
         audioQuality: com.example.core.model.StreamingAudioQuality =
             com.example.core.model.StreamingAudioQuality.AUTO_HIFI,
-        opusSupported: Boolean = true
+        opusSupported: Boolean = true,
+        preferMusicFirst: Boolean = originalUrl.contains("music.youtube.com", ignoreCase = true)
     ): OnlineVideoAudioImporter.ResolvedMediaInfo? = withContext(Dispatchers.IO) {
+        // Para YT Music: ANDROID_MUSIC primero (endpoint music.youtube.com nativo).
+        if (preferMusicFirst) {
+            val musicFirst = queryInnerTube(
+                videoId = videoId,
+                originalUrl = originalUrl,
+                endpointUrl = "https://music.youtube.com/youtubei/v1/player",
+                clientName = "ANDROID_MUSIC",
+                clientVersion = "6.42.52",
+                userAgent = "com.google.android.apps.youtube.music/6.42.52 (Linux; U; Android 14; es_ES) gzip",
+                extraClientProps = mapOf("androidSdkVersion" to 34),
+                audioQuality = audioQuality,
+                opusSupported = opusSupported
+            )
+            if (musicFirst != null) return@withContext musicFirst
+        }
+
         // Estrategia 1: ANDROID_VR (Meta Quest / VR). Entrega URLs directas sin signatureCipher ni n-sig.
         val vrResult = queryInnerTube(
             videoId = videoId,
@@ -71,19 +91,21 @@ object InnerTubeClient {
         )
         if (visionResult != null) return@withContext visionResult
 
-        // Estrategia 3: ANDROID_MUSIC (YouTube Music nativo)
-        val musicResult = queryInnerTube(
-            videoId = videoId,
-            originalUrl = originalUrl,
-            endpointUrl = "https://music.youtube.com/youtubei/v1/player",
-            clientName = "ANDROID_MUSIC",
-            clientVersion = "6.42.52",
-            userAgent = "com.google.android.apps.youtube.music/6.42.52 (Linux; U; Android 14; es_ES) gzip",
-            extraClientProps = mapOf("androidSdkVersion" to 34),
-            audioQuality = audioQuality,
-            opusSupported = opusSupported
-        )
-        if (musicResult != null) return@withContext musicResult
+        // Estrategia 3: ANDROID_MUSIC (YouTube Music nativo, omitido si ya se probó primero)
+        if (!preferMusicFirst) {
+            val musicResult = queryInnerTube(
+                videoId = videoId,
+                originalUrl = originalUrl,
+                endpointUrl = "https://music.youtube.com/youtubei/v1/player",
+                clientName = "ANDROID_MUSIC",
+                clientVersion = "6.42.52",
+                userAgent = "com.google.android.apps.youtube.music/6.42.52 (Linux; U; Android 14; es_ES) gzip",
+                extraClientProps = mapOf("androidSdkVersion" to 34),
+                audioQuality = audioQuality,
+                opusSupported = opusSupported
+            )
+            if (musicResult != null) return@withContext musicResult
+        }
 
         // Estrategia 4: IOS (Cliente nativo iPhone para pistas con restricción móvil en Android)
         val iosResult = queryInnerTube(

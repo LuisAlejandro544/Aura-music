@@ -206,23 +206,37 @@ object StreamingApiService {
         // esos casos con descifrado n-sig/cipher (CPython+QuickJS), extractor-args
         // youtube:player_client + po_token, cookies y selección bestaudio/bestvideo 480p.
         // Niveles: 1) yt-dlp → 2) InnerTube multi-cliente → 3) Invidious → 4) WebView.
+        // FIX Beta YT Music: si yt-dlp no está disponible en el teléfono (APK incompleto,
+        // OTA pendiente o Python sin inicializar) se omite al instante sin esperar 20s,
+        // y se va directo a InnerTube con prioridad ANDROID_MUSIC para no colgar Explorar.
         val platformLabel = if (item.platform == StreamingSourcePlatform.YOUTUBE) "YouTube" else "YT Music"
-        if (!forceBypassYtDlp && !YtDlpAutoUpdaterIsBlockedSafe()) {
-            val ytdlpResult = YtDlpNativeEngine.resolveStream(context, watchUrl, effectiveQuality)
-            val info = ytdlpResult.getOrNull()
-            if (info != null && (!info.audioUrl.isNullOrBlank() || info.videoUrl.isNotBlank())) {
-                return@withContext enrichAndRegister(info)
+        val isYtMusic = item.platform != StreamingSourcePlatform.YOUTUBE ||
+            watchUrl.contains("music.youtube.com", ignoreCase = true)
+        val ytdlpAvailable = !forceBypassYtDlp && !YtDlpAutoUpdaterIsBlockedSafe() &&
+            runCatching { YtDlpNativeEngine.isAvailable(context) }.getOrDefault(true)
+        if (ytdlpAvailable) {
+            val ytdlpResult = try {
+                kotlinx.coroutines.withTimeoutOrNull(12_000L) {
+                    YtDlpNativeEngine.resolveStream(context, watchUrl, effectiveQuality)
+                }?.getOrNull()
+            } catch (_: Throwable) { null }
+            if (ytdlpResult != null && (!ytdlpResult.audioUrl.isNullOrBlank() || ytdlpResult.videoUrl.isNotBlank())) {
+                return@withContext enrichAndRegister(ytdlpResult)
             } else {
                 AuraDebugManager.logWarning(TAG, "yt-dlp no resolvió $platformLabel \"${item.title}\". Continuando con InnerTube...")
             }
+        } else if (!forceBypassYtDlp) {
+            AuraDebugManager.logWarning(TAG, "yt-dlp no disponible en este teléfono; YT Music usa InnerTube directo sin espera.")
         }
 
-        // Respaldo automático si el stream tiene bloqueo en yt-dlp o recibió HTTP 403
+        // Respaldo automático si el stream tiene bloqueo en yt-dlp o recibió HTTP 403.
+        // YT Music prueba ANDROID_MUSIC primero (endpoint music.youtube.com nativo).
         val innerTubeFallback = InnerTubeClient.resolve(
             videoId = item.videoId,
             originalUrl = watchUrl,
             audioQuality = effectiveQuality,
-            opusSupported = opusOk
+            opusSupported = opusOk,
+            preferMusicFirst = isYtMusic
         )
         if (innerTubeFallback != null && (!innerTubeFallback.audioUrl.isNullOrBlank() || innerTubeFallback.videoUrl.isNotBlank())) {
             return@withContext enrichAndRegister(innerTubeFallback)
