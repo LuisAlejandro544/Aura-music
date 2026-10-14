@@ -43,11 +43,11 @@ android {
     applicationId = if (isBetaTaskRequested) "com.auramusic.beta" else "com.aistudio.musicplayer.aurasound"
     minSdk = 26
     targetSdk = 36
-    versionCode = 100201
-    versionName = "v0.2.1-beta.1f"
+    versionCode = 100202
+    versionName = "v0.2.2-beta.1f"
 
     buildConfigField("String", "APP_CODENAME", "\"Nebula\"")
-    buildConfigField("String", "APP_BUILD_CODE", "\"NEBULA-00201F\"")
+    buildConfigField("String", "APP_BUILD_CODE", "\"NEBULA-00202F\"")
     buildConfigField("boolean", "ENABLE_DEBUG_MONITOR", "true")
     buildConfigField("boolean", "ENABLE_DEMO_TRACKS", "true")
     val githubRepoSlug = (System.getenv("GITHUB_REPOSITORY")?.trim()?.takeIf { it.isNotEmpty() }) ?: "LuisAlejandro544/Aura-music"
@@ -183,14 +183,14 @@ android {
       signingConfig = signingConfigs.getByName("betaConfig")
       matchingFallbacks += listOf("release", "debug")
       buildConfigField("String", "APP_CODENAME", "\"Nebula\"")
-      buildConfigField("String", "APP_BUILD_CODE", "\"NEBULA-00201F\"")
+      buildConfigField("String", "APP_BUILD_CODE", "\"NEBULA-00202F\"")
       buildConfigField("boolean", "ENABLE_DEBUG_MONITOR", "false")
       buildConfigField("boolean", "ENABLE_DEMO_TRACKS", "false")
     }
     debug {
       signingConfig = signingConfigs.getByName("debugConfig")
       buildConfigField("String", "APP_CODENAME", "\"Nebula\"")
-      buildConfigField("String", "APP_BUILD_CODE", "\"NEBULA-00201F-DBG\"")
+      buildConfigField("String", "APP_BUILD_CODE", "\"NEBULA-00202F-DBG\"")
       buildConfigField("boolean", "ENABLE_DEBUG_MONITOR", "true")
       buildConfigField("boolean", "ENABLE_DEMO_TRACKS", "true")
     }

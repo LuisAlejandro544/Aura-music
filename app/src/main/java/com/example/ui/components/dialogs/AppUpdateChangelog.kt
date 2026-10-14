@@ -62,7 +62,7 @@ fun AppUpdateChangelog(
 
         // Resumen fijo: esta actualización incluye la base + el fix (para quienes no leen el changelog).
         Text(
-            text = "Incluye todo lo de la v0.2.0-beta-1a más las correcciones v0.2.1-beta.1f (formato auto, anti-cierres y Explorar).",
+            text = "Parche v0.2.2-beta.1f: descargas de videos por URL arregladas, modo Explorar al 100% y errores menores corregidos.",
             style = MaterialTheme.typography.bodySmall.copy(
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.SemiBold,
@@ -105,7 +105,7 @@ fun AppUpdateChangelog(
  */
 fun formatChangelogForDisplay(raw: String, tagName: String): String {
     if (raw.isBlank()) {
-        return "Nueva versión $tagName disponible para Aura Beta. Incluye todo lo de la v0.2.0-beta-1a más las correcciones v0.2.1-beta.1f."
+        return "Nueva versión $tagName disponible para Aura Beta. Parche de errores: descargas de videos por URL arregladas, modo Explorar al 100% y errores menores corregidos."
     }
     val linkRegex = Regex("""\[([^\]]+)]\(([^)]+)\)""")
     val lines = raw.lines()
