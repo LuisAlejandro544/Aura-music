@@ -6,17 +6,24 @@
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
 # Reglas quirúrgicas de R8 / ProGuard para Aura Music y Aura Beta:
-# 1. Ofuscación activa en APK Beta y Release (sin -dontobfuscate), renombrando clases/métodos/campos a identificadores de 1 letra
-#    y unificando todo en el paquete 'a' para compactar la tabla de strings en un único archivo classes.dex.
+# 1. Ofuscación activa en APK Beta y Release (sin -dontobfuscate), renombrando clases/métodos/campos
+#    y unificando en el paquete 'a' para compactar en un único archivo classes.dex, SIN
+#    -overloadaggressively/-mergeinterfacesaggressively/-allowaccessmodification (rompían
+#    OkHttp/Okio/Coil/Media3 por reflexión y tumbaban Descarga por URL + Explorar en Beta).
 # 2. Eliminación de comodines amplios ({ *; }) en Activities/Services y de -keep class com.example.model.** { *; },
 #    permitiendo que R8 elimine al 100% DebugMonitorActivity y su UI en el APK Beta, y haga inlining/poda de métodos no usados.
 # 3. Eliminación automática de logs de depuración (android.util.Log.v/d/i) y chequeos Intrinsics de Kotlin.
+# 4. Keeps quirúrgicos para la pila de red/streaming (okhttp3/okio/coil/media3/webkit/corrutinas)
+#    + JNI NativeAudioEngine con paquete preservado + tablas de línea para stacks Beta útiles.
 
 # 1. Preservar el puente JNI hacia el motor nativo C++20 (libauramusic_dsp.so)
-# Solo se preservan los nombres de métodos 'native' para que el enlace dinámico JNI funcione sin impedir la ofuscación del resto.
--keep class com.example.core.playback.NativeAudioEngine {
-    native <methods>;
+# La clase completa se conserva con su nombre/paquete original para que los símbolos
+# estáticos Java_com_example_core_playback_NativeAudioEngine_* sigan coincidiendo
+# tras -repackageclasses 'a' (las clases con -keep no se reempaquetan).
+-keep,allowshrinking class com.example.core.playback.NativeAudioEngine {
+    *;
 }
+-keeppackagenames com.example.core.playback
 -keepclasseswithmembernames class * {
     native <methods>;
 }
@@ -48,13 +55,56 @@
     public static ** valueOf(java.lang.String);
 }
 
-# 5. Ofuscación máxima, unificación de paquete y compactación de Strings en un solo archivo DEX (Single DEX)
+# 5. Ofuscación compacta en un solo archivo DEX (Single DEX) SIN flags que rompen
+# la pila de red/descarga-streaming (Descarga por URL + Explorar).
+# Se eliminan -overloadaggressively, -mergeinterfacesaggressively y -allowaccessmodification
+# porque renombran/fusionan métodos que OkHttp/Okio/Coil/Media3 resuelven por reflexión
+# (Platform, Conscrypt, interceptores, MediaSessionService) y provocaban en Beta
+# NoSuchMethodError/ClassNotFoundException en la cascada InnerTube/Invidious/Chunked/WebView.
 -optimizationpasses 5
--allowaccessmodification
 -repackageclasses 'a'
 -flattenpackagehierarchy 'a'
--overloadaggressively
--mergeinterfacesaggressively
+
+# 5b. Pila de red y streaming usada por Descarga por URL y Explorar (OkHttp directo +
+# org.json + WebView + Coil + Media3 + corrutinas). Sin estos -keep, R8 fullMode poda
+# clases llamadas por reflexión y la cascada de 5 niveles nunca completa en Beta.
+-keep class okhttp3.** { *; }
+-keep interface okhttp3.** { *; }
+-keep class okio.** { *; }
+-keep class org.json.** { *; }
+-keep class coil.** { *; }
+-keep class androidx.media3.** { *; }
+-keep class androidx.media.** { *; }
+-keep class kotlinx.coroutines.** { *; }
+# Conscrypt/Platform de OkHttp: detección por reflexión del proveedor TLS en Android.
+-keep class com.android.org.conscrypt.** { *; }
+-keep class org.conscrypt.** { *; }
+# WebView del nivel 4 de la cascada (HeadlessWebViewExtractor): callbacks invocados por el framework.
+-keepclassmembers class * extends android.webkit.WebViewClient {
+    public *;
+}
+-keepclassmembers class * extends android.webkit.WebChromeClient {
+    public *;
+}
+-keepclassmembers class android.webkit.WebView {
+    public *;
+}
+# Servicios de notificación/reproducción invocados por el sistema (MediaSessionService + workers).
+-keepclassmembers class * extends androidx.media3.session.MediaSessionService {
+    public *;
+}
+-keepclassmembers class * extends android.app.Service {
+    public *;
+}
+-keepclassmembers class * extends androidx.work.Worker {
+    public *;
+}
+-keepclassmembers class * extends androidx.work.ListenableWorker {
+    public *;
+}
+# Serialización org.json / modelos de InnerTube/Invidious/SoundCloud/LRCLIB: conservar firmas.
+-keepclassmembers class com.example.core.data.importer.** { *; }
+-keepclassmembers class com.example.feature.streaming.** { *; }
 
 # 6. Eliminar logs de depuración de Android y chequeos nulos/trazas de Kotlin en Release y Beta
 -assumenosideeffects class android.util.Log {
@@ -78,12 +128,16 @@
     public static void throwUninitializedPropertyAccessException(java.lang.String);
 }
 
-# 7. Omitir tablas de nombres de archivos y números de línea (SourceFile, LineNumberTable) y metadatos de reflexión Kotlin
-# para reducir drásticamente el peso de classes.dex y maximizar la ofuscación del APK Beta/Release.
--renamesourcefileattribute ''
--keepattributes *Annotation*,InnerClasses,EnclosingMethod,Signature
+# 7. Ofuscación de nombres de archivo pero CONSERVANDO tablas de línea y excepciones
+# para que los crashes Beta (Descarga por URL / Explorar) lleguen con stack útil.
+# Coste en peso mínimo (~KBs) a cambio de poder diagnosticar NoSuchMethodError/SSL/zipimport.
+-renamesourcefileattribute 'SourceFile'
+-keepattributes *Annotation*,InnerClasses,EnclosingMethod,Signature,Exceptions,LineNumberTable,SourceFile
 -dontwarn kotlin.Metadata
 -dontwarn okio.**
+-dontwarn okhttp3.**
+-dontwarn coil.**
+-dontwarn androidx.media3.**
 -dontwarn retrofit2.**
 -dontwarn kotlinx.coroutines.**
 -dontwarn com.google.errorprone.annotations.**

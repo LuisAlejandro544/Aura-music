@@ -210,8 +210,17 @@ fun LazyListScope.enginesAndDiagnosticsSettingsContent(
                     Spacer(modifier = Modifier.height(14.dp))
                     Button(
                         onClick = {
-                            val intent = android.content.Intent(context, com.example.debug.DebugMonitorActivity::class.java)
-                            context.startActivity(intent)
+                            // En Beta la actividad está eliminada del manifiesto (tools:node="remove"):
+                            // resolución segura por nombre para evitar ActivityNotFoundException/NoClassDefFoundError.
+                            try {
+                                val clazz = Class.forName("com.example.debug.DebugMonitorActivity")
+                                val intent = android.content.Intent(context, clazz)
+                                if (intent.resolveActivity(context.packageManager) != null) {
+                                    context.startActivity(intent)
+                                }
+                            } catch (_: Throwable) {
+                                // Beta/Release sin Aura Monitor: no-op seguro.
+                            }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                         shape = RoundedCornerShape(12.dp),
