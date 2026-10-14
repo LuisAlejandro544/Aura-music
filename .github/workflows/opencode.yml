@@ -2,7 +2,7 @@ name: OpenCode Assistant (Zen & Muse Spark)
 
 on:
   issues:
-    types: [opened, edited]
+    types: [opened]
   issue_comment:
     types: [created]
   pull_request_review_comment:
@@ -18,20 +18,36 @@ permissions:
 jobs:
   opencode-agent:
     name: OpenCode Agent (Muse Spark 1.3 Multimodal)
+    # Concurrencia: un solo run activo por issue/PR. Si llegan varios eventos
+    # seguidos (opened + comentarios), se cancela el anterior y solo queda uno,
+    # evitando N comentarios y hasta N PRs duplicados.
+    concurrency:
+      group: opencode-${{ github.event.issue.number || github.event.pull_request.number || github.run_id }}
+      cancel-in-progress: true
+    # Filtros anti-duplicado:
+    # 1. '/oc' suelto (no 'contains /oc' genérico que casa con '/opencode',
+    #    '/octubre', URLs, etc.). Se exige '/opencode' o '/oc' como comando
+    #    independiente ('/oc ' o terminando en '/oc').
+    # 2. Guard anti-bot: el propio bot nunca debe re-dispararse con sus
+    #    comentarios (causa del bucle de 3-5 comentarios por issue).
     if: |
       (github.event_name == 'issues' && (
         contains(github.event.issue.title, '/opencode') ||
-        contains(github.event.issue.title, '/oc') ||
         contains(github.event.issue.body, '/opencode') ||
-        contains(github.event.issue.body, '/oc')
+        contains(github.event.issue.title, '/oc ') ||
+        contains(github.event.issue.body, '/oc ') ||
+        endsWith(github.event.issue.title, '/oc') ||
+        endsWith(github.event.issue.body, '/oc')
       )) ||
-      (github.event_name == 'issue_comment' && (
+      (github.event_name == 'issue_comment' && github.event.comment.user.type != 'Bot' && github.actor != 'github-actions[bot]' && (
         contains(github.event.comment.body, '/opencode') ||
-        contains(github.event.comment.body, '/oc')
+        contains(github.event.comment.body, '/oc ') ||
+        endsWith(github.event.comment.body, '/oc')
       )) ||
-      (github.event_name == 'pull_request_review_comment' && (
+      (github.event_name == 'pull_request_review_comment' && github.event.comment.user.type != 'Bot' && github.actor != 'github-actions[bot]' && (
         contains(github.event.comment.body, '/opencode') ||
-        contains(github.event.comment.body, '/oc')
+        contains(github.event.comment.body, '/oc ') ||
+        endsWith(github.event.comment.body, '/oc')
       ))
     permissions:
       contents: write
