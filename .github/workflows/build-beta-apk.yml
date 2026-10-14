@@ -102,7 +102,28 @@ jobs:
             echo "✅ NDK configurado para Gradle y CMake: $NDK_PATH"
           fi
 
-      - name: 🔧 6. Preparar Gradle Wrapper (Cero Caché)
+      - name: 💾 6A. Caché Inteligente de Gradle y Dependencias Maven
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', 'gradle/libs.versions.toml') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      - name: 💾 6B. Caché Inteligente de Motores Nativos (CPython, FFmpeg, QuickJS, yt-dlp)
+        id: cache-native-deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            app/src/main/jniLibs
+            app/src/main/assets/bin
+          key: native-pure-mobile-${{ runner.os }}-${{ hashFiles('app/build.gradle.kts', 'gradle/libs.versions.toml', 'app/src/main/cpp/*') }}
+          restore-keys: |
+            native-pure-mobile-${{ runner.os }}-
+
+      - name: 🔧 6C. Preparar Gradle Wrapper
         run: |
           if [ ! -f "./gradlew" ]; then
             gradle wrapper || true
@@ -141,15 +162,18 @@ jobs:
             echo "⚠️ No se encontraron todos los Secrets de firma personalizada; se restaurará debug.keystore.base64 de respaldo para no abortar la compilación."
           fi
 
-      - name: ⚙️ 8. Aprovisionar Motores Nativos Puros Solo para Móvil (arm64-v8a y armeabi-v7a, Sin Caché)
+      - name: ⚙️ 8. Aprovisionar Motores Nativos Puros Solo para Móvil (arm64-v8a y armeabi-v7a, con caché)
+        # La caché evita APKs Beta incompletos por descargas parciales (causa de fallos de YT Music en Explorar):
+        # si la caché es válida se reutiliza; si no, se re-aprovisiona completo y se verifica.
+        if: steps.cache-native-deps.outputs.cache-hit != 'true'
         env:
           AURA_BETA_MOBILE_ONLY: "true"
         run: |
           echo "=== Limpiando cualquier residuo de arquitecturas de PC (x86 / x86_64) ==="
           rm -rf app/src/main/jniLibs/x86 app/src/main/jniLibs/x86_64
 
-          echo "=== Ejecutando tarea Gradle :app:provisionNativeDeps (Sin Caché, Solo Móvil 32/64 bits) ==="
-          ./gradlew :app:provisionNativeDeps --no-daemon --no-build-cache --rerun-tasks --stacktrace
+          echo "=== Ejecutando tarea Gradle :app:provisionNativeDeps (Solo Móvil 32/64 bits) ==="
+          ./gradlew :app:provisionNativeDeps --no-daemon --stacktrace
 
       - name: 🔍 9. Auditar Binarios Nativos Móviles Ensamblados (arm64-v8a, armeabi-v7a y yt-dlp)
         run: |
@@ -158,13 +182,31 @@ jobs:
           echo ""
           echo "=== Auditoría de ejecutables en Assets (app/src/main/assets/bin) ==="
           ls -lh app/src/main/assets/bin/ || true
+          echo ""
+          echo "=== Verificación estricta YT Music / Explorar (falla si falta motor crítico) ==="
+          FAIL=0
+          for ABI in arm64-v8a armeabi-v7a; do
+            QJS="app/src/main/jniLibs/$ABI/libqjs.so"
+            PYZIP="app/src/main/jniLibs/$ABI/libpython.zip.so"
+            PYSO="app/src/main/jniLibs/$ABI/libpython.so"
+            YTDLP="app/src/main/jniLibs/$ABI/libytdlp.zip.so"
+            if [ ! -f "$QJS" ] || [ "$(stat -c%s "$QJS")" -lt 250000 ]; then echo "❌ $ABI: libqjs.so ausente o <250KB (motor JS para n-sig/cipher)"; FAIL=1; fi
+            if [ ! -f "$PYZIP" ] || [ "$(stat -c%s "$PYZIP")" -lt 500000 ]; then echo "❌ $ABI: libpython.zip.so ausente o <500KB (stdlib yt-dlp)"; FAIL=1; fi
+            if [ ! -f "$PYSO" ] || [ "$(stat -c%s "$PYSO")" -lt 1000 ]; then echo "❌ $ABI: libpython.so ausente (lanzador PIE)"; FAIL=1; fi
+            if [ ! -f "$YTDLP" ] || [ "$(stat -c%s "$YTDLP")" -lt 1000000 ]; then echo "❌ $ABI: libytdlp.zip.so ausente o <1MB (motor YT Music)"; FAIL=1; fi
+          done
+          if [ "$FAIL" = "1" ]; then
+            echo "❌ APK Beta incompleto: re-ejecutar provisionNativeDeps sin caché. No se compila para no shipping YT Music roto."
+            exit 1
+          fi
+          echo "✅ Motores YT Music verificados (QuickJS + CPython + yt-dlp) en ambas ABIs."
 
-      - name: 🚀 10. Compilar los 3 APKs de Aura Beta (arm64-v8a, armeabi-v7a y Universal) Sin Caché
+      - name: 🚀 10. Compilar los 3 APKs de Aura Beta (arm64-v8a, armeabi-v7a y Universal)
         env:
           AURA_BETA_MOBILE_ONLY: "true"
         run: |
-          echo "Iniciando compilación limpia de Aura Beta ($VERSION_TAG - $APP_CODENAME)..."
-          ./gradlew :app:assembleBeta --no-daemon --no-build-cache --stacktrace
+          echo "Iniciando compilación de Aura Beta ($VERSION_TAG - $APP_CODENAME)..."
+          ./gradlew :app:assembleBeta --no-daemon --stacktrace
 
       - name: 📂 11. Organizar y Renombrar Estratégicamente los 3 APKs + Sumas SHA-256
         run: |

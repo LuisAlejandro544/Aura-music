@@ -48,12 +48,13 @@ internal object YouTubeMusicSearchEngine {
     internal fun parseYouTubeMusicSearchResults(root: JSONObject): List<StreamingSearchItem> {
         val items = mutableListOf<StreamingSearchItem>()
         val seenIds = mutableSetOf<String>()
+        // FIX Beta YT Music: la API WEB_REMIX varía su forma según la query (canciones, videos,
+        // álbumes). Antes solo se parseaba musicResponsiveListItemRenderer y Explorar quedaba
+        // vacío para muchas búsquedas. Ahora se cubren todos los renderers conocidos.
         val renderers = mutableListOf<JSONObject>()
         StreamingSearchUtils.collectJsonObjectsByKey(root, "musicResponsiveListItemRenderer", renderers)
-
         for (renderer in renderers) {
-            val playlistItemData = renderer.optJSONObject("playlistItemData")
-            val videoId = playlistItemData?.optString("videoId", "") ?: ""
+            val videoId = extractMusicVideoId(renderer) ?: continue
             if (videoId.length != 11 || !seenIds.add(videoId)) continue
 
             val flexColumns = renderer.optJSONArray("flexColumns") ?: continue
@@ -111,7 +112,84 @@ internal object YouTubeMusicSearchEngine {
             )
             if (items.size >= 25) break
         }
+        // Fallback 1: musicTwoRowItemRenderer (álbumes / tarjetas YT Music con navigationEndpoint).
+        if (items.size < 5) {
+            val twoRow = mutableListOf<JSONObject>()
+            StreamingSearchUtils.collectJsonObjectsByKey(root, "musicTwoRowItemRenderer", twoRow)
+            for (renderer in twoRow) {
+                val videoId = extractMusicVideoId(renderer) ?: continue
+                if (videoId.length != 11 || !seenIds.add(videoId)) continue
+                val titleObj = renderer.optJSONObject("title")
+                val title = StreamingSearchUtils.extractTextFromRuns(titleObj).ifBlank {
+                    renderer.optString("headline", "").trim()
+                }
+                if (title.isBlank()) continue
+                val subtitle = renderer.optJSONObject("subtitle")
+                val artist = StreamingSearchUtils.extractTextFromRuns(subtitle)
+                    .split("•", "·").firstOrNull()?.trim().orEmpty()
+                    .replace(" - Topic", "").ifBlank { "YouTube Music" }
+                val thumb = StreamingSearchUtils.extractBestThumbnail(renderer.optJSONObject("thumbnailRenderer")?.optJSONObject("musicThumbnailRenderer")?.optJSONObject("thumbnail"))
+                    .ifBlank { StreamingSearchUtils.extractBestThumbnail(renderer.optJSONObject("thumbnail")) }
+                    .ifBlank { "https://i.ytimg.com/vi/$videoId/hqdefault.jpg" }
+                items.add(
+                    StreamingSearchItem(
+                        videoId = videoId, title = title, artist = artist,
+                        album = "YT Music", durationSeconds = 0L,
+                        thumbnailUrl = thumb, platform = StreamingSourcePlatform.YT_MUSIC
+                    )
+                )
+                if (items.size >= 25) break
+            }
+        }
+        // Fallback 2: videoRenderer dentro de la respuesta de music.youtube.com (mezclas / videos).
+        if (items.size < 5) {
+            val videoRenderers = mutableListOf<JSONObject>()
+            StreamingSearchUtils.collectJsonObjectsByKey(root, "videoRenderer", videoRenderers)
+            for (renderer in videoRenderers) {
+                val videoId = renderer.optString("videoId", "")
+                if (videoId.length != 11 || !seenIds.add(videoId)) continue
+                val title = StreamingSearchUtils.extractTextFromRuns(renderer.optJSONObject("title"))
+                if (title.isBlank()) continue
+                val artist = StreamingSearchUtils.extractTextFromRuns(renderer.optJSONObject("ownerText"))
+                    .ifBlank { StreamingSearchUtils.extractTextFromRuns(renderer.optJSONObject("longBylineText")) }
+                    .replace(" - Topic", "").ifBlank { "YouTube Music" }
+                val thumb = StreamingSearchUtils.extractBestThumbnail(renderer.optJSONObject("thumbnail"))
+                    .ifBlank { "https://i.ytimg.com/vi/$videoId/hqdefault.jpg" }
+                items.add(
+                    StreamingSearchItem(
+                        videoId = videoId, title = title, artist = artist,
+                        album = "YT Music", durationSeconds = StreamingSearchUtils.parseDurationTextToSeconds(
+                            StreamingSearchUtils.extractTextFromRuns(renderer.optJSONObject("lengthText"))
+                        ),
+                        thumbnailUrl = thumb, platform = StreamingSourcePlatform.YT_MUSIC
+                    )
+                )
+                if (items.size >= 25) break
+            }
+        }
         return items
+    }
+
+    /**
+     * Extrae el videoId de 11 chars de cualquier renderer de YT Music, probando en orden:
+     * playlistItemData.videoId → navigationEndpoint.watchEndpoint.videoId → overlay →
+     * cualquier videoId de 11 chars en el subárbol.
+     */
+    private fun extractMusicVideoId(renderer: JSONObject): String? {
+        renderer.optJSONObject("playlistItemData")?.optString("videoId", "")?.takeIf { it.length == 11 }?.let { return it }
+        renderer.optJSONObject("navigationEndpoint")?.optJSONObject("watchEndpoint")?.optString("videoId", "")?.takeIf { it.length == 11 }?.let { return it }
+        renderer.optJSONObject("overlay")?.optJSONObject("musicItemThumbnailOverlayRenderer")
+            ?.optJSONObject("content")?.optJSONObject("musicPlayButtonRenderer")
+            ?.optJSONObject("playNavigationEndpoint")?.optJSONObject("watchEndpoint")
+            ?.optString("videoId", "")?.takeIf { it.length == 11 }?.let { return it }
+        // Barrido genérico: primer videoId válido en el subárbol (cubre dobleClickEndpoint, etc.).
+        val found = mutableListOf<JSONObject>()
+        StreamingSearchUtils.collectJsonObjectsByKey(renderer, "watchEndpoint", found)
+        for (node in found) {
+            val id = node.optString("videoId", "")
+            if (id.length == 11) return id
+        }
+        return null
     }
 
 }

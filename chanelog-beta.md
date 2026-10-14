@@ -28,6 +28,11 @@
 4. 🪟 **Pantalla de actualización legible con TODO incluido**:
    - El diálogo **"Nueva Versión Disponible"** ahora muestra el texto limpio y legible (sin símbolos `#`, `>`, `*` de Markdown), con el resumen de la **`v0.2.0-beta-1a` + `v0.2.1-beta.1f`** para quienes no leen el changelog antes de descargar.
    - Botones reorganizados y sin recortes en pantallas compactas de 720px, y área de novedades con altura limitada y desplazamiento propio (sin barras fantasma ni píldoras grises).
+5. 🎵 **YT Music en Explorar pulido para APK Beta (sin recortes)**:
+   - La Beta ahora usa **caché inteligente de motores nativos** (igual que Debug) y **auditoría estricta en CI** (`libqjs.so ≥250KB`, `libpython.zip.so`, `libytdlp.zip.so ≥1MB` en `arm64-v8a`/`armeabi-v7a`): si un motor queda incompleto, la compilación falla en vez de publicar una Beta que solo falla en YT Music.
+   - Al reproducir **YT MUSIC**, si `yt-dlp` no está listo en el teléfono se **omite al instante** (sin esperar 20s) y se resuelve por **InnerTube con prioridad `ANDROID_MUSIC` (music.youtube.com primero)**; con `yt-dlp` disponible se le da **12s máximo** antes del fallback, para no colgar Explorar.
+   - La búsqueda YT Music ahora parsea **todos los renderers** (`musicResponsiveListItemRenderer` + `musicTwoRowItemRenderer` + `videoRenderer`) y extrae el `videoId` por 4 vías (`playlistItemData`, `watchEndpoint`, `overlay`, barrido genérico), así deja de devolver listas vacías según la query.
+   - `extractVideoId` reconoce explícitamente **`music.youtube.com`** para no perder el ID en enlaces de YT Music.
 
 ---
 
