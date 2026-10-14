@@ -166,10 +166,16 @@ android {
       applicationIdSuffix = ""
       // Para la versión Beta el identificador es com.auramusic.beta -> Android/data/com.auramusic.beta
       isDebuggable = false
+      // FIX Beta funcional (Descarga por URL + Explorar): sin poda R8/recursos.
+      // Debug funciona porque no minifica; Beta crasheaba con fullMode + repackage +
+      // overloadaggressively sobre OkHttp/Okio/Coil/Media3/WebView y JNI estático.
+      // Se desactiva minify/shrink en Beta para no omitir nada (APK algo más pesado pero 100% funcional).
       multiDexEnabled = false
       isCrunchPngs = true
-      isMinifyEnabled = true
-      isShrinkResources = true
+      isMinifyEnabled = false
+      isShrinkResources = false
+      // Se conservan los proguardFiles por si Release los necesita, pero al estar
+      // minify desactivado R8 no poda nada en Beta.
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig = signingConfigs.getByName("betaConfig")
       matchingFallbacks += listOf("release", "debug")
@@ -725,45 +731,27 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
     val stdlibPycZip = resolvedPythonFiles.firstOrNull { it.name.contains("stdlib") }
     val pythonLauncherC = File(cppDir, "native_python_launcher.c")
 
-    // Paquetes y directorios de escritorio/test/servidores legados en stdlib que yt-dlp jamás utiliza en Android
-    val prunedStdlibPrefixes = listOf(
-      "test/", "tests/", "unittest/", "tkinter/", "idlelib/", "turtledemo/",
-      "pydoc_data/", "distutils/", "lib2to3/", "ensurepip/", "venv/", "curses/", "dbm/", "msilib/",
-      "multiprocessing/popen_", "multiprocessing/resource_", "multiprocessing/forkserver", "multiprocessing/shared_memory",
-      "wsgiref/", "xmlrpc/"
-    )
-    val prunedStdlibExact = setOf(
-      "turtle.pyc", "turtle.py", "doctest.pyc", "doctest.py", "pdb.pyc",
-      "_pydecimal.pyc", "_pydecimal.py", "pydoc.pyc", "pydoc.py",
-      "mailbox.pyc", "mailbox.py", "pickletools.pyc", "pickletools.py",
-      "difflib.pyc", "difflib.py", "smtpd.pyc", "smtplib.pyc", "imaplib.pyc",
-      "poplib.pyc", "nntplib.pyc", "ftplib.pyc", "telnetlib.pyc",
-      "antigravity.pyc", "this.pyc", " tabnanny.pyc", "tabnanny.pyc",
-      "cProfile.pyc", "profile.pyc", "pstats.pyc", "timeit.pyc", "trace.pyc",
-      "modulefinder.pyc", " symtable.pyc", "symtable.pyc", " wave.pyc", "sunau.pyc", "aifc.pyc", "chunk.pyc",
-      "sndhdr.pyc", "ossaudiodev.pyc", "crypt.pyc", "pty.pyc", "tty.pyc", "pipes.pyc", "mailcap.pyc", "xdrlib.pyc"
-    )
+    // FIX Beta funcional: SIN poda de stdlib. yt-dlp (motor por defecto YTDLP de
+    // Descarga por URL / Explorar) falla en runtime con `No module named ...` /
+    // `CERTIFICATE_VERIFY_FAILED` / `zipimport` roto si falta _pydecimal, difflib,
+    // codecs, ssl, hashlib, etc. Debug funcionaba con jniLibs completos; Beta de CI
+    // re-aprovisionaba podado. Para no omitir nada, no se poda ningún módulo.
+    val prunedStdlibPrefixes = emptyList<String>()
+    val prunedStdlibExact = emptySet<String>()
 
     fun shouldPruneStdlibEntry(entryName: String): Boolean {
-      val clean = entryName.trimStart('/')
-      if (clean in prunedStdlibExact) return true
-      if (prunedStdlibPrefixes.any { clean.startsWith(it) }) return true
-      if (clean.contains("/test/") || clean.contains("/tests/")) return true
+      // No podar nada: stdlib completo para yt-dlp/QuickJS/CPython.
       return false
     }
 
-    // Módulos C nativos (.so) y librerías compartidas que yt-dlp nunca usa (solo tests, GUI de escritorio y audioop legado; _sqlite3 y libsqlite3 SE CONSERVAN para yt-dlp)
+    // Módulos C nativos: SIN poda. yt-dlp necesita codecs, ssl, hashlib, sqlite3, etc.
+    // Podar audioop/_codecs_* rompía títulos, certificados y zipimport en Beta.
     val prunedNativeSharedLibs = emptySet<String>()
-    val prunedPythonCModules = listOf(
-      "_tkinter", "_test", "_ctypes_test", "_xxtestfuzz", "xxlimited",
-      "_curses", "_dbm", "_gdbm", "nis", "ossaudiodev", "spwd", "syslog",
-      "audioop", "_codecs_cn", "_codecs_hk", "_codecs_iso2022", "_codecs_jp", "_codecs_kr", "_codecs_tw",
-      "_lsprof", "_xxsubinterpreters"
-    )
+    val prunedPythonCModules = emptyList<String>()
 
     fun shouldPrunePythonCModule(fileName: String): Boolean {
-      val lower = fileName.lowercase()
-      return prunedPythonCModules.any { lower == "$it.so" || lower.startsWith("${it}.") || lower.startsWith("${it}_") }
+      // No podar ningún módulo C: todos van a nativeLibraryDir/libpymod_*.so.
+      return false
     }
 
     for (abi in abis) {
