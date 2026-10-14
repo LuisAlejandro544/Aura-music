@@ -725,23 +725,19 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
     val stdlibPycZip = resolvedPythonFiles.firstOrNull { it.name.contains("stdlib") }
     val pythonLauncherC = File(cppDir, "native_python_launcher.c")
 
-    // Paquetes y directorios de escritorio/test/servidores legados en stdlib que yt-dlp jamás utiliza en Android
+    // Poda mínima y segura de stdlib: SOLO tests y GUI de escritorio que yt-dlp jamás
+    // importa en Android. No se podan _pydecimal, pydoc, mailbox, pickletools, difflib,
+    // smtplib/imaplib/ftplib, wsgiref/xmlrpc ni multiprocessing: yt-dlp y sus dependencias
+    // (ssl, json, urllib, email, hashlib) los referencian transitivamente y podarlos
+    // rompía Descarga por URL y Explorar solo en el APK Beta con "No module named ...".
     val prunedStdlibPrefixes = listOf(
       "test/", "tests/", "unittest/", "tkinter/", "idlelib/", "turtledemo/",
-      "pydoc_data/", "distutils/", "lib2to3/", "ensurepip/", "venv/", "curses/", "dbm/", "msilib/",
-      "multiprocessing/popen_", "multiprocessing/resource_", "multiprocessing/forkserver", "multiprocessing/shared_memory",
-      "wsgiref/", "xmlrpc/"
+      "pydoc_data/", "lib2to3/", "ensurepip/", "venv/", "curses/", "dbm/", "msilib/"
     )
     val prunedStdlibExact = setOf(
       "turtle.pyc", "turtle.py", "doctest.pyc", "doctest.py", "pdb.pyc",
-      "_pydecimal.pyc", "_pydecimal.py", "pydoc.pyc", "pydoc.py",
-      "mailbox.pyc", "mailbox.py", "pickletools.pyc", "pickletools.py",
-      "difflib.pyc", "difflib.py", "smtpd.pyc", "smtplib.pyc", "imaplib.pyc",
-      "poplib.pyc", "nntplib.pyc", "ftplib.pyc", "telnetlib.pyc",
       "antigravity.pyc", "this.pyc", " tabnanny.pyc", "tabnanny.pyc",
-      "cProfile.pyc", "profile.pyc", "pstats.pyc", "timeit.pyc", "trace.pyc",
-      "modulefinder.pyc", " symtable.pyc", "symtable.pyc", " wave.pyc", "sunau.pyc", "aifc.pyc", "chunk.pyc",
-      "sndhdr.pyc", "ossaudiodev.pyc", "crypt.pyc", "pty.pyc", "tty.pyc", "pipes.pyc", "mailcap.pyc", "xdrlib.pyc"
+      "cProfile.pyc", "profile.pyc", "pstats.pyc", "timeit.pyc", "trace.pyc"
     )
 
     fun shouldPruneStdlibEntry(entryName: String): Boolean {
@@ -752,13 +748,14 @@ abstract class ProvisionNativeDepsTask : DefaultTask() {
       return false
     }
 
-    // Módulos C nativos (.so) y librerías compartidas que yt-dlp nunca usa (solo tests, GUI de escritorio y audioop legado; _sqlite3 y libsqlite3 SE CONSERVAN para yt-dlp)
+    // Módulos C nativos (.so) que yt-dlp nunca usa: SOLO GUI de escritorio y tests.
+    // No se podan audioop ni _codecs_* (necesarios para decodificación de texto/URLs),
+    // ni _lsprof/_xxsubinterpreters: el ahorro es mínimo y el riesgo de "No module named"
+    // en Beta es alto. _sqlite3 y libsqlite3 SE CONSERVAN para yt-dlp.
     val prunedNativeSharedLibs = emptySet<String>()
     val prunedPythonCModules = listOf(
       "_tkinter", "_test", "_ctypes_test", "_xxtestfuzz", "xxlimited",
-      "_curses", "_dbm", "_gdbm", "nis", "ossaudiodev", "spwd", "syslog",
-      "audioop", "_codecs_cn", "_codecs_hk", "_codecs_iso2022", "_codecs_jp", "_codecs_kr", "_codecs_tw",
-      "_lsprof", "_xxsubinterpreters"
+      "_curses", "_dbm", "_gdbm", "nis", "ossaudiodev", "spwd", "syslog"
     )
 
     fun shouldPrunePythonCModule(fileName: String): Boolean {

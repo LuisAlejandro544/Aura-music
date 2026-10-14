@@ -5,58 +5,113 @@
 # For more details, see
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
-# Reglas quirúrgicas de R8 / ProGuard para Aura Music y Aura Beta:
-# 1. Ofuscación activa en APK Beta y Release (sin -dontobfuscate), renombrando clases/métodos/campos a identificadores de 1 letra
-#    y unificando todo en el paquete 'a' para compactar la tabla de strings en un único archivo classes.dex.
-# 2. Eliminación de comodines amplios ({ *; }) en Activities/Services y de -keep class com.example.model.** { *; },
-#    permitiendo que R8 elimine al 100% DebugMonitorActivity y su UI en el APK Beta, y haga inlining/poda de métodos no usados.
-# 3. Eliminación automática de logs de depuración (android.util.Log.v/d/i) y chequeos Intrinsics de Kotlin.
+# Reglas R8 / ProGuard para Aura Music y Aura Beta:
+# El APK Beta minifica para ser liviano, pero SIN romper Descarga por URL ni Explorar.
+# Causa raíz anterior: -repackageclasses/-flatten/-overloadaggressively/-mergeinterfaces
+# + fullMode + falta de -keep para OkHttp/Okio/Coil/Media3/WebView + JNI estático con
+# nombres de paquete + poda agresiva de stdlib Python. Todo eso se corrige aquí.
 
-# 1. Preservar el puente JNI hacia el motor nativo C++20 (libauramusic_dsp.so)
-# Solo se preservan los nombres de métodos 'native' para que el enlace dinámico JNI funcione sin impedir la ofuscación del resto.
--keep class com.example.core.playback.NativeAudioEngine {
-    native <methods>;
-}
+# 1. Puente JNI hacia el motor nativo C++20 (libauramusic_dsp.so)
+# Los símbolos C++ usan nombres estáticos Java_com_example_core_playback_NativeAudioEngine_*,
+# por lo que el paquete y el nombre de la clase NUNCA deben renombrarse ni reempaquetarse.
+-keep class com.example.core.playback.NativeAudioEngine { *; }
+-keeppackagenames com.example.core.playback
 -keepclasseswithmembernames class * {
     native <methods>;
 }
 
-# 2. Preservar únicamente la estructura requerida por Room SQLite (sin forzar *; en métodos auxiliares no usados)
+# 2. Room SQLite: preservar estructura requerida (entidades, DAOs, DB)
 -keep class * extends androidx.room.RoomDatabase {
     <init>();
 }
 -keep @androidx.room.Entity class * {
     <init>(...);
     <fields>;
+    <methods>;
 }
 -keep @androidx.room.Dao interface * { *; }
+-keep class * extends androidx.room.RoomDatabase { *; }
 
-# 3. Componentes registrados en AndroidManifest:
-# aapt2 genera automáticamente las reglas -keep para los componentes presentes en el AndroidManifest final de cada variante
-# (así, en el APK Beta donde DebugMonitorActivity tiene tools:node="remove", R8 elimina toda la suite de depuración del .dex).
-# Solo aseguramos que se conserven los constructores por defecto sin usar el comodín { *; }.
--keepclassmembers class com.example.AuraApplication { <init>(); }
--keepclassmembers class com.example.MainActivity { <init>(); }
--keepclassmembers class com.example.core.playback.AuraMediaPlaybackService { <init>(); }
--keepclassmembers class com.example.core.playback.AuraDownloadService { <init>(); }
--keepclassmembers class com.example.widget.AuraMusicWidgetProvider { <init>(); }
--keepclassmembers class com.example.widget.AuraLibraryWidgetProvider { <init>(); }
+# 3. Componentes registrados en AndroidManifest (Application, Activities, Services, Widgets)
+# Se conservan completos (no solo <init>) para que MediaSessionService, DownloadService
+# y Widgets no pierdan callbacks por inlining/poda.
+-keep class com.example.AuraApplication { *; }
+-keep class com.example.MainActivity { *; }
+-keep class com.example.core.playback.AuraMediaPlaybackService { *; }
+-keep class com.example.core.playback.AuraDownloadService { *; }
+-keep class com.example.widget.AuraMusicWidgetProvider { *; }
+-keep class com.example.widget.AuraLibraryWidgetProvider { *; }
+-keep class com.example.debug.AuraDebugManager { *; }
 
-# 4. Preservar métodos estáticos de Enums usados por el runtime de Kotlin/Java
+# 4. Enums usados por el runtime de Kotlin/Java
 -keepclassmembers enum * {
     public static **[] values();
     public static ** valueOf(java.lang.String);
 }
 
-# 5. Ofuscación máxima, unificación de paquete y compactación de Strings en un solo archivo DEX (Single DEX)
--optimizationpasses 5
--allowaccessmodification
--repackageclasses 'a'
--flattenpackagehierarchy 'a'
--overloadaggressively
--mergeinterfacesaggressively
+# 5. Pila de red y streaming usada por Descarga por URL y Explorar (InnerTube/Invidious/
+# Chunked/TikTok/LRCLIB/SoundCloud/YT Music). Sin estos -keep, R8 fullMode + overload/
+# repackage rompe la reflexión/plataforma de OkHttp/Okio y la cascada de 5 niveles falla.
+-keep class okhttp3.** { *; }
+-keep interface okhttp3.** { *; }
+-dontwarn okhttp3.**
+-keep class okio.** { *; }
+-dontwarn okio.**
+-keep class org.json.** { *; }
+-keep class coil.** { *; }
+-keep interface coil.** { *; }
+-dontwarn coil.**
+-keep class kotlinx.coroutines.** { *; }
+-dontwarn kotlinx.coroutines.**
+# Conscrypt / plataforma TLS (detección Platform de OkHttp en Android 14+)
+-keep class org.conscrypt.** { *; }
+-keep class com.android.org.conscrypt.** { *; }
+-dontwarn org.conscrypt.**
+# Media3 / ExoPlayer (ForwardingPlayer, MediaSessionService, renderers por reflexión)
+-keep class androidx.media3.** { *; }
+-keep interface androidx.media3.** { *; }
+-dontwarn androidx.media3.**
+# Modelos y motores propios de descarga/streaming: evitar poda de niveles de fallback
+-keep class com.example.core.data.importer.** { *; }
+-keep class com.example.core.data.streaming.** { *; }
+-keep class com.example.core.network.** { *; }
+-keep class com.example.core.playback.** { *; }
+-keep class com.example.core.data.updater.** { *; }
+# Parcelable / Serializable usados al pasar pistas entre componentes
+-keepclassmembers class * implements android.os.Parcelable {
+    public static final android.os.Parcelable$Creator *;
+}
+-keepclassmembers class * implements java.io.Serializable {
+    static final long serialVersionUID;
+    private static final java.io.ObjectStreamField[] serialPersistentFields;
+    private void writeObject(java.io.ObjectOutputStream);
+    private void readObject(java.io.ObjectInputStream);
+    java.lang.Object writeReplace();
+    java.lang.Object readResolve();
+}
 
-# 6. Eliminar logs de depuración de Android y chequeos nulos/trazas de Kotlin en Release y Beta
+# 6. WebView del nivel 4 de la cascada (HeadlessWebViewExtractor: shouldOverrideUrlLoading,
+# shouldInterceptRequest, onPageFinished, evaluateJavascript + @JavascriptInterface)
+-keepclassmembers class * extends android.webkit.WebViewClient {
+    *;
+}
+-keepclassmembers class * extends android.webkit.WebChromeClient {
+    *;
+}
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}
+-keep class android.webkit.** { *; }
+
+# 7. Optimización moderada SIN reempaquetado agresivo.
+# Se eliminan -repackageclasses, -flattenpackagehierarchy, -overloadaggressively,
+# -mergeinterfacesaggressively y -allowaccessmodification porque renombran/fusionan
+# métodos que OkHttp/Okio/Coil/Media3 resuelven por reflexión y rompen los símbolos
+# JNI estáticos (UnsatisfiedLinkError) y la plataforma TLS.
+-optimizationpasses 5
+
+# 8. Eliminar solo logs de depuración verbose/debug/info; conservar w/e/wtf para
+# diagnosticar fallos de red/streaming en Beta (antes se borraba todo rastro útil).
 -assumenosideeffects class android.util.Log {
     public static boolean isLoggable(java.lang.String, int);
     public static int v(...);
@@ -78,15 +133,11 @@
     public static void throwUninitializedPropertyAccessException(java.lang.String);
 }
 
-# 7. Omitir tablas de nombres de archivos y números de línea (SourceFile, LineNumberTable) y metadatos de reflexión Kotlin
-# para reducir drásticamente el peso de classes.dex y maximizar la ofuscación del APK Beta/Release.
--renamesourcefileattribute ''
--keepattributes *Annotation*,InnerClasses,EnclosingMethod,Signature
+# 9. Conservar atributos de excepción y líneas para stacks útiles en Beta.
+# El peso extra (~100-200 KB en classes.dex) permite ver NoSuchMethodError /
+# ClassNotFoundException / errores python/ytdlp/ssl en logcat en vez de un crash mudo.
+-keepattributes *Annotation*,InnerClasses,EnclosingMethod,Signature,Exceptions,SourceFile,LineNumberTable
 -dontwarn kotlin.Metadata
--dontwarn okio.**
 -dontwarn retrofit2.**
 -dontwarn kotlinx.coroutines.**
 -dontwarn com.google.errorprone.annotations.**
-
-
-

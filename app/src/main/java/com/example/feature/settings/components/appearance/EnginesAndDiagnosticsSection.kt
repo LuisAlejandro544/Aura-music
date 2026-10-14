@@ -210,8 +210,25 @@ fun LazyListScope.enginesAndDiagnosticsSettingsContent(
                     Spacer(modifier = Modifier.height(14.dp))
                     Button(
                         onClick = {
-                            val intent = android.content.Intent(context, com.example.debug.DebugMonitorActivity::class.java)
-                            context.startActivity(intent)
+                            // Intent por nombre de clase + verificación previa: en el APK Beta
+                            // DebugMonitorActivity se elimina del manifiesto (tools:node="remove")
+                            // y R8 la poda; la referencia directa ::class.java dejaría una
+                            // referencia colgada que rompe la verificación del dex en Beta.
+                            // Con setClassName + resolveActivity + try/catch Beta nunca crashea.
+                            try {
+                                val safeIntent = android.content.Intent().apply {
+                                    setClassName(
+                                        context.packageName,
+                                        "com.example.debug.DebugMonitorActivity"
+                                    )
+                                }
+                                if (safeIntent.resolveActivity(context.packageManager) != null) {
+                                    context.startActivity(safeIntent)
+                                }
+                            } catch (_: Throwable) {
+                                // En Beta la actividad no existe: no hacer nada (sección oculta
+                                // por ENABLE_DEBUG_MONITOR de todos modos).
+                            }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                         shape = RoundedCornerShape(12.dp),
