@@ -79,6 +79,23 @@
 -keep class androidx.datastore.** { *; }
 -keep class androidx.credentials.** { *; }
 -keep class androidx.palette.** { *; }
+# TLS / certificados (Android 14+ CERTIFICATE_VERIFY_FAILED): Conscrypt APEX,
+# KeyStore PEM y validación SSL de yt-dlp/InnerTube/Invidious/Chunked/LRCLIB.
+# Se resuelven por reflexión/plataforma; R8 nunca debe renombrarlos ni podarlos.
+-keep class org.conscrypt.** { *; }
+-keep class org.bouncycastle.** { *; }
+-keep class org.openjsse.** { *; }
+-keep class com.android.org.conscrypt.** { *; }
+# Transitives de OkHttp/Okio/Coil/Media3 usados por la cascada de 5 niveles
+# (detección Platform, interceptores, fetchers, datasources, extractores).
+-keep class com.google.common.** { *; }
+-keep class okhttp3.internal.** { *; }
+-keep class okio.internal.** { *; }
+-keep class coil.fetch.** { *; }
+-keep class coil.request.** { *; }
+-keep class androidx.media3.datasource.** { *; }
+-keep class androidx.media3.extractor.** { *; }
+-keep class androidx.media3.exoplayer.** { *; }
 
 # 6. Optimización SEGURA (sin repackage/flatten/overload/merge/access-modification).
 -optimizationpasses 3
