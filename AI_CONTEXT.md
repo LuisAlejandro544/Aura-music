@@ -204,5 +204,11 @@ Este archivo define el contexto de diseño, directrices técnicas y restriccione
     - **Calidad de Audio Opus/M4A (Local + Streaming) y Ahorro de Datos solo-Explorar (`StreamingAudioQuality`)**: 4 modos (**Ahorro Opus ~48k**, **Estándar M4A ~128k**, **Alta Opus ~160k**, **Auto Hi-Fi**) con ranking por itag en `InnerTubeClient`/`Invidious`/`yt-dlp`, selector `bestaudio[ext=webm]/[ext=m4a]` en `YtDlpStreamDownloader`, guardado local `.opus`/`.m4a` en `OnlineVideoAudioImporter` y caché dual en `StreamingPrefetcher`. El interruptor **📶 Ahorro de Datos** (solo Explorar) fuerza Opus ahorro, apaga video, omite letras LRCLIB automáticas y pausa prefetch + radio; lo local queda intacto.
 
 24. **Idioma de Comunicación**:
-   - La documentación, comentarios en código, cadenas de usuario (`strings.xml`) y mensajes de commit deben redactarse en **español**.
+    - La documentación, comentarios en código, cadenas de usuario (`strings.xml`) y mensajes de commit deben redactarse en **español**.
+
+25. **Purgadores Masivos Manuales de Pull Requests e Issues (`.github/workflows/purge-pull-requests.yml` y `.github/workflows/purge-issues.yml`)**:
+    - Ambos son `workflow_dispatch` con doble blindaje (evento manual + confirmación `RECHAZAR`/`CERRAR`); jamás por `push` ni `pull_request`.
+    - **PRs** (`pull-requests: write`, `contents: write`): cierra sin merge los abiertos, comenta el rechazo y elimina ramas de origen no-fork (inputs `only_open`, `delete_branches`).
+    - **Issues** (`issues: write`): cierra los abiertos excluyendo PRs con motivo `not_planned`/`completed`, comenta y opcionalmente bloquea (inputs `only_open`, `close_reason`, `lock_issues`).
+    - Límite de plataforma: GitHub no permite borrar el historial de PRs/Issues vía API; quedan como *Closed*, con resumen en `$GITHUB_STEP_SUMMARY`.
 
