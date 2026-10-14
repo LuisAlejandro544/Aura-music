@@ -182,7 +182,15 @@ object YtDlpStreamDownloader {
             ok
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
-            AuraDebugManager.logWarning(TAG, "Excepción en descarga directa con yt-dlp: ${e.message}")
+            // FIX: distinguir EACCES (binario no lanzable) del fallo genérico para telemetría.
+            val msg = e.message.orEmpty()
+            if (msg.contains("Permission denied") || msg.contains("error=13") ||
+                msg.contains("Cannot run program") || msg.contains("EACCES")
+            ) {
+                AuraDebugManager.logWarning(TAG, friendlyYtDlpExecError(msg))
+            } else {
+                AuraDebugManager.logWarning(TAG, "Excepción en descarga directa con yt-dlp: ${e.message}")
+            }
             try { if (targetFile.exists() && targetFile.length() < 1024L) targetFile.delete() } catch (_: Throwable) {}
             false
         } catch (t: Throwable) {

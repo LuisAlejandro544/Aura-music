@@ -48,6 +48,8 @@ object NativeAudioEngine {
             try {
                 getNativeEngineInfo()
             } catch (e: Throwable) {
+                // FIX Detective: antes vacío, ahora telemetría mínima (llamada infrecuente).
+                try { Log.w(TAG, "getNativeEngineInfo falló, uso fallback: ${e.message}") } catch (_: Throwable) {}
                 "Aura Music C++20 10-Band Biquad DSP Core"
             }
         } else {
@@ -202,7 +204,10 @@ object NativeAudioEngine {
         if (isLoaded) {
             try {
                 return nativeGetAudioIntensity()
-            } catch (ignored: Throwable) {}
+            } catch (e: Throwable) {
+                // FIX: telemetría mínima en vez de silencio total.
+                try { Log.w(TAG, "getAudioIntensity falló: ${e.message}") } catch (_: Throwable) {}
+            }
         }
         return 0.15f
     }

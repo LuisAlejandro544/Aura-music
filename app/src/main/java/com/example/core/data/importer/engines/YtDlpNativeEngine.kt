@@ -205,7 +205,7 @@ object YtDlpNativeEngine {
             // no mostrar paths crudos del sistema en el diálogo de descarga.
             val rawErr = errorLog.takeLast(300)
             if (rawErr.contains("Permission denied") || rawErr.contains("error=13") ||
-                rawErr.contains("Cannot run program") || exitCode == -1 && jsonOutput.isBlank()
+                rawErr.contains("Cannot run program") || (exitCode == -1 && jsonOutput.isBlank())
             ) {
                 AuraDebugManager.logWarning(TAG, "yt-dlp no ejecutable en este dispositivo. Fallback a InnerTube.")
                 return@withContext Result.failure(

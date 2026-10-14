@@ -159,6 +159,12 @@ internal fun resolveNativePythonFile(context: Context): File? {
         val launcher = File(nativeDir, "libpython.so").takeIf { isValidPythonFile(it) }
             ?: File(nativeDir, "libpython3.so").takeIf { isValidPythonFile(it) }
             ?: return null
+        // FIX EACCES temprano: el .so debe tener bit exec (extractNativeLibs=true).
+        // Sin esto el fallo aparecía tarde en ProcessBuilder.start() sin telemetría.
+        if (!launcher.canExecute()) {
+            AuraDebugManager.logWarning("YtDlpProcessRunner", "libpython nativo sin bit exec, se usa fallback InnerTube.")
+            return null
+        }
         // El motor real debe existir junto al lanzador (self_dir/dlopen).
         val hasEngine = File(nativeDir, "libpython3.11.so").takeIf { it.length() >= 500_000L } != null ||
                 File(nativeDir, "libpython3.so").takeIf { it.length() >= 500_000L } != null
@@ -177,7 +183,8 @@ internal fun resolveNativePythonFile(context: Context): File? {
  * Nunca se crea una copia nueva en files/bin (W^X la deniega en Beta).
  */
 internal fun resolvePythonExecutable(context: Context): File? {
-    cachedPythonBin?.takeIf { isValidPythonFile(it) }?.let { return it }
+    // FIX: la caché solo vale si sigue ejecutable (OEM puede revocar exec).
+    cachedPythonBin?.takeIf { isValidPythonFile(it) && it.canExecute() }?.let { return it }
     cleanupLegacyPythonBin(context)
     resolveNativePythonFile(context)?.let { return it }
     // Compatibilidad: reutilizar copia legada solo si el sistema la permite.

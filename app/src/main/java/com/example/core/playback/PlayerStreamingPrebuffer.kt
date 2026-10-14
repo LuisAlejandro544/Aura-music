@@ -1,6 +1,7 @@
 package com.example.core.playback
 
 import android.os.Looper
+import android.util.Log
 import com.example.core.model.Track
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -101,12 +102,16 @@ internal fun AuraAudioPlayer.prebufferStreamingNextInternal(nextTrack: Track) {
             streamingPrebufferTrackId = nextTrack.id
             streamingPrebufferUri = uri
             streamingPrebufferAtMs = now
-        } catch (_: Throwable) {
+        } catch (e: Throwable) {
+            // FIX: antes vacío, ahora telemetría (ExoPlayer rechazó el playlist).
+            try { Log.w("StreamingPrebuffer", "prebuffer rechazado: ${e.message}") } catch (_: Throwable) {}
             // Si ExoPlayer rechaza el playlist (estado Idle), invalidar.
             streamingPrebufferTrackId = null
             streamingPrebufferUri = null
         }
-    } catch (_: Throwable) {}
+    } catch (e: Throwable) {
+        try { Log.w("StreamingPrebuffer", "prebufferStreamingNext falló: ${e.message}") } catch (_: Throwable) {}
+    }
 }
 
 /** True si el Deck principal tiene buferizado [track] como siguiente (listo para seek 0ms). */
@@ -126,7 +131,8 @@ internal fun AuraAudioPlayer.hasStreamingPrebufferForInternal(track: Track): Boo
         } catch (_: Throwable) { track.uriString }
         if (queuedUri != null && queuedUri != expectedUri) return false
         return true
-    } catch (_: Throwable) {
+    } catch (e: Throwable) {
+        try { Log.w("StreamingPrebuffer", "hasPrebuffer falló: ${e.message}") } catch (_: Throwable) {}
         return false
     }
 }

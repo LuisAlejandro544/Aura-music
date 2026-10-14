@@ -147,11 +147,12 @@ object YtDlpEnvironmentSetup {
      * Uso exclusivo como CLI vía `--js-runtimes quickjs:<rutaAbsoluta>`, nunca JNI.
      */
     fun getQuickJsExecutable(context: Context): File? {
-        cachedQuickJs?.takeIf { isValidQuickJsFile(it) }?.let { return it }
+        // FIX: la caché solo vale si sigue ejecutable.
+        cachedQuickJs?.takeIf { isValidQuickJsFile(it) && it.canExecute() }?.let { return it }
 
         // 1. Nativo directo (preferido, funciona en Debug y Beta).
         val nativeQjs = File(context.applicationInfo.nativeLibraryDir, QUICKJS_SO_NAME)
-        if (isValidQuickJsFile(nativeQjs)) {
+        if (isValidQuickJsFile(nativeQjs) && nativeQjs.canExecute()) {
             cachedQuickJs = nativeQjs
             // Limpieza de copia legada que provocaba EACCES en Beta.
             runCatching {
@@ -223,10 +224,11 @@ object YtDlpEnvironmentSetup {
 
     /** Clasifica el estado actual sin ejecutar procesos ni copiar archivos (apto para hilo UI). */
     fun quickJsState(context: Context): QuickJsState {
-        cachedQuickJs?.takeIf { isValidQuickJsFile(it) }?.let { return QuickJsState.OK }
-        // Nativo con tamaño válido = OK (PackageManager otorga exec a lib*.so).
+        // FIX: OK solo si hay bit exec real; antes el tamaño bastaba y mentía a la UI.
+        cachedQuickJs?.takeIf { isValidQuickJsFile(it) && it.canExecute() }?.let { return QuickJsState.OK }
+        // Nativo con tamaño válido + exec = OK (PackageManager otorga exec a lib*.so).
         val nativeQjs = File(context.applicationInfo.nativeLibraryDir, QUICKJS_SO_NAME)
-        if (isValidQuickJsFile(nativeQjs)) return QuickJsState.OK
+        if (isValidQuickJsFile(nativeQjs) && nativeQjs.canExecute()) return QuickJsState.OK
         val binQjs = File(File(context.filesDir, "bin"), QUICKJS_BIN_NAME)
         if (isValidQuickJsFile(binQjs) && binQjs.canExecute()) return QuickJsState.OK
         if (binQjs.exists() || nativeQjs.exists()) {
