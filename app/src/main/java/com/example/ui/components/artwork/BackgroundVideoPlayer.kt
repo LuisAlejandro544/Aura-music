@@ -39,8 +39,10 @@ import com.example.ui.theme.ExtractedArtworkColors
 import android.view.TextureView
 import android.view.View
 import androidx.compose.material3.MaterialTheme
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
 import java.io.File
 import kotlin.math.abs
 
@@ -297,20 +299,30 @@ fun BackgroundVideoPlayer(
                 val textureView = (playerViewRef?.videoSurfaceView as? TextureView)
                     ?: findInternalTextureView(playerViewRef)
                 if (textureView != null && textureView.isAvailable && textureView.width > 0 && textureView.height > 0) {
+                    // FIX perf: getBitmap 24x24 es <1ms en Main, pero la extracción Palette
+                    // va a Default para no bloquear HWUI. Se recicla el micro-bitmap.
                     val microBitmap = try {
                         textureView.getBitmap(24, 24)
                     } catch (_: Throwable) {
                         null
                     }
                     if (microBitmap != null) {
-                        val extracted = ArtworkColorExtractor.extractColorsFromVideoFrame(
-                            frameBitmap = microBitmap,
-                            trackId = placeholderTrack?.id,
-                            videoUri = videoUriString,
-                            fallbackPrimary = fallbackPrimary,
-                            fallbackSecondary = fallbackSecondary,
-                            sampleIntervalMs = intervalMs
-                        )
+                        val extracted = try {
+                            withContext(Dispatchers.Default) {
+                                ArtworkColorExtractor.extractColorsFromVideoFrame(
+                                    frameBitmap = microBitmap,
+                                    trackId = placeholderTrack?.id,
+                                    videoUri = videoUriString,
+                                    fallbackPrimary = fallbackPrimary,
+                                    fallbackSecondary = fallbackSecondary,
+                                    sampleIntervalMs = intervalMs
+                                )
+                            }
+                        } catch (_: Throwable) {
+                            null
+                        } finally {
+                            runCatching { microBitmap.recycle() }
+                        }
                         if (extracted != null) {
                             onLiveColorsExtracted?.invoke(extracted, intervalMs)
                             sampledOnceWhenPaused = true

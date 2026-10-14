@@ -335,11 +335,28 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                             }
                             liveIntensity = (0.22f + beatPulse * 0.45f).coerceIn(0.18f, 0.82f)
                         }
-
+                    }
+                    // FIX perf: emitir bandas solo si el cambio supera el umbral (evita recomponer 12x/s).
+                    val lastBands = _visualizerBands.value
+                    var maxDelta = 0f
+                    if (!isCinematicMode && lastBands.size == 28) {
+                        for (i in 0 until 28) {
+                            val d = kotlin.math.abs(buffer[i] - lastBands[i])
+                            if (d > maxDelta) maxDelta = d
+                        }
+                    } else if (!isCinematicMode) {
+                        maxDelta = 1f
+                    }
+                    if (!isCinematicMode && maxDelta > 0.02f) {
                         _visualizerBands.value = buffer.copyOf()
                     }
-                    _audioIntensity.value = liveIntensity
-                    delay(if (isCinematicMode) 110L else 36L)
+                    if (kotlin.math.abs(liveIntensity - _audioIntensity.value) > 0.02f) {
+                        _audioIntensity.value = liveIntensity
+                    } else if (isCinematicMode) {
+                        _audioIntensity.value = liveIntensity
+                    }
+                    // FIX perf: 36ms->80ms clásico (27fps->12fps), 110ms->150ms cinemático.
+                    delay(if (isCinematicMode) 150L else 80L)
                 } else {
                     var needsDecay = false
                     for (i in buffer.indices) {
@@ -354,7 +371,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     if (needsDecay) {
                         _visualizerBands.value = buffer.copyOf()
-                        delay(45L)
+                        delay(90L)
                     } else {
                         delay(350L)
                     }

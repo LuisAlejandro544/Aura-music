@@ -129,7 +129,10 @@ fun MiniPlayer(
                                 playbackSpeed = playbackSpeed,
                                 placeholderTrack = currentTrack,
                                 modifier = Modifier.fillMaxSize(),
-                                cornerRadius = 10.dp
+                                cornerRadius = 10.dp,
+                                // FIX perf: el mini (46dp) no muestrea colores; NowPlaying ya lo hace.
+                                // Evita 2x getBitmap+Palette por segundo con doble decodificador.
+                                enableLiveColorSampling = false
                             )
                         } else {
                             ArtworkImage(
