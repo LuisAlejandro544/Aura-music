@@ -98,7 +98,9 @@ object YtDlpStreamDownloader {
 
             val cmdList = mutableListOf<String>().apply {
                 add(activePython.absolutePath)
-                add("-I")
+                // Sin "-I" (modo aislado): -I ignora PYTHONHOME/PYTHONPATH del entorno
+                // y CPython no encuentra libpython.zip.so vía zipimport (-> "No module
+                // named encodings"). PYTHONNOUSERSITE=1 ya aísla del user-site sin romper stdlib.
                 add(ytdlpFile.absolutePath)
                 add("--no-config")
                 add("--no-warnings")

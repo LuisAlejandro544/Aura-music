@@ -210,12 +210,17 @@ fun LazyListScope.enginesAndDiagnosticsSettingsContent(
                     Spacer(modifier = Modifier.height(14.dp))
                     Button(
                         onClick = {
-                            // Blindaje Beta: aunque Beta elimina DebugMonitorActivity del
-                            // manifiesto (tools:node="remove") y ENABLE_DEBUG_MONITOR=false,
-                            // se resuelve antes de lanzar para no crashear nunca con
-                            // ActivityNotFoundException/NoClassDefFoundError.
+                            // Blindaje Beta: Beta elimina DebugMonitorActivity del
+                            // manifiesto (src/beta/AndroidManifest.xml con tools:node="remove")
+                            // y oculta esta tarjeta con ENABLE_DEBUG_MONITOR=false.
+                            // Se usa ComponentName por cadena (sin referencia directa a la clase)
+                            // para que R8 pueda descartar Aura Monitor del DEX en Beta/Release
+                            // y nunca lanzar ActivityNotFoundException/NoClassDefFoundError.
                             try {
-                                val intent = android.content.Intent(context, com.example.debug.DebugMonitorActivity::class.java)
+                                val intent = android.content.Intent().setClassName(
+                                    context,
+                                    "com.example.debug.DebugMonitorActivity"
+                                )
                                 if (intent.resolveActivity(context.packageManager) != null) {
                                     context.startActivity(intent)
                                 }

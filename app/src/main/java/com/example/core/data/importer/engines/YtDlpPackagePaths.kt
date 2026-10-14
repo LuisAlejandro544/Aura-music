@@ -54,7 +54,7 @@ import kotlin.system.exitProcess
         return try {
             val stagedFile = ytdlpStagedFile(context)
             val stagedVersionFile = ytdlpStagedVersionFile(context)
-            if (stagedFile.exists() && stagedFile.length() > 100_000L) {
+            if (stagedFile.exists() && stagedFile.length() > YTDLP_MIN_PACKAGE_BYTES) {
                 val targetFile = ytdlpOtaTargetFile(context)
                 val versionFile = File(context.filesDir, "bin/ytdlp_version.txt")
                 val newVer = if (stagedVersionFile.exists()) {
