@@ -12,7 +12,7 @@ El proyecto sigue una arquitectura reactiva y desacoplada organizada en capas:
 2. **Capa de Datos & Almacenamiento (Data & Storage)**:
    - Base de datos SQLite reactiva con **Room**.
    - Acceso al almacenamiento estructurado en `Android/data/com.aistudio.musicplayer.aurasound/files/` (Debug) y `Android/data/com.auramusic.beta/files/` (APK Beta `Aura Beta` • Codename `Nebula`) con subcarpetas (`songs/`, `images/`, `lyrics/`, `metadata/`, `videos/`), además de **Carpeta Pública / Personalizada del Usuario (`UserPublicMediaExporter` & `UserPublicFolderCard`)** mediante SAF (`OpenDocumentTree`) con subcarpetas `Videos/` y `Musica/` (y preparada para `Images/`) para exportar vídeos descargados con su audio completo y llevarse las músicas en su formato original.
-   - Motores de importación, sincronización de letras LRCLIB, extracción FFmpeg, descarga directa prioritaria con motor nativo yt-dlp (`YtDlpStreamDownloader`) con métricas de progreso en tiempo real y respaldo resiliente multi-nivel con separación de `audioHeaders`/`videoHeaders` por perfil `c=` (`ChunkedStreamDownloader` -> `InnerTubeClient` -> `InvidiousStreamResolver` -> `HeadlessWebViewExtractor`), arquitectura modular desacoplada en `engines/` (< 500 líneas por módulo), y actualizador automático de versiones APK (`AppReleaseUpdater` con comparador semántico de tags dinámicos `-beta`, selección por arquitectura móvil y verificación SHA-256).
+   - Motores de importación, sincronización de letras LRCLIB, extracción FFmpeg, descarga directa prioritaria con motor nativo yt-dlp (`YtDlpStreamDownloader`) con métricas de progreso en tiempo real y respaldo resiliente multi-nivel con separación de `audioHeaders`/`videoHeaders` por perfil `c=` (`ChunkedStreamDownloader` -> `InnerTubeClient` -> `InvidiousStreamResolver` -> `HeadlessWebViewExtractor`), formato auto por SoC (`AudioDownloadFormatResolver`: Opus solo con decodificador, fallback M4A), arquitectura modular desacoplada en `engines/` (< 500 líneas por módulo), y actualizador automático de versiones APK (`AppReleaseUpdater` con comparador semántico de tags dinámicos `-beta`, selección por arquitectura móvil y verificación SHA-256).
 3. **Capa de Control & Reproducción (Playback Layer)**:
    - `AuraAudioPlayer` con ExoPlayer/Media3, modularizado con controladores especializados (`PlayerQueueController`, `AudioFadeController`, `ABLoopController`, `MediaSessionBridge`) y coordinadores de reproducción (`PlaybackProgressTracker`, `StreamingErrorRecoveryHandler`, `PlaybackParametersManager`, `StreamingUrlPolicy`).
    - `NativeAudioEngine` conectando buffers de audio PCM en C++20 vía JNI.
@@ -463,6 +463,7 @@ app/
     │       │       ├── dialogs/                # Diálogos Modales Globales
     │       │       │   ├── AppUpdateDialog.kt # Fachada (117) que delega en 5 piezas
     │       │       │   │   ├── AppUpdateHeader.kt # Insignia Nebula y canal
+     │       │       │   │   ├── AppUpdateChangelog.kt # Notas legibles (formatChangelogForDisplay v0.2.0+v0.2.1, scroll propio acotado)
     │       │       │   │   ├── AppUpdateChips.kt # Arquitectura y tamaño
     │       │       │   │   ├── AppUpdateDataNotice.kt # Preservación de datos
     │       │       │   │   ├── AppUpdateChangelog.kt # Notas del Pre-Release

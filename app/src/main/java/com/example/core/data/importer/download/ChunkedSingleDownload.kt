@@ -125,10 +125,13 @@ internal object ChunkedSingleDownload {
                 }
             }
 
+            // v0.2.1-beta.1f: blindaje anti-crash — crear carpeta padre y no dejar parciales corruptos.
+            try { targetFile.parentFile?.mkdirs() } catch (_: Throwable) {}
             response.use { res ->
                 if (!res.isSuccessful) {
                     val clientTag = try { Uri.parse(cleanUrl).getQueryParameter("c") ?: "N/A" } catch (_: Exception) { "N/A" }
                     AuraDebugManager.logWarning("Downloader", "HTTP ${res.code} (c=$clientTag) al descargar: ${cleanUrl.take(55)}...")
+                    try { if (targetFile.exists() && targetFile.length() < 1024L) targetFile.delete() } catch (_: Throwable) {}
                     return false
                 }
                 val contentType = res.header("Content-Type", "") ?: ""
@@ -204,6 +207,13 @@ internal object ChunkedSingleDownload {
             targetFile.exists() && targetFile.length() > 0L
         } catch (e: Exception) {
             AuraDebugManager.logWarning("Downloader", "Fallo en descarga: ${e.message}")
+            try { if (targetFile.exists() && targetFile.length() < 1024L) targetFile.delete() } catch (_: Throwable) {}
+            false
+        } catch (t: Throwable) {
+            // OutOfMemoryError / StackOverflow en gamas bajas: nunca crashear la app.
+            AuraDebugManager.logWarning("Downloader", "Descarga abortada por falta de memoria: ${t.message}")
+            try { if (targetFile.exists() && targetFile.length() < 1024L) targetFile.delete() } catch (_: Throwable) {}
+            try { System.gc() } catch (_: Throwable) {}
             false
         }
     }

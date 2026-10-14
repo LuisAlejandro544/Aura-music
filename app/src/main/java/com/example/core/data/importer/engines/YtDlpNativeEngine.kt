@@ -240,6 +240,8 @@ object YtDlpNativeEngine {
                 return true
             }
 
+            // v0.2.1-beta.1f: si el teléfono no tiene decodificador Opus, priorizar M4A aunque se pida AUTO.
+            val opusOk = AudioDownloadFormatResolver.supportsOpus(context)
             val formats = rootJson.optJSONArray("formats")
             if (formats != null) {
                 var bestAudioScore = -1.0
@@ -260,15 +262,18 @@ object YtDlpNativeEngine {
                     if (acodec != "none" && vcodec == "none") {
                         val isOpus = ext == "webm" || acodec.contains("opus")
                         val isM4a = ext == "m4a" || acodec.contains("mp4a")
+                        // Sin Opus en el SoC, los flujos Opus se penalizan para no descargar algo irreproducible.
+                        val opusBonus = if (opusOk) 1.0 else -1000000.0
                         val score = when (audioQuality) {
                             com.example.core.model.StreamingAudioQuality.AHORRO_OPUS_48K ->
-                                (if (isOpus) 100000.0 else 0.0) - abr
+                                (if (isOpus) 100000.0 * opusBonus else 0.0) - abr
                             com.example.core.model.StreamingAudioQuality.ALTA_OPUS_160K ->
-                                abr + (if (isOpus) 50000.0 else 0.0)
+                                abr + (if (isOpus) 50000.0 * opusBonus else 0.0) + (if (!opusOk && isM4a) 60000.0 else 0.0)
                             com.example.core.model.StreamingAudioQuality.ESTANDAR_M4A_128K ->
                                 abr + (if (isM4a) 50000.0 else 0.0)
                             com.example.core.model.StreamingAudioQuality.AUTO_HIFI ->
-                                abr + (if (isOpus) 20000.0 else 0.0)
+                                if (opusOk) abr + (if (isOpus) 20000.0 else 0.0)
+                                else abr + (if (isM4a) 40000.0 else -500000.0)
                         }
                         if (score > bestAudioScore || directAudioUrl == null) {
                             bestAudioScore = score

@@ -37,14 +37,24 @@ internal object OnlineTrackImporter {
         val finalArtist = customArtist?.trim()?.ifBlank { resolvedInfo.suggestedArtist } ?: resolvedInfo.suggestedArtist
 
         try {
-            // Formato local según calidad elegida en Ajustes (Opus .opus vs M4A .m4a); vale para local y streaming.
-            val preferredQuality = readQuality(context)
-            val localExt = if (preferredQuality.prefersOpus && preferredQuality != com.example.core.model.StreamingAudioQuality.AUTO_HIFI) {
-                "opus"
-            } else {
-                // AUTO_HIFI y M4A estándar guardan .m4a para máxima compatibilidad con reproductores externos.
-                "m4a"
+            // v0.2.1-beta.1f: formato automático según SoC/teléfono (Opus solo si hay decodificador).
+            val requestedQuality = readQuality(context)
+            val preferredQuality = AudioDownloadFormatResolver.resolveEffectiveQuality(requestedQuality, context)
+            val localExt = AudioDownloadFormatResolver.resolveLocalExtension(requestedQuality, context)
+            // Blindaje anti-crash en gamas bajas: verificar carpetas y espacio libre antes de descargar.
+            try {
+                storageManager.songsDir.mkdirs()
+                storageManager.videosDir.mkdirs()
+                storageManager.imagesDir.mkdirs()
+            } catch (_: Throwable) {}
+            if (!AudioDownloadFormatResolver.hasEnoughFreeSpace(storageManager.songsDir)) {
+                onProgressUpdate(DownloadProgress(isDownloading = false))
+                return@withContext Result.failure(
+                    IllegalStateException("Sin espacio suficiente para descargar (se necesitan ~25 MB libres). Libera almacenamiento e inténtalo de nuevo.")
+                )
             }
+            // En equipos de gama baja se omite el Video Canvas pesado si falla, sin tumbar la descarga.
+            val isLowEnd = AudioDownloadFormatResolver.isLowMemoryDevice(context)
             val audioFile = File(storageManager.songsDir, "track_online_${timestamp}.$localExt")
             val tempVideoFile = File(storageManager.videosDir, "media_video_${timestamp}.mp4")
             var audioReady = false
@@ -274,16 +284,32 @@ internal object OnlineTrackImporter {
                 return@withContext Result.failure(IllegalStateException("Error al descargar el archivo de audio. Verifica tu conexión."))
             }
 
-            // Extraer duración real del archivo
-            val retriever = MediaMetadataRetriever()
-            try {
-                retriever.setDataSource(audioFile.absolutePath)
-                val durStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
-                durationMs = durStr?.toLongOrNull()?.takeIf { it > 0 } ?: durationMs
-            } catch (_: Throwable) {
-            } finally {
-                try { retriever.release() } catch (_: Throwable) {}
+            // Extraer duración real del archivo (blindado: en algunos SoCs setDataSource crashea con archivos cortos/corruptos).
+            if (audioFile.exists() && audioFile.length() > 4096L) {
+                val retriever = MediaMetadataRetriever()
+                try {
+                    try {
+                        retriever.setDataSource(audioFile.absolutePath)
+                    } catch (_: Throwable) {
+                        // Reintento vía FileDescriptor, más estable en OEMs con rutas largas.
+                        try {
+                            audioFile.inputStream().use { fis ->
+                                retriever.setDataSource(fis.fd)
+                            }
+                        } catch (_: Throwable) {}
+                    }
+                    val durStr = try {
+                        retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                    } catch (_: Throwable) { null }
+                    durationMs = durStr?.toLongOrNull()?.takeIf { it > 0 } ?: durationMs
+                } catch (_: Throwable) {
+                } finally {
+                    try { retriever.release() } catch (_: Throwable) {}
+                }
             }
+
+            // En gamas bajas: si el canvas falla no se reintenta en bucle (evita OOM/ANR).
+            val effectiveAttachCanvas = attachAsCanvas && !(isLowEnd && tempVideoFile.exists() && tempVideoFile.length() > 80L * 1024L * 1024L)
 
             // Si el usuario activó la eliminación inteligente de silencios al inicio y al final
             if (trimSilence) {
@@ -296,13 +322,17 @@ internal object OnlineTrackImporter {
                         progressFraction = 0.86f
                     )
                 )
-                val trimResult = AudioSilenceTrimmer.processLocalAudioFile(
-                    context = context,
-                    audioFile = audioFile,
-                    originalDurationMs = durationMs
-                )
-                if (trimResult.wasTrimmed && trimResult.newDurationMs > 0L) {
-                    durationMs = trimResult.newDurationMs
+                try {
+                    val trimResult = AudioSilenceTrimmer.processLocalAudioFile(
+                        context = context,
+                        audioFile = audioFile,
+                        originalDurationMs = durationMs
+                    )
+                    if (trimResult.wasTrimmed && trimResult.newDurationMs > 0L) {
+                        durationMs = trimResult.newDurationMs
+                    }
+                } catch (_: Throwable) {
+                    AuraDebugManager.logWarning("OnlineImporter", "Trim de silencios omitido en este teléfono; se conserva el audio original.")
                 }
             }
 
@@ -316,40 +346,40 @@ internal object OnlineTrackImporter {
                     progressFraction = 0.90f
                 )
             )
-            val artworkPath = MediaAssetProcessor.processArtwork(
-                storageManager = storageManager,
-                resolvedInfo = resolvedInfo,
-                tempVideoFile = tempVideoFile,
-                timestamp = timestamp,
-                httpClient = httpClient
-            )
-
+            // (La carátula se genera más abajo junto al Track final, dentro de try/catch anti-OOM.)
             // Procesamiento de Video Canvas de fondo
             var videoCanvasPath: String? = null
             val isLoop = forceLoop ?: (loopStyle == FFmpegNativeEngine.CanvasLoopStyle.BOOMERANG || durationMs in 1..20500L)
 
-            if (attachAsCanvas) {
-                videoCanvasPath = MediaAssetProcessor.processVideoCanvas(
-                    context = context,
-                    storageManager = storageManager,
-                    resolvedInfo = resolvedInfo,
-                    tempVideoFile = tempVideoFile,
-                    audioFile = audioFile,
-                    timestamp = timestamp,
-                    isLoop = isLoop,
-                    loopStyle = loopStyle,
-                    onProgressUpdate = onProgressUpdate,
-                    downloadFunction = { url, target, phase, headers ->
-                        ChunkedStreamDownloader.downloadUrlToFile(
-                            url = url,
-                            targetFile = target,
-                            phase = phase,
-                            customHeaders = headers,
-                            httpClient = httpClient,
-                            onProgress = onProgressUpdate
-                        )
-                    }
-                )
+            if (effectiveAttachCanvas) {
+                videoCanvasPath = try {
+                    MediaAssetProcessor.processVideoCanvas(
+                        context = context,
+                        storageManager = storageManager,
+                        resolvedInfo = resolvedInfo,
+                        tempVideoFile = tempVideoFile,
+                        audioFile = audioFile,
+                        timestamp = timestamp,
+                        isLoop = isLoop,
+                        loopStyle = loopStyle,
+                        onProgressUpdate = onProgressUpdate,
+                        downloadFunction = { url, target, phase, headers ->
+                            try {
+                                ChunkedStreamDownloader.downloadUrlToFile(
+                                    url = url,
+                                    targetFile = target,
+                                    phase = phase,
+                                    customHeaders = headers,
+                                    httpClient = httpClient,
+                                    onProgress = onProgressUpdate
+                                )
+                            } catch (_: Throwable) { false }
+                        }
+                    )
+                } catch (_: Throwable) {
+                    AuraDebugManager.logWarning("OnlineImporter", "Video Canvas omitido por falta de memoria/disco en este teléfono; se conserva solo el audio.")
+                    null
+                }
             } else {
                 if (tempVideoFile.exists() && audioFile.absolutePath != tempVideoFile.absolutePath) {
                     tempVideoFile.delete()
@@ -371,6 +401,16 @@ internal object OnlineTrackImporter {
             val finalFolder = if (isYoutubeSource) "YouTube & Web" else "TikTok & Web"
             val fileSizeFormatted = MediaAssetProcessor.formatFileSize(audioFile.length())
 
+            val artworkPath = try {
+                MediaAssetProcessor.processArtwork(
+                    storageManager = storageManager,
+                    resolvedInfo = resolvedInfo,
+                    tempVideoFile = tempVideoFile,
+                    timestamp = timestamp,
+                    httpClient = httpClient
+                )
+            } catch (_: Throwable) { null }
+
             val createdTrack = Track(
                 id = 0L,
                 title = finalTitle,
@@ -381,7 +421,7 @@ internal object OnlineTrackImporter {
                 albumArtPath = artworkPath,
                 videoUri = videoCanvasPath,
                 isVideoLoop = isLoop,
-                mimeType = if (audioFile.extension.equals("opus", ignoreCase = true)) "audio/opus" else "audio/mp4",
+                mimeType = AudioDownloadFormatResolver.resolveLocalMimeType(requestedQuality, context),
                 dateAdded = System.currentTimeMillis(),
                 isFavorite = false,
                 playCount = 0,

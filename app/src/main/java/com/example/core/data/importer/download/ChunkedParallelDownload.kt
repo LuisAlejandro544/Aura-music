@@ -27,6 +27,7 @@ internal object ChunkedParallelDownload {
         onProgress: (DownloadProgress) -> Unit
     ): Boolean {
         return try {
+            try { targetFile.parentFile?.mkdirs() } catch (_: Throwable) {}
             val probeBuilder = Request.Builder().url(url)
             for ((k, v) in alignedHeaders) {
                 if (!k.equals("Range", ignoreCase = true)) {
@@ -144,6 +145,12 @@ internal object ChunkedParallelDownload {
             targetFile.exists() && targetFile.length() > 0L
         } catch (e: Exception) {
             AuraDebugManager.logWarning("Downloader", "Descarga por bloques omitida por excepción: ${e.message}")
+            try { if (targetFile.exists() && targetFile.length() < 1024L) targetFile.delete() } catch (_: Throwable) {}
+            false
+        } catch (t: Throwable) {
+            AuraDebugManager.logWarning("Downloader", "Descarga por bloques abortada por falta de memoria: ${t.message}")
+            try { if (targetFile.exists() && targetFile.length() < 1024L) targetFile.delete() } catch (_: Throwable) {}
+            try { System.gc() } catch (_: Throwable) {}
             false
         }
     }

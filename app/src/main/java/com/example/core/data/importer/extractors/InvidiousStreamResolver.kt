@@ -82,7 +82,8 @@ object InvidiousStreamResolver {
         videoId: String,
         originalUrl: String,
         audioQuality: com.example.core.model.StreamingAudioQuality =
-            com.example.core.model.StreamingAudioQuality.AUTO_HIFI
+            com.example.core.model.StreamingAudioQuality.AUTO_HIFI,
+        opusSupported: Boolean = true
     ): OnlineVideoAudioImporter.ResolvedMediaInfo? = withContext(Dispatchers.IO) {
         val cleanVideoId = videoId.trim()
         if (!SAFE_VIDEO_ID_REGEX.matches(cleanVideoId)) {
@@ -90,7 +91,7 @@ object InvidiousStreamResolver {
             return@withContext null
         }
         for (baseInstance in INSTANCES) {
-            val resolved = queryInstance(baseInstance, cleanVideoId, originalUrl, audioQuality)
+            val resolved = queryInstance(baseInstance, cleanVideoId, originalUrl, audioQuality, opusSupported)
             if (resolved != null) {
                 return@withContext resolved
             }
@@ -103,7 +104,8 @@ object InvidiousStreamResolver {
         videoId: String,
         originalUrl: String,
         audioQuality: com.example.core.model.StreamingAudioQuality =
-            com.example.core.model.StreamingAudioQuality.AUTO_HIFI
+            com.example.core.model.StreamingAudioQuality.AUTO_HIFI,
+        opusSupported: Boolean = true
     ): OnlineVideoAudioImporter.ResolvedMediaInfo? {
         return try {
             val requestUrl = "$baseInstance/api/v1/videos/$videoId"
@@ -155,7 +157,7 @@ object InvidiousStreamResolver {
                     if (!url.contains(".m3u8") && !url.contains(".mpd")) {
                         if (mimeType.contains("audio/")) {
                             val itag = format.optInt("itag", 0)
-                            val score = InnerTubeClient.rankAudioFormat(mimeType, bitrate, itag, audioQuality)
+                            val score = InnerTubeClient.rankAudioFormat(mimeType, bitrate, itag, audioQuality, opusSupported)
                             if (score >= maxAudioBitrate) {
                                 maxAudioBitrate = score
                                 bestAudioUrl = url

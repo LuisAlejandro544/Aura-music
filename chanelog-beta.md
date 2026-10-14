@@ -1,6 +1,7 @@
-# 🌌 Aura Beta — Changelog Oficial (`v0.2.0-beta-1a` • Codename: **Nebula**)
+# 🌌 Aura Beta — Changelog Oficial (`v0.2.1-beta.1f` • Codename: **Nebula**)
 
-> **Versión:** `v0.2.0-beta-1a` (`NEBULA-00200A` • Build `#100200`)  
+> **Versión:** `v0.2.1-beta.1f` (`NEBULA-00201F` • Build `#100201`) — *f = fix*  
+> **Versión base incluida:** `v0.2.0-beta-1a` (`NEBULA-00200A` • Build `#100200`, todo su contenido sigue incluido abajo)  
 > **Nombre en Launcher:** `Aura Beta`  
 > **Identificador de Paquete (`Android/data/`):** `com.auramusic.beta`  
 > **Codename de la Serie Beta:** **Nebula**  
@@ -10,7 +11,27 @@
 
 ---
 
-## 🔥 Novedades Destacadas en `v0.2.0-beta-1a`
+## 🛠️ Novedades de la Actualización `v0.2.1-beta.1f` (*f = fix*)
+
+> Esta actualización **incluye TODO lo de la `v0.2.0-beta-1a`** (detallado más abajo) **más** las siguientes correcciones. Al actualizar desde cualquier versión anterior recibes ambas en un solo APK.
+
+1. 🎚️ **Formato de descarga automático según tu teléfono (`AudioDownloadFormatResolver`)**:
+   - La app ahora **elige sola entre Opus (`.opus`) y M4A (`.m4a`)** inspeccionando el decodificador real del teléfono (`MediaCodecList audio/opus`), la RAM y la gama del equipo.
+   - Si tu teléfono **sí soporta Opus**, el modo **Automática Hi-Fi** descarga en **Opus ~160 kbps** (suena mejor y pesa menos); si **no lo soporta** (gamas bajas / SoCs antiguos), cambia sola a **M4A ~128 kbps** universal sin que tengas que tocar nada.
+   - Si habías elegido manualmente Opus en un teléfono sin soporte, la app lo **corrige a M4A** para no descargar archivos irreproducibles. El ranking por itag en `InnerTubeClient`, `InvidiousStreamResolver` y `YtDlpNativeEngine` respeta esta detección.
+2. 🛡️ **Adiós a los cierres al descargar música (Explorar y descarga local)**:
+   - Blindaje anti-crash en `OnlineTrackImporter`, `YtDlpStreamDownloader`, `ChunkedStreamDownloader` (lineal + bloques) y `MediaAssetProcessor`: capturan `OutOfMemoryError`, verifican **~25-30 MB libres** antes de descargar, crean carpetas si faltan, borran parciales corruptos y degradan con gracia (si el Video Canvas falla en gamas bajas, **se conserva el audio**).
+   - Carátulas con **decodificación muestreada (~1024px, RGB_565)** para no agotar la RAM, y `MediaMetadataRetriever` con doble vía (`path` + `FileDescriptor`) porque en algunos SoCs el primer método crashea.
+3. ▶️ **Explorar ya no se queda en silencio**:
+   - Al tocar una canción, si la primera resolución falla se **reintenta automáticamente con bypass** (`forceBypassYtDlp`) y se valida que la URL de audio no esté vacía antes de reproducir.
+   - Si ExoPlayer rechaza la URL inicial (403 tardío), se resuelve una **ruta alternativa** y se reproduce sin que tengas que tocar nada; al cambiar de pista sin red ni caché, avisa y **salta a la siguiente** en vez de quedarse callado.
+4. 🪟 **Pantalla de actualización legible con TODO incluido**:
+   - El diálogo **"Nueva Versión Disponible"** ahora muestra el texto limpio y legible (sin símbolos `#`, `>`, `*` de Markdown), con el resumen de la **`v0.2.0-beta-1a` + `v0.2.1-beta.1f`** para quienes no leen el changelog antes de descargar.
+   - Botones reorganizados y sin recortes en pantallas compactas de 720px, y área de novedades con altura limitada y desplazamiento propio (sin barras fantasma ni píldoras grises).
+
+---
+
+## 🔥 Novedades Destacadas en `v0.2.0-beta-1a` (incluidas también en esta actualización)
 
 1. 🖼️ **Fondo de Pantalla Personalizado de Galería (Imagen WebP o Video Corto)**:
    - Ahora puedes elegir una **foto o un video corto de la galería de tu teléfono** para ponerlo como fondo de pantalla mientras navegas por **Tu Biblioteca**, **Inicio**, **Explorar** o **toda la aplicación (incluyendo Ajustes)** (configurable desde **Ajustes > Aura Dinámica, Video & Modo Juego** con alcances *Solo en Tu Biblioteca*, *En Biblioteca, Inicio y Explorar* o *En toda la app*).
@@ -137,9 +158,9 @@ En cada lanzamiento de **Aura Beta (`Nebula`)** generamos **3 archivos APK exclu
 
 | Archivo APK | Arquitectura | ¿Para qué sirve y qué teléfonos deben instalarlo? |
 | :--- | :--- | :--- |
-| 📱 **`AuraBeta-v0.2.0-beta-1a-Nebula-arm64-v8a.apk`** | **ARM 64-bits (`arm64-v8a`)** | **Recomendado para la mayoría de teléfonos modernos (2018 en adelante).** Incluye exclusivamente los motores nativos en C++20, FFmpeg y Python de 64 bits. Es más ligero en espacio de almacenamiento y ofrece el máximo rendimiento acústico y energético. |
-| 📱 **`AuraBeta-v0.2.0-beta-1a-Nebula-armeabi-v7a.apk`** | **ARM 32-bits (`armeabi-v7a`)** | **Diseñado para teléfonos antiguos, básicos o con sistemas Android de 32 bits.** Contiene exclusivamente los binarios nativos optimizados con instrucciones ARMv7 NEON de 32 bits sin cargar librerías de 64 bits que tu procesador no utilice. |
-| 🌐 **`AuraBeta-v0.2.0-beta-1a-Nebula-universal.apk`** | **Universal Móvil (`arm64-v8a` + `armeabi-v7a`)** | **Funciona en absolutamente cualquier teléfono Android (32 y 64 bits).** Es el APK todo-terreno ideal si no sabes qué procesador tiene tu celular, para compartir el archivo con amigos por mensajería o para subir directamente a tiendas como **Uptodown**. |
+| 📱 **`AuraBeta-v0.2.1-beta.1f-Nebula-arm64-v8a.apk`** | **ARM 64-bits (`arm64-v8a`)** | **Recomendado para la mayoría de teléfonos modernos (2018 en adelante).** Incluye exclusivamente los motores nativos en C++20, FFmpeg y Python de 64 bits. Es más ligero en espacio de almacenamiento y ofrece el máximo rendimiento acústico y energético. |
+| 📱 **`AuraBeta-v0.2.1-beta.1f-Nebula-armeabi-v7a.apk`** | **ARM 32-bits (`armeabi-v7a`)** | **Diseñado para teléfonos antiguos, básicos o con sistemas Android de 32 bits.** Contiene exclusivamente los binarios nativos optimizados con instrucciones ARMv7 NEON de 32 bits sin cargar librerías de 64 bits que tu procesador no utilice. |
+| 🌐 **`AuraBeta-v0.2.1-beta.1f-Nebula-universal.apk`** | **Universal Móvil (`arm64-v8a` + `armeabi-v7a`)** | **Funciona en absolutamente cualquier teléfono Android (32 y 64 bits).** Es el APK todo-terreno ideal si no sabes qué procesador tiene tu celular, para compartir el archivo con amigos por mensajería o para subir directamente a tiendas como **Uptodown**. |
 
 ---
 

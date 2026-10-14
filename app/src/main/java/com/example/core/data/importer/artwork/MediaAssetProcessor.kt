@@ -79,9 +79,24 @@ object MediaAssetProcessor {
                     .build()
                 httpClient.newCall(request).execute().use { res ->
                     if (res.isSuccessful) {
-                        val stream = res.body?.byteStream()
-                        if (stream != null) {
-                            val rawBitmap = BitmapFactory.decodeStream(stream)
+                        val bodyBytes = try { res.body?.bytes() } catch (_: Throwable) { null }
+                        if (bodyBytes != null && bodyBytes.size in 1024..(8 * 1024 * 1024)) {
+                            // v0.2.1-beta.1f: decodificación muestreada anti-OOM (máx ~1024px).
+                            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                            try { BitmapFactory.decodeByteArray(bodyBytes, 0, bodyBytes.size, bounds) } catch (_: Throwable) {}
+                            var sample = 1
+                            val maxSide = maxOf(bounds.outWidth, bounds.outHeight)
+                            while (maxSide / sample > 1024 && sample < 8) sample *= 2
+                            val opts = BitmapFactory.Options().apply {
+                                inSampleSize = sample
+                                inPreferredConfig = Bitmap.Config.RGB_565
+                            }
+                            val rawBitmap = try {
+                                BitmapFactory.decodeByteArray(bodyBytes, 0, bodyBytes.size, opts)
+                            } catch (_: OutOfMemoryError) {
+                                try { System.gc() } catch (_: Throwable) {}
+                                null
+                            } catch (_: Throwable) { null }
                             if (rawBitmap != null && rawBitmap.width > 30 && rawBitmap.height > 30) {
                                 val cleanBitmap = removeHorizontalLetterboxBars(rawBitmap)
                                 FileOutputStream(artFile).use { out ->
