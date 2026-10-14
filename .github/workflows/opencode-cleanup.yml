@@ -1,0 +1,31 @@
+name: OpenCode Cleanup (ramas temporales)
+
+# Limpieza de ramas `opencode/*` tras el merge. Vive en un workflow separado para
+# que el workflow principal "OpenCode Assistant" no registre runs fantasma del
+# tipo "Pull request #47 closed" en la lista de Actions (confusión reportada en
+# "Arreglo interno 2").
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup-branch:
+    name: Eliminar rama fusionada
+    if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'opencode/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
+
+      - name: Borrar rama remota temporal de OpenCode
+        run: |
+          echo "Borrando rama temporal fusionada: ${{ github.event.pull_request.head.ref }}"
+          git push origin --delete "${{ github.event.pull_request.head.ref }}" || echo "La rama ya fue eliminada o no se pudo borrar."
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
