@@ -37,6 +37,20 @@ El proyecto sigue una arquitectura reactiva y desacoplada organizada en capas:
 ## 📂 Árbol de Directorios y Módulos
 
 ```text
+.github/workflows/                           # Automatización CI/CD y mantenimiento manual (solo workflow_dispatch)
+├── build-beta-apk.yml                        # Canal APK Beta Nebula (3 APKs móviles, sin caché, firma por Secrets)
+├── build-debug-apk.yml                       # APK Debug con caché nativa y provisionNativeDeps
+├── purge-pull-requests.yml                   # Rechazo masivo manual de PRs (cierra + comenta + elimina ramas; el registro queda Closed porque GitHub no permite borrarlo)
+├── purge-issues.yml                          # Cierre masivo manual de Issues (cierra + comenta + bloqueo opcional; el registro queda Closed porque GitHub no permite borrarlo)
+├── purge-actions-history.yml                 # Limpieza manual de runs y artefactos de Actions
+├── purge-native-binaries-history.yml         # Purga de .so/.zip.so/yt-dlp del historial Git con git-filter-repo
+├── security-vulnerability-audit.yml          # Escáner manual Aura Shield (Gitleaks, OSV, Semgrep, Lint)
+├── opencode.yml                              # Asistente OpenCode
+├── opencode-cleanup.yml                      # Limpieza de ramas opencode/* tras merge
+├── sync-repo-from-zip.yml                    # Sincronización desde zips/
+├── update-stats.yml                          # Actualización de estadísticas
+└── virustotal-scan.yml                       # Escaneo VirusTotal
+
 web/                                            # Landing de descarga (Cloudflare Pages, sin build ni workflow)
 ├── index.html                                  # Hero + 3 APKs (arm64-v8a, armeabi-v7a, universal) + README/changelog en vivo
 ├── styles.css                                  # Paleta Dark Luxury Neo-Glass OLED (Violet #8B5CF6, Cyan #00D2FF)
@@ -609,6 +623,12 @@ app/
 
 8. **Escáner Automatizado Manual en GitHub Actions (`.github/workflows/security-vulnerability-audit.yml`)**:
    - Flujo `workflow_dispatch` ("Escáner de Seguridad y Vulnerabilidades (Aura Shield)") con análisis multicapa (Gitleaks, Google OSV-Scanner, Semgrep Kotlin/C++20, Invariantes de Seguridad de Aura Music y Android Lint opcional) y reporte ejecutivo en español en `$GITHUB_STEP_SUMMARY` optimizado para lectura desde teléfono móvil.
+
+9. **Purgadores Masivos Manuales de Pull Requests e Issues (`purge-pull-requests.yml` y `purge-issues.yml`)**:
+   - Ambos son `workflow_dispatch` con doble blindaje (solo evento manual + palabra de confirmación: `RECHAZAR` para PRs, `CERRAR` para Issues); jamás se activan por `push`, `pull_request` ni `commit`.
+   - `purge-pull-requests.yml` (permisos `pull-requests: write`, `contents: write`): lista los PRs abiertos vía `gh api`, deja comentario de rechazo, los cierra sin fusionar (`state: closed`) y elimina sus ramas de origen no-fork (excepto `main`/`master`), con resumen en `$GITHUB_STEP_SUMMARY`.
+   - `purge-issues.yml` (permisos `issues: write`): lista los Issues abiertos excluyendo PRs (`select(has("pull_request") | not)`), deja comentario de cierre, los cierra con motivo (`not_planned`/`completed`) y opcionalmente los bloquea (`lock_reason: resolved`), con resumen en `$GITHUB_STEP_SUMMARY`.
+   - Límite honesto de plataforma: GitHub no permite borrar el registro del historial de PRs/Issues vía API; quedan como *Closed* (rechazado/cerrado), que equivale funcionalmente a eliminarlos del trabajo pendiente.
 
 ---
 

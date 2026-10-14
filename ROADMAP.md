@@ -388,6 +388,11 @@ Este documento traza las fases de evolución técnica y funcional para convertir
   - **Resolución por itag en toda la cascada**: `InnerTubeClient.rankAudioFormat` + `InvidiousStreamResolver` + `YtDlpNativeEngine.resolveStream` eligen el flujo por itag/bitrate según la calidad (no solo por `mp4`); `YtDlpStreamDownloader` usa selector `bestaudio[ext=webm]/bestaudio[ext=m4a]` por calidad para descargas con `yt-dlp`.
   - **Formato local respetado**: `OnlineVideoAudioImporter` guarda **`.opus`** u **`.m4a`** en `songs/` según tu elección (con `mimeType` y `targetFormat` FFmpeg acordes); la caché temporal acepta ambos (`stream_audio_<id>.opus/.m4a` con inferencia por `itag`/`mime` en `StreamingPrefetcher`).
   - **Ahorro de Datos solo en Explorar**: interruptor `streaming_data_saver_enabled` que fuerza Opus ahorro, bloquea el Video Canvas, omite la búsqueda automática de letras LRCLIB, y pausa pre-descarga de audio/video y radio similar (`StreamingPlaybackResolver`). Lo local (videos, letras y reproducción) queda 100% intacto.
+- [x] **Purgadores Masivos Manuales de Pull Requests e Issues (`.github/workflows/purge-pull-requests.yml` y `.github/workflows/purge-issues.yml`)**:
+  - Ambos solo `workflow_dispatch` con palabra de confirmación (`RECHAZAR` / `CERRAR`); nunca por `push` ni `pull_request`.
+  - **PRs**: cierra sin merge todos los abiertos, comenta el rechazo y elimina ramas de origen no-fork (`only_open`, `delete_branches`); el registro queda *Closed* porque GitHub no permite borrar el historial de PRs vía API.
+  - **Issues**: cierra todos los abiertos (excluyendo PRs) con motivo `not_planned`/`completed`, comenta y opcionalmente bloquea (`only_open`, `close_reason`, `lock_issues`); el registro queda *Closed* porque GitHub no permite borrar el historial de Issues vía API.
+  - Reporte ejecutivo en español en `$GITHUB_STEP_SUMMARY` optimizado para móvil.
 
 
 

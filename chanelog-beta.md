@@ -185,3 +185,7 @@ En cada lanzamiento de **Aura Beta (`Nebula`)** generamos **3 archivos APK exclu
     - Botón "Vaciar caché" con ancho propio (texto en una línea) y chips 50/100/250/500 MB deslizables horizontalmente en pantallas compactas de 720px.
     - Menú intermedio ampliado a **6 pantallas propias** (Streaming & Caché solo Video + Caché, Calidad de Audio, Ahorro de Datos, Aura Dinámica, Modo Juego y Fondo de Galería).
     - Karaoke (`FullScreenLyricsScreen` y `NowPlayingLyricsCard`): al pulsar **"Sincronizar con audio"** el auto-follow sigue verso a verso hasta que el usuario arrastra la pantalla; el scroll programático ya no rompe el seguimiento (guardia `isAutoScrolling`).
+13. 🗑️ **Purgadores masivos manuales de Pull Requests e Issues (solo `workflow_dispatch`)**:
+    - **PRs (`purge-pull-requests.yml`, confirmación `RECHAZAR`)**: rechaza todos los abiertos (cierra sin merge + comenta + elimina ramas no-fork, inputs `only_open` y `delete_branches`).
+    - **Issues (`purge-issues.yml`, confirmación `CERRAR`)**: cierra todos los abiertos excluyendo PRs (comenta + motivo `not_planned`/`completed` + bloqueo opcional, inputs `only_open`, `close_reason` y `lock_issues`).
+    - Nota honesta: GitHub no permite borrar el registro del historial vía API; quedan como *Closed*, que equivale a eliminarlos del pendiente.
