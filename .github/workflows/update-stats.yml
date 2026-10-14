@@ -1,0 +1,69 @@
+# Actualiza web/data/stats.json con la última Beta y sus descargas.
+# La landing lee ese JSON local (sin gastar cuota de la API en cada visita).
+# Solo hace commit cuando los números cambian.
+name: Actualizar stats de descargas
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-stats
+  cancel-in-progress: true
+
+jobs:
+  stats:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generar web/data/stats.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 - <<'EOF'
+          import json, urllib.request, datetime
+
+          req = urllib.request.Request(
+              "https://api.github.com/repos/LuisAlejandro544/Aura-music/releases?per_page=30",
+              headers={"Accept": "application/vnd.github+json", "Authorization": "Bearer " + __import__("os").environ["GH_TOKEN"]},
+          )
+          with urllib.request.urlopen(req, timeout=30) as r:
+              releases = json.load(r)
+
+          beta = next((x for x in releases if x.get("prerelease") and "-beta" in str(x.get("tag_name", ""))), None)
+          rel = beta or (releases[0] if releases else None)
+          if not rel:
+              raise SystemExit("sin releases")
+
+          assets = [
+              {"name": a.get("name", ""), "size": a.get("size", 0),
+               "download_count": a.get("download_count", 0),
+               "browser_download_url": a.get("browser_download_url", "")}
+              for a in rel.get("assets", [])
+          ]
+          stats = {
+              "generated_at": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+              "tag_name": rel.get("tag_name", ""),
+              "name": rel.get("name", ""),
+              "published_at": rel.get("published_at", ""),
+              "total_downloads": sum(a["download_count"] for a in assets),
+              "assets": assets,
+          }
+          with open("web/data/stats.json", "w") as f:
+              json.dump(stats, f, separators=(",", ":"))
+              f.write("\n")
+          print("stats:", stats["tag_name"], "total:", stats["total_downloads"])
+          EOF
+
+      - name: Commit si cambió
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main || true
+          git add web/data/stats.json
+          git diff --cached --quiet && echo "sin cambios" || (git commit -m "Actualizo stats de descargas [bot]" && git push origin HEAD:main)

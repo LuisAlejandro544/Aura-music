@@ -43,16 +43,46 @@
     var pill = document.getElementById("versionPill");
     var meta = document.getElementById("releaseMeta");
     function showPill(t) { if (pill) { pill.textContent = t; pill.hidden = false; } }
+    var lastTotal = -1;
+    // Anima el contador subiendo desde el valor anterior (sin recargar).
+    function animateTotal(el, to) {
+      if (to === lastTotal) return;
+      var from = lastTotal < 0 ? to : lastTotal;
+      lastTotal = to;
+      if (!el) return;
+      el.classList.remove("tick");
+      void el.offsetWidth;
+      el.classList.add("tick");
+      if (from === to || !("requestAnimationFrame" in window)) { el.textContent = "+" + fmtInt(to); return; }
+      var t0 = null;
+      function step(ts) {
+        if (!t0) t0 = ts;
+        var k = Math.min(1, (ts - t0) / 600);
+        el.textContent = "+" + fmtInt(Math.round(from + (to - from) * k));
+        if (k < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
+    function ago(iso) {
+      var mins = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000));
+      if (!isFinite(mins)) return "";
+      if (mins < 1) return "ahora mismo";
+      if (mins < 60) return "hace " + mins + " min";
+      if (mins < 2880) return "hace " + Math.round(mins / 60) + " h";
+      return "hace " + Math.round(mins / 1440) + " días";
+    }
     function applyRelease(rel) {
       showPill(rel.tag_name + " • " + (rel.name || "Aura Beta Nebula"));
       var statV = document.getElementById("statVersion");
       if (statV) statV.textContent = rel.tag_name;
       var statD = document.getElementById("statDownloads");
-      meta.textContent = "Publicado el " + new Date(rel.published_at).toLocaleDateString("es-ES") + " • " + (rel.assets || []).length + " archivos adjuntos";
+      var pub = "Publicado el " + new Date(rel.published_at).toLocaleDateString("es-ES") + " • " + (rel.assets || []).length + " archivos adjuntos";
+      if (rel.generated_at) pub += " • actualizado " + ago(rel.generated_at);
+      meta.textContent = pub;
       var assets = rel.assets || [];
       if (statD) {
         var total = assets.reduce(function (s, a) { return s + (a.download_count || 0); }, 0);
-        statD.textContent = "+" + fmtInt(total);
+        animateTotal(statD, total);
       }
       function findAsset(part) {
         return assets.find(function (a) { return (a.name || "").indexOf(part) !== -1; });
@@ -77,22 +107,108 @@
       var label = document.getElementById("heroDownloadLabel");
       if (label) label.textContent = "Obtener APK Gratis";
     }
-    function fail() {
+    function fail(first) {
+      if (!first) return; // en refrescos de fondo se conservan los valores viejos
       showPill("Aura Beta • Nebula (ver Releases)");
       if (meta) meta.textContent = "No se pudo leer la API (límite de GitHub). Usa los botones: abren la página de Releases.";
     }
-    try {
-      var cached = JSON.parse(localStorage.getItem("auraRel") || "null");
-      if (cached && Date.now() - cached.at < 300000 && cached.rel) { applyRelease(cached.rel); return; }
-    } catch (e) { /* caché corrupta: se ignora */ }
-    fetchTimeout(API, 10000, true).then(function (list) {
-      var rel = (list || []).find(function (x) {
+    function pickRel(list) {
+      return (list || []).find(function (x) {
         return x.prerelease === true && String(x.tag_name || "").indexOf("-beta") !== -1;
       }) || (list || [])[0];
-      if (!rel) throw new Error("sin releases");
-      try { localStorage.setItem("auraRel", JSON.stringify({ at: Date.now(), rel: rel })); } catch (e) { /* sin storage */ }
-      applyRelease(rel);
-    }).catch(fail);
+    }
+    function saveCache(rel, etag) {
+      try { localStorage.setItem("auraRel", JSON.stringify({ at: Date.now(), rel: rel, etag: etag || null })); } catch (e) { /* sin storage */ }
+    }
+    var relETag = null;
+    try {
+      var c0 = JSON.parse(localStorage.getItem("auraRel") || "null");
+      if (c0 && c0.etag) relETag = c0.etag;
+    } catch (e) { /* caché corrupta: se ignora */ }
+    // Con ETag + 304 la re-consulta no consume cuota de la API (límite 60/h sin token).
+    function fetchRelease() {
+      var ctrl = ("AbortController" in window) ? new AbortController() : null;
+      var timer = ctrl ? setTimeout(function () { ctrl.abort(); }, 10000) : null;
+      var opts = ctrl ? { signal: ctrl.signal, headers: relETag ? { "If-None-Match": relETag } : {} } : {};
+      return fetch(API, opts).then(function (r) {
+        if (timer) clearTimeout(timer);
+        if (r.status === 304) { var e304 = new Error("not-modified"); e304.notModified = true; throw e304; }
+        if (!r.ok) {
+          var eHttp = new Error("HTTP " + r.status);
+          if (r.status === 403 || r.status === 429) {
+            eHttp.rateLimited = true;
+            var rst = parseInt(r.headers.get("x-ratelimit-reset") || "0", 10);
+            eHttp.reset = rst ? rst * 1000 : 0;
+          }
+          throw eHttp;
+        }
+        relETag = r.headers.get("ETag") || relETag;
+        return r.json().then(function (list) { return { list: list, etag: relETag }; });
+      }, function (err) {
+        if (timer) clearTimeout(timer);
+        throw err;
+      });
+    }
+    function refresh(first) {
+      if (!first && !claimPollSlot()) return; // otra pestaña ya sondeó hace poco
+      if (Date.now() < suspendedUntil) return; // en pausa hasta el reset de GitHub
+      fetchRelease().then(function (res) {
+        var rel = pickRel(res.list);
+        if (!rel) throw new Error("sin releases");
+        saveCache(rel, res.etag);
+        applyRelease(rel);
+      }).catch(function (err) {
+        if (err && err.notModified) return;
+        if (err && err.rateLimited) suspendedUntil = err.reset || (Date.now() + 3600000);
+        fail(first);
+      });
+    }
+    // Capas (en orden): 1) stats.json local (gratis, instantáneo),
+    // 2) API en vivo si el JSON envejece, 3) caché anterior, 4) mensaje de error.
+    var JSON_URL = "./data/stats.json";
+    var JSON_MAX_AGE = 7200000; // 2 h
+    function jsonFresh(j) {
+      return !!(j && j.tag_name && j.assets && j.generated_at &&
+        (Date.now() - Date.parse(j.generated_at) < JSON_MAX_AGE));
+    }
+    function loadJson() {
+      return fetchTimeout(JSON_URL, 10000, true).then(function (j) {
+        if (!j || !j.tag_name || !j.assets) throw new Error("json inválido");
+        return j;
+      });
+    }
+    function hasCache() {
+      try { return !!(JSON.parse(localStorage.getItem("auraRel") || "null") || {}).rel; }
+      catch (e) { return false; }
+    }
+    function tick(first) {
+      if (!first && !claimPollSlot()) return;
+      loadJson().then(function (j) {
+        saveCache(j, relETag);
+        if (jsonFresh(j) || Date.now() < suspendedUntil) { applyRelease(j); return; }
+        refresh(false); // JSON viejo: verificar con la API
+      }).catch(function () { refresh(first && !hasCache()); });
+    }
+    try {
+      var cached = JSON.parse(localStorage.getItem("auraRel") || "null");
+      if (cached && cached.rel) applyRelease(cached.rel); // pinta al instante
+    } catch (e) { /* caché corrupta: se ignora */ }
+    tick(true);
+    // Anti-saturación (límite 60/h por visitante): JSON local primero (gratis),
+    // API cada 5 min solo si el JSON envejece, turno entre pestañas por
+    // localStorage y pausa hasta el reset que indique GitHub si hay 403/429.
+    var POLL_MS = 300000;
+    var suspendedUntil = 0;
+    function claimPollSlot() {
+      try {
+        var last = parseInt(localStorage.getItem("auraPoll") || "0", 10);
+        if (Date.now() - last < POLL_MS) return false;
+        localStorage.setItem("auraPoll", String(Date.now()));
+        return true;
+      } catch (e) { return true; }
+    }
+    setInterval(function () { if (!document.hidden) tick(false); }, POLL_MS);
+    document.addEventListener("visibilitychange", function () { if (!document.hidden) tick(false); });
   }
 
   // 2. Render de Markdown remoto con marked (CDN). Recorta el README a su resumen inicial.
