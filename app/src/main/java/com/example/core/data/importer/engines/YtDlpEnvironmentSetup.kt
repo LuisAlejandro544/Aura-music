@@ -106,7 +106,9 @@ object YtDlpEnvironmentSetup {
 
             val binDir = File(context.filesDir, "bin")
             if (binDir.exists()) {
-                listOf("python3", "python").forEach { aliasName ->
+                // Limpieza de copias legadas que provocaban error=13 en Beta (W^X).
+                // No deben recrearse: el intérprete se ejecuta desde nativeLibraryDir.
+                listOf("python3", "python", "python.tmp", "qjs", "qjs.tmp").forEach { aliasName ->
                     val aliasFile = File(binDir, aliasName)
                     if (aliasFile.exists()) {
                         runCatching { aliasFile.delete() }
@@ -115,10 +117,10 @@ object YtDlpEnvironmentSetup {
             }
 
             ensureTlsCertificates(pythonEnvDir)
-            ensureQuickJsExecutable(context)
-            // Normaliza files/bin/python: en Beta no-debuggable el exec directo
-            // desde nativeLibraryDir falla (SELinux); en Debug sí permite.
-            ensurePythonExecutable(context)
+            // Pre-resuelve rutas nativas (sin copiar a files/bin) para fallar rápido
+            // en el primer uso y permitir fallback a InnerTube si faltan motores.
+            runCatching { getQuickJsExecutable(context) }
+            runCatching { resolvePythonExecutable(context) }
             isInitialized = true
         } catch (e: Exception) {
             AuraDebugManager.logWarning(TAG, "Fallo al inicializar entorno Python yt-dlp: ${e.message}")
@@ -127,60 +129,57 @@ object YtDlpEnvironmentSetup {
 
     /**
      * Localiza el binario ejecutable de Python disponible para el proceso de la app.
-     * Vía única [resolvePythonExecutable]: files/bin/python (chmod 0700) primero y
-     * nativeLibraryDir como respaldo, con normalización automática. Sin esto, Beta
-     * (no-debuggable) falla con EACCES mientras Debug funciona.
+     * Vía única [resolvePythonExecutable]: `nativeLibraryDir/libpython.so` directo
+     * (única vía con exec permitido en API 29+). Nunca se copia a files/bin.
      */
     fun getPythonExecutable(context: Context): File? = resolvePythonExecutable(context)
 
     /**
      * Localiza el binario ejecutable de QuickJS C99 real (Bellard ECMAScript Engine).
      *
-     * Vía única normalizada:
-     * 1. Caché en memoria validada.
-     * 2. Copia normalizada y ejecutable en `files/bin/qjs` (preferida: filesDir sí
-     *    garantiza bit de ejecución con chmod 0700, nativeLibraryDir no en Android 10+
-     *    con SELinux / targetSdk 34).
-     * 3. `nativeLibraryDir/libqjs.so` directo si es ejecutable.
+     * Vía soportada en API 29+ (W^X): ejecutar directamente
+     * `nativeLibraryDir/libqjs.so` (apk_data_file, con permiso exec y nombre .so
+     * conservado). Las copias en `files/bin/qjs` se deniegan con error=13 en Beta,
+     * igual que ocurría con `files/bin/python`.
      *
      * Umbral unificado: [QUICKJS_MIN_PACKAGE_BYTES] (250 KB). Un stub menor nunca se
      * considera válido, evitando el estado falso "activo" con binarios rotos.
      * Uso exclusivo como CLI vía `--js-runtimes quickjs:<rutaAbsoluta>`, nunca JNI.
      */
     fun getQuickJsExecutable(context: Context): File? {
-        cachedQuickJs?.takeIf { isValidQuickJsFile(it) && it.canExecute() }?.let { return it }
+        cachedQuickJs?.takeIf { isValidQuickJsFile(it) }?.let { return it }
 
+        // 1. Nativo directo (preferido, funciona en Debug y Beta).
+        val nativeQjs = File(context.applicationInfo.nativeLibraryDir, QUICKJS_SO_NAME)
+        if (isValidQuickJsFile(nativeQjs)) {
+            cachedQuickJs = nativeQjs
+            // Limpieza de copia legada que provocaba EACCES en Beta.
+            runCatching {
+                File(File(context.filesDir, "bin"), QUICKJS_BIN_NAME)
+                    .takeIf { it.exists() && it.absolutePath != nativeQjs.absolutePath }?.delete()
+            }
+            return nativeQjs
+        }
+
+        // 2. Compatibilidad: copia legada solo si ya es ejecutable en este dispositivo.
         val binQjs = File(File(context.filesDir, "bin"), QUICKJS_BIN_NAME)
         if (isValidQuickJsFile(binQjs) && binQjs.canExecute()) {
             cachedQuickJs = binQjs
             return binQjs
         }
-
-        val nativeQjs = File(context.applicationInfo.nativeLibraryDir, QUICKJS_SO_NAME)
-        if (isValidQuickJsFile(nativeQjs) && nativeQjs.canExecute()) {
-            // Intentar normalizar hacia files/bin/qjs para ejecuciones futuras garantizadas.
-            val normalized = ensureQuickJsExecutable(context)
-            if (normalized != null) return normalized
-            cachedQuickJs = nativeQjs
-            return nativeQjs
-        }
-
-        // Último recurso: si el .so existe con tamaño válido pero sin bit exec en su
-        // ubicación original, intentar copiarlo a files/bin con chmod.
-        if (isValidQuickJsFile(nativeQjs)) {
-            val normalized = ensureQuickJsExecutable(context)
-            if (normalized != null) return normalized
-        }
         return null
     }
 
     /**
-     * Copia atómicamente `nativeLibraryDir/libqjs.so` hacia `files/bin/qjs`,
-     * aplica `chmod 0700` (vía Os.chmod con fallback a setExecutable) y valida tamaño.
-     * Retorna el [File] ejecutable o null si no hay fuente válida. Idempotente.
+     * Normalización legada `nativeLibraryDir/libqjs.so` -> `files/bin/qjs`.
+     * @deprecated SELinux W^X deniega exec en filesDir desde API 29 (error=13).
+     * Se conserva por compatibilidad pero [getQuickJsExecutable] ya prefiere el .so nativo.
      */
+    @Deprecated("Usar nativeLibraryDir/libqjs.so directo.")
     @Synchronized
     fun ensureQuickJsExecutable(context: Context): File? {
+        // Vía correcta: nativo directo.
+        getQuickJsExecutable(context)?.let { return it }
         try {
             val binDir = File(context.filesDir, "bin").apply { mkdirs() }
             val target = File(binDir, QUICKJS_BIN_NAME)
@@ -188,34 +187,7 @@ object YtDlpEnvironmentSetup {
                 cachedQuickJs = target
                 return target
             }
-            val src = File(context.applicationInfo.nativeLibraryDir, QUICKJS_SO_NAME)
-            if (!isValidQuickJsFile(src)) {
-                if (target.exists() && !isValidQuickJsFile(target)) runCatching { target.delete() }
-                return null
-            }
-            val tmp = File(binDir, "$QUICKJS_BIN_NAME.tmp")
-            src.copyTo(tmp, overwrite = true)
-            applyExecutablePermission(tmp)
-            if (!isValidQuickJsFile(tmp) || !tmp.canExecute()) {
-                runCatching { tmp.delete() }
-                AuraDebugManager.logWarning(TAG, "QuickJS copiado a files/bin pero sin bit de ejecución (SELinux).")
-                return null
-            }
-            if (target.exists()) runCatching { target.delete() }
-            val moved = runCatching { tmp.renameTo(target) }.getOrDefault(false)
-            val finalFile = if (moved) target else {
-                tmp.copyTo(target, overwrite = true)
-                runCatching { tmp.delete() }
-                applyExecutablePermission(target)
-                target
-            }
-            if (!finalFile.canExecute()) {
-                AuraDebugManager.logWarning(TAG, "QuickJS en files/bin/qjs sin permiso de ejecución tras chmod.")
-                return null
-            }
-            AuraDebugManager.logInfo(TAG, "QuickJS normalizado en ${finalFile.absolutePath} (${finalFile.length()} bytes).")
-            cachedQuickJs = finalFile
-            return finalFile
+            return null
         } catch (e: Exception) {
             AuraDebugManager.logWarning(TAG, "Fallo al normalizar QuickJS a files/bin: ${e.message}")
             return null
@@ -251,11 +223,12 @@ object YtDlpEnvironmentSetup {
 
     /** Clasifica el estado actual sin ejecutar procesos ni copiar archivos (apto para hilo UI). */
     fun quickJsState(context: Context): QuickJsState {
-        cachedQuickJs?.takeIf { isValidQuickJsFile(it) && it.canExecute() }?.let { return QuickJsState.OK }
+        cachedQuickJs?.takeIf { isValidQuickJsFile(it) }?.let { return QuickJsState.OK }
+        // Nativo con tamaño válido = OK (PackageManager otorga exec a lib*.so).
+        val nativeQjs = File(context.applicationInfo.nativeLibraryDir, QUICKJS_SO_NAME)
+        if (isValidQuickJsFile(nativeQjs)) return QuickJsState.OK
         val binQjs = File(File(context.filesDir, "bin"), QUICKJS_BIN_NAME)
         if (isValidQuickJsFile(binQjs) && binQjs.canExecute()) return QuickJsState.OK
-        val nativeQjs = File(context.applicationInfo.nativeLibraryDir, QUICKJS_SO_NAME)
-        if (isValidQuickJsFile(nativeQjs) && nativeQjs.canExecute()) return QuickJsState.OK
         if (binQjs.exists() || nativeQjs.exists()) {
             val biggest = if (binQjs.exists() && (!nativeQjs.exists() || binQjs.length() >= nativeQjs.length())) binQjs else nativeQjs
             if (biggest.length() < QUICKJS_MIN_PACKAGE_BYTES) return QuickJsState.TOO_SMALL

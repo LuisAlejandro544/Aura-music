@@ -25,7 +25,7 @@ import java.io.File
             val cmd = listOf(pythonBin.absolutePath, ytdlpFile.absolutePath, "--version")
             val procResult = runYtDlpProcess(
                 cmd = cmd,
-                workDir = File(nativeDir),
+                workDir = context.cacheDir,
                 env = ytdlpProcessEnv(context, pythonEnvDir, File(nativeDir)),
                 timeoutSeconds = 6,
                 tag = YTDLP_UPDATER_TAG

@@ -84,28 +84,27 @@ object FFmpegNativeEngine {
     }
 
     /**
-     * Obtiene el archivo ejecutable de FFmpeg: files/bin/ffmpeg primero (chmod 0700,
-     * ejecutable garantizado en Beta no-debuggable) y nativeLibraryDir como respaldo.
-     * Si el .so nativo existe pero sin bit exec, se normaliza a files/bin.
+     * Obtiene el archivo ejecutable de FFmpeg: `nativeLibraryDir/libffmpeg.so` directo
+     * (única vía con exec permitido en API 29+ por SELinux W^X). Las copias en
+     * `files/bin/ffmpeg` se deniegan con error=13 en Beta, igual que `files/bin/python`.
      */
     fun getBinaryFile(context: Context): File? {
-        val binDir = File(context.filesDir, "bin")
-        val candidateInBin = File(binDir, "ffmpeg")
-        if (candidateInBin.exists() && candidateInBin.length() > 10_000L && candidateInBin.canExecute()) {
-            return candidateInBin
-        }
-
         val nativeLibDir = File(context.applicationInfo.nativeLibraryDir)
         val candidateInLib = File(nativeLibDir, "libffmpeg.so")
-        if (candidateInLib.exists() && candidateInLib.length() > 10_000L && candidateInLib.canExecute()) {
-            // Normalizar a files/bin para futuras ejecuciones garantizadas en Beta.
-            return ensureFfmpegExecutable(context) ?: candidateInLib
-        }
         if (candidateInLib.exists() && candidateInLib.length() > 10_000L) {
-            ensureFfmpegExecutable(context)?.let { return it }
+            // Limpieza de copia legada que provocaba EACCES en Beta.
+            runCatching {
+                File(File(context.filesDir, "bin"), "ffmpeg")
+                    .takeIf { it.exists() }?.delete()
+                File(File(context.filesDir, "bin"), "ffmpeg.tmp")
+                    .takeIf { it.exists() }?.delete()
+            }
+            return candidateInLib
         }
 
-        if (candidateInBin.exists() && candidateInBin.canExecute()) {
+        // Compatibilidad: reutilizar copia legada solo si ya es ejecutable aquí.
+        val candidateInBin = File(File(context.filesDir, "bin"), "ffmpeg")
+        if (candidateInBin.exists() && candidateInBin.length() > 10_000L && candidateInBin.canExecute()) {
             return candidateInBin
         }
 
@@ -113,45 +112,15 @@ object FFmpegNativeEngine {
     }
 
     /**
-     * Copia atómica nativeLibraryDir/libffmpeg.so -> files/bin/ffmpeg con chmod 0700.
-     * Idempotente. Misma causa que Python: en Beta el exec directo falla (SELinux).
+     * Normalización legada nativeLibraryDir/libffmpeg.so -> files/bin/ffmpeg.
+     * @deprecated SELinux W^X deniega exec en filesDir desde API 29 (error=13).
+     * Se conserva por compatibilidad; [getBinaryFile] ya prefiere el .so nativo.
      */
+    @Deprecated("Usar nativeLibraryDir/libffmpeg.so directo.")
     @Synchronized
     fun ensureFfmpegExecutable(context: Context): File? {
-        return try {
-            val binDir = File(context.filesDir, "bin").apply { mkdirs() }
-            val target = File(binDir, "ffmpeg")
-            if (target.exists() && target.length() > 10_000L && target.canExecute()) return target
-            val src = File(context.applicationInfo.nativeLibraryDir, "libffmpeg.so")
-            if (!src.exists() || src.length() < 10_000L) return null
-            val tmp = File(binDir, "ffmpeg.tmp")
-            src.copyTo(tmp, overwrite = true)
-            try {
-                android.system.Os.chmod(tmp.absolutePath, 448)
-            } catch (_: Throwable) {
-            }
-            runCatching { tmp.setExecutable(true, false) }
-            if (!tmp.canExecute()) {
-                runCatching { tmp.delete() }
-                return null
-            }
-            if (target.exists()) runCatching { target.delete() }
-            val moved = runCatching { tmp.renameTo(target) }.getOrDefault(false)
-            if (!moved) {
-                tmp.copyTo(target, overwrite = true)
-                runCatching { tmp.delete() }
-                try {
-                    android.system.Os.chmod(target.absolutePath, 448)
-                } catch (_: Throwable) {
-                }
-                runCatching { target.setExecutable(true, false) }
-            }
-            if (!target.canExecute()) return null
-            AuraDebugManager.logInfo(TAG, "FFmpeg normalizado en ${target.absolutePath} (${target.length()} bytes).")
-            target
-        } catch (_: Exception) {
-            null
-        }
+        getBinaryFile(context)?.let { return it }
+        return null
     }
 
     /**

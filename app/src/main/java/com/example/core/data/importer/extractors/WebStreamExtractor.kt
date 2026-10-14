@@ -68,7 +68,10 @@ object WebStreamExtractor {
             if (YtDlpAutoUpdater.isYtDlpTemporarilyBlocked()) {
                 AuraDebugManager.logInfo("WebStreamExtractor", "yt-dlp en actualización. Fallback automático transparente a InnerTube...")
             } else {
-                val ytdlpResult = YtDlpNativeEngine.resolveStream(context, url)
+                // runCatching: YtDlpNativeEngine ya no lanza, pero cualquier
+                // IOException futura (exec EACCES en Beta) no debe romper la cascada.
+                val ytdlpResult = runCatching { YtDlpNativeEngine.resolveStream(context, url) }
+                    .getOrElse { Result.failure(it) }
                 if (ytdlpResult.isSuccess) {
                     return ytdlpResult
                 }
@@ -93,7 +96,8 @@ object WebStreamExtractor {
             // Nivel 3: Motor yt-dlp local si aún no se intentó
             if (preferredEngine != YoutubeExtractionEngine.YTDLP && YtDlpNativeEngine.isAvailable(context)) {
                 AuraDebugManager.logInfo("WebStreamExtractor", "Probando motor local yt-dlp...")
-                val ytdlpResult = YtDlpNativeEngine.resolveStream(context, url)
+                val ytdlpResult = runCatching { YtDlpNativeEngine.resolveStream(context, url) }
+                    .getOrElse { Result.failure(it) }
                 if (ytdlpResult.isSuccess) {
                     return ytdlpResult
                 }
@@ -106,7 +110,8 @@ object WebStreamExtractor {
                 Result.success(webViewResult)
             } else {
                 // Último intento: yt-dlp
-                val finalYtdlp = YtDlpNativeEngine.resolveStream(context, url)
+                val finalYtdlp = runCatching { YtDlpNativeEngine.resolveStream(context, url) }
+                    .getOrElse { Result.failure(it) }
                 if (finalYtdlp.isSuccess) {
                     finalYtdlp
                 } else {
@@ -134,7 +139,8 @@ object WebStreamExtractor {
             }
 
             // Fallback 3: yt-dlp
-            val ytdlpResult = YtDlpNativeEngine.resolveStream(context, url)
+            val ytdlpResult = runCatching { YtDlpNativeEngine.resolveStream(context, url) }
+                .getOrElse { Result.failure(it) }
             if (ytdlpResult.isSuccess) {
                 ytdlpResult
             } else {

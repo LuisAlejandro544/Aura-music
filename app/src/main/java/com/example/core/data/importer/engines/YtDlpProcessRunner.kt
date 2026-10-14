@@ -66,12 +66,18 @@ internal fun ytdlpProcessEnv(
 }
 
 /**
- * Normalización del lanzador CPython a files/bin (paridad con QuickJS).
- * En APK Beta (isDebuggable=false, targetSdk 34+) la ejecución directa desde
- * nativeLibraryDir/libpython.so falla con EACCES por SELinux / noexec, mientras
- * en Debug (debuggable) el dominio SELinux lo permite. Por eso Debug funciona
- * y Beta no, aunque R8 ya está desactivado (minify=false) en ambos.
- * Se copia a files/bin/python con chmod 0700 y se reutiliza en caliente.
+ * Resolución del lanzador CPython.
+ *
+ * Causa raíz del error Beta "Cannot run program .../files/bin/python ... error=13,
+ * Permission denied" (ver captura): desde Android 10 (API 29, targetSdk 34) SELinux
+ * aplica W^X y deniega exec() de archivos en directorios escribibles (filesDir con
+ * contexto app_data_file). La vía soportada es ejecutar directamente el PIE
+ * empaquetado como `lib*.so` desde nativeLibraryDir (contexto apk_data_file con
+ * permiso exec + nombre .so conservado). Copiar `libpython.so` a `files/bin/python`
+ * (sin extensión .so y en ubicación no-exec) rompe además la resolución
+ * `self_dir` del lanzador (`native_python_launcher.c`), que busca
+ * `libpython3.11.so` junto a argv[0].
+ * Por eso se prefiere nativeLibraryDir y se elimina la copia obsoleta en files/bin.
  */
 internal const val PYTHON_BIN_NAME = "python"
 internal const val PYTHON_MIN_PACKAGE_BYTES = 5_000L
@@ -95,8 +101,24 @@ internal fun applyPythonExecutablePermission(f: File) {
     runCatching { f.setExecutable(true, false) }
 }
 
-/** Copia atómica nativeLibraryDir/libpython.so -> files/bin/python con chmod. Idempotente. */
+/** Elimina copias obsoletas en files/bin que siempre fallan con EACCES en Beta. */
+internal fun cleanupLegacyPythonBin(context: Context) {
+    try {
+        val binDir = File(context.filesDir, "bin")
+        listOf(PYTHON_BIN_NAME, "python3", "$PYTHON_BIN_NAME.tmp").forEach { name ->
+            runCatching { File(binDir, name).takeIf { it.exists() }?.delete() }
+        }
+    } catch (_: Throwable) {}
+}
+
+/** Copia atómica nativeLibraryDir/libpython.so -> files/bin/python con chmod. Idempotente.
+ * @deprecated No usar en API 29+: SELinux deniega exec en filesDir (error=13).
+ * Se conserva solo como último recurso si el .so nativo faltara. */
+@Deprecated("SELinux W^X deniega exec en filesDir desde API 29. Usar binario nativo directo.")
 internal fun ensurePythonExecutable(context: Context): File? {
+    // Vía correcta: binario nativo directo (conserva nombre .so y self_dir).
+    resolveNativePythonFile(context)?.let { return it }
+    // Último recurso legado (casi siempre fallará con EACCES, pero se intenta).
     try {
         val binDir = File(context.filesDir, "bin").apply { mkdirs() }
         val target = File(binDir, PYTHON_BIN_NAME)
@@ -111,7 +133,7 @@ internal fun ensurePythonExecutable(context: Context): File? {
         val tmp = File(binDir, "$PYTHON_BIN_NAME.tmp")
         src.copyTo(tmp, overwrite = true)
         applyPythonExecutablePermission(tmp)
-        if (!isValidPythonFile(tmp) || !tmp.canExecute()) {
+        if (!isValidPythonFile(tmp)) {
             runCatching { tmp.delete() }
             return null
         }
@@ -123,7 +145,6 @@ internal fun ensurePythonExecutable(context: Context): File? {
             applyPythonExecutablePermission(target)
             target
         }
-        if (!finalFile.canExecute()) return null
         cachedPythonBin = finalFile
         return finalFile
     } catch (_: Exception) {
@@ -131,30 +152,54 @@ internal fun ensurePythonExecutable(context: Context): File? {
     }
 }
 
+/** Localiza el PIE nativo en nativeLibraryDir sin copiar ni renombrar. */
+internal fun resolveNativePythonFile(context: Context): File? {
+    return try {
+        val nativeDir = File(context.applicationInfo.nativeLibraryDir)
+        val launcher = File(nativeDir, "libpython.so").takeIf { isValidPythonFile(it) }
+            ?: File(nativeDir, "libpython3.so").takeIf { isValidPythonFile(it) }
+            ?: return null
+        // El motor real debe existir junto al lanzador (self_dir/dlopen).
+        val hasEngine = File(nativeDir, "libpython3.11.so").takeIf { it.length() >= 500_000L } != null ||
+                File(nativeDir, "libpython3.so").takeIf { it.length() >= 500_000L } != null
+        if (!hasEngine) return null
+        cachedPythonBin = launcher
+        launcher
+    } catch (_: Exception) {
+        null
+    }
+}
+
 /**
  * Vía única de resolución del intérprete Python:
- * 1. Caché en memoria, 2. files/bin/python, 3. nativeLibraryDir ejecutable,
- * 4. normalización (copia + chmod) como último recurso.
+ * 1. Caché en memoria (nativa), 2. nativeLibraryDir/libpython.so directo,
+ * 3. copia legada en files/bin solo si ya existe y es ejecutable.
+ * Nunca se crea una copia nueva en files/bin (W^X la deniega en Beta).
  */
 internal fun resolvePythonExecutable(context: Context): File? {
-    cachedPythonBin?.takeIf { isValidPythonFile(it) && it.canExecute() }?.let { return it }
+    cachedPythonBin?.takeIf { isValidPythonFile(it) }?.let { return it }
+    cleanupLegacyPythonBin(context)
+    resolveNativePythonFile(context)?.let { return it }
+    // Compatibilidad: reutilizar copia legada solo si el sistema la permite.
     val binPython = File(File(context.filesDir, "bin"), PYTHON_BIN_NAME)
     if (isValidPythonFile(binPython) && binPython.canExecute()) {
         cachedPythonBin = binPython
         return binPython
     }
-    val nativeDir = File(context.applicationInfo.nativeLibraryDir)
-    val nativePython = File(nativeDir, "libpython.so").takeIf { isValidPythonFile(it) && it.canExecute() }
-        ?: File(nativeDir, "libpython3.so").takeIf { isValidPythonFile(it) && it.canExecute() }
-    if (nativePython != null) {
-        // Normalizar a files/bin para ejecuciones futuras garantizadas en Beta.
-        return ensurePythonExecutable(context) ?: nativePython.also { cachedPythonBin = it }
-    }
-    // El .so existe pero sin bit exec (caso Beta SELinux): intentar normalizar.
-    if (File(nativeDir, "libpython.so").let { isValidPythonFile(it) }) {
-        ensurePythonExecutable(context)?.let { return it }
-    }
     return null
+}
+
+/** Mensaje amigable para fallos de exec (EACCES/error=13) en lugar del path crudo. */
+internal fun friendlyYtDlpExecError(raw: String?): String {
+    val r = raw.orEmpty()
+    if (r.contains("Cannot run program") || r.contains("Permission denied") ||
+        r.contains("error=13") || r.contains("EACCES") || r.contains("/files/bin/python")
+    ) {
+        return "El motor yt-dlp no pudo ejecutarse en este dispositivo (permiso del sistema denegado). " +
+                "Se continuará automáticamente con el motor rápido InnerTube. " +
+                "Si el problema persiste, elige InnerTube o WebView en el selector de motor."
+    }
+    return r.ifBlank { "No se pudo ejecutar yt-dlp en este dispositivo." }
 }
 
 /**
