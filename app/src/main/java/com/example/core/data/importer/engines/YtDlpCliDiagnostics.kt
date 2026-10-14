@@ -20,7 +20,9 @@ import java.io.File
             val nativeDir = context.applicationInfo.nativeLibraryDir
             val pythonEnvDir = File(context.filesDir, "env/python")
 
-            val cmd = listOf(pythonBin.absolutePath, "-I", ytdlpFile.absolutePath, "--version")
+            // Sin "-I": -I ignora PYTHONHOME/PYTHONPATH y rompe zipimport
+            // ("No module named encodings"). Debe igualar el entorno real.
+            val cmd = listOf(pythonBin.absolutePath, ytdlpFile.absolutePath, "--version")
             val procResult = runYtDlpProcess(
                 cmd = cmd,
                 workDir = File(nativeDir),

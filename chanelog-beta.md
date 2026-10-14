@@ -23,6 +23,10 @@ Esta actualización es un **parche enfocado en arreglar errores**. No añade fun
 3. 🐞 **Otros errores menores corregidos**:
    - Ajustes de estabilidad y rendimiento general.
    - Correcciones pequeñas de interfaz y de comportamiento para una experiencia más fluida.
+4. 🐍 **yt-dlp funciona en APK Beta (paridad con Debug)**:
+   - No era R8 (Beta ya compila con `minify=false`): la causa era el permiso de ejecución — en Beta no-debuggable SELinux niega el `exec` directo desde `nativeLibraryDir`, mientras en Debug sí lo permite.
+   - Python (`libpython.so`) y FFmpeg (`libffmpeg.so`) ahora se normalizan a `files/bin/` con `chmod 0700` (igual que QuickJS) y `extractNativeLibs=true` garantiza la extracción.
+   - El diagnóstico `yt-dlp --version` ya no usa `-I` (rompía `zipimport`) y la auditoría CI exige motor real `libpython3.11.so` + `libpymod_*.so` + `libavcodec.so`, ejecutando `provisionNativeDeps` siempre aunque haya caché.
 
 > Si venías de una versión anterior, solo actualiza: este parche ya incluye todo lo anterior funcionando.
 
