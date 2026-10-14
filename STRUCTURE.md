@@ -64,10 +64,10 @@ zips/                                           # Carpeta receptora de paquetes 
 
 app/
 ├── build.gradle.kts                            # Configuración Gradle, NDK C++20 y tarea provisionNativeDeps
-├── proguard-rules.pro                          # Reglas de optimización R8 Full Mode y ofuscación Beta/Release
+├── proguard-rules.pro                          # Red segura R8 solo para Release (FullMode desactivado; Beta sin minify ni ofuscación)
 └── src/
     ├── beta/                                   # Recursos y Manifiesto exclusivos del canal APK Beta (Aura Beta • Nebula)
-    │   ├── AndroidManifest.xml                 # Remueve DebugMonitorActivity en compilaciones Beta
+    │   ├── AndroidManifest.xml                 # Descarta DebugMonitorActivity en Beta (tools:node="remove" + sin -keep R8)
     │   └── res/values/strings.xml              # Nombre de app "Aura Beta"
     │
     ├── main/

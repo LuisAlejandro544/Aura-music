@@ -3,9 +3,12 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <application>
-        <!-- En el APK Beta se elimina por completo Aura Monitor (DebugMonitorActivity) del Manifiesto y del Launcher -->
+        <!-- En el APK Beta se elimina por completo Aura Monitor (DebugMonitorActivity) del Manifiesto y del Launcher.
+             Se usa el mismo android:name literal que en src/main ("...debug...") para garantizar el merge con tools:node="remove".
+             Además la tarjeta en Ajustes está oculta con BuildConfig.ENABLE_DEBUG_MONITOR=false y el lanzamiento usa
+             ComponentName por cadena (sin referencia directa), así Beta nunca muestra ni puede abrir Aura Monitor. -->
         <activity
-            android:name="com.example.debug.DebugMonitorActivity"
+            android:name=".debug.DebugMonitorActivity"
             tools:node="remove" />
     </application>
 

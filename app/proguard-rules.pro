@@ -36,10 +36,11 @@
 -keepclassmembers class com.example.core.playback.AuraDownloadService { <init>(); }
 -keepclassmembers class com.example.widget.AuraMusicWidgetProvider { <init>(); }
 -keepclassmembers class com.example.widget.AuraLibraryWidgetProvider { <init>(); }
-# Aura Monitor: aunque Beta lo elimina del manifiesto, se conserva la clase para
-# que la referencia guardada por BuildConfig.ENABLE_DEBUG_MONITOR nunca lance
-# NoClassDefFoundError/ActivityNotFoundException.
--keep class com.example.debug.DebugMonitorActivity { <init>(); }
+# Aura Monitor DESCARTADO en APK Beta/Release: no se conserva la clase a propósito.
+# Beta lo elimina del manifiesto fusionado (src/beta/AndroidManifest.xml con
+# tools:node="remove") y oculta su tarjeta con BuildConfig.ENABLE_DEBUG_MONITOR=false;
+# el lanzamiento usa ComponentName por cadena (sin referencia directa), así R8 puede
+# eliminar DebugMonitorActivity del DEX en Release (minify=true). Solo existe en Debug.
 
 # 4. Enums de Kotlin/Java.
 -keepclassmembers enum * {
