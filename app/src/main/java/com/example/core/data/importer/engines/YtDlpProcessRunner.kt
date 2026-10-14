@@ -94,14 +94,17 @@ internal suspend fun runYtDlpProcess(
                 var line: String?
                 while (reader.readLine().also { line = it } != null) {
                     val text = line ?: continue
+                    // FIX: siempre acumular en stdout (con salto de línea) ADEMÁS del
+                    // callback. Antes, con onStdoutLine != null se descartaba el buffer
+                    // y sin callback se concatenaba sin "\n", rompiendo el parseo
+                    // lineSequence() de flat-playlist y el JSONObject de resolveStream.
+                    stdout.append(text).append("\n")
                     if (onStdoutLine != null) {
                         try {
                             onStdoutLine(text)
                         } catch (_: Throwable) {
                             // Un callback roto no debe matar el drenaje del proceso.
                         }
-                    } else {
-                        stdout.append(text)
                     }
                 }
             }

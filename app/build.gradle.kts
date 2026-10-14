@@ -170,7 +170,10 @@ android {
       // Debug funciona porque no minifica; Beta crasheaba con fullMode + repackage +
       // overloadaggressively sobre OkHttp/Okio/Coil/Media3/WebView y JNI estático.
       // Se desactiva minify/shrink en Beta para no omitir nada (APK algo más pesado pero 100% funcional).
-      multiDexEnabled = false
+      // Sin minify el conteo de métodos supera los 64K de un único classes.dex
+      // (Compose + Media3 + Room + OkHttp + Coil), así que Beta permite multidex
+      // (nativo desde minSdk 26, sin librería extra). Release mantiene single-DEX con R8.
+      multiDexEnabled = true
       isCrunchPngs = true
       isMinifyEnabled = false
       isShrinkResources = false

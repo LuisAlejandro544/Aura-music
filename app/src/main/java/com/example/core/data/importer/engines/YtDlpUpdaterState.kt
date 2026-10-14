@@ -19,8 +19,13 @@ import java.util.concurrent.TimeUnit
  */
 internal const val YTDLP_UPDATER_TAG = "YtDlpAutoUpdater"
 internal const val YTDLP_GITHUB_RELEASES_API = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest"
-/** Tamaño mínimo para considerar válido un binario/paquete yt-dlp. */
-internal const val YTDLP_MIN_PACKAGE_BYTES = 50_000L
+/** Tamaño mínimo para considerar válido un binario/paquete yt-dlp.
+ *  Unificado a 1 MB: es el mismo umbral que exigen :app:provisionNativeDeps y
+ *  la auditoría CI de build-beta-apk.yml. Un umbral menor (50 KB) marcaba como
+ *  "disponible" descargas OTA parciales/corruptas que luego fallaban en runtime
+ *  con --dump-single-json / --flat-playlist. El fallback aura_ytdlp_fallback.py
+ *  (~5 KB) nunca debe pasar como yt-dlp real. */
+internal const val YTDLP_MIN_PACKAGE_BYTES = 1_000_000L
 /** Tamaño mínimo unificado para considerar válido el binario QuickJS C99 real (450-700 KB, nunca < 250 KB). */
 internal const val QUICKJS_MIN_PACKAGE_BYTES = 250_000L
 

@@ -406,7 +406,7 @@ object YtDlpNativeEngine {
 
             val command = mutableListOf(
                 activePython.absolutePath,
-                "-I",
+                // Sin "-I": ver nota en YtDlpStreamDownloader (rompe PYTHONPATH/zipimport).
                 ytdlpBin.absolutePath,
                 "--no-config",
                 "--dump-single-json",
