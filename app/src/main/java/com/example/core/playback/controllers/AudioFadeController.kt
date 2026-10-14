@@ -67,6 +67,7 @@ class AudioFadeController(
         fadeInJob?.cancel()
         try { player.volume = 0.05f * baseVolume } catch (_: Throwable) {}
         fadeInJob = scope.launch(Dispatchers.Main) {
+            try {
             val steps = 25
             val delayStep = (durationMs / steps).coerceAtLeast(25L)
             for (i in 1..steps) {
@@ -77,7 +78,10 @@ class AudioFadeController(
                 val factor = sin(progress * (PI / 2.0)).toFloat().coerceIn(0.05f, 1.0f)
                 try { player.volume = (baseVolume * factor).coerceIn(0.0f, 1.0f) } catch (_: Throwable) { break }
             }
-            try { player.volume = baseVolume } catch (_: Throwable) {}
+            } finally {
+                // FIX: si el Job se cancela a mitad de rampa, no quedar atrapado en volumen bajo.
+                try { if (player.playbackState != androidx.media3.common.Player.STATE_IDLE) player.volume = baseVolume } catch (_: Throwable) {}
+            }
         }
     }
 
@@ -104,7 +108,11 @@ class AudioFadeController(
             (outgoingPlayer.isPlaying || outgoingPlayer.playWhenReady || outgoingPlayer.playbackState == androidx.media3.common.Player.STATE_BUFFERING)
         if (outgoingPlayer == null || !isOutgoingReadyOrStarting) {
             startSmoothFadeIn(safeDurationMs.coerceAtMost(2500L), inPlayer)
-            onCrossfadeCompleted()
+            // FIX: no completar sincrónico antes del fade; esperar al Job.
+            scope.launch(Dispatchers.Main) {
+                try { fadeInJob?.join() } catch (_: Throwable) {}
+                if (isActive) onCrossfadeCompleted()
+            }
             return
         }
 
@@ -116,6 +124,7 @@ class AudioFadeController(
         try { inPlayer.volume = 0.0f } catch (_: Throwable) { return }
 
         dualCrossfadeJob = scope.launch(Dispatchers.Main) {
+            try {
             // Esperar un breve instante (máx 400ms) si los reproductores aún están preparando el primer buffer PCM
             // para que ambas rampas (100% -> 0% y 0% -> 100%) arranquen exactamente al unísono
             var waitTicks = 0
@@ -159,7 +168,12 @@ class AudioFadeController(
                 outgoingPlayer.clearMediaItems()
                 outgoingPlayer.volume = baseVolume
             } catch (_: Throwable) {}
-            onCrossfadeCompleted()
+            } finally {
+                // FIX: skip a mitad de cruce no deja la entrante baja.
+                try { if (inPlayer.playbackState != androidx.media3.common.Player.STATE_IDLE) inPlayer.volume = baseVolume } catch (_: Throwable) {}
+            }
+            // Solo marcar completo si no se canceló (evita liberar Deck B antes de tiempo).
+            if (isActive) onCrossfadeCompleted()
         }
     }
 

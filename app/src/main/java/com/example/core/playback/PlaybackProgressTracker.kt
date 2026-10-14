@@ -50,10 +50,7 @@ internal class PlaybackProgressTracker(
     }
 
     fun start() {
-        progressJob?.cancel()
-        widgetProgressTickCounter = 0
-        progressJob = scope.launch {
-
+        // FIX: un solo Job (antes doble launch anidado fugaba el Job externo y duplicaba sondeo).
         progressJob?.cancel()
         widgetProgressTickCounter = 0
         progressJob = scope.launch {
@@ -176,8 +173,6 @@ internal class PlaybackProgressTracker(
                 }
                 delay(nextDelayMs)
             }
-        }
-    
         }
     }
 

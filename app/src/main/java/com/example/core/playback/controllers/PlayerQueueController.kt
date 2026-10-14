@@ -43,22 +43,29 @@ class PlayerQueueController {
 
     /**
      * Obtiene el siguiente índice según el modo de repetición y aleatorio activo.
+     * FIX: OFF retorna null al final (antes hacía % size = loop infinito).
+     * No muta estado antes de validar; el llamante ya maneja null (playNextInternal).
      */
     fun getNextIndex(): Int? {
         val q = _queue.value
         if (q.isEmpty()) return null
+        val cur = _currentIndex.value.coerceIn(0, q.size - 1)
 
         if (_repeatMode.value == RepeatMode.ONE) {
-            return _currentIndex.value
+            return cur
         }
 
         val nextIndex = if (_shuffleEnabled.value) {
             if (q.size > 1) {
-                (q.indices - _currentIndex.value).randomOrNull() ?: 0
-            } else 0
+                (q.indices - cur).randomOrNull() ?: return null
+            } else cur
         } else {
-            (_currentIndex.value + 1) % q.size
+            // OFF: parar al final. ALL: envolver al inicio.
+            if (cur + 1 < q.size) cur + 1
+            else if (_repeatMode.value == RepeatMode.ALL) 0
+            else return null
         }
+        if (nextIndex !in q.indices) return null
         _currentIndex.value = nextIndex
         return nextIndex
     }
